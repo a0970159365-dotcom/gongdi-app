@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工地日報表系統</title>
+<style>
+:root {
+  --primary: #1a3a5c;
+  --primary-l: #2563aa;
+  --accent: #c2560a;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #ca8a04;
+  --bg: #f1f5f9;
+  --border: #cbd5e1;
+  --text: #1e293b;
+  --muted: #64748b;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+/* NAV */
+nav{background:var(--primary);height:54px;display:flex;align-items:center;padding:0 16px;gap:4px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.nav-logo{color:#fff;font-size:16px;font-weight:800;margin-right:12px;white-space:nowrap}
+.nav-logo span{color:#93c5fd}
+.nav-btn{background:transparent;border:none;color:rgba(255,255,255,.75);padding:6px 13px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-btn.active{background:rgba(255,255,255,.2);color:#fff;font-weight:700}
+.nav-spacer{flex:1}
+.nav-proj{color:rgba(255,255,255,.55);font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* LAYOUT */
+.container{max-width:1440px;margin:0 auto;padding:16px}
+.page{display:none}
+.page.active{display:block}
+
+/* CARD */
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
+.card-header{padding:12px 16px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card-title{font-weight:700;font-size:14px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';display:block;width:3px;height:16px;background:var(--primary);border-radius:2px}
+.card-body{padding:14px 16px}
+
+/* GRID */
+.g{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:640px){.g2,.g3,.g4,.g6{grid-template-columns:1fr 1fr}}
+
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:3px}
+.fl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.fi{border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s,box-shadow .15s;width:100%}
+.fi:focus{outline:none;border-color:var(--primary-l);box-shadow:0 0 0 3px rgba(37,99,170,.1)}
+textarea.fi{resize:vertical;min-height:68px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border:none;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-l)}
+.btn-a{background:var(--accent);color:#fff}.btn-a:hover{filter:brightness(1.1)}
+.btn-s{background:var(--success);color:#fff}.btn-s:hover{filter:brightness(1.1)}
+.btn-d{background:var(--danger);color:#fff}.btn-d:hover{filter:brightness(1.1)}
+.btn-o{background:#fff;border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{background:var(--bg)}
+.btn-g{background:transparent;color:var(--muted);border:none}.btn-g:hover{background:var(--bg);color:var(--text)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-icon{padding:5px;min-width:28px;justify-content:center}
+
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px}
+.stat-card{padding:12px;border-radius:8px;text-align:center}
+.stat-blue{background:#dbeafe}.stat-green{background:#dcfce7}.stat-orange{background:#fed7aa}
+.stat-val{font-size:30px;font-weight:800;line-height:1}
+.stat-blue .stat-val{color:#1d4ed8}.stat-green .stat-val{color:#15803d}.stat-orange .stat-val{color:#c2410c}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:600}
+
+/* WORK TABLE */
+.tbl-wrap{overflow-x:auto}
+.wtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:860px}
+.wtbl th{background:var(--primary);color:#fff;padding:8px 6px;font-weight:600;text-align:center;white-space:nowrap}
+.wtbl td{border:1px solid #e2e8f0;padding:4px;vertical-align:middle}
+.wtbl tbody tr:nth-child(even) td{background:#f8fafc}
+.wtbl tbody tr:hover td{background:#eff6ff}
+.ci{border:none;background:transparent;padding:4px 5px;font-size:12px;font-family:inherit;color:var(--text);width:100%;min-width:50px}
+.ci:focus{outline:2px solid var(--primary-l);border-radius:3px;background:#fff}
+.ci[type="number"]{text-align:center;max-width:55px}
+.cs{border:none;background:transparent;padding:4px 5px;font-size:12px;font-family:inherit;color:var(--text);cursor:pointer;width:100%}
+.cs:focus{outline:2px solid var(--primary-l);border-radius:3px}
+.tfoot-row td{background:#dbeafe!important;font-weight:700;text-align:center;padding:7px 6px}
+.tfoot-row td:first-child{text-align:right;color:var(--primary);padding-right:10px}
+
+/* NOTES */
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.note-lbl{font-size:12px;font-weight:700;color:var(--primary);display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.note-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* PRINT VALUE DIV — hidden on screen, shown on print */
+.pv{display:none}
+
+/* PHOTOS */
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.photo-thumb{border-radius:7px;overflow:hidden;border:2px solid var(--border);cursor:pointer;transition:border-color .15s}
+.photo-thumb:hover{border-color:var(--primary-l)}
+.photo-thumb img{width:100%;height:90px;object-fit:cover;display:block}
+.photo-thumb-info{padding:5px 7px;font-size:11px;background:#fff}
+.phase-tag{font-weight:700;padding:1px 6px;border-radius:3px;font-size:10px;display:inline-block;margin-bottom:2px}
+.ph-b{background:#fee2e2;color:#dc2626}
+.ph-d{background:#fef3c7;color:#b45309}
+.ph-a{background:#dcfce7;color:#15803d}
+.upload-btn{height:120px;border:2px dashed var(--border);border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);gap:5px;font-size:12px;transition:all .15s}
+.upload-btn:hover{border-color:var(--primary-l);color:var(--primary);background:#f0f7ff}
+
+/* HISTORY */
+.report-list{display:flex;flex-direction:column;gap:8px}
+.ritem{background:#fff;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;border-left:4px solid var(--primary);transition:all .15s}
+.ritem:hover{transform:translateX(3px);box-shadow:0 3px 12px rgba(0,0,0,.1)}
+.ritem-date{min-width:60px;text-align:center;font-weight:800;color:var(--primary)}
+.ritem-date .day{font-size:20px;line-height:1}
+.ritem-date .mon{font-size:11px;color:var(--muted)}
+.ritem-info{flex:1}
+.ritem-info h3{font-size:14px;font-weight:700}
+.ritem-info p{font-size:12px;color:var(--muted)}
+.ritem-actions{display:flex;gap:5px}
+
+/* STONE / PROJECT TABLE */
+.stbl{width:100%;border-collapse:collapse;font-size:13px}
+.stbl th{background:var(--primary);color:#fff;padding:9px 11px;text-align:left;white-space:nowrap}
+.stbl td{border:1px solid var(--border);padding:9px 11px}
+.stbl tbody tr:nth-child(even) td{background:#f8fafc}
+.stbl tbody tr:hover td{background:#eff6ff}
+.sbadge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:100px;font-size:11px;font-weight:700}
+.sb-inv{background:#dbeafe;color:#1d4ed8}
+.sb-ins{background:#dcfce7;color:#15803d}
+.sb-dmg{background:#fee2e2;color:#dc2626}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:22px;width:90%;max-width:560px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-title{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:16px}
+
+/* TOAST */
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:5px}
+.toast{background:#0f172a;color:#fff;padding:9px 15px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.3);max-width:280px;animation:ti .25s ease}
+.toast-s{background:var(--success)}.toast-e{background:var(--danger)}
+@keyframes ti{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* EMPTY */
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:10px}
+.empty h3{font-size:15px;color:var(--text);margin-bottom:5px}
+
+/* UTILS */
+.flex{display:flex;align-items:center}
+.flex-b{display:flex;align-items:center;justify-content:space-between}
+.gap2{gap:8px}
+.mb1{margin-bottom:6px}
+.mb2{margin-bottom:12px}
+.divider{height:1px;background:var(--bg);margin:12px 0}
+.flex-wrap{flex-wrap:wrap}
+
+input[type="file"]{display:none}
+
+/* PRINT */
+@media print{
+  .no-print{display:none!important}
+  nav{display:none}
+  .container{padding:0;max-width:none}
+  .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid;margin-bottom:8px}
+  body{background:#fff}
+  .wtbl th,.stbl th{background:#1a3a5c!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tfoot-row td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* hide textareas, show companion print divs */
+  textarea.fi{display:none!important}
+  .pv{display:block;white-space:pre-wrap;font-size:13px;line-height:1.6;color:#1e293b;min-height:1.2em;padding:3px 0}
+  .notes-grid{grid-template-columns:repeat(2,1fr)!important}
+  /* select: remove arrow, plain border */
+  select.fi{-webkit-appearance:none;appearance:none;border:1px solid #ccc!important}
+}
+
+/* ─── O1: MOBILE CARD VIEW ─── */
+@media(max-width:767px){
+  .wtbl{min-width:unset}
+  .wtbl thead tr{display:none}
+  .wtbl tbody tr{
+    display:grid;grid-template-columns:1fr 1fr;
+    border:1.5px solid var(--border);border-radius:10px;
+    margin-bottom:10px;padding:10px 8px;background:#fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.07);position:relative;gap:3px 8px
+  }
+  .wtbl tbody tr.row-zero{background:rgba(251,191,36,.08)!important;border-color:#fde68a!important}
+  .wtbl td{display:flex;flex-direction:column;gap:2px;border:none;padding:3px 4px;vertical-align:unset}
+  .wtbl td::before{content:attr(data-label);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .wtbl td:first-child{display:none}
+  .col-wide{grid-column:span 2}
+  .col-del{position:absolute!important;top:8px;right:8px;padding:0;border:none;background:none;grid-column:unset!important}
+  .col-del::before{display:none!important}
+  .ci,.cs{width:100%;font-size:14px;min-width:unset}
+  .ci[type="number"]{max-width:unset;text-align:left}
+  .tbl-wrap tfoot{display:none}
+  .g6{grid-template-columns:1fr 1fr!important}
+  .stat-grid{grid-template-columns:repeat(3,1fr)!important}
+}
+
+/* ─── O4: ZERO WORKER ─── */
+.row-zero td{background:rgba(251,191,36,.06)!important}
+.row-zero .ci[data-f="w0"]{color:var(--warning);font-weight:700}
+.atype-warn{outline:2px solid var(--warning)!important;border-radius:4px}
+
+/* ─── O3: VOICE INPUT ─── */
+.voice-row{display:flex;align-items:flex-end;gap:6px}
+.voice-row textarea{flex:1}
+.mic-btn{
+  flex-shrink:0;background:none;border:1.5px solid var(--border);
+  border-radius:6px;padding:5px 8px;cursor:pointer;font-size:15px;
+  color:var(--muted);transition:all .15s;align-self:flex-start;margin-top:16px
+}
+.mic-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mic-btn.rec{color:#dc2626;border-color:#dc2626;animation:mpulse .7s infinite alternate}
+@keyframes mpulse{from{opacity:.55}to{opacity:1}}
+
+/* ─── MOBILE NAV ─── */
+@media(max-width:767px){
+  nav{flex-wrap:wrap;height:auto;padding:6px 12px 4px;gap:2px}
+  .nav-logo{width:100%;margin-right:0;font-size:14px;padding-bottom:2px}
+  .nav-btn{padding:5px 9px;font-size:12px;flex-shrink:0}
+  .nav-spacer{display:none}
+  .nav-proj{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav class="no-print">
+  <span class="nav-logo">工地 <span>日報表</span></span>
+  <button class="nav-btn active" onclick="goPage('report')">📋 日報表</button>
+  <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史記錄</button>
+  <button class="nav-btn" onclick="goPage('stones')">🪨 石材管理</button>
+  <button class="nav-btn" onclick="goPage('settings')">⚙️ 設定</button>
+  <span class="nav-spacer"></span>
+  <span class="nav-proj" id="nav-proj"></span>
+  <span id="sync-icon" title="雲端同步狀態" style="font-size:14px;color:rgba(255,255,255,.6);padding:0 6px;cursor:default"></span>
+</nav>
+
+<div class="container">
+
+<!-- ========== REPORT PAGE ========== -->
+<div id="page-report" class="page active">
+
+  <div class="stat-grid" id="stat-grid" style="display:none">
+    <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日總出工數</div></div>
+    <div class="stat-card stat-green"><div class="stat-val" id="st-tmrw">0</div><div class="stat-lbl">預估明日出工數</div></div>
+    <div class="stat-card stat-orange"><div class="stat-val" id="st-crew">0</div><div class="stat-lbl">今日施工班組</div></div>
+  </div>
+
+  <!-- Basic Info -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">基本資訊</span>
+      <div class="flex gap2 no-print" style="flex-wrap:wrap">
+        <button class="btn btn-o btn-sm" onclick="navDay(-1)">◀</button>
+        <button class="btn btn-o btn-sm" onclick="loadToday()">📅 今日</button>
+        <button class="btn btn-o btn-sm" onclick="navDay(1)">▶</button>
+        <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存</button>
+        <button class="btn btn-o btn-sm" onclick="window.print()">🖨️ 列印</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="g g6" style="gap:10px">
+        <div class="fg" style="grid-column:span 2">
+          <label class="fl">日期</label>
+          <input type="date" id="f-date" class="fi" onchange="onDateChange()">
+        </div>
+        <div class="fg">
+          <label class="fl">星期</label>
+          <input type="text" id="f-dow" class="fi" readonly style="background:#f8fafc;color:var(--muted)">
+        </div>
+        <div class="fg">
+          <label class="fl">天氣</label>
+          <select id="f-weather" class="fi">
+            <option value="">選擇...</option>
+            <option value="晴">☀️ 晴</option>
+            <option value="多雲">⛅ 多雲</option>
+            <option value="陰">☁️ 陰</option>
+            <option value="小雨">🌧️ 小雨</option>
+            <option value="大雨">⛈️ 大雨</option>
+            <option value="颱風">🌀 颱風</option>
+            <option value="停工">⛔ 停工</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">專案名稱</label>
+          <select id="f-proj" class="fi" onchange="onProjChange()">
+            <option value="">選擇專案...</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">負責人</label>
+          <select id="f-mgr" class="fi">
+            <option value="">選擇負責人...</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Work Items -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">施工明細</span>
+      <button class="btn btn-a btn-sm no-print" onclick="addRow()">＋ 新增班組</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="wtbl">
+        <thead>
+          <tr>
+            <th style="width:30px">#</th>
+            <th style="min-width:88px">部門</th>
+            <th style="min-width:110px">施作位置</th>
+            <th style="min-width:150px">工作進度 / 施工項目</th>
+            <th style="min-width:75px">今日施工班</th>
+            <th style="width:52px">今日<br>出工</th>
+            <th style="min-width:75px">預估明日<br>施工班</th>
+            <th style="width:52px">明日<br>出工</th>
+            <th style="min-width:95px">異常類型</th>
+            <th style="min-width:110px">異常/延誤說明</th>
+            <th style="min-width:90px">石材編號</th>
+            <th class="no-print" style="width:34px">刪</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="4" style="text-align:right;padding-right:10px">合計</td>
+            <td></td>
+            <td id="tot-today">0</td>
+            <td></td>
+            <td id="tot-tmrw">0</td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">備註事項</span></div>
+    <div class="card-body">
+      <div class="notes-grid">
+        <div>
+          <div class="note-lbl">外牆</div>
+          <div class="voice-row">
+            <textarea id="n-ext" class="fi" rows="3" placeholder="外牆相關備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-ext')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-ext_pv"></div>
+        </div>
+        <div>
+          <div class="note-lbl">內裝</div>
+          <div class="voice-row">
+            <textarea id="n-int" class="fi" rows="3" placeholder="內裝相關備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-int')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-int_pv"></div>
+        </div>
+        <div>
+          <div class="note-lbl">標準層梯廳</div>
+          <div class="voice-row">
+            <textarea id="n-lob" class="fi" rows="3" placeholder="梯廳備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-lob')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-lob_pv"></div>
+        </div>
+        <div>
+          <div class="note-lbl">標配浴室</div>
+          <div class="voice-row">
+            <textarea id="n-bat" class="fi" rows="3" placeholder="浴室備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-bat')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-bat_pv"></div>
+        </div>
+        <div>
+          <div class="note-lbl">基座</div>
+          <div class="voice-row">
+            <textarea id="n-bas" class="fi" rows="3" placeholder="基座備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-bas')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-bas_pv"></div>
+        </div>
+        <div>
+          <div class="note-lbl">景觀</div>
+          <div class="voice-row">
+            <textarea id="n-lan" class="fi" rows="3" placeholder="景觀備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-lan')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-lan_pv"></div>
+        </div>
+        <div style="grid-column:1/-1">
+          <div class="note-lbl">公設</div>
+          <div class="voice-row">
+            <textarea id="n-fac" class="fi" rows="3" placeholder="公設備註..." oninput="updPV(this)"></textarea>
+            <button class="mic-btn no-print" onclick="startVoice('n-fac')" title="語音輸入">🎤</button>
+          </div>
+          <div class="pv" id="n-fac_pv"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">與工地聯絡事項</span></div>
+    <div class="card-body">
+      <div class="voice-row">
+        <textarea id="f-contact" class="fi" rows="5" placeholder="記錄與營造廠、業主、其他工種的配合重點..." oninput="updPV(this)"></textarea>
+        <button class="mic-btn no-print" onclick="startVoice('f-contact')" title="語音輸入">🎤</button>
+      </div>
+      <div class="pv" id="f-contact_pv"></div>
+    </div>
+  </div>
+
+  <!-- Photos -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">施工照片</span>
+      <div class="flex gap2 no-print">
+        <select id="ph-phase" class="fi" style="max-width:110px;padding:5px 7px;font-size:12px">
+          <option value="before">施工前</option>
+          <option value="during">施工中</option>
+          <option value="after">施工後</option>
+        </select>
+        <button class="btn btn-o btn-sm" onclick="$('ph-input').click()">📷 上傳</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
+      <div class="photo-grid" id="ph-grid">
+        <div class="upload-btn no-print" onclick="$('ph-input').click()">
+          <span style="font-size:22px">📷</span><span>點擊上傳照片</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="card no-print">
+    <div class="card-body flex-b" style="padding:12px 16px">
+      <button class="btn btn-o btn-sm" onclick="clearForm()">🗑️ 清除表單</button>
+      <div class="flex gap2">
+        <button class="btn btn-o btn-sm" onclick="exportJSON()">📤 匯出</button>
+        <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存報表</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HISTORY PAGE ========== -->
+<div id="page-history" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">歷史報表</span>
+      <div class="flex gap2 flex-wrap">
+        <input type="month" id="filter-month" class="fi" style="max-width:140px" onchange="renderHistory()">
+        <button class="btn btn-o btn-sm" onclick="$('filter-month').value='';renderHistory()">清除</button>
+        <button class="btn btn-o btn-sm" onclick="exportAll()">📤 全部匯出</button>
+        <button class="btn btn-o btn-sm" onclick="$('imp-input').click()">📥 匯入</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="hist-list" class="report-list"></div>
+    </div>
+  </div>
+  <input type="file" id="imp-input" accept=".json" onchange="importData(event)">
+</div>
+
+<!-- ========== STONE PAGE ========== -->
+<div id="page-stones" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">石材管理（一板一號）</span>
+      <button class="btn btn-a btn-sm" onclick="openStone()">＋ 新增石材</button>
+    </div>
+    <div class="card-body">
+      <div class="flex gap2 mb2">
+        <input type="text" id="s-search" class="fi" placeholder="搜尋編號/描述/位置..." oninput="renderStones()" style="max-width:260px">
+        <select id="s-status" class="fi" style="max-width:130px" onchange="renderStones()">
+          <option value="">全部狀態</option>
+          <option value="inventory">庫存</option>
+          <option value="installed">已安裝</option>
+          <option value="damaged">損壞</option>
+        </select>
+      </div>
+      <div class="tbl-wrap">
+        <table class="stbl">
+          <thead>
+            <tr>
+              <th>石材編號</th><th>描述/類型</th><th>尺寸(cm)</th><th>安裝位置</th>
+              <th>狀態</th><th>更新日期</th><th>備註</th>
+              <th class="no-print">操作</th>
+            </tr>
+          </thead>
+          <tbody id="s-tbody"></tbody>
+        </table>
+      </div>
+      <div id="s-empty" class="empty" style="display:none">
+        <div class="empty-icon">🪨</div>
+        <h3>尚無石材記錄</h3>
+        <p>點擊「新增石材」開始建立庫存</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SETTINGS PAGE ========== -->
+<div id="page-settings" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">專案設定</span>
+      <button class="btn btn-a btn-sm" onclick="openProj()">＋ 新增專案</button>
+    </div>
+    <div class="card-body">
+      <div class="tbl-wrap" id="proj-tbl-wrap">
+        <table class="stbl">
+          <thead>
+            <tr>
+              <th>專案名稱</th><th>公司名稱</th><th>專案編號</th><th>負責人</th>
+              <th class="no-print" style="width:110px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="proj-tbody"></tbody>
+        </table>
+      </div>
+      <div id="proj-empty" class="empty" style="display:none">
+        <div class="empty-icon">📋</div>
+        <h3>尚無專案</h3>
+        <p>點擊右上角「新增專案」建立第一個專案</p>
+      </div>
+      <div class="divider"></div>
+      <div class="g g2" style="gap:12px">
+        <div class="fg">
+          <label class="fl">常用部門（每行一個）</label>
+          <textarea id="s-depts" class="fi" rows="5" placeholder="專案管理部&#10;工程部&#10;景觀部&#10;監造部"></textarea>
+        </div>
+        <div class="fg">
+          <label class="fl">常用班組/領班（每行一個）</label>
+          <textarea id="s-leads" class="fi" rows="5" placeholder="阿量&#10;阿和&#10;阿迪&#10;冠霖&#10;銘&#10;佑"></textarea>
+        </div>
+        <div class="fg">
+          <label class="fl">常用施作位置（每行一個，施工明細快選）</label>
+          <textarea id="s-locs" class="fi" rows="5" placeholder="外牆西向&#10;基座東側&#10;標準層梯廳&#10;B1停車場&#10;屋頂景觀"></textarea>
+        </div>
+        <div class="fg">
+          <label class="fl">常用施工項目（每行一個，施工明細快選）</label>
+          <textarea id="s-works" class="fi" rows="5" placeholder="石材放樣&#10;石材安裝&#10;填縫施作&#10;乾式施工&#10;收邊修飾"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn btn-p" onclick="saveSettings()">💾 儲存設定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- STONE MODAL -->
+<div id="stone-overlay" class="overlay">
+  <div class="modal">
+    <div class="modal-title" id="sm-title">新增石材</div>
+    <div class="g g2" style="gap:10px;margin-bottom:14px">
+      <div class="fg"><label class="fl">石材編號 *</label><input type="text" id="sm-sid" class="fi" placeholder="例：W001"></div>
+      <div class="fg"><label class="fl">狀態</label>
+        <select id="sm-stat" class="fi">
+          <option value="inventory">庫存</option>
+          <option value="installed">已安裝</option>
+          <option value="damaged">損壞</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">描述/類型</label><input type="text" id="sm-desc" class="fi" placeholder="例：義大利白大理石"></div>
+      <div class="fg"><label class="fl">尺寸(cm)</label><input type="text" id="sm-size" class="fi" placeholder="例：120x60x3"></div>
+      <div class="fg" style="grid-column:span 2"><label class="fl">安裝位置</label><input type="text" id="sm-loc" class="fi" placeholder="例：23F梯廳東向牆面"></div>
+      <div class="fg" style="grid-column:span 2"><label class="fl">備註</label><textarea id="sm-note" class="fi" rows="3"></textarea></div>
+    </div>
+    <div class="flex gap2" style="justify-content:flex-end">
+      <button class="btn btn-o" onclick="closeStone()">取消</button>
+      <button class="btn btn-a" onclick="saveStone()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div id="proj-overlay" class="overlay">
+  <div class="modal">
+    <div class="modal-title" id="pm-title">新增專案</div>
+    <div class="g g2" style="gap:10px;margin-bottom:14px">
+      <div class="fg" style="grid-column:span 2">
+        <label class="fl">專案名稱 *</label>
+        <input type="text" id="pm-name" class="fi" placeholder="例：XX豪宅石材工程">
+      </div>
+      <div class="fg">
+        <label class="fl">公司名稱</label>
+        <input type="text" id="pm-co" class="fi" placeholder="您的公司名稱">
+      </div>
+      <div class="fg">
+        <label class="fl">專案編號</label>
+        <input type="text" id="pm-pid" class="fi" placeholder="例：2025-001">
+      </div>
+      <div class="fg" style="grid-column:span 2">
+        <label class="fl">負責人</label>
+        <input type="text" id="pm-mgr" class="fi" placeholder="專案負責人">
+      </div>
+    </div>
+    <div class="flex gap2" style="justify-content:flex-end">
+      <button class="btn btn-o" onclick="closeProj()">取消</button>
+      <button class="btn btn-a" onclick="saveProj()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO MODAL -->
+<div id="ph-overlay" class="overlay" onclick="closePh(event)">
+  <div class="modal" style="max-width:680px;padding:0;overflow:hidden">
+    <img id="ph-img" src="" style="width:100%;display:block;max-height:65vh;object-fit:contain;background:#000">
+    <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="ph-phase-lbl" class="phase-tag"></span>
+        <span id="ph-cap" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="flex gap2">
+        <button class="btn btn-d btn-sm" onclick="deletePhoto()">🗑️ 刪除</button>
+        <button class="btn btn-o btn-sm" onclick="$('ph-overlay').classList.remove('show')">✕ 關閉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+<datalist id="leads-dl"></datalist>
+<datalist id="loc-dl"></datalist>
+<datalist id="work-dl"></datalist>
+
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+const DOW = ['日','一','二','三','四','五','六'];
+const today = () => new Date().toISOString().slice(0,10);
+let rowN = 0;
+
+const S = {
+  page: 'report',
+  report: blankReport(),
+  reports: [],
+  stones: [],
+  cfg: {
+    projects: [],
+    depts: ['專案管理部','工程部','景觀部','監造部'],
+    leads: []
+  },
+  editStoneId: null,
+  editProjId: null,
+  viewPhotoIdx: -1
+};
+
+function blankReport() {
+  return {
+    id: uid(), date: today(), weather: '', projectId: '', projectName: '', manager: '',
+    workItems: [], notes: {ext:'',int:'',lob:'',bat:'',bas:'',lan:'',fac:''},
+    contact: '', photos: [], createdAt: new Date().toISOString()
+  };
+}
+
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+// ─── storage ───
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('cdr2') || '{}');
+    S.reports = d.reports || [];
+    S.stones  = d.stones  || [];
+    if (d.cfg) {
+      S.cfg = {...S.cfg, ...d.cfg};
+      if (!S.cfg.projects) S.cfg.projects = [];
+      // migrate old single cfg fields into first project
+      if (S.cfg.projects.length === 0) {
+        const n = d.cfg.projectName || d.cfg.company || d.cfg.projectId || d.cfg.manager;
+        if (n) S.cfg.projects.push({
+          id: uid(),
+          name: d.cfg.projectName || '',
+          company: d.cfg.company || '',
+          projectId: d.cfg.projectId || '',
+          manager: d.cfg.manager || ''
+        });
+      }
+    }
+  } catch(e) {}
+}
+
+function save() {
+  const payload = {reports:S.reports, stones:S.stones, cfg:S.cfg, updatedAt:Date.now()};
+  try {
+    localStorage.setItem('cdr2', JSON.stringify(payload));
+  } catch(e) {
+    toast(e.name==='QuotaExceededError' ? '儲存空間不足，請清理舊資料' : '儲存失敗', 'e');
+  }
+  if (window._fbSave) {
+    setSyncIcon('⏳');
+    window._fbSave(payload).then(()=>setSyncIcon('☁️✅')).catch(()=>setSyncIcon('❌'));
+  }
+}
+
+// ─── cloud sync ───
+function setSyncIcon(s) {
+  const el = document.getElementById('sync-icon');
+  if (el) el.textContent = s;
+}
+
+async function cloudSync() {
+  let t = 0;
+  while (!window._fbLoad && t < 5000) { await new Promise(r=>setTimeout(r,200)); t+=200; }
+  if (!window._fbLoad) { setSyncIcon(''); return; }
+  setSyncIcon('⏳');
+  try {
+    const d = await window._fbLoad();
+    if (!d) { setSyncIcon('☁️'); return; }
+    const localTs = (JSON.parse(localStorage.getItem('cdr2')||'{}')).updatedAt || 0;
+    if ((d.updatedAt||0) > localTs) {
+      S.reports = d.reports || [];
+      S.stones  = d.stones  || [];
+      if (d.cfg) S.cfg = {...S.cfg, ...d.cfg};
+      localStorage.setItem('cdr2', JSON.stringify(d));
+      updateProjSelect();
+      updateNavProj();
+      toast('☁️ 已從雲端同步最新資料', 's');
+    }
+    setSyncIcon('☁️✅');
+  } catch(e) { setSyncIcon('❌'); }
+}
+
+// ─── navigation ───
+function goPage(p) {
+  S.page = p;
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  $(`page-${p}`).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if (b.getAttribute('onclick').includes(`'${p}'`)) b.classList.add('active');
+  });
+  if (p === 'history')  renderHistory();
+  if (p === 'stones')   renderStones();
+  if (p === 'settings') loadCfgForm();
+}
+
+// ─── date ───
+function onDateChange() {
+  const v = $('f-date').value;
+  if (!v) return;
+  $('f-dow').value = '星期' + DOW[new Date(v+'T00:00:00').getDay()];
+}
+
+// ─── print companion divs ───
+function updPV(el) {
+  const pv = $(el.id + '_pv');
+  if (pv) pv.textContent = el.value;
+}
+function refreshPVs() {
+  ['n-ext','n-int','n-lob','n-bat','n-bas','n-lan','n-fac','f-contact'].forEach(id => {
+    const pv = $(id + '_pv');
+    if (pv) pv.textContent = $(id).value || '';
+  });
+}
+
+// ─── project dropdowns (daily report) ───
+function updateProjSelect() {
+  const sel = $('f-proj');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">選擇專案...</option>';
+  S.cfg.projects.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+  if (cur) sel.value = cur;
+}
+
+function updateMgrSelect(projId) {
+  const sel = $('f-mgr');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">選擇負責人...</option>';
+  const seen = new Set();
+  S.cfg.projects.forEach(p => {
+    if (p.manager && !seen.has(p.manager)) {
+      seen.add(p.manager);
+      const opt = document.createElement('option');
+      opt.value = p.manager; opt.textContent = p.manager;
+      sel.appendChild(opt);
+    }
+  });
+  if (projId) {
+    const proj = S.cfg.projects.find(p => p.id === projId);
+    if (proj && proj.manager) { sel.value = proj.manager; return; }
+  }
+  if (cur) sel.value = cur;
+}
+
+function onProjChange() {
+  updateMgrSelect($('f-proj').value);
+  sync();
+}
+
+// 產生 select options；若目前值不在預設清單仍保留它
+function selOpts(presets, cur, placeholder) {
+  const list = presets || [];
+  const extra = cur && !list.includes(cur) ? [cur] : [];
+  const all = [...extra, ...list];
+  const blank = `<option value="">${placeholder}</option>`;
+  return blank + all.map(o => `<option value="${o}"${cur===o?' selected':''}>${o}</option>`).join('');
+}
+
+// ─── work table ───
+function addRow(it) {
+  const tbody = $('tbody');
+  const n = ++rowN;
+  const dOpts = S.cfg.depts.map(d=>`<option value="${d}"${it&&it.dept===d?' selected':''}>${d}</option>`).join('');
+  const aOpts = [
+    ['','— 無 —'],['material','🧱 材料未到'],['weather','🌧️ 天候影響'],
+    ['previous','⏳ 前項未完'],['other','❓ 其他']
+  ].map(([v,l])=>`<option value="${v}"${it&&it.atype===v?' selected':''}>${l}</option>`).join('');
+  const v = f => it ? (it[f]||'') : '';
+  const tr = document.createElement('tr');
+  tr.dataset.rn = n;
+  tr.innerHTML = `
+    <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
+    <td data-label="部門"><select class="cs" data-f="dept" onchange="sync()">${dOpts}<option value="">其他</option></select></td>
+    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="sync()">${selOpts(S.cfg.locs, v('loc'), '施作位置...')}</select></td>
+    <td data-label="施工項目"><select class="cs" data-f="work" onchange="sync()">${selOpts(S.cfg.works, v('work'), '施工項目...')}</select></td>
+    <td data-label="今日班組"><select class="cs" data-f="lead" onchange="sync()">${selOpts(S.cfg.leads, v('lead'), '班組/領班...')}</select></td>
+    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')}" min="0" oninput="recalc();sync()"></td>
+    <td data-label="明日班組"><select class="cs" data-f="lead2" onchange="sync()">${selOpts(S.cfg.leads, v('lead2'), '班組/領班...')}</select></td>
+    <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')}" min="0" oninput="recalc();sync()"></td>
+    <td data-label="異常類型" class="col-wide"><select class="cs" style="font-size:11px" data-f="atype" onchange="onAtypeChange(this);sync()">${aOpts}</select></td>
+    <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${v('anote')}" placeholder="說明..." oninput="sync()"></td>
+    <td data-label="石材編號" class="col-wide"><input class="ci" data-f="stone" value="${v('stone')}" placeholder="如：W001,W002" oninput="sync()"></td>
+    <td class="col-del no-print">
+      <button class="btn btn-g btn-icon btn-sm" onclick="delRow(this)">✕</button>
+    </td>`;
+  tbody.appendChild(tr);
+  renum(); recalc();
+}
+
+function delRow(btn) { btn.closest('tr').remove(); renum(); recalc(); sync(); }
+function renum() { $('tbody').querySelectorAll('.rnum').forEach((td,i) => td.textContent = i+1); }
+function recalc() {
+  let t0=0, t1=0;
+  $('tbody').querySelectorAll('tr').forEach(tr => {
+    const w0in = tr.querySelector('[data-f="w0"]');
+    const w1in = tr.querySelector('[data-f="w1"]');
+    const w0 = parseInt(w0in?.value)||0;
+    const w1 = parseInt(w1in?.value)||0;
+    t0 += w0; t1 += w1;
+    if (w0 === 0 && tr.querySelector('[data-f="lead"]')?.value) {
+      tr.classList.add('row-zero');
+      const atSel = tr.querySelector('[data-f="atype"]');
+      if (atSel && !atSel.value) atSel.classList.add('atype-warn');
+    } else {
+      tr.classList.remove('row-zero');
+      tr.querySelector('[data-f="atype"]')?.classList.remove('atype-warn');
+    }
+  });
+  $('tot-today').textContent = t0; $('tot-tmrw').textContent = t1;
+  $('st-today').textContent = t0; $('st-tmrw').textContent = t1;
+  const crew = $('tbody').children.length;
+  $('st-crew').textContent = crew;
+  $('stat-grid').style.display = crew > 0 ? 'grid' : 'none';
+}
+
+function onAtypeChange(sel) {
+  sel.classList.remove('atype-warn');
+}
+
+function sync() {
+  const projId = $('f-proj').value;
+  const proj = S.cfg.projects.find(p => p.id === projId);
+  S.report.date        = $('f-date').value;
+  S.report.weather     = $('f-weather').value;
+  S.report.projectId   = projId;
+  S.report.projectName = proj ? proj.name : '';
+  S.report.manager     = $('f-mgr').value;
+  S.report.workItems = Array.from($('tbody').children).map(tr => {
+    const g = f => tr.querySelector(`[data-f="${f}"]`)?.value || '';
+    return {
+      dept:g('dept'),loc:g('loc'),work:g('work'),
+      lead:g('lead'),w0:parseInt(g('w0'))||0,
+      lead2:g('lead2'),w1:parseInt(g('w1'))||0,
+      atype:g('atype'),anote:g('anote'),stone:g('stone')
+    };
+  });
+  S.report.notes.ext = $('n-ext').value; S.report.notes.int = $('n-int').value;
+  S.report.notes.lob = $('n-lob').value; S.report.notes.bat = $('n-bat').value;
+  S.report.notes.bas = $('n-bas').value; S.report.notes.lan = $('n-lan').value;
+  S.report.notes.fac = $('n-fac').value;
+  S.report.contact   = $('f-contact').value;
+}
+
+function fillForm(r) {
+  S.report = JSON.parse(JSON.stringify(r));
+  $('f-date').value    = r.date || '';
+  $('f-weather').value = r.weather || '';
+  onDateChange();
+  updateProjSelect();
+  if (r.projectId) {
+    $('f-proj').value = r.projectId;
+  } else if (r.projectName) {
+    const m = S.cfg.projects.find(p => p.name === r.projectName);
+    if (m) $('f-proj').value = m.id;
+  }
+  updateMgrSelect($('f-proj').value);
+  if (r.manager) $('f-mgr').value = r.manager;
+  $('tbody').innerHTML = ''; rowN = 0;
+  (r.workItems||[]).forEach(it => addRow(it));
+  $('n-ext').value = r.notes?.ext||''; $('n-int').value = r.notes?.int||'';
+  $('n-lob').value = r.notes?.lob||''; $('n-bat').value = r.notes?.bat||'';
+  $('n-bas').value = r.notes?.bas||''; $('n-lan').value = r.notes?.lan||'';
+  $('n-fac').value = r.notes?.fac||'';
+  $('f-contact').value = r.contact||'';
+  refreshPVs(); renderPhotos(); recalc();
+}
+
+function loadToday() {
+  const d = today();
+  const ex = S.reports.find(r => r.date === d);
+  if (ex) { fillForm(ex); toast('已讀取今日報表','s'); }
+  else {
+    clearForm();
+    toast('今日尚無報表，空白表單已就緒');
+  }
+}
+
+function clearForm() {
+  S.report = blankReport();
+  $('f-date').value = today(); $('f-weather').value = '';
+  onDateChange();
+  updateProjSelect();
+  if (S.cfg.projects.length > 0) {
+    $('f-proj').value = S.cfg.projects[0].id;
+    updateMgrSelect(S.cfg.projects[0].id);
+  } else {
+    updateMgrSelect('');
+  }
+  $('tbody').innerHTML = ''; rowN = 0;
+  ['n-ext','n-int','n-lob','n-bat','n-bas','n-lan','n-fac','f-contact'].forEach(id => $(id).value='');
+  refreshPVs(); renderPhotos(); recalc();
+}
+
+function saveReport() {
+  sync();
+  const r = S.report;
+  if (!r.date) { toast('請填寫日期','e'); return; }
+  const idx = S.reports.findIndex(x => x.id === r.id);
+  if (idx >= 0) S.reports[idx] = r; else S.reports.unshift(r);
+  S.reports.sort((a,b) => b.date.localeCompare(a.date));
+  save(); toast('報表已儲存！','s');
+}
+
+function exportJSON() {
+  sync();
+  dl(JSON.stringify(S.report, null, 2), `日報表_${S.report.date}.json`);
+}
+
+// ─── photos ───
+function uploadPhotos(e) {
+  const phase = $('ph-phase').value;
+  Array.from(e.target.files).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    const rd = new FileReader();
+    rd.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        let w=img.width, h=img.height;
+        if (w>1024){h=h*1024/w;w=1024}
+        if (h>800){w=w*800/h;h=800}
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        S.report.photos.push({id:uid(), phase, caption:f.name,
+          data:c.toDataURL('image/jpeg',.72), ts:new Date().toISOString()});
+        renderPhotos();
+      };
+      img.src = ev.target.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  e.target.value='';
+}
+
+function renderPhotos() {
+  const photos = S.report.photos||[];
+  const PL = {before:'施工前',during:'施工中',after:'施工後'};
+  const PC = {before:'ph-b',during:'ph-d',after:'ph-a'};
+  let html = `<div class="upload-btn no-print" onclick="$('ph-input').click()">
+    <span style="font-size:22px">📷</span><span>點擊上傳照片</span></div>`;
+  photos.forEach((p,i) => {
+    html += `<div class="photo-thumb" onclick="viewPhoto(${i})">
+      <img src="${p.data}" alt="${p.caption}">
+      <div class="photo-thumb-info">
+        <span class="phase-tag ${PC[p.phase]}">${PL[p.phase]||p.phase}</span>
+        <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)">${p.caption}</div>
+      </div></div>`;
+  });
+  $('ph-grid').innerHTML = html;
+}
+
+function viewPhoto(i) {
+  S.viewPhotoIdx = i;
+  const p = S.report.photos[i];
+  const PL = {before:'施工前',during:'施工中',after:'施工後'};
+  const PC = {before:'ph-b',during:'ph-d',after:'ph-a'};
+  $('ph-img').src = p.data;
+  const lbl = $('ph-phase-lbl');
+  lbl.textContent = PL[p.phase]||p.phase;
+  lbl.className = `phase-tag ${PC[p.phase]}`;
+  $('ph-cap').textContent = p.caption;
+  $('ph-overlay').classList.add('show');
+}
+
+function closePh(e) { if (e.target===$('ph-overlay')) $('ph-overlay').classList.remove('show'); }
+
+function deletePhoto() {
+  const i = S.viewPhotoIdx;
+  if (i >= 0) {
+    S.report.photos.splice(i,1);
+    S.viewPhotoIdx = -1;
+    $('ph-overlay').classList.remove('show');
+    renderPhotos();
+  }
+}
+
+// ─── history ───
+function renderHistory() {
+  const fm = $('filter-month').value;
+  let rs = fm ? S.reports.filter(r => r.date?.startsWith(fm)) : [...S.reports];
+  const el = $('hist-list');
+  if (!rs.length) {
+    el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div>
+      <h3>尚無報表記錄</h3><p>在日報表頁面建立並儲存後會顯示在此</p></div>`;
+    return;
+  }
+  const WE = {晴:'☀️',多雲:'⛅',陰:'☁️',小雨:'🌧️',大雨:'⛈️',颱風:'🌀',停工:'⛔'};
+  el.innerHTML = rs.map(r => {
+    const dt = new Date(r.date+'T00:00:00');
+    const mon = (dt.getMonth()+1)+'月'; const day = dt.getDate();
+    const tot = (r.workItems||[]).reduce((s,w)=>s+(w.w0||0),0);
+    const crew = (r.workItems||[]).length;
+    const we = WE[r.weather]||'';
+    return `<div class="ritem" onclick="editReport('${r.id}')">
+      <div class="ritem-date"><div class="day">${day}</div><div class="mon">${mon}</div></div>
+      <div class="ritem-info">
+        <h3>${r.projectName||'未命名專案'} ${we}</h3>
+        <p>${r.date} 星期${DOW[dt.getDay()]} ｜ 出工 <strong>${tot}</strong> 人 ｜ ${crew} 班組</p>
+      </div>
+      <div class="ritem-actions no-print" onclick="event.stopPropagation()">
+        <button class="btn btn-o btn-sm" onclick="editReport('${r.id}')">✏️</button>
+        <button class="btn btn-d btn-sm" onclick="delReport('${r.id}')">🗑️</button>
+      </div></div>`;
+  }).join('');
+}
+
+function editReport(id) {
+  const r = S.reports.find(x => x.id===id);
+  if (!r) return;
+  fillForm(r); goPage('report'); toast('已載入報表');
+}
+
+function delReport(id) {
+  if (!confirm('確定要刪除此報表？')) return;
+  S.reports = S.reports.filter(r => r.id!==id);
+  save(); renderHistory(); toast('已刪除');
+}
+
+function exportAll() {
+  dl(JSON.stringify({reports:S.reports,stones:S.stones,cfg:S.cfg},null,2), `工地日報_${today()}.json`);
+}
+
+function importData(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      const exist = new Set(S.reports.map(r=>r.id));
+      let cnt=0;
+      (d.reports||[]).forEach(r => { if(!exist.has(r.id)){S.reports.push(r);cnt++;} });
+      S.reports.sort((a,b)=>b.date.localeCompare(a.date));
+      save(); renderHistory(); toast(`已匯入 ${cnt} 份報表`,'s');
+    } catch { toast('匯入失敗：格式錯誤','e'); }
+  };
+  rd.readAsText(f); e.target.value='';
+}
+
+// ─── stones ───
+function openStone(id) {
+  S.editStoneId = id||null;
+  $('sm-title').textContent = id ? '編輯石材' : '新增石材';
+  if (id) {
+    const s = S.stones.find(x=>x.id===id);
+    $('sm-sid').value=s.sid||''; $('sm-stat').value=s.status||'inventory';
+    $('sm-desc').value=s.desc||''; $('sm-size').value=s.size||'';
+    $('sm-loc').value=s.loc||''; $('sm-note').value=s.note||'';
+  } else {
+    ['sm-sid','sm-desc','sm-size','sm-loc','sm-note'].forEach(id=>$(id).value='');
+    $('sm-stat').value='inventory';
+  }
+  $('stone-overlay').classList.add('show');
+}
+
+function closeStone() { $('stone-overlay').classList.remove('show'); S.editStoneId=null; }
+
+function saveStone() {
+  const sid = $('sm-sid').value.trim();
+  if (!sid) { toast('請填寫石材編號','e'); return; }
+  const s = {
+    id: S.editStoneId||uid(), sid,
+    status:$('sm-stat').value, desc:$('sm-desc').value,
+    size:$('sm-size').value, loc:$('sm-loc').value,
+    note:$('sm-note').value, updAt:today()
+  };
+  const idx = S.stones.findIndex(x=>x.id===s.id);
+  if (idx>=0) S.stones[idx]=s; else S.stones.push(s);
+  save(); closeStone(); renderStones(); toast('石材已儲存','s');
+}
+
+function renderStones() {
+  const q = ($('s-search')?.value||'').toLowerCase();
+  const sf = $('s-status')?.value||'';
+  const ss = S.stones.filter(s => {
+    const m = !q || [s.sid,s.desc,s.loc].some(v=>(v||'').toLowerCase().includes(q));
+    return m && (!sf||s.status===sf);
+  });
+  const tbody = $('s-tbody');
+  if (!ss.length) { tbody.innerHTML=''; $('s-empty').style.display='block'; return; }
+  $('s-empty').style.display='none';
+  const SM = {inventory:{l:'庫存',c:'sb-inv'},installed:{l:'已安裝',c:'sb-ins'},damaged:{l:'損壞',c:'sb-dmg'}};
+  tbody.innerHTML = ss.map(s => {
+    const st = SM[s.status]||{l:s.status,c:''};
+    return `<tr>
+      <td><strong>${s.sid}</strong></td><td>${s.desc||''}</td>
+      <td style="color:var(--muted)">${s.size||''}</td>
+      <td>${s.loc||''}</td>
+      <td><span class="sbadge ${st.c}">${st.l}</span></td>
+      <td style="color:var(--muted);font-size:12px">${s.updAt||''}</td>
+      <td style="color:var(--muted);font-size:12px">${s.note||''}</td>
+      <td class="no-print"><div class="flex gap2">
+        <button class="btn btn-o btn-sm" onclick="openStone('${s.id}')">編輯</button>
+        <button class="btn btn-d btn-sm" onclick="delStone('${s.id}')">🗑️</button>
+      </div></td></tr>`;
+  }).join('');
+}
+
+function delStone(id) {
+  if (!confirm('確定刪除此石材記錄？')) return;
+  S.stones = S.stones.filter(s=>s.id!==id);
+  save(); renderStones(); toast('已刪除');
+}
+
+// ─── projects (settings) ───
+function openProj(id) {
+  S.editProjId = id||null;
+  $('pm-title').textContent = id ? '編輯專案' : '新增專案';
+  if (id) {
+    const p = S.cfg.projects.find(x=>x.id===id);
+    if (p) {
+      $('pm-name').value=p.name||''; $('pm-co').value=p.company||'';
+      $('pm-pid').value=p.projectId||''; $('pm-mgr').value=p.manager||'';
+    }
+  } else {
+    ['pm-name','pm-co','pm-pid','pm-mgr'].forEach(id=>$(id).value='');
+  }
+  $('proj-overlay').classList.add('show');
+}
+
+function closeProj() { $('proj-overlay').classList.remove('show'); S.editProjId=null; }
+
+function saveProj() {
+  const name = $('pm-name').value.trim();
+  if (!name) { toast('請填寫專案名稱','e'); return; }
+  const p = {
+    id: S.editProjId||uid(), name,
+    company: $('pm-co').value.trim(),
+    projectId: $('pm-pid').value.trim(),
+    manager: $('pm-mgr').value.trim()
+  };
+  const idx = S.cfg.projects.findIndex(x=>x.id===p.id);
+  if (idx>=0) S.cfg.projects[idx]=p; else S.cfg.projects.push(p);
+  save(); closeProj(); renderProjs();
+  updateProjSelect(); updateMgrSelect($('f-proj').value);
+  updateNavProj(); toast('專案已儲存','s');
+}
+
+function delProj(id) {
+  if (!confirm('確定刪除此專案？')) return;
+  S.cfg.projects = S.cfg.projects.filter(p=>p.id!==id);
+  save(); renderProjs();
+  updateProjSelect(); updateMgrSelect('');
+  updateNavProj(); toast('已刪除');
+}
+
+function renderProjs() {
+  const tbody = $('proj-tbody');
+  const empty = $('proj-empty');
+  const wrap  = $('proj-tbl-wrap');
+  if (!S.cfg.projects.length) {
+    tbody.innerHTML=''; empty.style.display='block'; wrap.style.display='none'; return;
+  }
+  empty.style.display='none'; wrap.style.display='';
+  tbody.innerHTML = S.cfg.projects.map(p => `<tr>
+    <td><strong>${p.name}</strong></td>
+    <td>${p.company||'—'}</td>
+    <td style="color:var(--muted);font-size:12px">${p.projectId||'—'}</td>
+    <td>${p.manager||'—'}</td>
+    <td class="no-print">
+      <div class="flex gap2">
+        <button class="btn btn-o btn-sm" onclick="openProj('${p.id}')">編輯</button>
+        <button class="btn btn-d btn-sm" onclick="delProj('${p.id}')">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+// ─── settings ───
+function loadCfgForm() {
+  renderProjs();
+  $('s-depts').value  = (S.cfg.depts||[]).join('\n');
+  $('s-leads').value  = (S.cfg.leads||[]).join('\n');
+  $('s-locs').value   = (S.cfg.locs||[]).join('\n');
+  $('s-works').value  = (S.cfg.works||[]).join('\n');
+}
+
+function saveSettings() {
+  S.cfg.depts  = $('s-depts').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  S.cfg.leads  = $('s-leads').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  S.cfg.locs   = $('s-locs').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  S.cfg.works  = $('s-works').value.split('\n').map(x=>x.trim()).filter(Boolean);
+  save(); updateLeads(); updateLocs(); updateWorks(); toast('設定已儲存','s');
+}
+
+function updateLeads() {
+  $('leads-dl').innerHTML = (S.cfg.leads||[]).map(l=>`<option value="${l}">`).join('');
+}
+function updateLocs() {
+  $('loc-dl').innerHTML  = (S.cfg.locs||[]).map(l=>`<option value="${l}">`).join('');
+}
+function updateWorks() {
+  $('work-dl').innerHTML = (S.cfg.works||[]).map(w=>`<option value="${w}">`).join('');
+}
+
+// ─── O2: day navigation ───
+function navDay(delta) {
+  sync();
+  const cur = $('f-date').value || today();
+  const d = new Date(cur + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  const nd = d.toISOString().slice(0,10);
+  const ex = S.reports.find(r => r.date === nd);
+  if (ex) { fillForm(ex); toast(`已載入 ${nd}`,'s'); }
+  else { clearForm(); $('f-date').value = nd; onDateChange(); toast(`${nd} 無記錄，空白表單`); }
+}
+
+// ─── O3: voice input ───
+function startVoice(targetId) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { toast('此裝置不支援語音輸入','e'); return; }
+  const btn = document.querySelector(`[onclick="startVoice('${targetId}')"]`);
+  if (btn?.classList.contains('rec')) return;
+  const r = new SR();
+  r.lang = 'zh-TW'; r.interimResults = false; r.maxAlternatives = 1;
+  r.onstart  = () => { if (btn) { btn.classList.add('rec'); btn.textContent = '🔴'; } };
+  r.onresult = ev => {
+    const idx = ev.results.length - 1;
+    const t = (ev.results[idx][0].transcript || '').trim();
+    if (!t) return;
+    const el = $(targetId);
+    el.value += t;
+    updPV(el); sync();
+    toast('語音輸入完成','s');
+  };
+  r.onerror  = () => { toast('語音辨識失敗','e'); };
+  r.onend    = () => { if (btn) { btn.classList.remove('rec'); btn.textContent = '🎤'; } };
+  r.start();
+}
+
+function updateNavProj() {
+  $('nav-proj').textContent = S.cfg.projects[0]?.name || '';
+}
+
+// ─── utils ───
+function dl(data, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data],{type:'application/json'}));
+  a.download = filename; a.click();
+}
+
+function toast(msg, type='') {
+  const c = $('toasts');
+  const el = document.createElement('div');
+  el.className = `toast${type?` toast-${type}`:''}`;
+  el.innerHTML = `${type==='s'?'✅':type==='e'?'❌':'ℹ️'} ${msg}`;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(), 3200);
+}
+
+// ─── init ───
+load();
+$('f-date').value = today();
+onDateChange();
+updateProjSelect();
+if (S.cfg.projects.length > 0) {
+  $('f-proj').value = S.cfg.projects[0].id;
+  updateMgrSelect(S.cfg.projects[0].id);
+} else {
+  updateMgrSelect('');
+}
+updateLeads();
+updateLocs();
+updateWorks();
+updateNavProj();
+cloudSync();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
+  authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
+  databaseURL: "https://dailyconstructionreport-dfe1b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "dailyconstructionreport-dfe1b",
+  storageBucket: "dailyconstructionreport-dfe1b.firebasestorage.app",
+  messagingSenderId: "228712770866",
+  appId: "1:228712770866:web:07634a3df74781419cfb2b"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+window._fbSave = async (data) => { await set(ref(db, 'cdr2'), data); };
+window._fbLoad = async () => { const s = await get(ref(db, 'cdr2')); return s.exists() ? s.val() : null; };
+</script>
+</body>
+</html>
