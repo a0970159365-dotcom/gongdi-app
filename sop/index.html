@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1e3a5f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>標準作業流程</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <style>
+    *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+    html,body{height:100%;overflow-x:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Noto Sans TC',sans-serif;background:#f3f4f6}
+    .btn-status{transition:all .15s;border:2px solid transparent;cursor:pointer}
+    .btn-status.s-normal  {background:#16a34a!important;color:#fff!important;border-color:#15803d!important}
+    .btn-status.s-abnormal{background:#dc2626!important;color:#fff!important;border-color:#b91c1c!important}
+    .btn-status.s-improved{background:#ea580c!important;color:#fff!important;border-color:#c2410c!important}
+    .btn-status.s-na      {background:#6b7280!important;color:#fff!important;border-color:#4b5563!important}
+    .hidden{display:none!important}
+    .view{display:none}
+    .view.active{display:block}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+    .toast-wrap{position:fixed;bottom:96px;left:0;right:0;display:flex;justify-content:center;z-index:60;pointer-events:none}
+    .toast-msg{background:#1f2937;color:#fff;font-size:.875rem;padding:.5rem 1.25rem;border-radius:9999px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+    .border-l-normal  {border-left-color:#16a34a!important}
+    .border-l-abnormal{border-left-color:#dc2626!important}
+    .border-l-improved{border-left-color:#ea580c!important}
+    .border-l-na      {border-left-color:#9ca3af!important}
+    .badge-n{background:#dcfce7;color:#166534}
+    .badge-a{background:#fee2e2;color:#991b1b}
+    .badge-i{background:#ffedd5;color:#9a3412}
+    .badge-x{background:#f3f4f6;color:#4b5563}
+    @media print{
+      .no-print{display:none!important}
+      body{background:#fff}
+      .status-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:9pt;font-weight:600}
+      .s-n2{background:#dcfce7;color:#166534}
+      .s-a2{background:#fee2e2;color:#991b1b}
+      .s-i2{background:#ffedd5;color:#9a3412}
+      .s-x2{background:#f3f4f6;color:#4b5563}
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOP HEADER -->
+<header id="top-header" class="no-print fixed top-0 left-0 right-0 z-40 bg-blue-900 text-white shadow-md" style="max-width:512px;margin:0 auto">
+  <div class="flex items-center h-14 px-4 gap-3">
+    <button id="btn-back" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-2xl flex-shrink-0 hidden">&#8249;</button>
+    <div id="back-placeholder" class="w-9 flex-shrink-0"></div>
+    <h1 id="page-title" class="flex-1 text-base font-semibold truncate">標準作業流程</h1>
+    <span id="sync-icon" class="text-xs mr-1"></span>
+    <button id="btn-settings" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-lg flex-shrink-0">&#9881;&#65039;</button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="max-w-lg mx-auto min-h-screen">
+<main class="no-print pt-14 pb-20">
+
+  <!-- ===== HOME ===== -->
+  <div id="view-home" class="view active p-4">
+    <div class="text-center py-5 mb-4">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-900 text-3xl mb-3 shadow-lg">&#128203;</div>
+      <h2 class="text-xl font-bold text-gray-800">標準作業流程</h2>
+      <p class="text-sm text-gray-500 mt-1">選擇工法開始現場查驗</p>
+    </div>
+    <div id="template-cards" class="space-y-3 mb-6"></div>
+    <div id="recent-section">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-sm font-semibold text-gray-600">最近記錄</h3>
+        <button onclick="goTo('history')" class="text-xs text-blue-600">查看全部 &#8250;</button>
+      </div>
+      <div id="recent-list" class="space-y-2"></div>
+    </div>
+    <div id="no-recent" class="hidden text-center py-8 text-gray-400 text-sm">尚無記錄，點選上方工法開始填寫</div>
+  </div>
+
+  <!-- ===== HEADER FORM ===== -->
+  <div id="view-new-header" class="view p-4 space-y-4">
+    <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">案場資訊</h3>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">案場 <span class="text-red-500">*</span></label>
+        <select id="f-case" onchange="handleCaseSelect()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">請選擇</option>
+        </select>
+        <input id="f-case-custom" placeholder="輸入案場名稱" class="hidden mt-2 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">施作範圍 <span class="text-red-500">*</span></label>
+        <input id="f-area" placeholder="例：全區域室內地坪" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label id="f-material-label" class="block text-sm font-medium text-gray-700 mb-1">材質名稱</label>
+        <input id="f-material" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+        <input type="date" id="f-date" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">人員資訊</h3>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">部門</label>
+        <select id="f-dept" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">請選擇</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">填表人員 <span class="text-red-500">*</span></label>
+        <select id="f-person" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">請選擇</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">施工廠商</label>
+        <select id="f-contractor" onchange="handleContractorSelect()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">請選擇</option>
+        </select>
+        <input id="f-contractor-custom" placeholder="輸入廠商名稱" class="hidden mt-2 w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">施工人員</label>
+        <input id="f-workers" placeholder="例：張三/李四" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+    </div>
+    <button onclick="startChecklist()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 rounded-2xl shadow-md text-base">開始查驗 →</button>
+  </div>
+
+  <!-- ===== CHECKLIST ===== -->
+  <div id="view-checklist" class="view p-4">
+    <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+      <div class="flex items-center justify-between text-sm mb-2">
+        <span class="font-medium text-gray-700">查驗進度</span>
+        <span id="cl-progress-text" class="font-bold text-blue-700">0 / 0</span>
+      </div>
+      <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div id="cl-progress-bar" class="h-full bg-blue-600 rounded-full transition-all" style="width:0%"></div>
+      </div>
+      <div id="cl-progress-pct" class="text-xs text-gray-400 text-right mt-1">0% 完成</div>
+    </div>
+    <div id="checklist-items" class="space-y-3"></div>
+    <div class="mt-4 space-y-2">
+      <button onclick="saveAsDraft()" class="w-full border-2 border-blue-700 text-blue-700 font-semibold py-3 rounded-2xl text-sm hover:bg-blue-50">&#128190; 儲存草稿</button>
+      <button id="btn-complete" onclick="completeReport()" class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-2xl text-base">查驗中...</button>
+    </div>
+  </div>
+
+  <!-- ===== COMPLETE ===== -->
+  <div id="view-complete" class="view p-4">
+    <div class="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4 text-center">
+      <div class="text-3xl mb-2">&#9989;</div>
+      <div class="font-bold text-green-800">查驗完成！</div>
+      <div id="complete-subtitle" class="text-xs text-green-600 mt-1"></div>
+    </div>
+    <div id="complete-info" class="bg-white rounded-2xl p-4 shadow-sm mb-3"></div>
+    <div id="complete-stats" class="grid grid-cols-4 gap-2 mb-3"></div>
+    <div id="complete-items" class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden"></div>
+    <div class="space-y-2">
+      <button onclick="printCurrentReport()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 匯出 PDF</button>
+      <button onclick="goTo('home')" class="w-full border-2 border-gray-300 text-gray-600 font-semibold py-3 rounded-2xl text-sm hover:bg-gray-50">返回首頁</button>
+    </div>
+  </div>
+
+  <!-- ===== HISTORY ===== -->
+  <div id="view-history" class="view p-4">
+    <div class="flex gap-2 mb-4">
+      <select id="h-filter-tpl" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">全部工法</option>
+      </select>
+      <select id="h-filter-status" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">全部狀態</option>
+        <option value="completed">已完成</option>
+        <option value="draft">草稿</option>
+      </select>
+    </div>
+    <div id="history-list" class="space-y-3"></div>
+  </div>
+
+  <!-- ===== DETAIL ===== -->
+  <div id="view-detail" class="view p-4">
+    <div id="detail-info" class="bg-white rounded-2xl p-4 shadow-sm mb-3"></div>
+    <div id="detail-items" class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden"></div>
+    <div class="space-y-2">
+      <button id="btn-print-detail" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 匯出 PDF</button>
+      <button id="btn-delete-detail" class="w-full border-2 border-red-300 text-red-600 font-semibold py-3 rounded-2xl text-sm hover:bg-red-50">&#128465;&#65039; 刪除此記錄</button>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div id="view-settings" class="view p-4 space-y-4">
+    <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
+    <div id="cfg-departments" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="departments" data-label="部門管理"  data-icon="🏢"></div>
+    <div id="cfg-personnel"   class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="personnel"   data-label="人員管理"  data-icon="👤"></div>
+    <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm">
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">☁️ 雲端同步狀態</h3>
+      <div id="sync-status-text" class="text-sm text-gray-400 mb-3">— 尚未同步</div>
+      <button onclick="syncNow()" class="w-full border-2 border-blue-300 text-blue-700 font-medium py-2 rounded-xl text-sm hover:bg-blue-50">立即同步至雲端</button>
+    </div>
+    <button onclick="saveConfig()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128190; 儲存設定</button>
+  </div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav" class="no-print fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg" style="max-width:512px;margin:0 auto">
+  <div class="flex">
+    <button onclick="goTo('home')"     id="nav-home"    class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">🏠</span>首頁</button>
+    <button onclick="goTo('history')"  id="nav-history" class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">📂</span>歷史</button>
+    <button onclick="goTo('settings')" id="nav-settings"class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">⚙️</span>設定</button>
+  </div>
+</nav>
+</div><!-- max-w-lg -->
+
+<!-- CRITERION MODAL -->
+<div id="criterion-modal" class="hidden modal-overlay" onclick="closeCriterion(event)">
+  <div class="relative w-full max-w-lg bg-white rounded-t-3xl p-6 overflow-y-auto shadow-2xl" style="max-height:70vh">
+    <div class="flex items-center justify-between mb-3">
+      <h3 id="criterion-title" class="font-bold text-gray-800"></h3>
+      <button onclick="closeCriterionModal()" class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200">&#10005;</button>
+    </div>
+    <p class="text-xs font-semibold text-blue-700 mb-2 uppercase tracking-wide">查檢準則</p>
+    <div id="criterion-body" class="text-sm text-gray-700 leading-relaxed bg-blue-50 rounded-xl p-3 whitespace-pre-wrap"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast-wrap" class="toast-wrap hidden no-print">
+  <div id="toast-msg" class="toast-msg"></div>
+</div>
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+(function(){
+  try {
+    firebase.initializeApp({
+      apiKey:"AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
+      authDomain:"dailyconstructionreport-dfe1b.firebaseapp.com",
+      databaseURL:"https://dailyconstructionreport-dfe1b-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:"dailyconstructionreport-dfe1b",
+      storageBucket:"dailyconstructionreport-dfe1b.firebasestorage.app",
+      messagingSenderId:"228712770866",
+      appId:"1:228712770866:web:07634a3df74781419cfb2b"
+    });
+    var _db = firebase.database();
+    window._sopSet    = function(p,d){ return _db.ref('sop/'+p).set(d); };
+    window._sopGet    = function(p){ return _db.ref('sop/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
+    window._sopRemove = function(p){ return _db.ref('sop/'+p).remove(); };
+  } catch(e){ console.warn('Firebase init failed:',e); }
+})();
+</script>
+
+<script>
+'use strict';
+
+// ====== TEMPLATES ======
+var TEMPLATES = [
+  {
+    id:'t1', name:'瑪摩石地坪硬底工法', materialLabel:'材質名稱', icon:'🪵',
+    items:[
+      {id:'i1',name:'施工前地坪檢查', criterion:'地坪水泥砂漿打底面應檢查不能嚴重起砂、大坑洞及龜裂情形\n如遇到該情形應立即向現場管理人員反應並改善後才可進場施工'},
+      {id:'i2',name:'地坪清潔',        criterion:'全區域地坪粉塵清掃或用海綿清理'},
+      {id:'i3',name:'地坪介面劑施作',  criterion:'確實均勻塗抹於全區域施工範圍地坪'},
+      {id:'i4',name:'地磚施作前',      criterion:'依照圖面基準線或設定起磚點位置施作，有裂、有缺角的不要安裝\n益膠泥先攪拌均勻後應放置10~15分鐘，再次攪拌使用'},
+      {id:'i5',name:'地磚施作',        criterion:'益膠泥須以鋸齒鏝刀加壓於黏貼材背面及施工地坪位置\n黏貼材背面與施工地坪位置之泥漿刮紋應互相垂直\n黏著方式必須滿鋪且土路<5mm\n每片邊緣底部益膠泥確實要求補滿漿\n整平器間隔<15cm為一個單位放置'},
+      {id:'i6',name:'地磚施作後',      criterion:'完工後須以警示帶將施工區域圍起來，避免遭到破壞\n24小時後才可放行人員走動'},
+      {id:'i7',name:'Epoxy填縫前',     criterion:'整平器敲除\n粉塵確實掃除及用美工刀清理磁磚接縫並用清水拖地表面材'},
+      {id:'i8',name:'Epoxy填縫',       criterion:'依重量比例確實秤重拌合（A劑：B劑=9：1）\n攪拌後45分鐘內完成崁縫作業\n以45度角把填縫劑確實押入縫隙'},
+      {id:'i9',name:'Epoxy填縫後',     criterion:'崁完縫後15分鐘\n海綿使用鹽酸加清水將面材之Epoxy殘留物清洗乾淨\n全區域完成後再用鹽酸加清水清理一次並擦拭乾淨\n最後一次用清水清理並擦拭'}
+    ]
+  },
+  {
+    id:'t2', name:'插銷式鐵件固定工法', materialLabel:'石材種類', icon:'🪨',
+    items:[
+      {id:'j1', name:'內迫錨栓施作',     criterion:'內迫長度4cm、直徑12.75mm，鑽頭尺寸13mm，應鑽入結構深度4.5cm使其全埋入\n結構有防水層需使用防水材或矽利康，避免水沿著鑽孔處滲入造成鋼筋鏽蝕及牆壁滲水'},
+      {id:'j2', name:'內迫錨栓鑽孔',     criterion:'鑽孔後粉塵需清理，鑽孔擊中鋼筋時應改位置，內迫應確實擊開\n擊中鋼筋時內迫無法全埋入'},
+      {id:'j3', name:'內迫錨栓距離',     criterion:'混凝土固定錨栓間距不得小於3倍有效孔深，與混凝土結構邊距不得小於1.5倍有效孔深\n有效間距 = 孔深5cm x 3倍 = 15cm；有效邊距 = 孔深5cm x 1.5倍 = 7.5cm'},
+      {id:'j4', name:'石材鑽孔加工',     criterion:'圓棒型插銷長6cm、直徑0.4cm，鑽頭尺寸6.5mm\n加工鑽Pin孔時避免破損，若破損不影響外觀則改變鑽孔位置即可，若影響外觀則不可安裝\n鑽孔位置板厚處，均不可採用扁型插銷'},
+      {id:'j5', name:'石材施作前',       criterion:'依照圖面基準線施作，有裂、有破的石材不要安裝'},
+      {id:'j6', name:'石材起底施作',     criterion:'地坪往上2M需採用隱藏鐵件，石材第一塊下方使用L鐵件托住，上方切溝隱藏鐵件\n使用插銷貫穿L型鐵件，AB膠確實填滿切溝及鑽孔處\n石材編號需磨除'},
+      {id:'j7', name:'石材施作',         criterion:'上下層石材固定使用插銷穿過L型角鐵與上下層石材串接，插銷與石材孔隙以AB膠填滿\n0.6cm縫：插入孔後露出長度須 2.7cm +/- 0.2cm\n0.3cm縫：露出長度須 2.8cm'},
+      {id:'j8', name:'石材施作中',       criterion:'檢核進出、左右及水平位置，完成面10CM以上須結構補強，結構補強須滿焊\n施工縫務必一致不能大小不一\n鐵件須先行噴平光黑漆，安裝後將多餘AB膠進行修整\n減少使用快乾及催化劑，如必須使用不能塗在石材表面'},
+      {id:'j9', name:'石材樑帶施作',     criterion:'石材下方鐵件不可採用切溝方式，必須改為側邊鐵件插銷固定\n鐵件施打需使石材無法轉動及位移\n採用側面固定時，要有第三支鐵件固定，避免旋轉'},
+      {id:'j10',name:'石材轉角磚施作',   criterion:'轉角處石材無法固定時應採用L型角鐵進行結構延伸\nL型角鐵固定於結構時必須至少有2支錨栓以求穩定'},
+      {id:'j11',name:'石材倒吊板施作',   criterion:'倒吊處結構端一律採用扭力控制型錨栓，Fischer開裂式混凝土專用錨栓'},
+      {id:'j12',name:'石材蓋板小料施作', criterion:'鐵件無法固定時事先與正面使用扁插銷及膠黏結成為一體，後方黏石塊補強'},
+      {id:'j13',name:'石材底層施作',     criterion:'起底層下方石材，待地坪完成後施工\n將來施工時與地坪距離至少0.3cm（與工地負責人確認）'},
+      {id:'j14',name:'石材施作後',       criterion:'需進行壓克力墊片敲除，敲除中發現石材鬆動馬上處理\n檢查鐵件噴黑及AB膠清除'},
+      {id:'j15',name:'拆架前檢查',       criterion:'樑及懸空牆底層及最上層石材固定，務必落實延伸鐵件使該處有鐵件也有插銷（全部以照片建檔）\n石材缺角，美容修補\n鏽斑使用銹斑解離劑，刷除時須將整塊石材都刷過，否則會導致石材色差'},
+      {id:'j16',name:'拆架前清洗',       criterion:'外牆石材清洗以正常水壓清潔即可\n若採高壓沖洗機時須特別注意保持適當距離，避免傷害表面'}
+    ]
+  }
+];
+
+// ====== STATE ======
+var S = {
+  view: 'home',
+  viewStack: ['home'],
+  report: {},
+  reports: [],
+  selectedReportId: null,
+  config: {
+    cases:       ['國泰Mega+5B2','雙橡園2925'],
+    departments: ['瑪摩石工程事業處','專案管理部'],
+    personnel:   ['曾宇鵬','廖學健'],
+    contractors: ['廣泰工程行','賢明工程行']
+  },
+  syncStatus: ''
+};
+
+// ====== HELPERS ======
+var LS_KEY = 'sop_v1';
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function loadLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ return null; } }
+function saveLS(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({config:S.config, reports:S.reports})); }catch(e){} }
+
+function showToast(msg){
+  var w=$('toast-wrap'), m=$('toast-msg');
+  m.textContent=msg; w.classList.remove('hidden');
+  clearTimeout(window._toastT);
+  window._toastT=setTimeout(function(){ w.classList.add('hidden'); }, 2500);
+}
+
+function setSyncStatus(st){
+  S.syncStatus=st;
+  var el=$('sync-icon'), txt=$('sync-status-text');
+  if(st==='saving'){ el.textContent='⏳'; el.className='text-xs mr-1 text-blue-300'; txt.textContent='⏳ 同步中...'; txt.className='text-sm text-blue-600'; }
+  else if(st==='saved'){ el.textContent='☁️✓'; el.className='text-xs mr-1 text-green-300'; txt.textContent='✓ 已同步至雲端'; txt.className='text-sm text-green-600'; setTimeout(function(){ el.textContent=''; },3000); }
+  else if(st==='error'){ el.textContent='⚠️'; el.className='text-xs mr-1 text-red-300'; txt.textContent='⚠️ 同步失敗（資料已存本機）'; txt.className='text-sm text-red-500'; }
+  else { el.textContent=''; txt.textContent='— 尚未同步'; txt.className='text-sm text-gray-400'; }
+}
+
+function badgeClass(s){
+  return s==='正常'?'badge-n':s==='不正常'?'badge-a':s==='改善後合格'?'badge-i':'badge-x';
+}
+function borderClass(s){
+  return s==='正常'?'border-l-normal':s==='不正常'?'border-l-abnormal':s==='改善後合格'?'border-l-improved':s==='未列入'?'border-l-na':'';
+}
+function tplIcon(id){ return id==='t1'?'🪵':'🪨'; }
+function tplBg(id){ return id==='t1'?'background:#eff6ff':'background:#fffbeb'; }
+
+function infoRow(label, val){
+  return '<div class="flex justify-between py-1"><span class="text-gray-500">'+esc(label)+'</span><span class="font-medium text-right" style="max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(val||'—')+'</span></div>';
+}
+
+// ====== NAVIGATION ======
+function goTo(v){
+  S.viewStack.push(v);
+  showView(v);
+}
+function goBack(){
+  if(S.viewStack.length>1){
+    S.viewStack.pop();
+    showView(S.viewStack[S.viewStack.length-1]);
+  }
+}
+
+var PAGE_TITLES = {
+  home:'標準作業流程','new-header':'基本資訊',checklist:'查驗中',
+  complete:'查驗完成',history:'歷史記錄',detail:'查核詳情',settings:'設定'
+};
+var BOTTOM_NAV_VIEWS = {home:true,history:true,settings:true};
+
+function showView(v){
+  S.view=v;
+  document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('active'); });
+  var el=$('view-'+v);
+  if(el) el.classList.add('active');
+
+  // page title
+  var title = PAGE_TITLES[v]||'標準作業流程';
+  if(v==='checklist' && S.report.templateName) title=S.report.templateName;
+  if(v==='detail' && S.selectedReportId){
+    var r=S.reports.find(function(x){return x.id===S.selectedReportId;});
+    if(r) title=r.caseName;
+  }
+  $('page-title').textContent=title;
+
+  // back button
+  var canBack = S.viewStack.length>1;
+  $('btn-back').classList.toggle('hidden', !canBack);
+  $('back-placeholder').classList.toggle('hidden', canBack);
+
+  // settings button
+  $('btn-settings').classList.toggle('hidden', v==='settings');
+
+  // bottom nav
+  var showNav = BOTTOM_NAV_VIEWS[v];
+  $('bottom-nav').style.display = showNav ? '' : 'none';
+  ['home','history','settings'].forEach(function(n){
+    var btn=$('nav-'+n);
+    btn.className='flex-1 flex flex-col items-center py-2 text-xs transition-colors '+(v===n?'text-blue-700':'text-gray-400');
+  });
+
+  window.scrollTo(0,0);
+
+  // render views
+  if(v==='home') renderHome();
+  if(v==='history') renderHistory();
+  if(v==='settings') renderSettings();
+  if(v==='detail') renderDetail();
+  if(v==='checklist') renderChecklist();
+  if(v==='complete') renderComplete();
+  if(v==='new-header') renderHeaderForm();
+}
+
+// ====== HOME ======
+function renderHome(){
+  // template cards
+  var html='';
+  TEMPLATES.forEach(function(t){
+    html+='<button onclick="selectTemplate(\''+t.id+'\')" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
+      +'<div class="flex items-center gap-4">'
+      +'<div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style="'+tplBg(t.id)+'">'+t.icon+'</div>'
+      +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(t.name)+'</div>'
+      +'<div class="text-xs text-gray-500 mt-1">'+t.items.length+' 個查檢項目</div></div>'
+      +'<span class="text-gray-400 text-xl">&#8250;</span>'
+      +'</div></button>';
+  });
+  $('template-cards').innerHTML=html;
+
+  // recent
+  var recent=[].concat(S.reports).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,5);
+  if(recent.length===0){
+    $('recent-section').classList.add('hidden');
+    $('no-recent').classList.remove('hidden');
+  } else {
+    $('recent-section').classList.remove('hidden');
+    $('no-recent').classList.add('hidden');
+    var rh='';
+    recent.forEach(function(r){
+      rh+='<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">'
+        +'<div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
+        +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800 truncate">'+esc(r.caseName)+'</div>'
+        +'<div class="text-xs text-gray-500 truncate">'+esc(r.templateName)+' · '+esc(r.personnel)+'</div></div>'
+        +'<div class="text-right flex-shrink-0"><div class="text-xs text-gray-400">'+esc(r.date)+'</div>'
+        +'<div class="text-xs mt-1 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</div></div>'
+        +'</div>';
+    });
+    $('recent-list').innerHTML=rh;
+  }
+}
+
+// ====== HEADER FORM ======
+function renderHeaderForm(){
+  // populate dropdowns
+  function fillSelect(id, items, addCustom){
+    var el=$(id); if(!el) return;
+    var html='<option value="">請選擇</option>';
+    items.forEach(function(v){ html+='<option value="'+esc(v)+'">'+esc(v)+'</option>'; });
+    if(addCustom) html+='<option value="__custom__">+ 自訂</option>';
+    el.innerHTML=html;
+  }
+  fillSelect('f-case', S.config.cases, true);
+  fillSelect('f-dept', S.config.departments, false);
+  fillSelect('f-person', S.config.personnel, false);
+  fillSelect('f-contractor', S.config.contractors, true);
+
+  var tpl=TEMPLATES.find(function(t){return t.id===S.report.templateId;})||TEMPLATES[0];
+  $('f-material-label').textContent=tpl.materialLabel;
+  $('f-date').value=today();
+  if(S.config.departments.length) $('f-dept').value=S.config.departments[0];
+  if(S.config.personnel.length)   $('f-person').value=S.config.personnel[0];
+}
+
+function handleCaseSelect(){
+  var v=$('f-case').value;
+  $('f-case-custom').classList.toggle('hidden', v!=='__custom__');
+}
+function handleContractorSelect(){
+  var v=$('f-contractor').value;
+  $('f-contractor-custom').classList.toggle('hidden', v!=='__custom__');
+}
+
+function selectTemplate(id){
+  S.report={id:uid(), templateId:id, templateName:TEMPLATES.find(function(t){return t.id===id;}).name, items:[]};
+  goTo('new-header');
+}
+
+function startChecklist(){
+  var cn=$('f-case').value==='__custom__' ? $('f-case-custom').value.trim() : $('f-case').value;
+  var co=$('f-contractor').value==='__custom__' ? $('f-contractor-custom').value.trim() : $('f-contractor').value;
+  if(!cn||!$('f-area').value||!$('f-person').value){ showToast('請填寫案場、施作範圍、人員'); return; }
+
+  S.report.caseName=cn;
+  S.report.area=$('f-area').value;
+  S.report.material=$('f-material').value;
+  S.report.department=$('f-dept').value;
+  S.report.personnel=$('f-person').value;
+  S.report.contractor=co;
+  S.report.workers=$('f-workers').value;
+  S.report.date=$('f-date').value||today();
+  S.report.status='draft';
+
+  var tpl=TEMPLATES.find(function(t){return t.id===S.report.templateId;});
+  S.report.items=tpl.items.map(function(it){
+    return {id:it.id,name:it.name,criterion:it.criterion,status:'',description:'',photo:null,photoThumb:null};
+  });
+  goTo('checklist');
+}
+
+// ====== CHECKLIST ======
+function renderChecklist(){
+  updateProgress();
+  var html='';
+  S.report.items.forEach(function(item,idx){
+    var borderCls=borderClass(item.status);
+    html+='<div class="bg-white rounded-2xl shadow-sm overflow-hidden border-l-4 '+(borderCls?borderCls:'border-gray-200')+'">'
+      +'<div class="p-4">'
+      +'<div class="flex items-start gap-2 mb-1">'
+      +'<span class="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5">'+(idx+1)+'</span>'
+      +'<h3 class="text-sm font-semibold text-gray-800 leading-tight flex-1">'+esc(item.name)+'</h3>'
+      +'</div>'
+      +(item.criterion
+        ?'<button onclick="toggleById(\'cl-crit-'+idx+'\',\'cl-arw-'+idx+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mb-2 ml-8 transition-colors"><span id="cl-arw-'+idx+'">▶</span><span>查檢準則</span></button>'
+         +'<div id="cl-crit-'+idx+'" class="hidden mb-3 text-xs text-gray-600 bg-blue-50 rounded-xl p-3 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>'
+        :'<div class="mb-3"></div>')
+      +'<div class="grid gap-2 mb-3" style="grid-template-columns:repeat(4,1fr)">'
+      +statusBtn(idx,'正常',item.status)+statusBtn(idx,'不正常',item.status)
+      +statusBtn(idx,'改善後合格',item.status)+statusBtn(idx,'未列入',item.status)
+      +'</div>'
+      +'<div id="item-extra-'+idx+'" class="'+(item.status==='不正常'||item.status==='改善後合格'?'':'hidden')+' space-y-2">'
+      +'<textarea id="item-desc-'+idx+'" onchange="setDesc('+idx+',this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none" rows="2" placeholder="'+(item.status==='不正常'?'狀況說明（必填）':'狀況說明')+'">'+esc(item.description)+'</textarea>'
+      +'<div class="flex items-center gap-2">'
+      +'<label for="item-photo-'+idx+'" class="flex-1 flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-2 text-sm cursor-pointer '+(item.photoThumb?'border-green-400 text-green-600 bg-green-50':'border-gray-300 text-gray-500 hover:border-blue-400')+'">'
+      +'📷 '+(item.photoThumb?'已拍照（點擊更換）':'拍照 / 上傳')
+      +'<input id="item-photo-'+idx+'" type="file" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event,'+idx+')">'
+      +'</label>'
+      +(item.photoThumb?'<button onclick="removePhoto('+idx+')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">🗑️</button>':'')
+      +'</div>'
+      +(item.photoThumb?'<img src="'+item.photoThumb+'" class="w-full object-cover rounded-xl border border-gray-200" style="max-height:9rem">':'')
+      +'</div>'
+      +'</div></div>';
+  });
+  $('checklist-items').innerHTML=html;
+  updateCompleteBtn();
+}
+
+function statusBtn(idx,label,current){
+  var map={'正常':'s-normal','不正常':'s-abnormal','改善後合格':'s-improved','未列入':'s-na'};
+  var shortLabel={'正常':'正常','不正常':'不正常','改善後合格':'改善合格','未列入':'未列入'}[label]||label;
+  var cls='btn-status py-3 text-xs font-semibold rounded-xl bg-gray-100 text-gray-600 w-full '+(current===label?map[label]:'');
+  return '<button class="'+cls+'" onclick="setStatus('+idx+',\''+label+'\')">'+shortLabel+'</button>';
+}
+
+function setStatus(idx,s){
+  S.report.items[idx].status=s;
+  var extra=$('item-extra-'+idx);
+  var show=(s==='不正常'||s==='改善後合格');
+  if(extra) extra.classList.toggle('hidden',!show);
+  if(!show){ S.report.items[idx].description=''; }
+
+  // update card border
+  var cards=$('checklist-items').querySelectorAll('.border-l-4');
+  if(cards[idx]){
+    ['border-l-normal','border-l-abnormal','border-l-improved','border-l-na','border-gray-200'].forEach(function(c){ cards[idx].classList.remove(c); });
+    var bc=borderClass(s);
+    if(bc) cards[idx].classList.add(bc); else cards[idx].classList.add('border-gray-200');
+  }
+
+  // update buttons
+  var grid=cards[idx].querySelectorAll('.btn-status');
+  var labels=['正常','不正常','改善後合格','未列入'];
+  var map2={'正常':'s-normal','不正常':'s-abnormal','改善後合格':'s-improved','未列入':'s-na'};
+  grid.forEach(function(btn,i){
+    ['s-normal','s-abnormal','s-improved','s-na'].forEach(function(c){ btn.classList.remove(c); });
+    if(labels[i]===s) btn.classList.add(map2[s]);
+  });
+
+  updateProgress();
+  updateCompleteBtn();
+}
+
+function setDesc(idx,v){ S.report.items[idx].description=v; }
+
+function updateProgress(){
+  var done=S.report.items.filter(function(i){return i.status;}).length;
+  var total=S.report.items.length;
+  var pct=total?Math.round(done/total*100):0;
+  $('cl-progress-text').textContent=done+' / '+total;
+  $('cl-progress-bar').style.width=pct+'%';
+  $('cl-progress-pct').textContent=pct+'% 完成';
+}
+
+function updateCompleteBtn(){
+  var done=S.report.items.filter(function(i){return i.status;}).length;
+  var total=S.report.items.length;
+  var btn=$('btn-complete');
+  if(done===total){
+    btn.className='w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base';
+    btn.textContent='✓ 完成查驗';
+  } else {
+    btn.className='w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-2xl text-base';
+    btn.textContent='還有 '+(total-done)+' 項未查驗';
+  }
+}
+
+function handlePhoto(e,idx){
+  var file=e.target.files[0]; if(!file) return;
+  resizeImg(file,600,function(dataUrl){
+    S.report.items[idx].photo=dataUrl;
+    S.report.items[idx].photoThumb=dataUrl;
+    renderChecklist();
+  });
+}
+function removePhoto(idx){
+  S.report.items[idx].photo=null;
+  S.report.items[idx].photoThumb=null;
+  renderChecklist();
+}
+function resizeImg(file,maxW,cb){
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var img=new Image();
+    img.onload=function(){
+      var r=Math.min(1,maxW/img.width);
+      var c=document.createElement('canvas');
+      c.width=img.width*r; c.height=img.height*r;
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      cb(c.toDataURL('image/jpeg',0.72));
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// criterion modal
+function showCriterion(idx){
+  var item=S.report.items[idx];
+  $('criterion-title').textContent=item.name;
+  $('criterion-body').textContent=item.criterion;
+  $('criterion-modal').classList.remove('hidden');
+}
+function closeCriterionModal(){ $('criterion-modal').classList.add('hidden'); }
+function closeCriterion(e){ if(e.target.id==='criterion-modal') closeCriterionModal(); }
+function toggleById(contentId,arrowId){
+  var body=document.getElementById(contentId);
+  var arrow=document.getElementById(arrowId);
+  if(!body) return;
+  var hidden=body.classList.toggle('hidden');
+  if(arrow) arrow.textContent=hidden?'▶':'▼';
+}
+
+// ====== SAVE ======
+function saveAsDraft(){
+  S.report.status='draft';
+  persistReport();
+  showToast('草稿已儲存');
+}
+function completeReport(){
+  var done=S.report.items.filter(function(i){return i.status;}).length;
+  if(done<S.report.items.length){ showToast('請完成所有查驗項目'); return; }
+  S.report.status='completed';
+  persistReport();
+  goTo('complete');
+}
+function persistReport(){
+  var data=JSON.parse(JSON.stringify(S.report));
+  data.createdAt=Date.now();
+  var idx=S.reports.findIndex(function(r){return r.id===data.id;});
+  if(idx>=0) S.reports.splice(idx,1,data); else S.reports.push(data);
+  saveLS();
+  if(window._sopSet){
+    setSyncStatus('saving');
+    window._sopSet('reports/'+data.id, data).then(function(){ setSyncStatus('saved'); }).catch(function(){ setSyncStatus('error'); });
+  }
+}
+
+// ====== COMPLETE VIEW ======
+function renderComplete(){
+  var r=S.report;
+  $('complete-subtitle').textContent=(r.caseName||'')+(r.date?' · '+r.date:'');
+
+  $('complete-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
+    +infoRow('工法',r.templateName)+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +infoRow(TEMPLATES.find(function(t){return t.id===r.templateId;})||{materialLabel:'材質'},'materialLabel' in (TEMPLATES.find(function(t){return t.id===r.templateId;})||{})?TEMPLATES.find(function(t){return t.id===r.templateId;}).materialLabel:'材質',r.material)
+    +infoRow('部門',r.department)+infoRow('填表人員',r.personnel)+infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
+    +'</div>';
+
+  var n=0,a=0,im=0,x=0;
+  (r.items||[]).forEach(function(i){ if(i.status==='正常') n++; else if(i.status==='不正常') a++; else if(i.status==='改善後合格') im++; else if(i.status==='未列入') x++; });
+  $('complete-stats').innerHTML=
+    '<div class="bg-green-50 rounded-xl p-2 text-center"><div class="text-xl font-bold text-green-700">'+n+'</div><div class="text-xs text-green-600">正常</div></div>'
+    +'<div class="bg-red-50 rounded-xl p-2 text-center"><div class="text-xl font-bold text-red-700">'+a+'</div><div class="text-xs text-red-600">不正常</div></div>'
+    +'<div class="bg-yellow-50 rounded-xl p-2 text-center"><div class="text-xl font-bold text-yellow-700">'+im+'</div><div class="text-xs text-yellow-600">改善合格</div></div>'
+    +'<div class="bg-gray-50 rounded-xl p-2 text-center"><div class="text-xl font-bold text-gray-500">'+x+'</div><div class="text-xs text-gray-500">未列入</div></div>';
+
+  $('complete-items').innerHTML='<div class="p-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">查驗明細</div>'
+    +'<div class="divide-y divide-gray-50">'+itemsHTML(r.items)+'</div>';
+}
+
+function itemsHTML(items, pfx){
+  pfx=pfx||'cp';
+  return (items||[]).map(function(item,idx){
+    var cid=pfx+'-crit-'+idx, aid=pfx+'-arw-'+idx;
+    return '<div class="px-4 py-2">'
+      +'<div class="flex items-start gap-3">'
+      +'<span class="text-xs text-gray-400 flex-shrink-0 mt-1" style="min-width:1.25rem;text-align:right">'+(idx+1)+'</span>'
+      +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+esc(item.name)+'</div>'
+      +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
+      +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 text-xs">&#128221; '+esc(item.description)+'</div>':'')
+      +'</div>'
+      +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
+      +'</div></div>';
+  }).join('');
+}
+
+// ====== HISTORY ======
+function renderHistory(){
+  // fill filter template select
+  var sel=$('h-filter-tpl');
+  if(sel.options.length<=1){
+    TEMPLATES.forEach(function(t){ sel.innerHTML+='<option value="'+t.id+'">'+esc(t.name)+'</option>'; });
+  }
+  var ft=sel.value, fs=$('h-filter-status').value;
+  var list=[].concat(S.reports)
+    .filter(function(r){ return (!ft||r.templateId===ft)&&(!fs||r.status===fs); })
+    .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+
+  if(list.length===0){
+    $('history-list').innerHTML='<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">📭</div><div class="text-sm">沒有符合的記錄</div></div>';
+    return;
+  }
+  $('history-list').innerHTML=list.map(function(r){
+    return '<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all">'
+      +'<div class="flex items-start gap-3">'
+      +'<div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
+      +'<div class="flex-1 min-w-0">'
+      +'<div class="flex items-center justify-between">'
+      +'<span class="font-semibold text-gray-800 text-sm truncate">'+esc(r.caseName)+'</span>'
+      +'<span class="text-xs flex-shrink-0 ml-2 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</span>'
+      +'</div>'
+      +'<div class="text-xs text-gray-500 mt-1 truncate">'+esc(r.templateName)+'</div>'
+      +'<div class="text-xs text-gray-400 mt-1">'+esc(r.date)+' · '+esc(r.personnel)+'</div>'
+      +'</div></div></div>';
+  }).join('');
+}
+
+// ====== DETAIL ======
+function viewReport(id){
+  S.selectedReportId=id;
+  goTo('detail');
+}
+function renderDetail(){
+  var r=S.reports.find(function(x){return x.id===S.selectedReportId;});
+  if(!r) return;
+
+  $('detail-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
+    +infoRow('工法',r.templateName)+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +infoRow('材質/石材',r.material)+infoRow('部門',r.department)+infoRow('填表人員',r.personnel)
+    +infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
+    +'</div>';
+
+  $('detail-items').innerHTML='<div class="p-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">查驗明細</div>'
+    +'<div class="divide-y divide-gray-50">'
+    +(r.items||[]).map(function(item,idx){
+      var cid='dt-crit-'+idx, aid='dt-arw-'+idx;
+      return '<div class="px-4 py-2">'
+        +'<div class="flex items-start gap-3">'
+        +'<span class="text-xs text-gray-400 flex-shrink-0 mt-1" style="min-width:1.25rem;text-align:right">'+(idx+1)+'</span>'
+        +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+esc(item.name)+'</div>'
+        +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
+        +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1">&#128221; '+esc(item.description)+'</div>':'')
+        +(item.photoThumb?'<img src="'+item.photoThumb+'" class="mt-2 w-full object-cover rounded-lg" style="max-height:7rem">':'')
+        +'</div>'
+        +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
+        +'</div></div>';
+    }).join('')+'</div>';
+
+  $('btn-print-detail').onclick=function(){ printReportData(r); };
+  $('btn-delete-detail').onclick=function(){ deleteReport(r.id); };
+}
+
+function deleteReport(id){
+  if(!confirm('確定刪除此查核記錄？')) return;
+  S.reports=S.reports.filter(function(r){return r.id!==id;});
+  saveLS();
+  if(window._sopRemove){ window._sopRemove('reports/'+id).catch(function(){}); }
+  showToast('已刪除');
+  goBack();
+}
+
+// ====== SETTINGS ======
+function renderSettings(){
+  var secs=[
+    {key:'cases',label:'案場管理',icon:'📍'},
+    {key:'departments',label:'部門管理',icon:'🏢'},
+    {key:'personnel',label:'人員管理',icon:'👤'},
+    {key:'contractors',label:'施工廠商',icon:'🔨'}
+  ];
+  secs.forEach(function(sec){
+    var el=$('cfg-'+sec.key);
+    var items=S.config[sec.key]||[];
+    var listHtml=items.map(function(item,i){
+      return '<div class="flex items-center gap-2 mb-2">'
+        +'<span class="flex-1 text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">'+esc(item)+'</span>'
+        +'<button onclick="removeCfgItem(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded-lg">&#10005;</button>'
+        +'</div>';
+    }).join('');
+    if(!items.length) listHtml='<div class="text-xs text-gray-400 py-1 mb-2">尚無資料</div>';
+
+    el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-3">'+sec.icon+' '+esc(sec.label)+'</h3>'
+      +listHtml
+      +'<div class="flex gap-2">'
+      +'<input id="cfg-input-'+sec.key+'" placeholder="新增'+esc(sec.label)+'" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onkeyup="if(event.key===\'Enter\') addCfgItem(\''+sec.key+'\')">'
+      +'<button onclick="addCfgItem(\''+sec.key+'\')" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">+</button>'
+      +'</div>';
+  });
+}
+
+function addCfgItem(key){
+  var inp=$('cfg-input-'+key);
+  var v=inp.value.trim();
+  if(!v||S.config[key].indexOf(v)>=0) return;
+  S.config[key].push(v);
+  inp.value='';
+  renderSettings();
+}
+function removeCfgItem(key,idx){
+  S.config[key].splice(idx,1);
+  renderSettings();
+}
+function saveConfig(){
+  saveLS();
+  if(window._sopSet){
+    window._sopSet('config', S.config).then(function(){ showToast('設定已儲存並同步'); }).catch(function(){ showToast('設定已存本機'); });
+  } else {
+    showToast('設定已儲存');
+  }
+}
+function syncNow(){
+  if(!window._sopSet){ showToast('Firebase 未連線'); return; }
+  setSyncStatus('saving');
+  var p = window._sopSet('config', S.config);
+  S.reports.forEach(function(r){ p = p.then(function(){ return window._sopSet('reports/'+r.id, r); }); });
+  p.then(function(){ setSyncStatus('saved'); showToast('同步完成'); }).catch(function(){ setSyncStatus('error'); showToast('同步失敗'); });
+}
+
+// ====== PRINT ======
+function buildPrintHTML(r){
+  var tpl=TEMPLATES.find(function(t){return t.id===r.templateId;})||{materialLabel:'材質/石材'};
+  var rows=(r.items||[]).map(function(it,i){
+    var sc={'正常':'s-n2','不正常':'s-a2','改善後合格':'s-i2','未列入':'s-x2'}[it.status]||'s-x2';
+    return '<tr><td style="text-align:center;color:#888;width:24px">'+(i+1)+'</td>'
+      +'<td><strong>'+esc(it.name)+'</strong></td>'
+      +'<td style="text-align:center;width:88px"><span class="status-badge '+sc+'">'+esc(it.status||'未填')+'</span></td>'
+      +'<td style="font-size:9.5pt;color:#555">'+esc(it.description||'')
+      +(it.photoThumb?'<br><img src="'+it.photoThumb+'" style="max-height:72px;border-radius:4px;margin-top:4px">':'')+'</td></tr>';
+  }).join('');
+
+  return '<div style="font-family:sans-serif;max-width:760px;margin:0 auto;padding:16px">'
+    +'<div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #1e3a5f;padding-bottom:10px">'
+    +'<h1 style="font-size:17pt;color:#1e3a5f;margin:0 0 3px">標準作業流程查核表</h1>'
+    +'<p style="font-size:10pt;color:#666;margin:0">'+esc(r.templateName)+'</p></div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10pt">'
+    +'<tr><td style="color:#666;width:15%;padding:2px 0">案場</td><td style="font-weight:600;padding:2px 8px;width:35%">'+esc(r.caseName)+'</td><td style="color:#666;width:12%">日期</td><td style="font-weight:600;padding:2px 8px">'+esc(r.date)+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">施作範圍</td><td style="font-weight:600;padding:2px 8px">'+esc(r.area)+'</td><td style="color:#666">部門</td><td style="font-weight:600;padding:2px 8px">'+esc(r.department||'')+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">'+esc(tpl.materialLabel)+'</td><td colspan="3" style="font-weight:600;padding:2px 8px">'+esc(r.material||'')+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">填表人員</td><td style="font-weight:600;padding:2px 8px">'+esc(r.personnel)+'</td><td style="color:#666">施工廠商</td><td style="font-weight:600;padding:2px 8px">'+esc(r.contractor||'')+'</td></tr>'
+    +'<tr><td style="color:#666;padding:2px 0">施工人員</td><td colspan="3" style="font-weight:600;padding:2px 8px">'+esc(r.workers||'')+'</td></tr>'
+    +'</table>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:14px">'
+    +'<thead><tr style="background:#e8f0fe"><th style="border:1px solid #ccc;padding:6px;text-align:center">#</th>'
+    +'<th style="border:1px solid #ccc;padding:6px;text-align:left">查檢項目</th>'
+    +'<th style="border:1px solid #ccc;padding:6px;text-align:center">查檢狀況</th>'
+    +'<th style="border:1px solid #ccc;padding:6px;text-align:left">狀況說明 / 照片</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'<div style="display:flex;gap:36px;margin-top:18px;padding-top:14px;border-top:1px solid #ddd">'
+    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">填表人：'+esc(r.personnel)+'</div></div>'
+    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">主管核簽</div></div>'
+    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">客戶確認</div></div>'
+    +'</div>'
+    +'<div style="text-align:right;margin-top:10px;font-size:8pt;color:#bbb">列印：'+new Date().toLocaleString('zh-TW')+'</div>'
+    +'</div>';
+}
+
+function openPrint(html){
+  var w=window.open('','_blank');
+  var doc='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>標準作業流程查核表</title>'
+    +'<style>body{font-family:sans-serif;margin:0;padding:0}'
+    +'.status-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:9pt;font-weight:600}'
+    +'.s-n2{background:#dcfce7;color:#166534}.s-a2{background:#fee2e2;color:#991b1b}'
+    +'.s-i2{background:#ffedd5;color:#9a3412}.s-x2{background:#f3f4f6;color:#4b5563}'
+    +'table td,table th{border:1px solid #ccc;padding:5px 7px;vertical-align:top}'
+    +'@media print{@page{margin:12mm}}</style></head><body>'+html+'</body></html>';
+  w.document.write(doc);
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 600);
+}
+
+function printCurrentReport(){ openPrint(buildPrintHTML(JSON.parse(JSON.stringify(S.report)))); }
+function printReportData(r){ openPrint(buildPrintHTML(r)); }
+
+// ====== INIT ======
+(function init(){
+  // load local
+  var local=loadLS();
+  if(local){
+    if(local.config) { ['cases','departments','personnel','contractors'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
+    if(local.reports) S.reports=local.reports;
+  }
+
+  // load Firebase
+  if(window._sopGet){
+    Promise.all([window._sopGet('config'), window._sopGet('reports')]).then(function(res){
+      var fbCfg=res[0], fbRpts=res[1];
+      if(fbCfg){ ['cases','departments','personnel','contractors'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; }); }
+      if(fbRpts){
+        var cloud=Object.values(fbRpts);
+        cloud.forEach(function(r){
+          var idx=S.reports.findIndex(function(x){return x.id===r.id;});
+          if(idx>=0){ if((r.createdAt||0)>(S.reports[idx].createdAt||0)) S.reports.splice(idx,1,r); }
+          else S.reports.push(r);
+        });
+      }
+      saveLS();
+      setSyncStatus('saved');
+      setTimeout(function(){setSyncStatus('');},2000);
+      renderHome();
+    }).catch(function(e){ console.warn('Firebase load err:',e); });
+  }
+
+  // bind header buttons
+  document.getElementById('btn-back').addEventListener('click', goBack);
+  document.getElementById('btn-settings').addEventListener('click', function(){ goTo('settings'); });
+
+  // render initial view
+  showView('home');
+})();
+</script>
+</body>
+</html>
