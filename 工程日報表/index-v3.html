@@ -1610,17 +1610,14 @@ async function exportExcel(){
 
 /* ── SETTINGS ── */
 function loadCfgForm(){
-  loadListField('lf-depts',S.cfg.depts);
   loadListField('lf-locs',S.cfg.locs);
   loadListField('lf-works',S.cfg.works);
   loadListField('lf-leads',S.cfg.leads);
   loadListField('lf-matnames',S.cfg.matNames);
   loadListField('lf-matunits',S.cfg.matUnits);
   renderProjTable();
-  renderUsersTable();
 }
 function saveSettings(){
-  S.cfg.depts = readListField('lf-depts');
   S.cfg.locs = readListField('lf-locs');
   S.cfg.works = readListField('lf-works');
   S.cfg.leads = readListField('lf-leads');
