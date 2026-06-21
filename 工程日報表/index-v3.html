@@ -225,7 +225,7 @@ input[type="file"]{display:none}
     <span id="nav-name" class="nav-badge"></span>
     <span id="nav-dept" class="nav-badge" style="background:rgba(147,197,253,.25)"></span>
   </div>
-  <span id="sync-icon" title="同步狀態"></span>
+  <span id="sync-icon" title="雲端同步狀態">☁️</span>
 </nav>
 
 <div class="print-header"><h1>工程日報表</h1><p id="ph-info"></p></div>
@@ -823,15 +823,12 @@ function save() {
       projSort: S.projSort, updatedAt: Date.now()
     };
     localStorage.setItem('cdr_v3', JSON.stringify(data));
-    setSyncIcon('💾');
-    // Firebase 整包同步（跨裝置）
+    // Firebase 整包同步（跨裝置，圖示持久顯示，仿圖面進度表）
     if(window._cdrSet){
       setSyncIcon('☁️');
       window._cdrSet('all', data)
-        .then(()=>{ setSyncIcon('☁️✅'); setTimeout(()=>setSyncIcon(''),1500); })
-        .catch(()=>{ setSyncIcon('☁️❌'); setTimeout(()=>setSyncIcon(''),3000); });
-    } else {
-      setTimeout(()=>setSyncIcon(''),1500);
+        .then(()=>setSyncIcon('☁️✅'))
+        .catch(()=>setSyncIcon('☁️❌'));
     }
   } catch(e) { toast('儲存失敗：'+e.message,'e'); }
 }

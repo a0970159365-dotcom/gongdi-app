@@ -58,7 +58,7 @@
       <div class="text-sm font-semibold truncate leading-tight">查檢表（標準作業流程)</div>
       <div id="page-title" class="text-xs text-blue-200 truncate leading-tight mt-0.5">檢核填寫</div>
     </div>
-    <span id="sync-icon" class="text-xs mr-1"></span>
+    <span id="sync-icon" class="text-xs mr-1" title="雲端同步狀態">☁️</span>
     <button id="btn-settings" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-lg flex-shrink-0">&#9881;&#65039;</button>
   </div>
 </header>
@@ -347,7 +347,7 @@ function setSyncStatus(st){
   S.syncStatus=st;
   var el=$('sync-icon'), txt=$('sync-status-text');
   if(st==='saving'){ el.textContent='⏳'; el.className='text-xs mr-1 text-blue-300'; txt.textContent='⏳ 同步中...'; txt.className='text-sm text-blue-600'; }
-  else if(st==='saved'){ el.textContent='☁️✓'; el.className='text-xs mr-1 text-green-300'; txt.textContent='✓ 已同步至雲端'; txt.className='text-sm text-green-600'; setTimeout(function(){ el.textContent=''; },3000); }
+  else if(st==='saved'){ el.textContent='☁️✅'; el.className='text-xs mr-1 text-green-300'; txt.textContent='✓ 已同步至雲端'; txt.className='text-sm text-green-600'; }
   else if(st==='error'){ el.textContent='⚠️'; el.className='text-xs mr-1 text-red-300'; txt.textContent='⚠️ 同步失敗（資料已存本機）'; txt.className='text-sm text-red-500'; }
   else { el.textContent=''; txt.textContent='— 尚未同步'; txt.className='text-sm text-gray-400'; }
 }
@@ -1127,7 +1127,6 @@ function syncFromPortal(){
       }
       saveLS();
       setSyncStatus('saved');
-      setTimeout(function(){setSyncStatus('');},2000);
       renderHome();
     }).catch(function(e){ console.warn('Firebase load err:',e); });
   }
