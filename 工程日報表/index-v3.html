@@ -171,6 +171,29 @@ input[type="file"]{display:none}
 }
 @media screen{.print-header{display:none}.pv{display:none}}
 </style>
+
+<!-- Firebase compat SDK（跨裝置同步） -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+(function(){
+  try {
+    firebase.initializeApp({
+      apiKey:"AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
+      authDomain:"dailyconstructionreport-dfe1b.firebaseapp.com",
+      databaseURL:"https://dailyconstructionreport-dfe1b-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:"dailyconstructionreport-dfe1b",
+      storageBucket:"dailyconstructionreport-dfe1b.firebasestorage.app",
+      messagingSenderId:"228712770866",
+      appId:"1:228712770866:web:07634a3df74781419cfb2b"
+    });
+    var _db = firebase.database();
+    window._cdrSet    = function(p,d){ return _db.ref('cdr_v3/'+p).set(d); };
+    window._cdrGet    = function(p){ return _db.ref('cdr_v3/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
+    window._cdrRemove = function(p){ return _db.ref('cdr_v3/'+p).remove(); };
+  } catch(e){ console.warn('Firebase init failed:',e); }
+})();
+</script>
 </head>
 <body>
 
@@ -795,12 +818,21 @@ function load() {
 }
 function save() {
   try {
-    localStorage.setItem('cdr_v3', JSON.stringify({
+    const data = {
       reports: S.reports, cfg: S.cfg, user: S.user,
       projSort: S.projSort, updatedAt: Date.now()
-    }));
+    };
+    localStorage.setItem('cdr_v3', JSON.stringify(data));
     setSyncIcon('💾');
-    setTimeout(()=>setSyncIcon(''),1500);
+    // Firebase 整包同步（跨裝置）
+    if(window._cdrSet){
+      setSyncIcon('☁️');
+      window._cdrSet('all', data)
+        .then(()=>{ setSyncIcon('☁️✅'); setTimeout(()=>setSyncIcon(''),1500); })
+        .catch(()=>{ setSyncIcon('☁️❌'); setTimeout(()=>setSyncIcon(''),3000); });
+    } else {
+      setTimeout(()=>setSyncIcon(''),1500);
+    }
   } catch(e) { toast('儲存失敗：'+e.message,'e'); }
 }
 function setSyncIcon(s) { const el=$('sync-icon'); if(el) el.textContent=s; }
@@ -1819,7 +1851,34 @@ function backToPortal(){
 
 /* ── INIT ── */
 function init(){
-  load();
+  load();  // 1. 先讀本機（快）
+
+  // 2. Firebase 拉雲端，用 updatedAt 判新舊
+  if(window._cdrGet){
+    window._cdrGet('all').then(function(cloud){
+      if(!cloud) {
+        // 雲端沒資料 → 本機有就推一次（首次同步）
+        var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
+        if((localData.reports||[]).length && window._cdrSet){
+          window._cdrSet('all', localData);
+        }
+        return;
+      }
+      var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
+      var localTime = localData.updatedAt || 0;
+      var cloudTime = cloud.updatedAt || 0;
+      if(cloudTime > localTime){
+        S.reports = cloud.reports || [];
+        if(cloud.cfg) S.cfg = {...S.cfg, ...cloud.cfg};
+        if(cloud.user) S.user = {...S.user, ...cloud.user};
+        if(cloud.projSort) S.projSort = cloud.projSort;
+        localStorage.setItem('cdr_v3', JSON.stringify(cloud));
+        if(S.page) goPage(S.page);
+        toast('已從雲端同步最新資料 ☁️','s');
+      }
+    }).catch(function(e){ console.warn('Firebase load failed:',e); });
+  }
+
   if (initPortalUser()) {
     // 來自入口：直接進入系統
     $('login-overlay').style.display = 'none';
