@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>石御石材工程管理系統</title>
+<style>
+:root{
+  --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
+  --accent:#c2560a;--accent-l:#e07820;
+  --success:#16a34a;--danger:#dc2626;--warning:#ca8a04;
+  --bg:#f1f5f9;--card-bg:#fff;--border:#cbd5e1;
+  --text:#1e293b;--muted:#64748b;--text-light:#94a3b8;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.08);
+  --shadow-md:0 4px 12px rgba(0,0,0,.1);
+  --shadow-lg:0 10px 30px rgba(0,0,0,.15);
+  --radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.55}
+
+/* ── NAV ── */
+nav{background:var(--primary);min-height:56px;display:flex;align-items:center;padding:0 20px;gap:6px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.25);flex-wrap:wrap}
+.nav-logo{color:#fff;font-size:16px;font-weight:800;margin-right:8px;white-space:nowrap;display:flex;align-items:center;gap:10px}
+.nav-logo .logo-icon{width:36px;height:36px;background:#fff;border-radius:6px;padding:3px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.nav-logo .logo-icon img{width:100%;height:100%;object-fit:contain;display:block}
+.nav-logo span{color:#93c5fd}
+.nav-v{background:#f59e0b;color:var(--primary);font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;margin-left:4px}
+.nav-spacer{flex:1}
+.nav-btn{background:transparent;border:none;color:rgba(255,255,255,.75);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.nav-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-btn.active{background:rgba(255,255,255,.2);color:#fff;font-weight:700}
+.nav-user{color:rgba(255,255,255,.9);font-size:12px;display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;background:rgba(255,255,255,.08);border-radius:18px;margin-left:6px;cursor:pointer;transition:background .15s;border:none;font-family:inherit}
+.nav-user:hover{background:rgba(255,255,255,.16)}
+.nav-user .switch-ic{font-size:11px;opacity:.6;margin-left:2px}
+
+/* ── BELL & NOTIFICATIONS ── */
+.nav-bell{position:relative;background:transparent;border:none;color:rgba(255,255,255,.85);font-size:18px;cursor:pointer;padding:7px 10px;border-radius:6px;transition:all .15s;font-family:inherit}
+.nav-bell:hover{background:rgba(255,255,255,.14);color:#fff}
+.nav-bell-dot{position:absolute;top:2px;right:2px;min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:9px;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--primary);box-shadow:0 0 0 1px #ef4444}
+.notif-panel{position:fixed;top:62px;right:20px;width:380px;max-width:calc(100vw - 30px);background:#fff;border-radius:12px;box-shadow:var(--shadow-lg);z-index:90;display:none;max-height:560px;flex-direction:column;overflow:hidden;border:1px solid var(--border);animation:fadeIn .15s ease}
+.notif-panel.show{display:flex}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--bg);flex-shrink:0}
+.notif-head strong{color:var(--primary);font-size:14px;font-weight:800}
+.notif-mark-all{background:transparent;border:none;color:var(--primary-l);font-size:12px;font-weight:700;cursor:pointer;padding:4px 8px;border-radius:4px;font-family:inherit}
+.notif-mark-all:hover{background:var(--bg)}
+.notif-list{flex:1;overflow-y:auto;min-height:60px;max-height:460px}
+.notif-item{padding:12px 18px;border-bottom:1px solid var(--bg);cursor:pointer;display:flex;gap:12px;transition:background .15s;position:relative}
+.notif-item:hover{background:#f8fafc}
+.notif-item.unread{background:#fff7ed}
+.notif-item.unread:hover{background:#ffedd5}
+.notif-item.unread::before{content:'';position:absolute;left:8px;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.notif-item .ic{width:34px;height:34px;border-radius:8px;flex-shrink:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:17px}
+.notif-item.priority-high .ic{background:#fee2e2;color:var(--danger)}
+.notif-item.priority-normal .ic{background:#dbeafe;color:var(--primary)}
+.notif-item .body{flex:1;min-width:0}
+.notif-item .title{font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px;display:flex;align-items:center;gap:6px}
+.notif-item .message{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:4px;word-break:break-word}
+.notif-item .meta{font-size:11px;color:var(--text-light);display:flex;align-items:center;gap:6px}
+.notif-item .meta-app{background:var(--bg);padding:1px 6px;border-radius:8px;font-weight:600;color:var(--primary)}
+.notif-empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:13px}
+.nav-user .avatar{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+.nav-user .info{display:flex;flex-direction:column;line-height:1.2}
+.nav-user .name{font-weight:700;font-size:12px}
+.nav-user .dept{font-size:10px;opacity:.75}
+
+/* ── LAYOUT ── */
+.container{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+.page{display:none}
+.page.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── HERO ── */
+.hero{padding:32px 0 24px;text-align:center}
+.hero h1{font-size:32px;font-weight:800;color:var(--primary);letter-spacing:-.5px;margin-bottom:8px}
+.hero .sub{color:var(--muted);font-size:15px;font-weight:500}
+.hero .badge{display:inline-block;background:linear-gradient(135deg,var(--accent) 0%,var(--accent-l) 100%);color:#fff;padding:3px 12px;border-radius:14px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:14px;box-shadow:0 2px 8px rgba(194,86,10,.3)}
+
+/* ── SECTION ── */
+.section{margin-bottom:36px}
+.section-title{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-left:4px}
+.section-title h2{font-size:17px;font-weight:800;color:var(--primary)}
+.section-title .bar{width:4px;height:18px;background:var(--accent);border-radius:2px}
+.section-title .note{margin-left:auto;font-size:12px;color:var(--muted);font-weight:500}
+
+/* ── CARDS ── */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:900px){.cards{grid-template-columns:1fr}}
+.app-card{background:var(--card-bg);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm);border:1px solid transparent;transition:all .2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;cursor:pointer;position:relative;overflow:hidden}
+.app-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--primary-l)}
+.app-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary) 0%,var(--primary-l) 100%);opacity:0;transition:opacity .2s}
+.app-card:hover::before{opacity:1}
+.app-card .ic{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px;background:linear-gradient(135deg,var(--primary) 0%,var(--primary-l) 100%);color:#fff}
+.app-card .ic.ic-accent{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-l) 100%)}
+.app-card .ic.ic-green{background:linear-gradient(135deg,#16a34a 0%,#22c55e 100%)}
+.app-card h3{font-size:17px;font-weight:800;color:var(--primary);margin-bottom:6px}
+.app-card .desc{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:16px;flex:1}
+.app-card .meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-light);margin-bottom:14px;flex-wrap:wrap}
+.app-card .meta .dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.app-card .enter-btn{background:var(--primary);color:#fff;padding:9px 14px;border-radius:6px;font-size:13px;font-weight:700;text-align:center;transition:background .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.app-card:hover .enter-btn{background:var(--primary-l)}
+.app-card-disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}
+.app-card-disabled:hover{transform:none;box-shadow:var(--shadow-sm);border-color:transparent}
+.app-card-disabled:hover::before{opacity:0}
+.app-card-disabled .enter-btn{background:var(--muted)}
+.app-card-disabled::after{content:'🔒 無權限';position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;color:var(--danger);background:#fee2e2;padding:3px 8px;border-radius:10px}
+
+/* ── COMING SOON ── */
+.coming-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:900px){.coming-cards{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.coming-cards{grid-template-columns:1fr}}
+.coming-card{background:#fff;border:1px dashed var(--border);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:12px;opacity:.75}
+.coming-card .ic{width:36px;height:36px;border-radius:8px;background:var(--bg);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.coming-card .body{flex:1;min-width:0}
+.coming-card h4{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.coming-card p{font-size:11px;color:var(--muted);line-height:1.4}
+.coming-card .tag{background:var(--warning);color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;flex-shrink:0}
+
+/* ── SETTINGS ── */
+.settings-tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
+.tab-btn{background:transparent;border:none;padding:10px 16px;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;transition:all .15s}
+.tab-btn:hover{color:var(--primary)}
+.tab-btn.active{color:var(--primary);border-color:var(--accent)}
+.tab-btn.disabled{color:var(--text-light);cursor:not-allowed;opacity:.5}
+.tab-btn .lock{font-size:11px;background:var(--bg);padding:1px 6px;border-radius:8px;font-weight:600}
+
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn .2s}
+
+.tab-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.tab-toolbar .count{color:var(--muted);font-size:13px}
+.tab-toolbar .count strong{color:var(--primary);font-weight:800;font-size:15px}
+
+.btn{border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:all .15s;text-decoration:none;line-height:1}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-l)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-l)}
+.btn-secondary{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--primary)}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid transparent}
+.btn-danger:hover{background:#fef2f2;border-color:var(--danger)}
+.btn-sm{padding:6px 10px;font-size:12px}
+
+/* ── TABLE ── */
+.data-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--bg)}
+th{text-align:left;padding:11px 14px;font-weight:800;font-size:12px;color:var(--primary);letter-spacing:.3px;text-transform:uppercase;border-bottom:2px solid var(--border)}
+td{padding:12px 14px;border-bottom:1px solid var(--bg);font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#fafbfc}
+.tag-pill{display:inline-block;padding:2px 10px;background:var(--bg);color:var(--primary);border-radius:10px;font-size:11px;font-weight:700}
+.seq{display:inline-block;min-width:24px;text-align:center;color:var(--muted);font-weight:700;font-size:12px}
+.code-pill{display:inline-block;padding:2px 8px;background:#eef2f7;color:var(--primary-d);border-radius:4px;font-family:'Consolas','Courier New',monospace;font-size:12px;font-weight:700;letter-spacing:.3px}
+
+/* ── LEVEL PILLS ── */
+.level-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:800;letter-spacing:.3px;color:#fff}
+.legend-card{margin-top:14px;padding:12px 16px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:0;border:1px solid var(--border)}
+.legend-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;row-gap:8px;padding:8px 0}
+.legend-row + .legend-row{border-top:1px solid var(--border)}
+.legend-row strong{color:var(--text);min-width:60px;font-weight:800;font-size:12px}
+.legend-item{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.level-none{background:#cbd5e1;color:#475569}
+.level-self{background:#64748b}
+.level-dept{background:#0ea5e9}
+.level-cross{background:var(--accent)}
+.level-all{background:var(--danger)}
+.app-pill{display:inline-block;padding:2px 7px;margin:0 2px 2px 0;background:var(--bg);color:var(--primary);border-radius:4px;font-size:11px;font-weight:600}
+.dept-pill{display:inline-block;padding:2px 9px;margin:0 3px 3px 0;background:#fff7ed;color:var(--accent);border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700}
+
+/* ── RADIO/CHECKBOX UI ── */
+.level-radio-group{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:8px;padding:10px}
+.level-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid transparent;border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s}
+.level-radio:hover{border-color:var(--primary-l)}
+.level-radio input[type=radio]{margin:0;cursor:pointer;accent-color:var(--primary)}
+.checkbox-list{display:flex;flex-wrap:wrap;gap:6px;background:var(--bg);border-radius:8px;padding:10px}
+.checkbox-item{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12.5px;transition:all .15s}
+.checkbox-item:hover{border-color:var(--primary-l)}
+.checkbox-item input[type=checkbox]{margin:0;cursor:pointer;accent-color:var(--primary)}
+.tag-role{background:#fef3c7;color:#92400e}
+.tag-role.tag-mgr{background:#dbeafe;color:#1e40af}
+
+/* ── APP ICONS（員工管理表的可用系統） ── */
+.app-icon{display:inline-block;margin:0 2px;font-size:16px;transition:all .15s;cursor:default}
+.app-icon.on{opacity:1;filter:none}
+.app-icon.off{opacity:.25;filter:grayscale(1)}
+
+/* ── ROLE TAGS（員工管理表的權限角色色塊） ── */
+.role-tag{display:inline-block;padding:3px 11px;border-radius:12px;font-size:12px;font-weight:700;letter-spacing:.2px;border:1px solid transparent}
+.role-tag-default{background:#e0f2fe;color:#0369a1;border-color:#bae6fd}
+.role-tag-member{background:#f1f5f9;color:#475569;border-color:#cbd5e1}    /* 一般員工 - 灰 */
+.role-tag-manager{background:#dbeafe;color:#1e40af;border-color:#93c5fd}   /* 部門主管 - 藍 */
+.role-tag-cross{background:#dcfce7;color:#166534;border-color:#86efac}     /* 跨部門協作 - 綠 */
+.role-tag-admin{background:#f3e8ff;color:#6b21a8;border-color:#d8b4fe}     /* 系統管理員 - 紫 */
+.role-tag-exec{background:#fef3c7;color:#92400e;border-color:#fcd34d}      /* 總經理室 - 金 */
+
+.empty-row{text-align:center;color:var(--muted);padding:40px 14px;font-size:13px}
+.row-actions{display:flex;gap:6px;justify-content:flex-end}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,36,64,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex;animation:fadeIn .15s}
+.modal{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-lg);max-width:480px;width:100%;max-height:90vh;overflow:auto}
+.modal-header{padding:18px 22px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between}
+.modal-header h3{font-size:16px;font-weight:800;color:var(--primary)}
+.modal-close{background:transparent;border:none;font-size:22px;color:var(--muted);cursor:pointer;width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:var(--bg);color:var(--text)}
+.modal-body{padding:22px}
+.modal-footer{padding:14px 22px;background:var(--bg);display:flex;gap:10px;justify-content:flex-end}
+
+.form-row{margin-bottom:14px}
+.form-row label{display:block;font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px}
+.form-row .hint{font-size:11px;color:var(--muted);margin-top:4px}
+.fi{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;background:#fff;color:var(--text);transition:border-color .15s}
+.fi:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,58,92,.1)}
+select.fi{cursor:pointer}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--primary);color:#fff;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:all .25s}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--danger)}
+.toast.warn{background:var(--warning)}
+
+/* ── SYNC STATUS ── */
+.sync-indicator{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.7);padding:3px 8px;background:rgba(255,255,255,.06);border-radius:10px}
+.sync-indicator .dot{width:6px;height:6px;border-radius:50%;background:var(--text-light)}
+.sync-indicator.ok .dot{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.sync-indicator.err .dot{background:#ef4444}
+
+/* ── FOOTER ── */
+footer{text-align:center;padding:22px 0;color:var(--muted);font-size:12px;border-top:1px solid var(--border);margin-top:30px}
+footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
+
+/* ── RWD ── */
+@media(max-width:640px){
+  .container{padding:16px 14px 50px}
+  .hero{padding:18px 0 12px}
+  .hero h1{font-size:24px}
+  .hero .sub{font-size:13px}
+  nav{padding:0 12px}
+  .nav-logo{font-size:14px}
+  .nav-user .info{display:none}
+  .app-card{padding:18px}
+  th,td{padding:9px 10px;font-size:12.5px}
+  .modal{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">
+    <div class="logo-icon"><img src="logo.png" alt="石御石材"></div>
+    石御石材<span>工程管理系統</span>
+  </div>
+  <button class="nav-btn active" id="nav-home" onclick="showView('home')">🏠 首頁</button>
+  <button class="nav-btn" id="nav-settings" onclick="showView('settings')">⚙️ 設定</button>
+  <div class="nav-spacer"></div>
+  <button class="nav-bell" id="nav-bell" onclick="toggleNotifPanel(event)" title="通知中心">
+    🔔
+    <span class="nav-bell-dot" id="nav-bell-dot" style="display:none">0</span>
+  </button>
+  <div class="sync-indicator" id="sync-ind"><div class="dot"></div><span id="sync-text">本地</span></div>
+  <div class="nav-user" id="nav-user" onclick="openLoginModal()" title="切換登入身分">
+    <div class="avatar" id="user-avatar">廖</div>
+    <div class="info">
+      <div class="name" id="user-name">廖學健</div>
+      <div class="dept" id="user-dept">專案管理部</div>
+    </div>
+    <span class="switch-ic">🔄</span>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ===== HOME ===== -->
+  <main id="page-home" class="page active">
+    <div class="hero">
+      <div class="badge">🚀 整合管理平台</div>
+      <h1>石御石材工程管理系統</h1>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><div class="bar"></div><h2>子系統入口</h2><div class="note">點擊卡片進入系統</div></div>
+      <div class="cards">
+
+        <a class="app-card" data-app="cdr" data-base-url="../工程日報表/index-v3.html" href="../工程日報表/index-v3.html" target="_blank">
+          <div class="ic ic-accent">📋</div>
+          <h3>工程日報表</h3>
+          <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
+          <div class="meta"><div class="dot"></div>已上線 v3<span>·</span>專案管理部主用</div>
+          <div class="enter-btn">進入系統 →</div>
+        </a>
+
+        <a class="app-card" data-app="dtp" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html" target="_blank">
+          <div class="ic ic-green">📊</div>
+          <h3>圖面進度管理</h3>
+          <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
+          <div class="meta"><div class="dot"></div>已上線<span>·</span>規劃設計部主用</div>
+          <div class="enter-btn">進入系統 →</div>
+        </a>
+
+        <a class="app-card" data-app="sop" data-base-url="../標準作業流程/index.html" href="../標準作業流程/index.html" target="_blank">
+          <div class="ic">📐</div>
+          <h3>標準作業流程</h3>
+          <p class="desc">SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用</p>
+          <div class="meta"><div class="dot"></div>已上線<span>·</span>工地現場用</div>
+          <div class="enter-btn">進入系統 →</div>
+        </a>
+
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title"><div class="bar"></div><h2>即將推出（F 版整合功能）</h2></div>
+      <div class="coming-cards">
+        <div class="coming-card"><div class="ic">🗂️</div><div class="body"><h4>共用主表</h4><p>跨 App 共用的基礎資料集中管理</p></div><div class="tag" style="background:#64748b">待客戶確認</div></div>
+        <div class="coming-card"><div class="ic">🔔</div><div class="body"><h4>跨系統通知</h4><p>卡關事件即時推送</p></div><div class="tag">F版</div></div>
+        <div class="coming-card"><div class="ic">📥</div><div class="body"><h4>IIS 本地化部署</h4><p>離開 Firebase，落地內網</p></div><div class="tag">F版</div></div>
+        <div class="coming-card"><div class="ic">🛡️</div><div class="body"><h4>稽核日誌</h4><p>誰改了什麼、何時改</p></div><div class="tag">F版</div></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== SETTINGS ===== -->
+  <main id="page-settings" class="page">
+    <div class="hero" style="padding-bottom:12px">
+      <h1 style="font-size:24px">⚙️ 系統設定</h1>
+    </div>
+
+    <!-- 部門 -->
+    <div class="section">
+      <div class="section-title"><div class="bar"></div><h2>🏢 部門管理</h2></div>
+      <div class="tab-toolbar">
+        <div class="count">共 <strong id="dept-count">0</strong> 個部門</div>
+        <button class="btn btn-accent" onclick="openDeptModal()">+ 新增部門</button>
+      </div>
+      <div class="data-card">
+        <table>
+          <thead><tr>
+            <th style="width:50px">序號</th>
+            <th style="width:110px">部門編號</th>
+            <th>部門名稱</th>
+            <th>備註</th>
+            <th style="text-align:right;width:140px">操作</th>
+          </tr></thead>
+          <tbody id="dept-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 員工 -->
+    <div class="section">
+      <div class="section-title"><div class="bar"></div><h2>👤 員工管理</h2></div>
+      <div class="tab-toolbar">
+        <div class="count">共 <strong id="emp-count">0</strong> 位員工</div>
+        <button class="btn btn-accent" onclick="openEmpModal()">+ 新增員工</button>
+      </div>
+      <div class="data-card">
+        <table>
+          <thead><tr>
+            <th style="width:50px">序號</th>
+            <th style="width:110px">員工編號</th>
+            <th>姓名</th>
+            <th>部門</th>
+            <th>權限角色</th>
+            <th style="width:120px">可用系統</th>
+            <th>密碼</th>
+            <th style="text-align:right;width:140px">操作</th>
+          </tr></thead>
+          <tbody id="emp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 權限設定 -->
+    <div class="section">
+      <div class="section-title">
+        <div class="bar"></div><h2>🔑 權限設定</h2>
+        <div class="note" id="role-lock-note" style="display:none;color:var(--accent);font-weight:600">🔒 僅限主管/總經理室人員可編輯</div>
+      </div>
+      <div class="tab-toolbar">
+        <div class="count">共 <strong id="role-count">0</strong> 個角色</div>
+        <button class="btn btn-accent" id="btn-add-role" onclick="openRoleModal()">+ 新增角色</button>
+      </div>
+      <div class="data-card">
+        <table>
+          <thead><tr>
+            <th style="width:50px">序號</th>
+            <th style="width:90px">角色編號</th>
+            <th>角色名稱</th>
+            <th style="width:110px">檢視範圍</th>
+            <th style="width:110px">編輯範圍</th>
+            <th>跨部門互看</th>
+            <th style="text-align:right;width:140px">操作</th>
+          </tr></thead>
+          <tbody id="role-tbody"></tbody>
+        </table>
+      </div>
+      <div class="legend-card">
+        <div class="legend-row">
+          <strong>檢視範圍</strong>
+          <span class="legend-item"><span class="level-pill level-self">本人</span> 只看自己</span>
+          <span class="legend-item"><span class="level-pill level-dept">同部門</span> 本部門所有人</span>
+          <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
+          <span class="legend-item"><span class="level-pill level-all">全部</span> 全公司</span>
+        </div>
+        <div class="legend-row">
+          <strong>編輯範圍</strong>
+          <span class="legend-item"><span class="level-pill level-none">無</span> 唯讀</span>
+          <span class="legend-item"><span class="level-pill level-self">自己</span> 改自己建的</span>
+          <span class="legend-item"><span class="level-pill level-dept">同部門</span> 改本部門</span>
+          <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
+          <span class="legend-item"><span class="level-pill level-all">全部</span> 改全公司</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div>© 石御石材 · 工程管理系統</div>
+    <div class="ver">Portal v0.1 · 2026-06-14 · 階段 1（入口殼 + 基礎資料）</div>
+  </footer>
+</div>
+
+<!-- ===== 部門 Modal ===== -->
+<div class="modal-overlay" id="dept-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="dept-modal-title">新增部門</h3>
+      <button class="modal-close" onclick="closeModal('dept-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>部門編號 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="dept-code" placeholder="例：D001" maxlength="20">
+        <div class="hint">建議格式 D001、D002…（編號不可重複）</div>
+      </div>
+      <div class="form-row">
+        <label>部門名稱 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="dept-name" placeholder="例：專案管理部" maxlength="40">
+      </div>
+      <div class="form-row">
+        <label>備註</label>
+        <input class="fi" id="dept-note" placeholder="可空白" maxlength="100">
+        <div class="hint">用途、職掌簡述等</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('dept-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveDept()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 員工 Modal ===== -->
+<div class="modal-overlay" id="emp-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="emp-modal-title">新增員工</h3>
+      <button class="modal-close" onclick="closeModal('emp-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>員工編號 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="emp-code" placeholder="例：E001" maxlength="20">
+        <div class="hint">建議格式 E001、E002…（編號不可重複）</div>
+      </div>
+      <div class="form-row">
+        <label>姓名 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="emp-name" placeholder="例：廖學健" maxlength="20">
+      </div>
+      <div class="form-row">
+        <label>所屬部門 <span style="color:var(--danger)">*</span></label>
+        <select class="fi" id="emp-dept" onchange="onEmpDeptChange()"><option value="">請選擇</option></select>
+        <div class="hint" id="emp-dept-hint" style="display:none;color:var(--accent);font-weight:600">⚠️ 總經理室員工依規則預設為「看全公司資料、唯讀」權限（不能編輯他人資料）</div>
+      </div>
+      <div class="form-row">
+        <label>權限角色 <span style="color:var(--danger)">*</span></label>
+        <select class="fi" id="emp-roleid"><option value="">請選擇</option></select>
+        <div class="hint" id="emp-role-hint">決定該員工可看到哪些資料、可進入哪些子系統</div>
+      </div>
+      <div class="form-row">
+        <label>登入密碼</label>
+        <input class="fi" id="emp-pw" placeholder="留空表示尚未設定" maxlength="30" autocomplete="new-password">
+        <div class="hint">F 版上線後將用於登入；現階段可先空白</div>
+      </div>
+      <div class="form-row">
+        <label>可用子系統 <span style="color:var(--muted);font-weight:400">（勾選此員工能進入哪些 App）</span></label>
+        <div class="checkbox-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr" checked> 📋 工程日報表</label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp" checked> 📊 圖面進度管理</label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-sop" checked> 📐 標準作業流程</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('emp-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveEmp()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 權限角色 Modal ===== -->
+<div class="modal-overlay" id="role-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 id="role-modal-title">新增角色</h3>
+      <button class="modal-close" onclick="closeModal('role-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row" style="display:grid;grid-template-columns:140px 1fr;gap:10px">
+        <div>
+          <label>角色編號 <span style="color:var(--danger)">*</span></label>
+          <input class="fi" id="role-code" placeholder="R001" maxlength="20">
+        </div>
+        <div>
+          <label>角色名稱 <span style="color:var(--danger)">*</span></label>
+          <select class="fi" id="role-name-sel" onchange="onRoleNamePresetChange()">
+            <option value="">請選擇</option>
+            <option value="一般員工">一般員工</option>
+            <option value="部門主管">部門主管</option>
+            <option value="跨部門協作">跨部門協作</option>
+            <option value="系統管理員">系統管理員</option>
+            <option value="總經理室">總經理室</option>
+            <option value="__custom__">＋ 其他（自訂名稱）</option>
+          </select>
+          <input class="fi" id="role-name" placeholder="自訂角色名稱" maxlength="40" style="display:none;margin-top:6px">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>描述</label>
+        <input class="fi" id="role-desc" placeholder="說明這個角色的用途" maxlength="100">
+      </div>
+      <div class="form-row">
+        <label>檢視範圍 <span style="color:var(--danger)">*</span></label>
+        <div class="level-radio-group">
+          <label class="level-radio"><input type="radio" name="role-level" value="self" onchange="onRoleLevelChange()"><span class="level-pill level-self">本人</span> 只看自己</label>
+          <label class="level-radio"><input type="radio" name="role-level" value="dept" onchange="onRoleLevelChange()"><span class="level-pill level-dept">同部門</span> 本部門所有人</label>
+          <label class="level-radio"><input type="radio" name="role-level" value="cross" onchange="onRoleLevelChange()"><span class="level-pill level-cross">跨部門</span> 本部門 + 指定部門</label>
+          <label class="level-radio"><input type="radio" name="role-level" value="all" onchange="onRoleLevelChange()"><span class="level-pill level-all">全部</span> 全公司</label>
+        </div>
+      </div>
+      <div class="form-row" id="role-cross-box" style="display:none">
+        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
+        <div id="role-cross-list" class="checkbox-list"></div>
+        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
+      </div>
+      <div class="form-row">
+        <label>編輯範圍 <span style="color:var(--danger)">*</span></label>
+        <div class="level-radio-group">
+          <label class="level-radio"><input type="radio" name="role-edit-level" value="none"><span class="level-pill level-none">無</span> 唯讀（不能編輯任何資料）</label>
+          <label class="level-radio"><input type="radio" name="role-edit-level" value="self"><span class="level-pill level-self">自己</span> 只能改自己建的</label>
+          <label class="level-radio"><input type="radio" name="role-edit-level" value="dept"><span class="level-pill level-dept">同部門</span> 可改本部門所有資料</label>
+          <label class="level-radio"><input type="radio" name="role-edit-level" value="cross"><span class="level-pill level-cross">跨部門</span> 可改本部門 + 指定部門</label>
+          <label class="level-radio"><input type="radio" name="role-edit-level" value="all"><span class="level-pill level-all">全部</span> 全公司</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('role-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveRole()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 登入 / 切換身分 Modal ===== -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔄 切換登入身分</h3>
+      <button class="modal-close" onclick="closeModal('login-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>部門 <span style="color:var(--danger)">*</span></label>
+        <select class="fi" id="login-dept" onchange="onLoginDeptChange()"><option value="">請選擇部門</option></select>
+      </div>
+      <div class="form-row">
+        <label>姓名 <span style="color:var(--danger)">*</span></label>
+        <select class="fi" id="login-name"><option value="">請先選擇部門</option></select>
+      </div>
+      <div class="form-row">
+        <label>密碼</label>
+        <input class="fi" id="login-pw" type="password" placeholder="若未設定密碼可留空" autocomplete="current-password">
+        <div class="hint">未設定密碼的員工可直接切換；設定過密碼則需輸入正確密碼</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('login-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doLogin()">切換登入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 通知中心面板 ===== -->
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-head">
+    <strong>🔔 通知中心</strong>
+    <button class="notif-mark-all" onclick="markAllRead()">全部已讀</button>
+  </div>
+  <div class="notif-list" id="notif-list"></div>
+  <div class="notif-empty" id="notif-empty">
+    <div style="font-size:28px;margin-bottom:8px">🔕</div>
+    目前沒有通知
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
+  authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
+  databaseURL: "https://dailyconstructionreport-dfe1b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "dailyconstructionreport-dfe1b",
+  storageBucket: "dailyconstructionreport-dfe1b.firebasestorage.app",
+  messagingSenderId: "228712770866",
+  appId: "1:228712770866:web:07634a3df74781419cfb2b"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+window._fbSet = async (path, data) => {
+  try { await set(ref(db, 'portal/'+path), data); setSync('ok','已同步'); }
+  catch(e){ console.error(e); setSync('err','同步失敗'); }
+};
+window._fbWatch = (path, cb) => {
+  onValue(ref(db, 'portal/'+path), snap => cb(snap.val()), err => { console.error(err); setSync('err','讀取失敗'); });
+};
+// 通知專用：寫入個別通知（子 App 也透過這個函式 — 直接呼叫 Firebase 即可）
+window._fbSetChild = async (path, key, data) => {
+  try { await set(ref(db, 'portal/'+path+'/'+key), data); }
+  catch(e){ console.error('fbSetChild failed', e); }
+};
+window._fbUpdateChild = async (path, key, partial) => {
+  try { await update(ref(db, 'portal/'+path+'/'+key), partial); }
+  catch(e){ console.error('fbUpdateChild failed', e); }
+};
+function setSync(state,text){
+  const el=document.getElementById('sync-ind');
+  el.className='sync-indicator '+(state||'');
+  document.getElementById('sync-text').textContent=text;
+}
+window.setSync=setSync;
+setSync('','連線中…');
+setTimeout(()=>{ if(document.getElementById('sync-text').textContent==='連線中…') setSync('ok','已連線'); }, 1500);
+</script>
+
+<script>
+/* ============================================================
+ * 石御石材 工程管理系統 · Portal v0.1
+ * 階段 1：入口殼 + 部門 CRUD + 員工 CRUD
+ * Firebase 路徑：portal/{departments,employees,roles}
+ * localStorage key：portal_v1
+ * ============================================================ */
+
+const $ = id => document.getElementById(id);
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const LEVEL_LABEL = { self:'本人', dept:'同部門', cross:'跨部門', all:'全部' };
+const EDIT_LEVEL_LABEL = { none:'無（唯讀）', self:'自己', dept:'同部門', cross:'跨部門', all:'全部' };
+const APP_LABEL   = { cdr:'📋 工程日報表', dtp:'📊 圖面進度', sop:'📐 標準作業' };
+// 舊資料（職位字串）→ 新權限角色 ID 對照
+const LEGACY_ROLE_MAP = { member:'r1', manager:'r2', admin:'r4' };
+
+/* ── 自動建議下一個編號（D001 → D002 / E001 → E002） ── */
+function nextCode(list, prefix){
+  let max = 0;
+  const re = new RegExp('^'+prefix+'(\\d+)$', 'i');
+  list.forEach(x => {
+    const m = (x.code||'').match(re);
+    if (m) { const n = parseInt(m[1],10); if (n > max) max = n; }
+  });
+  return prefix + String(max+1).padStart(3,'0');
+}
+
+/* ── 預設種子資料（首次啟動時，三 App 既有的部門/員工） ── */
+const SEED_DEPTS = [
+  { id:'d0', code:'D000', name:'總經理室', note:'最高權限 — 可看所有部門資料' },
+  { id:'d1', code:'D001', name:'瑪摩石工程事業處', note:'總公司 / 事業處層級' },
+  { id:'d2', code:'D002', name:'專案管理部', note:'專案統籌、客戶對接' },
+  { id:'d3', code:'D003', name:'規劃設計部', note:'圖面規劃、設計繪製' },
+  { id:'d4', code:'D004', name:'工程部', note:'現場施工管理' },
+  { id:'d5', code:'D005', name:'景觀部', note:'景觀工程' },
+  { id:'d6', code:'D006', name:'監造部', note:'品質監造' },
+];
+// 業務規則：屬於以下部門的員工，新增/編輯時預設權限角色為「系統管理員」
+const FULL_ACCESS_DEPTS = ['總經理室'];
+const SEED_EMPS = [
+  { id:'e1', code:'E001', name:'廖學健', dept:'專案管理部', roleId:'r2', password:'',
+    appAccess:{cdr:true,dtp:true,sop:true} },
+  { id:'e2', code:'E002', name:'曾宇鵬', dept:'瑪摩石工程事業處', roleId:'r4', password:'',
+    appAccess:{cdr:true,dtp:true,sop:true} },
+];
+const SEED_ROLES = [
+  { id:'r1', code:'R001', name:'一般員工', desc:'可檢視和編輯自己建立的資料；可檢視同部門人員的資料',
+    level:'dept', editLevel:'self', crossDepts:[], appAccess:{cdr:true,dtp:true,sop:true} },
+  { id:'r2', code:'R002', name:'部門主管', desc:'可檢視和編輯本部門所有人員建立的資料',
+    level:'dept', editLevel:'dept', crossDepts:[], appAccess:{cdr:true,dtp:true,sop:true} },
+  { id:'r3', code:'R003', name:'跨部門協作', desc:'可檢視本部門 + 指定其他部門資料（雙向互看）',
+    level:'cross', editLevel:'cross', crossDepts:[], appAccess:{cdr:true,dtp:true,sop:true} },
+  { id:'r4', code:'R004', name:'系統管理員', desc:'可檢視和編輯全公司所有資料',
+    level:'all', editLevel:'all', crossDepts:[], appAccess:{cdr:true,dtp:true,sop:true} },
+  { id:'r5', code:'R005', name:'總經理室', desc:'可檢視全公司所有部門人員資料',
+    level:'all', editLevel:'none', crossDepts:[], appAccess:{cdr:true,dtp:true,sop:true} },
+];
+
+/* ── State ── */
+const S = {
+  departments: [],
+  employees: [],
+  roles: [],
+  notifications: [],
+  currentUser: null,  // { id, name, dept, roleId }
+  editDeptId: null,
+  editEmpId: null,
+  editRoleId: null,
+};
+
+/* ── Storage ── */
+function loadLS() {
+  try {
+    const d = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    S.departments = d.departments || [];
+    S.employees = d.employees || [];
+    S.roles = d.roles || [];
+    S.notifications = d.notifications || [];
+    S.currentUser = d.currentUser || null;
+  } catch(e){ console.warn('load failed', e); }
+}
+function saveLS() {
+  try {
+    localStorage.setItem('portal_v1', JSON.stringify({
+      departments: S.departments,
+      employees: S.employees,
+      roles: S.roles,
+      notifications: S.notifications,
+      currentUser: S.currentUser,
+      updatedAt: new Date().toISOString(),
+    }));
+  } catch(e){ console.warn('save failed', e); }
+}
+function syncCloud() {
+  if (window._fbSet) {
+    window._fbSet('departments', S.departments);
+    window._fbSet('employees', S.employees);
+    window._fbSet('roles', S.roles);
+    window._fbSet('notifications', S.notifications);
+  }
+}
+function saveAll() { saveLS(); syncCloud(); }
+
+/* ── 角色資料 migration：補 editLevel + 強制更新描述（無論從 LS 或 Firebase 載入都要跑） ── */
+const ROLE_DESC_UPDATES = {
+  '一般員工':   '可檢視和編輯自己建立的資料；可檢視同部門人員的資料',
+  '部門主管':   '可檢視和編輯本部門所有人員建立的資料',
+  '跨部門協作': '可檢視本部門 + 指定其他部門資料（雙向互看）',
+  '系統管理員': '可檢視和編輯全公司所有資料',
+  '總經理室':   '可檢視全公司所有部門人員資料',
+};
+function migrateRoles() {
+  let changed = false;
+  S.roles.forEach(r => {
+    // R001 一般員工：強制鎖定為 level=dept + editLevel=self
+    // （用「code + name 同時匹配」當作 canonical 信號；要客製就改名即可）
+    if (r.code === 'R001' && r.name === '一般員工') {
+      if (r.level !== 'dept') { r.level = 'dept'; changed = true; }
+      if (r.editLevel !== 'self') { r.editLevel = 'self'; changed = true; }
+    }
+    // 名為「總經理室」的角色強制 level=all（看全公司）+ editLevel=none（唯讀）
+    if (r.name === '總經理室') {
+      if (r.level !== 'all') { r.level = 'all'; changed = true; }
+      if (r.editLevel !== 'none') { r.editLevel = 'none'; changed = true; }
+    }
+    // 缺 editLevel 預設與檢視範圍同
+    if (!r.editLevel) {
+      r.editLevel = r.level || 'self';
+      changed = true;
+    }
+    // 強制更新描述（如名稱對應到 ROLE_DESC_UPDATES）
+    if (ROLE_DESC_UPDATES[r.name] && r.desc !== ROLE_DESC_UPDATES[r.name]) {
+      r.desc = ROLE_DESC_UPDATES[r.name];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+/* ── 遷移舊資料：員工的職位字串 → roleId + 補 appAccess（從角色繼承） ── */
+function migrateEmployees() {
+  let changed = false;
+  S.employees.forEach(e => {
+    // 舊職位字串 → roleId
+    if (!e.roleId && e.role && LEGACY_ROLE_MAP[e.role]) {
+      e.roleId = LEGACY_ROLE_MAP[e.role];
+      delete e.role;
+      changed = true;
+    }
+    // 缺 appAccess → 從角色繼承（角色也沒有就預設三 App 全開）
+    if (!e.appAccess) {
+      const r = getRole(e.roleId);
+      e.appAccess = (r && r.appAccess) ? {...r.appAccess} : {cdr:true,dtp:true,sop:true};
+      changed = true;
+    }
+  });
+  if (changed) saveLS();
+}
+
+/* ── Seed if empty ── */
+function ensureSeed() {
+  let changed = false;
+  if (!S.departments.length) { S.departments = [...SEED_DEPTS]; changed = true; }
+  if (!S.roles.length) { S.roles = JSON.parse(JSON.stringify(SEED_ROLES)); changed = true; }
+  if (!S.employees.length) { S.employees = [...SEED_EMPS]; changed = true; }
+  // 確保「總經理室」存在（即使是既有環境也補進去）
+  FULL_ACCESS_DEPTS.forEach(name => {
+    if (!S.departments.find(d => d.name === name)) {
+      const code = nextCode(S.departments, 'D');
+      S.departments.unshift({ id: uid(), code, name, note:'最高權限 — 可看所有部門資料' });
+      changed = true;
+    }
+  });
+  // 一次性 migrate：把先前誤改的 R002/R004 名稱還原
+  const r002 = S.roles.find(r => r.code === 'R002');
+  if (r002 && r002.name === '總經理室&部門主管') {
+    r002.name = '部門主管';
+    changed = true;
+  }
+  const r004 = S.roles.find(r => r.code === 'R004');
+  if (r004 && r004.name === '總經理室&系統管理員') {
+    r004.name = '系統管理員';
+    changed = true;
+  }
+  // 確保 R005「總經理室」存在（即使是既有環境也補進去）
+  if (!S.roles.find(r => r.name === '總經理室')) {
+    const code = nextCode(S.roles, 'R');
+    S.roles.push({
+      id: uid(), code, name:'總經理室',
+      desc:'總經理室專屬角色 — 可檢視全公司資料（唯讀，不能編輯）',
+      level:'all', editLevel:'none', crossDepts:[],
+      appAccess:{cdr:true,dtp:true,sop:true}
+    });
+    changed = true;
+  }
+  if (migrateRoles()) changed = true;
+  if (!S.currentUser && S.employees.length) {
+    const e = S.employees[0];
+    S.currentUser = { id: e.id, name: e.name, dept: e.dept, roleId: e.roleId };
+    changed = true;
+  }
+  if (changed) saveLS();
+}
+
+/* ── 取角色資訊（給其他函式用） ── */
+function getRole(roleId) { return S.roles.find(r => r.id === roleId) || null; }
+function getRoleName(roleId) { const r = getRole(roleId); return r ? r.name : '—'; }
+
+/* ── 角色名稱對應的顯示色塊 class ── */
+const ROLE_TAG_CLASS = {
+  '一般員工':   'role-tag-member',
+  '部門主管':   'role-tag-manager',
+  '跨部門協作': 'role-tag-cross',
+  '系統管理員': 'role-tag-admin',
+  '總經理室':   'role-tag-exec',
+};
+function getRoleTagClass(name) { return ROLE_TAG_CLASS[name] || 'role-tag-default'; }
+
+/* ── 當前登入者能否編輯權限設定 ──
+ * 規則：(a) 部門 = 總經理室 永遠可以；
+ *       (b) 角色的編輯範圍 ≥ 同部門（dept/cross/all）即可
+ */
+function canEditRoles() {
+  if (!S.currentUser) return false;
+  if (S.currentUser.dept === '總經理室') {
+    console.log('[canEditRoles] ✅ 允許 — 部門為總經理室');
+    return true;
+  }
+  const r = getRole(S.currentUser.roleId);
+  if (!r) {
+    console.log('[canEditRoles] ❌ 拒絕 — 找不到角色（roleId=' + S.currentUser.roleId + '）');
+    return false;
+  }
+  const can = ['dept','cross','all'].includes(r.editLevel);
+  console.log('[canEditRoles]', can ? '✅ 允許' : '❌ 拒絕',
+    '— 角色：', r.name, '· 編輯範圍：', r.editLevel || '(無)');
+  return can;
+}
+
+/* ── Current user display ── */
+function updateNavUser() {
+  const u = S.currentUser;
+  if (!u) {
+    $('user-name').textContent = '未登入';
+    $('user-dept').textContent = '點此選擇身分';
+    $('user-avatar').textContent = '?';
+    updateAppCardLinks();
+    return;
+  }
+  $('user-name').textContent = u.name;
+  const r = getRole(u.roleId);
+  const roleText = r ? ` · ${r.name}` : '';
+  $('user-dept').textContent = (u.dept || '—') + roleText;
+  $('user-avatar').textContent = (u.name||'?').charAt(0);
+  updateAppCardLinks();
+}
+
+/* ── 把當前登入身分帶進 3 個子 App 的卡片連結 ──
+ * 子 App 開啟時優先讀 localStorage（同網域共享），若沒拿到就 fallback 讀 URL 參數
+ */
+function updateAppCardLinks() {
+  const u = S.currentUser;
+  const emp = u ? S.employees.find(e => e.id === u.id) : null;
+  const appAccess = emp?.appAccess || {cdr:true,dtp:true,sop:true};
+  const qs = u ? new URLSearchParams({
+    user: u.name || '',
+    dept: u.dept || '',
+    roleId: u.roleId || ''
+  }).toString() : '';
+  document.querySelectorAll('.app-card[data-base-url]').forEach(card => {
+    const base = card.getAttribute('data-base-url');
+    const app = card.getAttribute('data-app');
+    card.href = qs ? (base + '?' + qs) : base;
+    // 若沒勾此 App 的使用權，視覺上灰掉並阻擋點擊
+    const allowed = !u || appAccess[app] !== false;
+    if (allowed) {
+      card.classList.remove('app-card-disabled');
+      card.removeAttribute('data-blocked');
+    } else {
+      card.classList.add('app-card-disabled');
+      card.setAttribute('data-blocked', '1');
+    }
+  });
+}
+document.addEventListener('click', e => {
+  const card = e.target.closest('.app-card[data-blocked="1"]');
+  if (card) {
+    e.preventDefault();
+    toast('此帳號未開放使用該系統，請聯絡管理員', 'error');
+  }
+});
+
+/* ============================================================
+ * 切換登入身分
+ * ============================================================ */
+function openLoginModal() {
+  // 部門下拉填入
+  const deptSel = $('login-dept');
+  deptSel.innerHTML = '<option value="">請選擇部門</option>' +
+    S.departments.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  // 預填當前用戶
+  if (S.currentUser) {
+    deptSel.value = S.currentUser.dept || '';
+    onLoginDeptChange();
+    $('login-name').value = S.currentUser.name || '';
+  } else {
+    $('login-name').innerHTML = '<option value="">請先選擇部門</option>';
+  }
+  $('login-pw').value = '';
+  openModal('login-modal');
+  setTimeout(()=>{
+    if (!deptSel.value) deptSel.focus();
+    else $('login-pw').focus();
+  }, 100);
+}
+function onLoginDeptChange() {
+  const dept = $('login-dept').value;
+  const sel = $('login-name');
+  if (!dept) {
+    sel.innerHTML = '<option value="">請先選擇部門</option>';
+    return;
+  }
+  const list = S.employees.filter(e => e.dept === dept);
+  if (!list.length) {
+    sel.innerHTML = '<option value="">此部門尚無員工</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">請選擇姓名</option>' +
+    list.map(e => {
+      const r = getRole(e.roleId);
+      const tag = r ? `（${r.name}）` : '';
+      return `<option value="${esc(e.name)}">${esc(e.name)}${esc(tag)}</option>`;
+    }).join('');
+}
+function doLogin() {
+  const dept = $('login-dept').value;
+  const name = $('login-name').value;
+  const pw = $('login-pw').value;
+  if (!dept) { toast('請選擇部門', 'error'); return; }
+  if (!name) { toast('請選擇姓名', 'error'); return; }
+  const emp = S.employees.find(e => e.name === name && e.dept === dept);
+  if (!emp) { toast('查無此員工', 'error'); return; }
+  // 密碼驗證：若該員工有設密碼則必須輸入正確
+  if (emp.password) {
+    if (!pw) { toast('此帳號已設密碼，請輸入密碼', 'error'); $('login-pw').focus(); return; }
+    if (pw !== emp.password) { toast('密碼錯誤', 'error'); $('login-pw').focus(); return; }
+  }
+  // 登入成功
+  S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
+  saveLS();
+  updateNavUser();
+  renderRoles();  // 切換身分後重整權限設定區的可編輯狀態
+  closeModal('login-modal');
+  toast(`已切換為「${emp.name}」`, 'success');
+}
+
+/* ── View routing ── */
+function showView(v) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  $('page-'+v).classList.add('active');
+  document.querySelectorAll('nav .nav-btn').forEach(b => b.classList.remove('active'));
+  $('nav-'+v).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ── Toast ── */
+let toastT;
+function toast(msg, type='') {
+  const t = $('toast');
+  t.className = 'toast '+type+' show';
+  t.textContent = msg;
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+/* ── Modal helpers ── */
+function openModal(id){ $(id).classList.add('show'); }
+function closeModal(id){ $(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
+});
+
+/* ============================================================
+ * 部門 CRUD
+ * ============================================================ */
+function renderDepts() {
+  const tbody = $('dept-tbody');
+  $('dept-count').textContent = S.departments.length;
+  if (!S.departments.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">尚無部門資料，點擊右上「+ 新增部門」開始建立</td></tr>';
+    return;
+  }
+  tbody.innerHTML = S.departments.map((d, idx) => `
+    <tr>
+      <td><span class="seq">${idx+1}</span></td>
+      <td><span class="code-pill">${esc(d.code||'—')}</span></td>
+      <td><strong>${esc(d.name)}</strong></td>
+      <td><span style="color:var(--muted)">${esc(d.note||'—')}</span></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editDept('${d.id}')">編輯</button>
+          <button class="btn btn-danger btn-sm" onclick="delDept('${d.id}')">刪除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  refreshDeptSelect();
+}
+function openDeptModal() {
+  S.editDeptId = null;
+  $('dept-modal-title').textContent = '新增部門';
+  $('dept-code').value = nextCode(S.departments, 'D');
+  $('dept-name').value = '';
+  $('dept-note').value = '';
+  openModal('dept-modal');
+  setTimeout(()=>$('dept-name').focus(), 100);
+}
+function editDept(id) {
+  const d = S.departments.find(x => x.id === id);
+  if (!d) return;
+  S.editDeptId = id;
+  $('dept-modal-title').textContent = '編輯部門';
+  $('dept-code').value = d.code || '';
+  $('dept-name').value = d.name;
+  $('dept-note').value = d.note || '';
+  openModal('dept-modal');
+}
+function saveDept() {
+  const code = $('dept-code').value.trim();
+  const name = $('dept-name').value.trim();
+  const note = $('dept-note').value.trim();
+  if (!code) { toast('請輸入部門編號', 'error'); $('dept-code').focus(); return; }
+  if (!name) { toast('請輸入部門名稱', 'error'); $('dept-name').focus(); return; }
+  // 編號重複檢查
+  const dupCode = S.departments.find(d => d.code === code && d.id !== S.editDeptId);
+  if (dupCode) { toast(`編號「${code}」已被使用`, 'error'); $('dept-code').focus(); return; }
+  // 名稱重複檢查
+  const dup = S.departments.find(d => d.name === name && d.id !== S.editDeptId);
+  if (dup) { toast('已存在同名部門', 'error'); return; }
+  if (S.editDeptId) {
+    const i = S.departments.findIndex(d => d.id === S.editDeptId);
+    if (i >= 0) S.departments[i] = { ...S.departments[i], code, name, note };
+  } else {
+    S.departments.push({ id: uid(), code, name, note });
+  }
+  saveAll();
+  renderDepts();
+  closeModal('dept-modal');
+  toast(S.editDeptId ? '部門已更新' : '部門已新增', 'success');
+}
+function delDept(id) {
+  const d = S.departments.find(x => x.id === id);
+  if (!d) return;
+  // 檢查是否有員工屬於此部門
+  const inUse = S.employees.filter(e => e.dept === d.name);
+  if (inUse.length) {
+    if (!confirm(`「${d.name}」目前有 ${inUse.length} 位員工屬於此部門，刪除後這些員工的部門會變成空白。確定要刪除嗎？`)) return;
+  } else {
+    if (!confirm(`確定刪除部門「${d.name}」？`)) return;
+  }
+  S.departments = S.departments.filter(x => x.id !== id);
+  saveAll();
+  renderDepts();
+  renderEmps();
+  toast('部門已刪除', 'success');
+}
+
+/* ============================================================
+ * 員工 CRUD
+ * ============================================================ */
+function refreshDeptSelect() {
+  const sel = $('emp-dept');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">請選擇</option>' +
+    S.departments.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  sel.value = cur;
+}
+/* ── 員工部門變更時：若是「總經理室」這類全閱覽部門，自動套用系統管理員角色 ── */
+function onEmpDeptChange() {
+  const dept = $('emp-dept').value;
+  const hint = $('emp-dept-hint');
+  if (FULL_ACCESS_DEPTS.includes(dept)) {
+    // 優先選「總經理室」專屬角色，找不到才挑任一 level=all 角色
+    const adminRole = S.roles.find(r => r.name === '總經理室')
+                   || S.roles.find(r => r.level === 'all');
+    if (adminRole) $('emp-roleid').value = adminRole.id;
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+function refreshRoleSelect() {
+  const sel = $('emp-roleid');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">請選擇</option>' +
+    S.roles.map(r => `<option value="${r.id}">${esc(r.code)} ${esc(r.name)}（${LEVEL_LABEL[r.level]||r.level}）</option>`).join('');
+  sel.value = cur;
+}
+function renderEmps() {
+  const tbody = $('emp-tbody');
+  $('emp-count').textContent = S.employees.length;
+  if (!S.employees.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">尚無員工資料</td></tr>';
+    return;
+  }
+  tbody.innerHTML = S.employees.map((e, idx) => {
+    const r = getRole(e.roleId);
+    const roleCell = r
+      ? `<span class="role-tag ${getRoleTagClass(r.name)}">${esc(r.name)}</span>`
+      : '<span style="color:var(--text-light)">— 未指派</span>';
+    const ac = e.appAccess || {};
+    const appsHtml = `
+      <span class="app-icon ${ac.cdr?'on':'off'}" title="工程日報表">📋</span>
+      <span class="app-icon ${ac.dtp?'on':'off'}" title="圖面進度管理">📊</span>
+      <span class="app-icon ${ac.sop?'on':'off'}" title="標準作業流程">📐</span>`;
+    return `
+    <tr>
+      <td><span class="seq">${idx+1}</span></td>
+      <td><span class="code-pill">${esc(e.code||'—')}</span></td>
+      <td><strong>${esc(e.name)}</strong></td>
+      <td><span class="tag-pill">${esc(e.dept||'—')}</span></td>
+      <td>${roleCell}</td>
+      <td>${appsHtml}</td>
+      <td>${e.password ? '<span style="color:var(--success);font-weight:700">✓ 已設定</span>' : '<span style="color:var(--text-light)">— 未設定</span>'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-secondary btn-sm" onclick="editEmp('${e.id}')">編輯</button>
+          <button class="btn btn-danger btn-sm" onclick="delEmp('${e.id}')">刪除</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function openEmpModal() {
+  S.editEmpId = null;
+  $('emp-modal-title').textContent = '新增員工';
+  refreshDeptSelect();
+  refreshRoleSelect();
+  $('emp-code').value = nextCode(S.employees, 'E');
+  $('emp-name').value = '';
+  $('emp-dept').value = '';
+  $('emp-roleid').value = S.roles[0]?.id || '';
+  $('emp-pw').value = '';
+  $('emp-app-cdr').checked = true;
+  $('emp-app-dtp').checked = true;
+  $('emp-app-sop').checked = true;
+  openModal('emp-modal');
+  setTimeout(()=>$('emp-name').focus(), 100);
+}
+function editEmp(id) {
+  const e = S.employees.find(x => x.id === id);
+  if (!e) return;
+  S.editEmpId = id;
+  $('emp-modal-title').textContent = '編輯員工';
+  refreshDeptSelect();
+  refreshRoleSelect();
+  $('emp-code').value = e.code || '';
+  $('emp-name').value = e.name;
+  $('emp-dept').value = e.dept || '';
+  $('emp-roleid').value = e.roleId || '';
+  $('emp-pw').value = e.password || '';
+  $('emp-app-cdr').checked = !!e.appAccess?.cdr;
+  $('emp-app-dtp').checked = !!e.appAccess?.dtp;
+  $('emp-app-sop').checked = !!e.appAccess?.sop;
+  openModal('emp-modal');
+}
+function saveEmp() {
+  const code = $('emp-code').value.trim();
+  const name = $('emp-name').value.trim();
+  const dept = $('emp-dept').value;
+  const roleId = $('emp-roleid').value;
+  const password = $('emp-pw').value.trim();
+  const appAccess = {
+    cdr: $('emp-app-cdr').checked,
+    dtp: $('emp-app-dtp').checked,
+    sop: $('emp-app-sop').checked,
+  };
+  if (!code) { toast('請輸入員工編號', 'error'); $('emp-code').focus(); return; }
+  if (!name) { toast('請輸入姓名', 'error'); $('emp-name').focus(); return; }
+  if (!dept) { toast('請選擇所屬部門', 'error'); $('emp-dept').focus(); return; }
+  if (!roleId) { toast('請選擇權限角色', 'error'); $('emp-roleid').focus(); return; }
+  // 編號重複檢查
+  const dupCode = S.employees.find(e => e.code === code && e.id !== S.editEmpId);
+  if (dupCode) { toast(`編號「${code}」已被使用`, 'error'); $('emp-code').focus(); return; }
+  // 重名檢查（同部門內不可重名）
+  const dup = S.employees.find(e => e.name === name && e.dept === dept && e.id !== S.editEmpId);
+  if (dup) { toast(`「${dept}」已存在同名員工`, 'error'); return; }
+  if (S.editEmpId) {
+    const i = S.employees.findIndex(e => e.id === S.editEmpId);
+    if (i >= 0) S.employees[i] = { ...S.employees[i], code, name, dept, roleId, password, appAccess };
+  } else {
+    S.employees.push({ id: uid(), code, name, dept, roleId, password, appAccess });
+  }
+  saveAll();
+  renderEmps();
+  closeModal('emp-modal');
+  toast(S.editEmpId ? '員工已更新' : '員工已新增', 'success');
+}
+
+/* ============================================================
+ * 權限角色 CRUD
+ * ============================================================ */
+function renderRoles() {
+  const tbody = $('role-tbody');
+  $('role-count').textContent = S.roles.length;
+  // 依登入者權限切換 UI
+  const canEdit = canEditRoles();
+  const addBtn = $('btn-add-role'); if (addBtn) addBtn.style.display = canEdit ? '' : 'none';
+  const lockNote = $('role-lock-note'); if (lockNote) lockNote.style.display = canEdit ? 'none' : '';
+  if (!S.roles.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">尚無角色資料</td></tr>';
+    return;
+  }
+  tbody.innerHTML = S.roles.map((r, idx) => {
+    const crossHtml = r.level === 'cross'
+      ? (r.crossDepts?.length
+          ? r.crossDepts.map(d => `<span class="dept-pill">${esc(d)}</span>`).join('')
+          : '<span style="color:var(--text-light)">— 尚未設定</span>')
+      : '<span style="color:var(--text-light)">—</span>';
+    const editLv = r.editLevel || 'self';
+    const actions = canEdit
+      ? `<button class="btn btn-secondary btn-sm" onclick="editRole('${r.id}')">編輯</button>
+         <button class="btn btn-danger btn-sm" onclick="delRole('${r.id}')">刪除</button>`
+      : `<span style="color:var(--text-light);font-size:12px">🔒 唯讀</span>`;
+    return `
+      <tr>
+        <td><span class="seq">${idx+1}</span></td>
+        <td><span class="code-pill">${esc(r.code||'—')}</span></td>
+        <td>
+          <strong>${esc(r.name)}</strong>
+          ${r.desc ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(r.desc)}</div>` : ''}
+        </td>
+        <td><span class="level-pill level-${r.level}">${LEVEL_LABEL[r.level]||r.level}</span></td>
+        <td><span class="level-pill level-${editLv}">${EDIT_LEVEL_LABEL[editLv]||editLv}</span></td>
+        <td>${crossHtml}</td>
+        <td><div class="row-actions">${actions}</div></td>
+      </tr>`;
+  }).join('');
+}
+function renderCrossDeptCheckboxes(selectedDepts) {
+  const box = $('role-cross-list');
+  box.innerHTML = S.departments.map(d => `
+    <label class="checkbox-item">
+      <input type="checkbox" value="${esc(d.name)}" ${selectedDepts.includes(d.name)?'checked':''}>
+      ${esc(d.name)}
+    </label>
+  `).join('') || '<span style="color:var(--muted);padding:6px">尚無可選部門，請先新增部門</span>';
+}
+function onRoleLevelChange() {
+  const level = document.querySelector('input[name="role-level"]:checked')?.value;
+  $('role-cross-box').style.display = (level === 'cross') ? 'block' : 'none';
+  if (level === 'cross') {
+    const cur = (S.editRoleId ? S.roles.find(r=>r.id===S.editRoleId)?.crossDepts : null) || [];
+    renderCrossDeptCheckboxes(cur);
+  }
+}
+
+/* ── 角色名稱下拉變更時，同步建議「可看範圍」 ── */
+const ROLE_NAME_PRESETS = {
+  '一般員工':   { level:'dept',  editLevel:'self' },
+  '部門主管':   { level:'dept',  editLevel:'dept' },
+  '跨部門協作': { level:'cross', editLevel:'cross' },
+  '系統管理員': { level:'all',   editLevel:'all' },
+  '總經理室':   { level:'all',   editLevel:'none' },
+};
+function onRoleNamePresetChange() {
+  const sel = $('role-name-sel').value;
+  const customInput = $('role-name');
+  if (sel === '__custom__') {
+    customInput.style.display = '';
+    customInput.value = '';
+    setTimeout(()=>customInput.focus(), 50);
+  } else {
+    customInput.style.display = 'none';
+    customInput.value = '';
+    // 自動建議對應的檢視範圍 + 編輯範圍
+    if (ROLE_NAME_PRESETS[sel]) {
+      const p = ROLE_NAME_PRESETS[sel];
+      document.querySelectorAll('input[name="role-level"]').forEach(r => r.checked = (r.value === p.level));
+      document.querySelectorAll('input[name="role-edit-level"]').forEach(r => r.checked = (r.value === p.editLevel));
+      onRoleLevelChange();
+    }
+  }
+}
+function readRoleNameFromForm() {
+  const sel = $('role-name-sel').value;
+  if (sel === '__custom__') return $('role-name').value.trim();
+  return sel;
+}
+function setRoleNameInForm(name) {
+  const presetVals = ['一般員工','部門主管','跨部門協作','系統管理員','總經理室'];
+  const sel = $('role-name-sel');
+  const customInput = $('role-name');
+  if (presetVals.includes(name)) {
+    sel.value = name;
+    customInput.style.display = 'none';
+    customInput.value = '';
+  } else {
+    sel.value = '__custom__';
+    customInput.style.display = '';
+    customInput.value = name || '';
+  }
+}
+function openRoleModal() {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  S.editRoleId = null;
+  $('role-modal-title').textContent = '新增角色';
+  $('role-code').value = nextCode(S.roles, 'R');
+  setRoleNameInForm('');
+  $('role-desc').value = '';
+  document.querySelectorAll('input[name="role-level"]').forEach(r => r.checked = (r.value === 'self'));
+  document.querySelectorAll('input[name="role-edit-level"]').forEach(r => r.checked = (r.value === 'self'));
+  $('role-cross-box').style.display = 'none';
+  openModal('role-modal');
+  setTimeout(()=>$('role-name-sel').focus(), 100);
+}
+function editRole(id) {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  const r = S.roles.find(x => x.id === id);
+  if (!r) return;
+  S.editRoleId = id;
+  $('role-modal-title').textContent = '編輯角色';
+  $('role-code').value = r.code || '';
+  setRoleNameInForm(r.name || '');
+  $('role-desc').value = r.desc || '';
+  document.querySelectorAll('input[name="role-level"]').forEach(x => x.checked = (x.value === r.level));
+  const editLv = r.editLevel || r.level || 'self';
+  document.querySelectorAll('input[name="role-edit-level"]').forEach(x => x.checked = (x.value === editLv));
+  if (r.level === 'cross') {
+    $('role-cross-box').style.display = 'block';
+    renderCrossDeptCheckboxes(r.crossDepts || []);
+  } else {
+    $('role-cross-box').style.display = 'none';
+  }
+  openModal('role-modal');
+}
+function saveRole() {
+  const code = $('role-code').value.trim();
+  const name = readRoleNameFromForm();
+  const desc = $('role-desc').value.trim();
+  const level = document.querySelector('input[name="role-level"]:checked')?.value || 'self';
+  const editLevel = document.querySelector('input[name="role-edit-level"]:checked')?.value || 'self';
+  let crossDepts = [];
+  if (level === 'cross') {
+    crossDepts = [...document.querySelectorAll('#role-cross-list input[type=checkbox]:checked')].map(c => c.value);
+  }
+  if (!code) { toast('請輸入角色編號', 'error'); $('role-code').focus(); return; }
+  if (!name) { toast('請輸入角色名稱', 'error'); $('role-name').focus(); return; }
+  // 編號 / 名稱重複檢查
+  if (S.roles.find(r => r.code === code && r.id !== S.editRoleId)) { toast(`編號「${code}」已被使用`, 'error'); return; }
+  if (S.roles.find(r => r.name === name && r.id !== S.editRoleId)) { toast(`角色名稱「${name}」已存在`, 'error'); return; }
+  // 軟提示：編輯範圍 > 檢視範圍 時警告（編輯範圍應 ≤ 檢視範圍）
+  const levelRank = { none:0, self:1, dept:2, cross:3, all:4 };
+  if (editLevel !== 'none' && levelRank[editLevel] > levelRank[level]) {
+    if (!confirm(`提醒：編輯範圍（${EDIT_LEVEL_LABEL[editLevel]}）大於檢視範圍（${LEVEL_LABEL[level]}）。\n通常編輯範圍應 ≤ 檢視範圍（看得到才能改）。\n確定要這樣設定嗎？`)) return;
+  }
+
+  if (S.editRoleId) {
+    const i = S.roles.findIndex(r => r.id === S.editRoleId);
+    if (i >= 0) S.roles[i] = { ...S.roles[i], code, name, desc, level, editLevel, crossDepts };
+  } else {
+    S.roles.push({ id: uid(), code, name, desc, level, editLevel, crossDepts });
+  }
+  // 對稱模式：crossDepts 由子 App 的資料過濾邏輯雙向解讀，這邊不需動其他角色的設定
+
+  saveAll();
+  renderRoles();
+  renderEmps();
+  refreshRoleSelect();
+  closeModal('role-modal');
+  toast(S.editRoleId ? '角色已更新' : '角色已新增', 'success');
+}
+function delRole(id) {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  const r = S.roles.find(x => x.id === id);
+  if (!r) return;
+  const inUse = S.employees.filter(e => e.roleId === id);
+  if (inUse.length) {
+    if (!confirm(`「${r.name}」目前有 ${inUse.length} 位員工使用，刪除後這些員工會變成「未指派」狀態。確定刪除嗎？`)) return;
+    inUse.forEach(e => { e.roleId = ''; });
+  } else {
+    if (!confirm(`確定刪除角色「${r.name}」？`)) return;
+  }
+  S.roles = S.roles.filter(x => x.id !== id);
+  saveAll();
+  renderRoles();
+  renderEmps();
+  refreshRoleSelect();
+  toast('角色已刪除', 'success');
+}
+
+/* ── 跨部門互看 — 雙向自動同步 ──
+ * 概念：角色 R（屬於部門 A 的人會用）勾了「可看部門 B」 → 自動把 B 部門員工常用的角色也加上「可看部門 A」。
+ * 簡化實作：對 B 部門的所有 cross 角色，加上 A 部門到其 crossDepts。
+ *           A = 此角色擁有者所屬部門集合（從 S.employees 推導）
+ */
+function syncBidirectional(roleId, oldCrossDepts) {
+  const role = S.roles.find(r => r.id === roleId);
+  if (!role || role.level !== 'cross') return;
+  // 找出擁有此角色的員工分布在哪些部門
+  const ownerDepts = [...new Set(S.employees.filter(e => e.roleId === roleId).map(e => e.dept).filter(Boolean))];
+  if (!ownerDepts.length) return;  // 還沒人用這角色，不同步
+  const added = role.crossDepts.filter(d => !oldCrossDepts.includes(d));
+  added.forEach(targetDept => {
+    // 對 targetDept 的所有 cross 角色：加入 ownerDepts
+    const targetRoleIds = [...new Set(S.employees.filter(e => e.dept === targetDept).map(e => e.roleId))];
+    targetRoleIds.forEach(tid => {
+      const tr = S.roles.find(r => r.id === tid);
+      if (tr && tr.level === 'cross') {
+        ownerDepts.forEach(od => {
+          if (!tr.crossDepts.includes(od)) tr.crossDepts.push(od);
+        });
+      }
+    });
+  });
+}
+function delEmp(id) {
+  const e = S.employees.find(x => x.id === id);
+  if (!e) return;
+  if (!confirm(`確定刪除員工「${e.name}」？`)) return;
+  S.employees = S.employees.filter(x => x.id !== id);
+  saveAll();
+  renderEmps();
+  toast('員工已刪除', 'success');
+}
+
+/* ── Cloud watch（其他裝置改了就自動更新） ── */
+function attachCloudWatch() {
+  if (!window._fbWatch) return setTimeout(attachCloudWatch, 300);
+  window._fbWatch('departments', val => {
+    if (Array.isArray(val) && JSON.stringify(val) !== JSON.stringify(S.departments)) {
+      S.departments = val;
+      saveLS();
+      renderDepts();
+    }
+  });
+  window._fbWatch('employees', val => {
+    if (Array.isArray(val) && JSON.stringify(val) !== JSON.stringify(S.employees)) {
+      S.employees = val;
+      migrateEmployees();  // 雲端可能含舊 role 字串，同步後立刻轉成 roleId
+      saveLS();
+      renderEmps();
+    }
+  });
+  window._fbWatch('roles', val => {
+    if (Array.isArray(val) && JSON.stringify(val) !== JSON.stringify(S.roles)) {
+      S.roles = val;
+      const migrated = migrateRoles();  // ← 雲端可能含舊描述/缺 editLevel，同步後立刻 migrate
+      saveLS();
+      if (migrated && window._fbSet) {
+        // 把 migrate 後的資料推回雲端，避免下次又被舊資料覆蓋
+        window._fbSet('roles', S.roles);
+      }
+      renderRoles();
+      renderEmps();
+      refreshRoleSelect();
+    }
+  });
+  window._fbWatch('notifications', val => {
+    if (Array.isArray(val) && JSON.stringify(val) !== JSON.stringify(S.notifications)) {
+      S.notifications = val;
+      saveLS();
+      renderNotifBell();
+      if ($('notif-panel').classList.contains('show')) renderNotifPanel();
+    }
+  });
+}
+
+/* ============================================================
+ * 通知中心（站內）
+ * ============================================================ */
+const NOTIF_TYPE_ICONS = {
+  block: '🚧',         // 卡關
+  overdue: '⏰',       // 超期
+  'cross-dept': '🔄',  // 跨部門協作
+  reminder: '🔔',      // 提醒
+  system: 'ℹ️',       // 系統訊息
+  approval: '✅',      // 審核
+};
+const NOTIF_APP_LABEL = { cdr:'工程日報表', dtp:'圖面進度', sop:'標準作業', portal:'入口' };
+
+/* 判斷一則通知是否要顯示給當前登入者 */
+function isNotifTargetedAtCurrent(n) {
+  const u = S.currentUser;
+  if (!u) return false;
+  // 廣播給所有人
+  if (n.broadcast === true) return true;
+  if (n.targetUsers?.includes('*')) return true;
+  // 指定 user id
+  if (n.targetUsers?.includes(u.id)) return true;
+  // 指定部門
+  if (n.targetDepts?.includes(u.dept)) return true;
+  // 指定角色
+  if (n.targetRoles?.includes(u.roleId)) return true;
+  return false;
+}
+
+function formatTimeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000) return '剛剛';
+  if (diff < 3600000) return Math.floor(diff/60000) + ' 分鐘前';
+  if (diff < 86400000) return Math.floor(diff/3600000) + ' 小時前';
+  if (diff < 86400000*7) return Math.floor(diff/86400000) + ' 天前';
+  return new Date(iso).toLocaleDateString('zh-TW');
+}
+
+function renderNotifBell() {
+  const dot = $('nav-bell-dot');
+  if (!dot) return;
+  if (!S.currentUser) { dot.style.display = 'none'; return; }
+  const userId = S.currentUser.id;
+  const unread = S.notifications.filter(n =>
+    isNotifTargetedAtCurrent(n) && !(n.readBy||[]).includes(userId)
+  ).length;
+  if (unread > 0) {
+    dot.textContent = unread > 99 ? '99+' : String(unread);
+    dot.style.display = 'flex';
+  } else {
+    dot.style.display = 'none';
+  }
+}
+
+function renderNotifPanel() {
+  const list = $('notif-list');
+  const empty = $('notif-empty');
+  if (!S.currentUser) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  const userId = S.currentUser.id;
+  const myNotifs = S.notifications
+    .filter(n => isNotifTargetedAtCurrent(n))
+    .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 50);
+  if (!myNotifs.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = myNotifs.map(n => {
+    const isUnread = !(n.readBy||[]).includes(userId);
+    const icon = NOTIF_TYPE_ICONS[n.type] || '🔔';
+    const timeAgo = formatTimeAgo(n.createdAt);
+    const appLabel = NOTIF_APP_LABEL[n.sourceApp] || n.sourceApp || '';
+    return `
+      <div class="notif-item ${isUnread?'unread':''} priority-${n.priority||'normal'}" onclick="onNotifClick('${n.id}')">
+        <div class="ic">${icon}</div>
+        <div class="body">
+          <div class="title">${esc(n.title||'')}</div>
+          <div class="message">${esc(n.message||'')}</div>
+          <div class="meta">
+            <span>${esc(timeAgo)}</span>
+            ${appLabel ? `<span class="meta-app">${esc(appLabel)}</span>` : ''}
+            ${n.createdBy ? `<span>· ${esc(n.createdBy)}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleNotifPanel(e) {
+  if (e) e.stopPropagation();
+  if (!S.currentUser) { toast('請先登入', 'warn'); return; }
+  const panel = $('notif-panel');
+  panel.classList.toggle('show');
+  if (panel.classList.contains('show')) renderNotifPanel();
+}
+
+function onNotifClick(id) {
+  const n = S.notifications.find(x => x.id === id);
+  if (!n) return;
+  markAsRead(id);
+  if (n.sourceUrl) {
+    window.open(n.sourceUrl, '_blank');
+  }
+}
+
+function markAsRead(id) {
+  if (!S.currentUser) return;
+  const n = S.notifications.find(x => x.id === id);
+  if (!n) return;
+  if (!n.readBy) n.readBy = [];
+  if (!n.readBy.includes(S.currentUser.id)) {
+    n.readBy.push(S.currentUser.id);
+    saveAll();
+    renderNotifBell();
+    renderNotifPanel();
+  }
+}
+
+function markAllRead() {
+  if (!S.currentUser) return;
+  const userId = S.currentUser.id;
+  let changed = false;
+  S.notifications.forEach(n => {
+    if (isNotifTargetedAtCurrent(n) && !(n.readBy||[]).includes(userId)) {
+      if (!n.readBy) n.readBy = [];
+      n.readBy.push(userId);
+      changed = true;
+    }
+  });
+  if (changed) {
+    saveAll();
+    renderNotifBell();
+    renderNotifPanel();
+    toast('已全部標記為已讀', 'success');
+  }
+}
+
+/* 建立通知（給入口本身用，子 App 直接寫 Firebase portal/notifications） */
+function createNotification(opts) {
+  const notif = {
+    id: uid(),
+    type: opts.type || 'system',
+    title: opts.title || '通知',
+    message: opts.message || '',
+    sourceApp: opts.sourceApp || 'portal',
+    sourceUrl: opts.sourceUrl || '',
+    targetUsers: opts.targetUsers || [],
+    targetDepts: opts.targetDepts || [],
+    targetRoles: opts.targetRoles || [],
+    broadcast: opts.broadcast === true,
+    createdBy: opts.createdBy || S.currentUser?.name || 'system',
+    createdAt: new Date().toISOString(),
+    readBy: [],
+    priority: opts.priority || 'normal',
+  };
+  S.notifications.push(notif);
+  // 只保留最近 200 筆，避免無限增長
+  if (S.notifications.length > 200) {
+    S.notifications = S.notifications.slice(-200);
+  }
+  saveAll();
+  renderNotifBell();
+  if ($('notif-panel').classList.contains('show')) renderNotifPanel();
+  return notif;
+}
+
+/* 點外面關閉通知面板 */
+document.addEventListener('click', e => {
+  const panel = $('notif-panel');
+  if (panel?.classList.contains('show')
+      && !e.target.closest('#notif-panel')
+      && !e.target.closest('#nav-bell')) {
+    panel.classList.remove('show');
+  }
+});
+
+/* ── Expose to global ── */
+Object.assign(window, {
+  showView, toast, closeModal,
+  openDeptModal, editDept, saveDept, delDept,
+  openEmpModal, editEmp, saveEmp, delEmp,
+  openRoleModal, editRole, saveRole, delRole, onRoleLevelChange, onRoleNamePresetChange,
+  onEmpDeptChange,
+  openLoginModal, onLoginDeptChange, doLogin,
+  toggleNotifPanel, onNotifClick, markAsRead, markAllRead, createNotification,
+});
+
+/* ── Init ── */
+loadLS();
+ensureSeed();
+migrateEmployees();
+updateNavUser();
+renderDepts();
+renderEmps();
+renderRoles();
+renderNotifBell();
+attachCloudWatch();
+console.log('[Portal] v0.3 booted ·',
+  S.departments.length,'depts,',
+  S.employees.length,'emps,',
+  S.roles.length,'roles,',
+  S.notifications.length,'notifs · user:', S.currentUser?.name);
+</script>
+
+</body>
+</html>

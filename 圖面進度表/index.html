@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圖面進度管理系統</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+nav{background:var(--primary);min-height:52px;display:flex;align-items:center;padding:0 16px;gap:4px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.25);flex-wrap:wrap}
+.nav-logo{color:#fff;font-size:15px;font-weight:800;margin-right:8px;white-space:nowrap}
+.nav-logo span{color:#93c5fd}
+.nav-btn{background:transparent;border:none;color:rgba(255,255,255,.75);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-btn.active{background:rgba(255,255,255,.2);color:#fff;font-weight:700}
+.nav-spacer{flex:1}
+#sync-icon{font-size:13px;color:rgba(255,255,255,.6);padding:0 6px;cursor:default}
+.nav-xbtn{background:#166534;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:12px;font-family:inherit;cursor:pointer;font-weight:600}
+.nav-xbtn:hover{filter:brightness(1.15)}
+
+.container{max-width:1500px;margin:0 auto;padding:16px}
+.page{display:none}.page.active{display:block}
+
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
+.card-header{padding:11px 16px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card-title{font-weight:700;font-size:14px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';display:block;width:3px;height:16px;background:var(--primary);border-radius:2px}
+.card-body{padding:14px 16px}
+
+.fg{display:flex;flex-direction:column;gap:3px}
+.fl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.fi{border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s;width:100%}
+.fi:focus{outline:none;border-color:var(--primary-l);box-shadow:0 0 0 3px rgba(37,99,170,.1)}
+textarea.fi{resize:vertical;min-height:60px}
+
+.g{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:640px){.g2,.g3,.g4{grid-template-columns:1fr}}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border:none;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-l)}
+.btn-s{background:var(--success);color:#fff}.btn-s:hover{filter:brightness(1.1)}
+.btn-d{background:var(--danger);color:#fff}.btn-d:hover{filter:brightness(1.1)}
+.btn-o{background:#fff;border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{background:var(--bg)}
+.btn-g{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-g:hover{background:var(--bg);color:var(--text)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-icon{padding:5px 7px;min-width:28px;justify-content:center}
+.btn-a{background:var(--accent);color:#fff;border:none}.btn-a:hover{filter:brightness(1.1)}
+.tbl-act{display:inline-flex;flex-direction:column;gap:3px}
+.tbl-act .btn{min-width:48px;justify-content:center}
+.d-none{display:none!important}
+
+.filter-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+/* STATUS BADGES */
+.st-badge{display:inline-block;border-radius:4px;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;background:#e2e8f0;color:#475569}
+.st-進行中{background:#dbeafe;color:#1d4ed8}
+.st-送審中{background:#fef3c7;color:#b45309}
+.st-已下單{background:#fed7aa;color:#c2410c}
+.st-報價中{background:#cffafe;color:#0e7490}
+.st-已完成{background:#dcfce7;color:#15803d}
+.st-待確認{background:#f1f5f9;color:#475569;border:1px solid var(--border)}
+.st-已定案{background:#166534;color:#fff}
+.st-暫停卡關{background:#fecaca;color:#991b1b;font-weight:800}
+.st-恢復啟動{background:#bbf7d0;color:#15803d;font-weight:700}
+
+.ex-tag{display:inline-block;background:#e0e7ff;color:#3730a3;border-radius:10px;padding:2px 8px;font-size:11px;margin:1px}
+.wk-tag{display:inline-block;background:#f0fdf4;color:#166534;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700}
+.loc-tag{display:inline-block;background:#fdf4ff;color:#7e22ce;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700;margin-bottom:3px}
+
+/* 卡關紅字高亮 */
+.tr-stuck>td{background:#fef2f2!important}
+.tr-stuck .log-tx{color:#991b1b}
+.log-li-stuck .log-tx{color:#991b1b;font-weight:700}
+
+/* 進度紀錄內小徽章 */
+.log-loc{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700;margin-right:3px}
+.log-status{display:inline-block;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700;margin-right:3px;background:#e2e8f0;color:#475569}
+.log-status.st-進行中{background:#dbeafe;color:#1d4ed8}
+.log-status.st-送審中{background:#fef3c7;color:#b45309}
+.log-status.st-已下單{background:#fed7aa;color:#c2410c}
+.log-status.st-報價中{background:#cffafe;color:#0e7490}
+.log-status.st-已完成{background:#dcfce7;color:#15803d}
+.log-status.st-待確認{background:#f1f5f9;color:#475569}
+.log-status.st-已定案{background:#166534;color:#fff}
+.log-status.st-暫停卡關{background:#fecaca;color:#991b1b;font-weight:800}
+.log-status.st-恢復啟動{background:#bbf7d0;color:#15803d}
+
+.proj-section{margin-bottom:10px;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.proj-header{background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.proj-header:hover{background:#1e4a6e}
+.proj-cnt{background:rgba(255,255,255,.18);border-radius:10px;padding:1px 8px;font-size:11px;margin-left:8px}
+.chevron{transition:transform .2s}
+.sec-collapsed .chevron{transform:rotate(-90deg)}
+
+.wt-tbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.wt-tbl th{background:#1a3a5c;color:#fff;font-weight:700;padding:9px 10px;text-align:center;font-size:12px;cursor:pointer;user-select:none;white-space:nowrap}
+.wt-tbl th:hover{background:#264a73}
+.wt-tbl th.sorted{background:var(--accent)}
+.wt-tbl th .sort-ind{font-size:10px;margin-left:3px}
+.wt-tbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:middle;text-align:center}
+.wt-tbl td.tl{text-align:left}
+.wt-tbl tbody tr:hover td{background:#f8fafc;cursor:pointer}
+.wt-tbl tr.row-stuck td{background:#fef2f2!important;color:#991b1b}
+.wt-tbl .num-work{color:var(--primary);font-weight:800;font-size:14px}
+.wt-tbl .num-pause{color:#94a3b8;font-weight:700}
+.wt-tbl tr.row-stuck .num-pause{color:#dc2626}
+.ptbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+.ptbl th{background:#f8fafc;color:var(--primary);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;font-size:12px}
+.ptbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:top}
+.ptbl tbody tr:hover td{background:#f8fafc}
+
+.log-stat{font-size:11px;color:var(--muted);padding:2px 0 5px;border-bottom:1px dashed #e2e8f0;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.log-stat .stat-work{color:var(--primary);font-weight:700}
+.log-stat .stat-pause{color:#94a3b8;font-weight:600}
+.log-stat.stat-stuck .stat-pause{color:#dc2626}
+.log-stat.stat-stuck{color:#991b1b}
+.log-stat .stat-flag{background:#fee2e2;color:#991b1b;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700}
+.log-stat .stat-done{background:#dcfce7;color:#166534;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700}
+.log-ul{list-style:none;padding:0;margin:0}
+.log-li{display:flex;gap:6px;padding:3px 0;border-bottom:1px dashed #e2e8f0;align-items:flex-start}
+.log-li:last-child{border-bottom:none}
+.log-dt{background:#e2e8f0;color:#475569;border-radius:3px;padding:1px 6px;font-size:11px;white-space:nowrap;flex-shrink:0;margin-top:2px}
+.log-tx{flex:1;line-height:1.5;color:var(--text)}
+.log-plain{color:var(--muted);font-size:12px}
+
+.hist-item{background:#fff;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);border-left:4px solid var(--primary-l);transition:all .15s;cursor:pointer}
+.hist-item:hover{transform:translateX(2px)}
+.hist-proj{font-weight:800;color:var(--primary);font-size:13px}
+.hist-time{font-size:11px;color:var(--muted);margin-top:2px}
+.hist-wk{font-size:12px;color:var(--muted)}
+.hist-last{font-size:13px;color:var(--text);margin-top:3px}
+
+/* SETTINGS */
+.set-grp-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)}
+.set-grp-title{font-size:13px;font-weight:700;color:var(--primary)}
+.cfg-list-wrap{display:flex;flex-direction:column;gap:1px;margin-bottom:8px;max-height:200px;overflow-y:auto}
+.cfg-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px dashed #e2e8f0;font-size:13px}
+.cfg-row:last-child{border-bottom:none}
+.cfg-row-num{min-width:22px;text-align:right;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;flex-shrink:0}
+.cfg-row-lbl{flex:1;word-break:break-all;color:var(--text)}
+.cfg-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 4px;line-height:1;flex-shrink:0}
+.cfg-del:hover{color:var(--danger)}
+.cfg-inp-row{display:flex;gap:6px;margin-top:6px}
+.cfg-inp-row input{flex:1;min-width:0}
+.log-edit-wrap{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--border);border-radius:6px;padding:8px;min-height:52px;max-height:380px;overflow-y:auto;background:#fafafa}
+.log-edit-row{display:grid;grid-template-columns:138px 110px 100px 1fr 30px;gap:5px;align-items:center}
+.log-edit-row .fi{padding:4px 8px;font-size:12px}
+.log-edit-row .log-status{font-weight:700}
+.log-edit-row.row-stuck{background:#fef2f2;border-radius:4px;padding:3px;margin:-3px}
+@media(max-width:640px){
+  .log-edit-row{grid-template-columns:1fr 1fr 30px;gap:5px}
+  .log-edit-row .log-date{grid-column:1}
+  .log-edit-row .log-loc{grid-column:2}
+  .log-edit-row .log-status{grid-column:1/3;grid-row:2}
+  .log-edit-row .log-text{grid-column:1/3;grid-row:3}
+  .log-edit-row .log-del{grid-column:3;grid-row:1/4}
+}
+.cfg-empty-txt{font-size:12px;color:var(--muted);padding:6px 4px;text-align:center}
+details.adv-details{margin-top:8px}
+details.adv-details summary{font-size:12px;color:var(--muted);cursor:pointer;padding:6px 0;user-select:none}
+details.adv-details summary:hover{color:var(--primary)}
+details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.overlay.show{display:flex}
+.modal-box{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:680px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-title{font-size:16px;font-weight:800;color:var(--primary);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:0 4px}
+.modal-close:hover{color:var(--danger)}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--bg)}
+
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:5px}
+.toast{background:#0f172a;color:#fff;padding:9px 15px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:ti .25s ease}
+.toast-s{background:var(--success)}.toast-e{background:var(--danger)}
+@keyframes ti{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:10px}
+
+/* LOGIN MODAL */
+.login-modal{max-width:380px;text-align:center}
+.login-icon{font-size:48px;margin-bottom:6px}
+.login-title{font-size:17px;font-weight:800;color:var(--primary);margin-bottom:6px}
+.login-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+.login-form{display:flex;flex-direction:column;gap:12px;text-align:left}
+.login-form .fl{font-size:11px}
+.login-rem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;margin-top:-2px}
+.login-rem input{width:14px;height:14px;cursor:pointer}
+
+/* NAV 使用者區塊 */
+.nav-user{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border-radius:6px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;transition:background .15s}
+.nav-user:hover{background:rgba(255,255,255,.2)}
+.nav-user-name{font-weight:700}
+.nav-user-dept{color:rgba(255,255,255,.7);font-size:11px}
+.nav-user-role{background:#16a34a;color:#fff;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700}
+.nav-user-role.r-reporter{background:#475569}
+
+/* 唯讀標記 */
+.ro-mini{display:inline-block;font-size:10px;color:var(--muted);background:#f1f5f9;border-radius:3px;padding:1px 5px;margin-left:4px}
+
+/* 群組標題列（仿工程日報表 v3） */
+.grp-hdr-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--primary);flex-wrap:wrap;gap:8px}
+.grp-title{font-size:14px;font-weight:800;color:var(--primary)}
+.grp-divider{height:1px;background:var(--bg);margin:24px 0}
+.set-top-bar{display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 0;flex-wrap:wrap}
+
+/* 人員管理 table */
+.user-tbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff;margin-top:8px}
+.user-tbl th{background:#f8fafc;color:var(--primary);font-weight:700;padding:7px 9px;text-align:left;border-bottom:2px solid var(--border);font-size:12px}
+.user-tbl td{border-bottom:1px solid #f1f5f9;padding:6px 9px;vertical-align:middle}
+
+/* 平板優化（≤1024px）：nav 縮一點、表格 padding 縮、群組二 3 欄→2 欄 */
+@media(max-width:1024px){
+  .container{padding:12px}
+  .nav-btn{padding:5px 9px;font-size:11px}
+  .nav-user-dept{display:none}
+  .nav-user{padding:3px 8px}
+  .ptbl th,.ptbl td{padding:6px 7px}
+  .ptbl th{font-size:11px}
+  .ptbl td{font-size:12px}
+  .g3{grid-template-columns:repeat(2,1fr)}
+  .card-body{padding:12px 14px}
+  .filter-bar{padding:8px 12px;gap:6px}
+  .grp-title{font-size:13px}
+  .log-li{font-size:12px}
+  .log-dt{font-size:10px}
+}
+@media(max-width:767px){nav{padding:6px 10px}.nav-logo{font-size:13px}.nav-btn{padding:5px 7px;font-size:11px}.nav-spacer{display:none}.nav-user{padding:3px 8px;font-size:11px}}
+</style>
+</head>
+<body>
+
+<!-- ===== PORTAL REQUIRED OVERLAY（無入口身分時才顯示）===== -->
+<div id="login-overlay" class="overlay" style="display:none">
+  <div class="modal-box login-modal">
+    <div class="login-icon">🔐</div>
+    <div class="login-title">請從入口網頁登入</div>
+    <div class="login-sub" style="line-height:1.7;margin-bottom:20px">本系統已整合至<br><strong>「石御石材工程管理系統」入口</strong><br>請先從入口選擇身分後再進入</div>
+    <a href="../portal/index.html" class="btn btn-p" style="padding:9px;font-size:14px;text-decoration:none;display:flex;align-items:center;justify-content:center">前往入口網頁 →</a>
+  </div>
+</div>
+
+<nav>
+  <span class="nav-logo">圖面 <span>進度表</span></span>
+  <button class="nav-btn active" onclick="goPage('main')">📋 進度總表</button>
+  <button class="nav-btn" onclick="goPage('worktime')">⏱️ 工時計算</button>
+  <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史資料</button>
+  <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
+  <span class="nav-spacer"></span>
+  <div class="nav-user" id="nav-user" onclick="backToPortal()" title="點此返回入口">
+    <span class="nav-user-role r-reporter" id="nav-user-role">—</span>
+    <span class="nav-user-name" id="nav-user-name">未登入</span>
+    <span class="nav-user-dept" id="nav-user-dept"></span>
+    <span style="font-size:11px;opacity:.6">🔄</span>
+  </div>
+  <button class="nav-xbtn" onclick="exportExcel()">📊 匯出 Excel</button>
+  <span id="sync-icon" title="雲端同步狀態">☁️</span>
+</nav>
+
+<div class="container">
+
+<!-- ===== 進度總表 ===== -->
+<div id="page-main" class="page active">
+  <div class="filter-bar">
+    <input type="text" id="q" class="fi" placeholder="搜尋案場、執行者、工作內容..." style="max-width:220px" oninput="renderMain()">
+    <select id="f-proj" class="fi" style="max-width:170px" onchange="renderMain()"><option value="">全部案場</option></select>
+    <select id="f-exec" class="fi" style="max-width:130px" onchange="renderMain()"><option value="">全部執行者</option></select>
+    <select id="f-status" class="fi" style="max-width:120px" onchange="renderMain()"><option value="">全部狀態</option></select>
+    <span id="result-count" style="font-size:12px;color:var(--muted)"></span>
+    <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openEdit(null)">＋ 新增紀錄</button>
+  </div>
+  <div id="main-table"></div>
+</div>
+
+<!-- ===== 工時計算 ===== -->
+<div id="page-worktime" class="page">
+  <div class="filter-bar" style="flex-wrap:wrap;gap:6px">
+    <input type="text" id="wt-q" class="fi" placeholder="搜尋案場、執行者、工作內容..." style="max-width:200px" oninput="renderWorktime()">
+    <select id="wt-proj" class="fi" style="max-width:160px" onchange="renderWorktime()"><option value="">全部案場</option></select>
+    <select id="wt-exec" class="fi" style="max-width:130px" onchange="renderWorktime()"><option value="">全部執行者</option></select>
+    <select id="wt-status" class="fi" style="max-width:120px" onchange="renderWorktime()"><option value="">全部狀態</option></select>
+    <span style="font-size:12px;color:var(--muted);margin-left:6px">日期區間：</span>
+    <input type="date" id="wt-from" class="fi" style="max-width:140px" onchange="renderWorktime()">
+    <span style="font-size:12px;color:var(--muted)">~</span>
+    <input type="date" id="wt-to" class="fi" style="max-width:140px" onchange="renderWorktime()">
+    <button class="btn btn-g btn-sm" onclick="clearWtFilters()">清除</button>
+    <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="exportWorktimeExcel()">📊 匯出本頁結果</button>
+  </div>
+  <div id="wt-summary" style="margin-bottom:10px;padding:10px 14px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);font-size:13px;color:var(--text);display:none"></div>
+  <div id="wt-table"></div>
+</div>
+
+<!-- ===== 歷史 ===== -->
+<div id="page-history" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">歷史資料（依更新時間排序）</span>
+      <input type="text" id="hist-q" class="fi" placeholder="搜尋..." style="max-width:200px" oninput="renderHistory()">
+    </div>
+    <div class="card-body" id="hist-list"></div>
+  </div>
+</div>
+
+<!-- ===== 設定 ===== -->
+<div id="page-settings" class="page">
+  <div class="card">
+    <div class="set-top-bar">
+      <button class="btn btn-p btn-sm" onclick="manualSave()">💾 儲存設定</button>
+      <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回入口</button>
+    </div>
+    <div class="card-body">
+
+      <!-- 群組一已移除：部門、執行者、權限設定改由入口網頁集中管理 -->
+      <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:18px;color:#1e40af;font-size:13px;line-height:1.6">
+        ℹ️ <strong>部門、執行者、權限設定已移至入口網頁集中管理</strong><br>
+        如需新增/編輯部門、員工、權限角色，請至
+        <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+      </div>
+
+      <div class="grp-divider"></div>
+
+      <!-- ===== 群組二：案場、施作位置／工作項目、狀態 ===== -->
+      <div class="grp-hdr-bar">
+        <span class="grp-title">群組二：案場、施作位置／工作項目、狀態</span>
+        <button class="btn btn-p btn-sm" onclick="manualSave()">💾 儲存</button>
+      </div>
+      <div class="g g3" style="gap:16px;align-items:start">
+        <div>
+          <div class="set-grp-hdr">
+            <span class="set-grp-title">📁 案場</span>
+            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('案場')">＋ 新增</button>
+          </div>
+          <div class="cfg-list-wrap" id="lw-案場"></div>
+          <div class="cfg-inp-row" id="ir-案場" style="display:none">
+            <input type="text" id="cfg-inp-案場" class="fi" placeholder="輸入案場名稱後按 Enter"
+              onkeydown="if(event.key==='Enter')cfgAdd('案場');if(event.key==='Escape')cfgHideInp('案場')">
+            <button class="btn btn-p btn-sm" onclick="cfgAdd('案場')">新增</button>
+            <button class="btn btn-g btn-sm" onclick="cfgHideInp('案場')">取消</button>
+          </div>
+        </div>
+        <div>
+          <div class="set-grp-hdr">
+            <span class="set-grp-title">📍 施作位置／工作項目</span>
+            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('施作位置')">＋ 新增</button>
+          </div>
+          <div class="cfg-list-wrap" id="lw-施作位置"></div>
+          <div class="cfg-inp-row" id="ir-施作位置" style="display:none">
+            <input type="text" id="cfg-inp-施作位置" class="fi" placeholder="施作位置或工作項目"
+              onkeydown="if(event.key==='Enter')cfgAdd('施作位置');if(event.key==='Escape')cfgHideInp('施作位置')">
+            <button class="btn btn-p btn-sm" onclick="cfgAdd('施作位置')">新增</button>
+            <button class="btn btn-g btn-sm" onclick="cfgHideInp('施作位置')">取消</button>
+          </div>
+        </div>
+        <div>
+          <div class="set-grp-hdr">
+            <span class="set-grp-title">🏷️ 狀態</span>
+            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('狀態')">＋ 新增</button>
+          </div>
+          <div class="cfg-list-wrap" id="lw-狀態"></div>
+          <div class="cfg-inp-row" id="ir-狀態" style="display:none">
+            <input type="text" id="cfg-inp-狀態" class="fi" placeholder="狀態名稱"
+              onkeydown="if(event.key==='Enter')cfgAdd('狀態');if(event.key==='Escape')cfgHideInp('狀態')">
+            <button class="btn btn-p btn-sm" onclick="cfgAdd('狀態')">新增</button>
+            <button class="btn btn-g btn-sm" onclick="cfgHideInp('狀態')">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部按鈕（仿 v3） -->
+      <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-p" onclick="manualSave()">💾 儲存設定</button>
+        <button class="btn btn-o" onclick="switchUser()">🔄 切換使用者</button>
+      </div>
+
+      <!-- 資料備份 -->
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--muted)">資料備份：</span>
+        <button class="btn btn-o btn-sm" onclick="exportJson()">⬇️ 匯出 JSON</button>
+        <label class="btn btn-o btn-sm" style="cursor:pointer">⬆️ 匯入 JSON <input type="file" accept=".json" onchange="importJson(event)" style="display:none"></label>
+        <span id="api-status-txt" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ===== EDIT MODAL ===== -->
+<div id="edit-overlay" class="overlay" onclick="overlayClick(event)">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="modal-title-text">新增紀錄</span>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <input type="hidden" id="edit-id">
+
+    <!-- datalists -->
+    <datalist id="dl-案場"></datalist>
+    <datalist id="dl-部門"></datalist>
+    <datalist id="dl-執行者"></datalist>
+    <datalist id="dl-施作位置"></datalist>
+    <datalist id="dl-位置"></datalist>
+
+    <div class="g g2" style="gap:12px;margin-bottom:12px">
+      <div class="fg" style="grid-column:span 2">
+        <label class="fl">案場 *</label>
+        <input type="text" id="e-proj" class="fi" list="dl-案場" placeholder="選擇或輸入案場名稱">
+      </div>
+      <div class="fg">
+        <label class="fl">部門</label>
+        <input type="text" id="e-dept" class="fi" list="dl-部門" placeholder="選擇或輸入部門">
+      </div>
+      <div class="fg">
+        <label class="fl">執行者</label>
+        <input type="text" id="e-exec" class="fi" list="dl-執行者" placeholder="多人可用、分隔">
+      </div>
+      <div class="fg" style="grid-column:span 2">
+        <label class="fl">施作位置／工作項目</label>
+        <input type="text" id="e-loc" class="fi" list="dl-施作位置" placeholder="選擇或輸入施作位置／工作項目">
+      </div>
+      <div class="fg" style="grid-column:span 2">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+          <label class="fl" style="margin-bottom:0">進度記錄（最後一筆狀態 = 主狀態徽章）</label>
+          <button type="button" class="btn btn-a btn-sm" onclick="addLogRow()">＋ 新增一筆</button>
+        </div>
+        <div id="log-editor" class="log-edit-wrap"></div>
+      </div>
+      <div class="fg" style="grid-column:span 2">
+        <label class="fl">備註</label>
+        <textarea id="e-note" class="fi" rows="3" placeholder="材質、注意事項..."></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="del-btn" class="btn btn-d btn-sm" onclick="delRecord()" style="margin-right:auto;display:none">🗑️ 刪除</button>
+      <button class="btn btn-o btn-sm" onclick="closeEdit()">取消</button>
+      <button id="save-btn" class="btn btn-p btn-sm" onclick="saveRecord()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== USER MODAL ===== -->
+<div id="user-overlay" class="overlay" onclick="if(event.target===event.currentTarget)closeUserModal()">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-title">
+      <span id="um-title">新增人員</span>
+      <button class="modal-close" onclick="closeUserModal()">✕</button>
+    </div>
+    <input type="hidden" id="um-id">
+    <div class="g" style="gap:12px;margin-bottom:16px">
+      <div class="fg">
+        <label class="fl">姓名 *</label>
+        <input type="text" id="um-name" class="fi" placeholder="例：黃惠瑩">
+      </div>
+      <div class="fg">
+        <label class="fl">部門 *</label>
+        <input type="text" id="um-dept" class="fi" list="dl-部門" placeholder="輸入或選擇部門">
+      </div>
+      <div class="fg">
+        <label class="fl">角色</label>
+        <select id="um-role" class="fi">
+          <option value="reporter">填報人員（只能編自己的紀錄）</option>
+          <option value="manager">管理主管（可編全部 + 管理人員）</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">密碼</label>
+        <input type="password" id="um-pw" class="fi" placeholder="留空＝不設密碼">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="um-del" class="btn btn-d btn-sm" onclick="delUser()" style="margin-right:auto;display:none">🗑️ 刪除</button>
+      <button class="btn btn-o btn-sm" onclick="closeUserModal()">取消</button>
+      <button class="btn btn-p btn-sm" onclick="saveUser()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ============================================================
+// 初始資料
+// ============================================================
+const INIT = [
+  {id:'i001',案場:'雙橡園-1518',部門:'',執行者:'黃惠瑩、郭映均',施作位置:'基座',工作項目:'',進度記錄:'03/10 進行第一次設計會議\n03/25 進行第二次設計會議\n04/08 進行第三次設計會議\n04/23 進行第四次設計會議\n05/06 進行第五次設計會議(陳先生)\n05/20 進行第六次設計會議(陳先生)\n06/03 進行第七次設計會議(陳先生)\n06/10 進行第八次設計會議(陳先生)\n06/17 進行第九次設計會議(陳先生)\n06/24 進行第十次設計會議(陳先生)\n06/30 拆圖中',備註:'*3/10 第一次設計會議\n*6/24 第十次設計會議定案',狀態:'進行中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i002',案場:'雙橡園-2045',部門:'',執行者:'郭映均',施作位置:'基座',工作項目:'',進度記錄:'規劃圖繪製中(預計2月底交給開發設計部)\n02/21 上午08:30內部會議討論\n02/27 已提供規劃圖說給開發設計部\n03/10 依會議後調整圖說\n03/18 已向優石特詢價\n04/19 已收到優石特報價，待登打報價單\n04/25 已完成報價單登打，待林總確認\n05/16 拱心石報價已回復優石特請他確認\n06/04 優石特提供更新後拱心石報價，因還有異議將會提供分割再與優石特討論\n06/30 優石特2次提供更新後報價 報價單調整中\n07/01 提供更新後報價單',備註:'*8/1進行第一次設計會議\n*12/16第十二次設計會議已定案',狀態:'報價中',updatedAt:'2026-07-01T00:00:00.000Z'},
+  {id:'i003',案場:'雙橡園-2045',部門:'',執行者:'郭映均、許詠珺',施作位置:'外牆',工作項目:'',進度記錄:'05/12 標準層數量計算完成\n05/14 RF層數量計算完成\n06/16 10F~11F標準層外牆平面送審圖繪製中，預計6/18送審（含立面分割規劃）\n06/23 標準層外牆6/18第一次送審\n07/11 下週再重新提供分割新方案，另設計部回覆立面會盡快更新版本並提供',備註:'',狀態:'送審中',updatedAt:'2026-07-11T00:00:00.000Z'},
+  {id:'i004',案場:'雙橡園-1920',部門:'',執行者:'蕭宇良',施作位置:'基座',工作項目:'',進度記錄:'02/08 加詢新桃花紅及項目報價\n02/17 確定使用新桃花紅作為外牆材質\n03/31 已依林總建議調整報價\n05/15 已送出報價單\n05/22 收到基座細部大樣圖，回套規劃圖中\n06/10 回套之規劃圖已提供開發設計部\n06/20 已同步提供圖面給工區\n追加項目詢價中',備註:'',狀態:'報價中',updatedAt:'2026-06-20T00:00:00.000Z'},
+  {id:'i005',案場:'雙橡園-1920',部門:'',執行者:'黃惠瑩',施作位置:'外牆',工作項目:'',進度記錄:'已完成初步數量計算&登打報價單待確認',備註:'',狀態:'待確認',updatedAt:'2026-05-01T00:00:00.000Z'},
+  {id:'i006',案場:'雙橡園-1920',部門:'',執行者:'許詠珺',施作位置:'1F景觀',工作項目:'',進度記錄:'02/10 已收到1F景觀設計圖面，讀圖中',備註:'',狀態:'進行中',updatedAt:'2026-02-10T00:00:00.000Z'},
+  {id:'i007',案場:'雙橡園-4117',部門:'',執行者:'郭映均',施作位置:'基座',工作項目:'',進度記錄:'12/02 已提供更新後圖說\n12/11 送審最新基座圖說(經開發設計部確認)\n12/21 重新詢價優石特 待報價後登打報價單\n12/27 報價單待確認\n01/02 已送出報價單\n待工地確認實際可澆灌範圍\n05/10 已對接上目前負責人員(劉任祐)預計本周會提供確認後圖面\n05/22 與工區開基座結構範圍確認會議\n06/05 依開發設計部指示調整內迴廊石材範圍後更新圖說\n06/06 已送審最新版本基座石材規劃圖給開發設計部以及工地\n06/16 基座報價單調整中\n06/18 已提供更新後報價給工地',備註:'',狀態:'報價中',updatedAt:'2026-06-18T00:00:00.000Z'},
+  {id:'i008',案場:'雙橡園-4117',部門:'',執行者:'蕭宇良、蘇芸加',施作位置:'標準層外牆',工作項目:'',進度記錄:'02/06 與會4117工務所、開發設計部、YKKap，外牆分割規劃定案\n預計4月中由YKKap提供最新平面圖\n04/15 工務所提供最新PC板片圖\n05/08 已依榮工需求增列大樣詳圖，並提供最新N棟標準層3~5F外牆PC板石材送審圖\n05/14 收到N棟標準層3~5F外牆PC板回簽圖\n05/26 N棟標準層6~16F外牆PC板石材送審\n06/02 S棟標準層3~16F外牆PC板石材送審\n06/09 收到N棟標準層6~16F外牆PC板回簽圖\n06/16 收到S棟標準層3~16F外牆PC板回簽圖，待依意見調整圖面後備查\n06/17 N棟標準層3~16F外牆PC板石材下單\n06/20 S棟標準層3~16F外牆PC板石材第二次送審\n07/04 S棟標準層3~16F外牆PC板石材下單',備註:'',狀態:'已下單',updatedAt:'2026-07-04T00:00:00.000Z'},
+  {id:'i009',案場:'雙橡園-4117',部門:'',執行者:'蘇芸加',施作位置:'標準層內裝',工作項目:'',進度記錄:'06/19 已提供單價明細表給開發設計部及總監\n07/05 已提供預算用報價單給全品及總監',備註:'',狀態:'報價中',updatedAt:'2026-07-05T00:00:00.000Z'},
+  {id:'i010',案場:'雙橡園-2925',部門:'',執行者:'許詠珺、李冠彬',施作位置:'標準層梯廳',工作項目:'',進度記錄:'06/09 籃英已下單6F電梯框（待設計部確認造型，確認後才可接續繪製其餘樓層電梯框）\n06/24 21F部分牆面已補料\n07/04 已協助靖翔繪製各樓層部分牆面補料單(石材暗裂)，待靖翔確認後下單',備註:'',狀態:'待確認',updatedAt:'2026-07-04T00:00:00.000Z'},
+  {id:'i011',案場:'雙橡園-2925',部門:'',執行者:'蘇芸加、郭映均、蕭宇良、黃惠瑩',施作位置:'標準層浴室',工作項目:'門檻+淋浴柱+馬背+檯面',進度記錄:'4/10 7E客浴入口門檻補料（竺雨送紙本給工區副所，4/11+14已追蹤，4/14回簽）\n4/18 7E客浴入口門檻補料已下單至舜晟\n4/21 5B1主公浴送審，4/25回簽，4/28已下單\n06/09 3A2+W戶5/12送審，5/18回簽，5/19已下單',備註:'下單圖變更續歸檔問題有分兩種：\n1. 料到現場，圖檔位置不能動，需要額外備註原因\n2. 工廠告知變更後，圖檔要跟著移動+修正',狀態:'已下單',updatedAt:'2026-06-09T00:00:00.000Z'},
+  {id:'i012',案場:'雙橡園-2925',部門:'',執行者:'許詠珺、李冠彬',施作位置:'標準層浴室',工作項目:'地壁',進度記錄:'04/15 30F(蕭邦戶別)已送審，04/15已回簽，04/17已下單\n04/23 31A1+B1+B2戶主浴牆面+地坪、E戶主浴浴缸送審，4/25回簽，4/28已下單\n04/30 26B1、26W主浴淋浴踏板補料\n05/05 東元調整31F主浴A1+B1+B2戶分割，已調整並回傳\n05/06 27W戶公浴改下單至舜晟\n05/08 東元第二次調整31F主浴A1+B1+B2戶分割並裁剪完畢，已調整\n05/08 3FA2、W主浴牆面+地坪已送審，5/11已回簽\n05/15 9E主浴牆面+地坪補料',備註:'',狀態:'進行中',updatedAt:'2026-05-15T00:00:00.000Z'},
+  {id:'i013',案場:'雙橡園-2925',部門:'',執行者:'蘇芸加',施作位置:'1F景觀',工作項目:'',進度記錄:'05/20 西向大門拼花交接給宗儒接續繪製\n06/18 已提供樣品_浪淘沙荔沖面、雪白蒙卡荔沖面\n07/02 開發設計部珮綺已確認維持原加工(荔面)\n07/26 已詢價\n01/13 已送出報價單給工區',備註:'',狀態:'報價中',updatedAt:'2026-07-26T00:00:00.000Z'},
+  {id:'i014',案場:'雙橡園-2925',部門:'',執行者:'蘇芸加、李冠彬',施作位置:'34F景觀',工作項目:'',進度記錄:'12/06 34F花台第二次送審\n12/09 已與尚宇興業(金屬骨架)現場討論泳池施作\n12/18 34F依厚磚配色參考修改後已送審回簽\n12/26 台灣瑪摩通知印度黑會有三批號\n12/27 確認三批號對色已計算分別使用數量\n01/06 花台下單流程中\n01/07 花台已下單\n01/16 Stand bar已下單\n報價單待登打中',備註:'',狀態:'進行中',updatedAt:'2026-01-16T00:00:00.000Z'},
+  {id:'i015',案場:'雙橡園-2925',部門:'',執行者:'蘇芸加、李冠彬、蕭宇良',施作位置:'公設',工作項目:'',進度記錄:'04/02 已提供B1~B3迎賓車道地坪石材數量給林總\n04/07 B1~B3、2F梯廳地坪已下單\n04/07 2925-34F公設梯廳地坪已送審\n04/09 2925-1F公設梯廳地坪已送審\n04/11 B1~B3迎賓車道地坪依綜合設計部意見調整，抽圖送審\n04/21 B1~B3迎賓車道地坪回簽，預計4/22第二次送審\n04/22 1F、34F公設梯廳地坪已回簽\n04/28 1F、34F公設梯廳地坪已下單\n04/30 B1~B3迎賓車道地坪已下單\n06/30 2F過道地坪繪製中，預計07/01送審',備註:'',狀態:'進行中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i016',案場:'雙橡園-2279',部門:'',執行者:'李冠彬',施作位置:'標準層浴室',工作項目:'',進度記錄:'03/19 追蹤3戶客變皆未貼磚(無法丈量)\n03/24 16w公浴已送審，3/25已回簽，3/26已下單\n06/09 19E+20E戶主公浴門檻5/28送審，6/2回簽(待客戶確認石材後即可下單)\n06/13 19E+20E戶主公浴門檻，客戶已確認為銀河之星A1#MGKS63，已下單至舜晟\n06/16 銀河之星A1#MGKS63，待許副總提供簽認單後，通知芷陽拉板',備註:'內部審圖_規劃設計>>專案管理(蘭姐、許副總)\n5/19 公浴未丈量(客變未完成)：\n19F E\n23F B2\n計2間',狀態:'待確認',updatedAt:'2026-06-16T00:00:00.000Z'},
+  {id:'i017',案場:'雙橡園-2279',部門:'',執行者:'蘇芸加',施作位置:'33F公設',工作項目:'',進度記錄:'06/30 已提供報價單',備註:'',狀態:'報價中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i018',案場:'雙橡園-2279',部門:'',執行者:'蘇芸加',施作位置:'2F公設',工作項目:'',進度記錄:'06/30 已提供報價單',備註:'',狀態:'報價中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i019',案場:'雙橡園-2279',部門:'',執行者:'許詠珺、蘇芸加',施作位置:'1F&BF公設',工作項目:'',進度記錄:'06/30 已提供報價單',備註:'',狀態:'報價中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i020',案場:'雙橡園-3A會所',部門:'',執行者:'李冠彬',施作位置:'室內',工作項目:'',進度記錄:'02/21 地坪分割已繪製完成\n03/05 因大板尺寸過大無法進場，已調整\n03/06 已將地坪分割圖面提供給台灣瑪摩依珊',備註:'',狀態:'進行中',updatedAt:'2026-03-06T00:00:00.000Z'},
+  {id:'i021',案場:'雙橡園-3A會所',部門:'',執行者:'蘇芸加',施作位置:'外牆',工作項目:'',進度記錄:'06/17 交接圖面給籃英繪製施工圖\n立面圖繪製完成後詢價優石特',備註:'',狀態:'進行中',updatedAt:'2026-06-17T00:00:00.000Z'},
+  {id:'i022',案場:'雙橡園-3A會所',部門:'',執行者:'許詠珺、黃惠瑩',施作位置:'停車場側入口石柱',工作項目:'',進度記錄:'05/05 已收到設計意象照片\n06/02 已與開發設計部確認造型\n06/09 拆圖中\n06/25 已提供圖面&報價',備註:'',狀態:'報價中',updatedAt:'2026-06-25T00:00:00.000Z'},
+  {id:'i023',案場:'惠國建設-沙鹿麓境案',部門:'',執行者:'蘇芸加、黃惠瑩',施作位置:'',工作項目:'',進度記錄:'06/13 景觀樣品提供給業主\n外牆石材確認為 [ 白玫瑰沖仿面 ]\n06/20 Gigi追加景觀詢樣白蒙卡荔面/藍珊瑚燒面\n樣品已收到待送樣\n10/28 需追加樣品數量放置於接待中心\n10/29 詢樣\n林總已送樣\n12/31 收到30*30cm的樣品，待送去接待中心\n已收到第二次樣品待送樣至惠國建設\n數量計算完成，待提供報價單',備註:'優石特_白玫瑰荔仿面\n光華_白玫瑰沖仿面',狀態:'待確認',updatedAt:'2025-12-31T00:00:00.000Z'},
+  {id:'i024',案場:'惠國建設烏日案',部門:'',執行者:'許詠珺',施作位置:'',工作項目:'',進度記錄:'2024/9/9 依8/30圖面檢討會議回饋並調整3D及基座拆圖',備註:'重要不緊急約三年後',狀態:'進行中',updatedAt:'2024-09-09T00:00:00.000Z'},
+  {id:'i025',案場:'惠國建設清澄之境',部門:'',執行者:'蘇芸加',施作位置:'',工作項目:'',進度記錄:'11/25 已送出1F景觀報價單',備註:'',狀態:'報價中',updatedAt:'2025-11-25T00:00:00.000Z'},
+  {id:'i026',案場:'舜元建設',部門:'',執行者:'蘇芸加',施作位置:'',工作項目:'',進度記錄:'01/04 洲際段提供建築師立面分割建議',備註:'洲際段-浪花白\n境朗-安格拉黑燒仿面\n大里新光段-安格拉黑',狀態:'進行中',updatedAt:'2026-01-04T00:00:00.000Z'},
+  {id:'i027',案場:'大鑫建設-琢寓',部門:'',執行者:'蕭宇良',施作位置:'',工作項目:'',進度記錄:'07/31 收到外觀圖\n08/21 已送樣\n09/20 收到新圖面\n03/06 與業主會議，依業主需求追加詢樣，並依最新石材範圍調整石材數量計算\n03/21 數量已計算完成並載於報價單，待與業主確認石材品項\n04/30 材質及介面會議，待業主提供調整後之最新圖面\n06/23 已提供報價單給業主\n06/30 召開啟動會議',備註:'',狀態:'進行中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i028',案場:'峰閣建設彰化案',部門:'',執行者:'蘇芸加',施作位置:'',工作項目:'',進度記錄:'01/14 已送出報價單\n04/09 送出更新報價單(浪濤沙&浪花白-X)\n04/18 已送樣(浪濤沙&浪花白-X&雪白蒙卡)\n04/29 確認預計使用浪花白-X，待業主確認試燒丁掛磚成果後簽約\n06/12 已議價簽約\n06/13 已提供議價後報價單及空白合約 業主審閱中',備註:'材質-浪花白(水沖面)\n報價前需與優石特對樣並確認原礦數量 已重新送樣',狀態:'待確認',updatedAt:'2026-06-13T00:00:00.000Z'},
+  {id:'i029',案場:'九上建設-九上州廳',部門:'',執行者:'蘇芸加、李冠彬',施作位置:'',工作項目:'',進度記錄:'04/07 石材分割規劃圖繪製完成待確認\n04/09 已提供方案\n04/10 業主回覆希望設計更繁複\n06/02 立面設計方案繪製\n07/03 預計與業主會議',備註:'',狀態:'進行中',updatedAt:'2026-07-03T00:00:00.000Z'},
+  {id:'i030',案場:'宇揚設計鹿港案',部門:'',執行者:'郭映均',施作位置:'',工作項目:'',進度記錄:'01/22 已送出報價單\n03/19 至現場與營造確認\n03/28 報價單林總確認中\n04/01 已送出報價單給宇揚\n05/29 已更新報價單提供給宇揚',備註:'',狀態:'報價中',updatedAt:'2026-05-29T00:00:00.000Z'},
+  {id:'i031',案場:'聯悅建設鎮福段',部門:'',執行者:'黃惠瑩',施作位置:'',工作項目:'',進度記錄:'規劃圖繪製&數量計算已完成\n02/11 已送出報價單',備註:'',狀態:'報價中',updatedAt:'2026-02-11T00:00:00.000Z'},
+  {id:'i032',案場:'圓境設計-斗六蘇宅第二期裝修工程',部門:'',執行者:'黃惠瑩',施作位置:'',工作項目:'',進度記錄:'規劃圖繪製&數量計算已完成\n待業主通知選板',備註:'',狀態:'待確認',updatedAt:'2026-03-01T00:00:00.000Z'},
+  {id:'i033',案場:'寶璟建設-臻品(永富段)',部門:'',執行者:'黃惠瑩',施作位置:'',工作項目:'',進度記錄:'03/26 收到相關測繪圖\n03/26 規劃圖繪製，計算數量中\n04/30 已提供報價給業主',備註:'',狀態:'報價中',updatedAt:'2026-04-30T00:00:00.000Z'},
+  {id:'i034',案場:'精銳ABBA',部門:'',執行者:'蘇芸加',施作位置:'',工作項目:'',進度記錄:'03/27 收到標單相關圖面\n04/08 已提供報價給業主',備註:'',狀態:'報價中',updatedAt:'2026-04-08T00:00:00.000Z'},
+  {id:'i035',案場:'鑫嘉建設',部門:'',執行者:'蘇芸加、李冠彬',施作位置:'',工作項目:'',進度記錄:'04/09 收到設計圖面\n04/28 圖面繪製\n05/12 預計與業主開會取消\n05/20 已與業主開會\n05/26 規劃圖已繪製完成，待與業主開會確認後計算數量\n06/09 報價圖繪製完成後詢價、數量計算中\n06/13 報價圖已送出，待優石特提供報價，6/18已收到報價單\n06/23 已與業主開會，待修改後提供報價\n06/30 報價已修改，預計07/02與業主開會',備註:'',狀態:'進行中',updatedAt:'2026-06-30T00:00:00.000Z'},
+  {id:'i036',案場:'禾固營造-關朝政案',部門:'',執行者:'許詠珺',施作位置:'',工作項目:'',進度記錄:'05/09 依工地會議討論內容進行調整，1F~2F露臺展開圖第二次送審\n05/20 1F~2F露臺展開圖第三次送審\n05/26 已提供RC結構建議，尚未收到第三次送審回簽\n06/23 展開圖第四次送審，目前有疑慮尚未釋疑 (上一次送審未回覆)\n06/26 依回饋修改部分尺寸，第四次已重新送審\n07/06 1F~2F 圖面已回簽\n07/11 1F~2F 已下單至優石特',備註:'04/16 外牆2F~4F已下單至優石特',狀態:'已下單',updatedAt:'2026-07-11T00:00:00.000Z'},
+  {id:'i037',案場:'禾固營造-豐樂北二路陳公館案',部門:'',執行者:'蘇芸加',施作位置:'',工作項目:'',進度記錄:'05/02 已收到設計圖面',備註:'',狀態:'進行中',updatedAt:'2026-05-02T00:00:00.000Z'},
+  {id:'i038',案場:'乾唐建設螺青段案',部門:'',執行者:'李冠彬',施作位置:'',工作項目:'',進度記錄:'06/20 收到設計圖面\n規劃圖繪製中',備註:'',狀態:'進行中',updatedAt:'2026-06-20T00:00:00.000Z'}
+];
+
+// ============================================================
+// 預設設定
+// ============================================================
+function buildDefaultCfg(){
+  const projSet=new Set(), execSet=new Set(), locSet=new Set();
+  INIT.forEach(r=>{
+    projSet.add(r.案場);
+    (r.執行者||'').split(/[、,，\n]/).forEach(e=>{const t=e.trim();if(t)execSet.add(t)});
+    if(r.施作位置)locSet.add(r.施作位置);
+    if(r.工作項目)locSet.add(r.工作項目);
+  });
+  return {
+    案場:[...projSet].sort(),
+    部門:[],
+    執行者:[...execSet].sort(),
+    施作位置:[...locSet].filter(Boolean).sort(),
+    狀態:['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動'],
+    users:[]
+  };
+}
+
+// 確保現有 cfg 的狀態包含新增的選項（向下相容）
+function ensureStatusOptions(){
+  if(!cfg.狀態)cfg.狀態=[];
+  ['暫停/卡關','恢復啟動'].forEach(s=>{if(!cfg.狀態.includes(s))cfg.狀態.push(s)});
+  if(!cfg.users)cfg.users=[];
+  if(!cfg.部門)cfg.部門=[];
+}
+
+// ============================================================
+// 狀態
+// ============================================================
+let records=[], cfg={}, currentUser=null;
+
+// ============================================================
+// 權限
+// ============================================================
+function isManager(){return currentUser&&currentUser.role==='manager'}
+function isLoggedIn(){return !!(currentUser&&currentUser.name)}
+function canEditRecord(r){
+  if(!isLoggedIn())return false;
+  if(isManager())return true;
+  if(!r||!r.執行者)return false;
+  // 執行者欄位「包含」當前登入姓名（多人用、分隔）
+  const execs=String(r.執行者).split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean);
+  return execs.includes(currentUser.name);
+}
+
+const CFG_KEYS=[
+  {key:'案場',icon:'📁'},
+  {key:'部門',icon:'🏢'},
+  {key:'執行者',icon:'👤'},
+  {key:'施作位置',icon:'📍'},
+  {key:'狀態',icon:'🏷️'}
+];
+
+// ============================================================
+// 工具
+// ============================================================
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function uid(){return 'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)}
+function stClassName(s){return 'st-'+String(s||'').replace(/[\s/]/g,'')}
+
+// ============================================================
+// 進度紀錄 結構化 (新格式：陣列 of {date, location, status, text})
+// 向下相容：舊資料是字串「03/10 說明」格式，自動解析成陣列
+// ============================================================
+function parseProgressString(text){
+  if(!text)return[];
+  if(Array.isArray(text))return text;
+  return String(text).split('\n').filter(l=>l.trim()).map(line=>{
+    const m=line.match(/^(\d{1,4}\/\d{1,2}(?:\/\d{1,2})?)\s+([\s\S]*)/);
+    let date='',body=line.trim();
+    if(m){
+      const parts=m[1].split('/');
+      try{
+        if(parts.length===2){const y=new Date().getFullYear();date=`${y}-${parts[0].padStart(2,'0')}-${parts[1].padStart(2,'0')}`}
+        else if(parts.length===3){date=`${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`}
+      }catch{}
+      body=m[2];
+    }
+    return{date,location:'',status:'',text:body};
+  });
+}
+function normalizeRecord(r){
+  if(!r)return r;
+  if(typeof r.進度記錄==='string'){
+    const arr=parseProgressString(r.進度記錄);
+    // 舊資料的主狀態繼承到最後一筆，這樣升級後主徽章仍正確
+    if(arr.length&&r.狀態)arr[arr.length-1].status=r.狀態;
+    r.進度記錄=arr;
+  }
+  if(!Array.isArray(r.進度記錄))r.進度記錄=[];
+  return r;
+}
+function getMainStatus(r){
+  const logs=r.進度記錄||[];
+  for(let i=logs.length-1;i>=0;i--){
+    if(logs[i]&&logs[i].status)return logs[i].status;
+  }
+  return r.狀態||'進行中';
+}
+function isStuck(r){return getMainStatus(r)==='暫停/卡關'}
+
+// 工作天數計算（總曆時 − 暫停區間總和）
+function calcWorkDays(logs){
+  if(!logs||!logs.length)return null;
+  const dated=logs.filter(l=>l&&l.date).map(l=>({status:l.status||'',date:l.date,_d:new Date(l.date)})).sort((a,b)=>a._d-b._d);
+  if(!dated.length)return null;
+  const start=dated[0]._d;
+  // 找最後一個有 status 的 log 來判斷是否已完結
+  let lastStatus='';
+  for(let i=dated.length-1;i>=0;i--){if(dated[i].status){lastStatus=dated[i].status;break;}}
+  const isClosed=['已完成','已定案'].includes(lastStatus);
+  const today=new Date(new Date().toISOString().slice(0,10));
+  const end=isClosed?dated[dated.length-1]._d:today;
+  const totalDays=Math.max(1,Math.round((end-start)/86400000)+1);
+  // 暫停區間累積
+  let pausedDays=0,pauseStart=null;
+  for(const log of dated){
+    if(log.status==='暫停/卡關'){if(!pauseStart)pauseStart=log._d;}
+    else if(log.status&&pauseStart){
+      pausedDays+=Math.max(0,Math.round((log._d-pauseStart)/86400000));
+      pauseStart=null;
+    }
+  }
+  // 仍卡關中：算到終點（包含當日）
+  const isStuckNow=!!pauseStart;
+  if(pauseStart)pausedDays+=Math.max(1,Math.round((end-pauseStart)/86400000)+1);
+  const workDays=Math.max(0,totalDays-pausedDays);
+  const iso=d=>d.toISOString().slice(0,10);
+  return{total:totalDays,paused:pausedDays,work:workDays,isStuck:isStuckNow,isClosed,startDate:iso(start),endDate:iso(end)};
+}
+
+// 目前卡關資訊（給 Excel Sheet 2 用）
+function getCurrentStuckInfo(logs){
+  if(!logs||!logs.length)return null;
+  const dated=logs.filter(l=>l&&l.date).map(l=>({...l,_d:new Date(l.date)})).sort((a,b)=>a._d-b._d);
+  if(!dated.length)return null;
+  let stuckStart=null,stuckReason='',stuckLocation='';
+  for(const log of dated){
+    if(log.status==='暫停/卡關'){
+      if(!stuckStart){stuckStart=log;stuckReason=log.text||'';stuckLocation=log.location||'';}
+    }else if(log.status){stuckStart=null;stuckReason='';stuckLocation='';}
+  }
+  if(!stuckStart)return null;
+  const today=new Date(new Date().toISOString().slice(0,10));
+  const days=Math.max(1,Math.round((today-stuckStart._d)/86400000)+1);
+  return{startDate:stuckStart.date,days,reason:stuckReason,location:stuckLocation};
+}
+function fmtLogDate(iso){
+  if(!iso)return'';
+  const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m?`${m[2]}/${m[3]}`:iso;
+}
+function getAllLocations(){
+  const set=new Set();
+  records.forEach(r=>{(r.進度記錄||[]).forEach(p=>{if(p.location)set.add(p.location)})});
+  return[...set].sort();
+}
+function toast(msg,type=''){
+  const w=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className='toast'+(type?' toast-'+type:'');
+  el.textContent=msg;w.appendChild(el);
+  setTimeout(()=>el.remove(),2800);
+}
+function setSyncIcon(s){
+  const el=document.getElementById('sync-icon');
+  el.textContent=s==='ok'?'☁️✅':s==='err'?'☁️❌':'☁️';
+  el.title=s==='ok'?'已同步':s==='err'?'連線失敗':'本機模式';
+}
+
+// ============================================================
+// 登入 / 切換使用者
+// ============================================================
+function populateLoginDepts(){
+  const depts=[...new Set([...(cfg.部門||[]),...(cfg.users||[]).map(u=>u.dept)])].filter(Boolean).sort();
+  document.getElementById('dl-login-dept').innerHTML=depts.map(d=>`<option value="${esc(d)}">`).join('');
+}
+function onLoginDeptChange(){
+  const dept=document.getElementById('login-dept').value.trim();
+  const names=(cfg.users||[]).filter(u=>u.dept===dept).map(u=>u.name);
+  document.getElementById('dl-login-name').innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+  document.getElementById('login-name').value='';
+  setTimeout(()=>document.getElementById('login-name').focus(),50);
+}
+function showLogin(){
+  populateLoginDepts();
+  const rem=localStorage.getItem('dtp_remember');
+  if(rem){try{const r=JSON.parse(rem);document.getElementById('login-dept').value=r.dept||'';if(r.dept)onLoginDeptChange();setTimeout(()=>{document.getElementById('login-name').value=r.name||''},80)}catch{}}
+  document.getElementById('login-pw').value='';
+  document.getElementById('login-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById((document.getElementById('login-dept').value?'login-name':'login-dept')).focus(),200);
+}
+function doLogin(){
+  const name=document.getElementById('login-name').value.trim();
+  const dept=document.getElementById('login-dept').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  const remember=document.getElementById('login-remember').checked;
+  if(!dept){toast('請輸入部門','e');return}
+  if(!name){toast('請輸入姓名','e');return}
+  if(!cfg.users)cfg.users=[];
+  let user=cfg.users.find(u=>u.name===name&&u.dept===dept);
+  // 自動 bootstrap：第一位登入者自動成為 manager
+  const isFirst=cfg.users.length===0;
+  if(!user&&isFirst){
+    user={id:uid(),name,dept,role:'manager',password:pw||''};
+    cfg.users.push(user);
+    saveCfg();
+    toast(`歡迎 ${name}！您是第一位使用者，已自動設為管理主管 ✓`,'s');
+  }else if(user){
+    if(!user.password&&pw){toast('此帳號未設密碼，請留空登入','e');document.getElementById('login-pw').focus();return}
+    if(user.password&&user.password!==pw){toast('密碼錯誤','e');document.getElementById('login-pw').focus();return}
+    toast(`歡迎回來，${name}！`,'s');
+  }else{
+    // 不在清單中，視為 reporter 並提示
+    toast(`歡迎 ${name}！（未在人員清單中，請至設定頁新增以啟用密碼）`);
+  }
+  currentUser={name,dept,role:user?user.role:'reporter'};
+  localStorage.setItem('dtp_user',JSON.stringify(currentUser));
+  if(remember)localStorage.setItem('dtp_remember',JSON.stringify({name,dept}));
+  else localStorage.removeItem('dtp_remember');
+  document.getElementById('login-overlay').classList.remove('show');
+  updateNavUser();
+  renderMain();renderHistory();renderCfgCards();
+}
+function switchUser(){showLogin()}
+function logout(){
+  currentUser=null;
+  localStorage.removeItem('dtp_user');
+  showLogin();
+}
+function updateNavUser(){
+  if(!currentUser){
+    document.getElementById('nav-user-name').textContent='未登入';
+    document.getElementById('nav-user-dept').textContent='';
+    document.getElementById('nav-user-role').textContent='—';
+    document.getElementById('nav-user-role').className='nav-user-role r-reporter';
+    return;
+  }
+  document.getElementById('nav-user-name').textContent=currentUser.name;
+  document.getElementById('nav-user-dept').textContent=currentUser.dept;
+  const roleEl=document.getElementById('nav-user-role');
+  if(currentUser.role==='manager'){roleEl.textContent='主管';roleEl.className='nav-user-role'}
+  else{roleEl.textContent='填報';roleEl.className='nav-user-role r-reporter'}
+}
+
+// ============================================================
+// 人員管理 CRUD
+// ============================================================
+function renderUsers(){
+  const tbody=document.getElementById('users-tbody');
+  const tbl=document.getElementById('users-tbl');
+  const emp=document.getElementById('users-empty');
+  const sec=document.getElementById('user-mgmt-section');
+  const lock=document.getElementById('user-mgmt-lock');
+  if(!tbody)return;
+  const users=cfg.users||[];
+  // 區塊顯示規則：沒人員時全員可見、有人員時只 manager 可見
+  const showSec=users.length===0||isManager();
+  sec.style.display=showSec?'':'none';
+  lock.textContent=showSec?(users.length===0?'（首次設定，全員可建立）':'（管理主管限定）'):'';
+  if(users.length===0){tbl.style.display='none';emp.style.display='block';return}
+  tbl.style.display='table';emp.style.display='none';
+  tbody.innerHTML=users.map((u,i)=>`
+    <tr>
+      <td style="text-align:center;color:var(--muted)">${i+1}</td>
+      <td><strong>${esc(u.name)}</strong></td>
+      <td>${esc(u.dept)}</td>
+      <td>${u.role==='manager'?'<span style="color:#16a34a;font-weight:700">管理主管</span>':'<span style="color:var(--muted)">填報人員</span>'}</td>
+      <td>${u.password?'<span style="color:#16a34a">✓ 已設定</span>':'<span style="color:var(--muted)">— 未設</span>'}</td>
+      <td><div class="tbl-act">
+        <button class="btn btn-o btn-sm" onclick="openUserModal('${esc(u.id)}')">編輯</button>
+        <button class="btn btn-d btn-sm" onclick="delUserById('${esc(u.id)}')">刪除</button>
+      </div></td>
+    </tr>`).join('');
+}
+function delUserById(id){
+  if(!isManager()){toast('需管理主管權限','e');return}
+  const u=(cfg.users||[]).find(x=>x.id===id);
+  if(!u)return;
+  if(!confirm(`確定刪除「${u.name}」？`))return;
+  cfg.users=cfg.users.filter(x=>x.id!==id);
+  saveCfg();renderUsers();
+  toast('已刪除','s');
+}
+function openUserModal(id){
+  if(cfg.users&&cfg.users.length>0&&!isManager()){toast('需管理主管權限','e');return}
+  document.getElementById('um-id').value=id||'';
+  document.getElementById('um-title').textContent=id?'編輯人員':'新增人員';
+  document.getElementById('um-del').style.display=id?'':'none';
+  const u=id?(cfg.users||[]).find(x=>x.id===id):null;
+  document.getElementById('um-name').value=u?u.name:'';
+  document.getElementById('um-dept').value=u?u.dept:'';
+  document.getElementById('um-role').value=u?u.role:'reporter';
+  document.getElementById('um-pw').value=u?(u.password||''):'';
+  updateDataLists();
+  document.getElementById('user-overlay').classList.add('show');
+}
+function closeUserModal(){document.getElementById('user-overlay').classList.remove('show')}
+function saveUser(){
+  const id=document.getElementById('um-id').value;
+  const name=document.getElementById('um-name').value.trim();
+  const dept=document.getElementById('um-dept').value.trim();
+  const role=document.getElementById('um-role').value;
+  const pw=document.getElementById('um-pw').value;
+  if(!name||!dept){toast('姓名與部門必填','e');return}
+  if(!cfg.users)cfg.users=[];
+  const dup=cfg.users.find(u=>u.name===name&&u.dept===dept&&u.id!==id);
+  if(dup){toast('此部門已有同名人員','e');return}
+  if(id){const i=cfg.users.findIndex(u=>u.id===id);if(i>=0)cfg.users[i]={...cfg.users[i],name,dept,role,password:pw}}
+  else cfg.users.push({id:uid(),name,dept,role,password:pw});
+  // 同步順便把部門加入 cfg.部門
+  if(!cfg.部門)cfg.部門=[];
+  if(!cfg.部門.includes(dept))cfg.部門.push(dept);
+  saveCfg();renderUsers();renderCfgLists();updateDataLists();
+  // 若編輯的是當前登入者，同步更新 currentUser
+  if(currentUser&&currentUser.name===name&&currentUser.dept===dept){
+    currentUser.role=role;
+    localStorage.setItem('dtp_user',JSON.stringify(currentUser));
+    updateNavUser();
+  }
+  closeUserModal();toast('已儲存 ✓','s');
+}
+function delUser(){
+  const id=document.getElementById('um-id').value;
+  if(!id||!confirm('確定刪除此人員？'))return;
+  cfg.users=(cfg.users||[]).filter(u=>u.id!==id);
+  saveCfg();renderUsers();closeUserModal();
+  toast('已刪除','s');
+}
+
+// ============================================================
+// CFG 管理
+// ============================================================
+function loadCfg(){
+  const saved=localStorage.getItem('dtp_cfg');
+  cfg=saved?JSON.parse(saved):buildDefaultCfg();
+  ensureStatusOptions();
+}
+function saveCfg(){localStorage.setItem('dtp_cfg',JSON.stringify(cfg));fbSave()}
+function manualSave(){saveCfg();toast('已儲存設定 ✓','s')}
+
+function cfgAdd(key){
+  const inp=document.getElementById('cfg-inp-'+key);
+  const val=(inp&&inp.value||'').trim();
+  if(!val)return;
+  if(!cfg[key])cfg[key]=[];
+  if(cfg[key].includes(val)){toast('已存在','');return}
+  cfg[key].push(val);
+  saveCfg();renderCfgLists();updateDataLists();
+  if(inp)inp.value='';
+}
+function cfgDel(key,idx){
+  cfg[key].splice(idx,1);
+  saveCfg();renderCfgLists();updateDataLists();
+}
+function cfgAddFromBtn(key){
+  const ir=document.getElementById('ir-'+key);
+  if(ir){ir.style.display='flex';const inp=document.getElementById('cfg-inp-'+key);if(inp)inp.focus()}
+}
+function cfgHideInp(key){
+  const ir=document.getElementById('ir-'+key);
+  if(ir)ir.style.display='none';
+}
+
+function renderCfgLists(){
+  CFG_KEYS.forEach(({key})=>{
+    const wrap=document.getElementById('lw-'+key);
+    if(!wrap)return;
+    const arr=cfg[key]||[];
+    wrap.innerHTML=arr.length===0
+      ?`<div class="cfg-empty-txt">尚無選項，點右側「＋ 新增」加入</div>`
+      :arr.map((v,i)=>`<div class="cfg-row">
+          <span class="cfg-row-num">${i+1}</span>
+          <span class="cfg-row-lbl">${esc(v)}</span>
+          <button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>
+        </div>`).join('');
+  });
+}
+
+function renderCfgCards(){renderCfgLists()}
+
+// ============================================================
+// 進度記錄 row editor (新版：日期 + 位置 + 狀態 + 說明)
+// ============================================================
+function logRowsToArray(){
+  return[...document.querySelectorAll('.log-edit-row')].map(row=>{
+    const date=row.querySelector('.log-date').value;
+    const location=row.querySelector('.log-loc').value.trim();
+    const status=row.querySelector('.log-status').value;
+    const text=row.querySelector('.log-text').value.trim();
+    if(!date&&!location&&!status&&!text)return null;
+    return{date,location,status,text};
+  }).filter(Boolean);
+}
+function addLogRow(date='',location='',status='',text=''){
+  const editor=document.getElementById('log-editor');
+  if(!editor)return;
+  const row=document.createElement('div');
+  row.className='log-edit-row'+(status==='暫停/卡關'?' row-stuck':'');
+  const opts=['',...(cfg['狀態']||[])].map(v=>`<option value="${esc(v)}"${v===status?' selected':''}>${v||'— 狀態 —'}</option>`).join('');
+  row.innerHTML=`
+    <input type="date" class="fi log-date" value="${esc(date)}">
+    <input type="text" class="fi log-loc" list="dl-位置" placeholder="位置 例:S31A1" value="${esc(location)}">
+    <select class="fi log-status" onchange="this.closest('.log-edit-row').classList.toggle('row-stuck',this.value==='暫停/卡關')">${opts}</select>
+    <input type="text" class="fi log-text" placeholder="工作進度說明..." value="${esc(text)}">
+    <button class="btn btn-g btn-icon btn-sm log-del" onclick="this.closest('.log-edit-row').remove()" title="刪除">✕</button>`;
+  editor.appendChild(row);
+}
+
+function updateDataLists(){
+  // datalists for text inputs
+  ['案場','部門','執行者','施作位置'].forEach(k=>{
+    const el=document.getElementById('dl-'+k);
+    if(el)el.innerHTML=(cfg[k]||[]).map(v=>`<option value="${esc(v)}">`).join('');
+  });
+  // 位置 datalist（從所有歷史紀錄自動收集）
+  const locDl=document.getElementById('dl-位置');
+  if(locDl)locDl.innerHTML=getAllLocations().map(v=>`<option value="${esc(v)}">`).join('');
+  // filter dropdowns
+  updateFilters();
+}
+
+// ============================================================
+// Firebase 同步
+// ============================================================
+async function fbSave(){
+  saveLocal();saveCfgLocal();
+  if(!window._fbSet){setSyncIcon('err');return}
+  try{
+    const recObj={};records.forEach(r=>{recObj[r.id]=r});
+    await window._fbSet({records:recObj,cfg});
+    setSyncIcon('ok');
+  }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err')}
+}
+async function initFb(){
+  let t=0;
+  while(!window._fbGet&&t<5000){await new Promise(r=>setTimeout(r,200));t+=200}
+  if(!window._fbGet){setSyncIcon('err');loadLocal();return}
+  try{
+    const data=await window._fbGet();
+    if(data&&data.records){
+      records=Object.values(data.records).map(normalizeRecord);
+      if(data.cfg&&Object.keys(data.cfg).length){cfg={...buildDefaultCfg(),...data.cfg};ensureStatusOptions();saveCfgLocal()}
+      saveLocal();setSyncIcon('ok');
+    }else{
+      loadLocal();
+      if(records.length)fbSave();
+    }
+  }catch(e){console.warn('Firebase 連線失敗，使用本機資料:',e);setSyncIcon('err');loadLocal()}
+  renderMain();renderHistory();updateFilters();updateDataLists();
+}
+function saveLocal(){localStorage.setItem('dtp_rec',JSON.stringify(records))}
+function saveCfgLocal(){localStorage.setItem('dtp_cfg',JSON.stringify(cfg))}
+function loadLocal(){
+  const s=localStorage.getItem('dtp_rec');
+  records=(s?JSON.parse(s):INIT.map(r=>({...r}))).map(normalizeRecord);
+  if(!s)saveLocal();
+}
+
+// ============================================================
+// 頁面切換
+// ============================================================
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>{if(b.getAttribute('onclick')===`goPage('${id}')`)b.classList.add('active')});
+  if(id==='settings'){renderCfgCards();updateDataLists();renderUsers();renderSettingsFbStatus()}
+  if(id==='worktime'){renderWorktime()}
+}
+
+// ============================================================
+// 篩選
+// ============================================================
+function getFiltered(){
+  const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
+  const fp=(document.getElementById('f-proj')||{value:''}).value;
+  const fe=(document.getElementById('f-exec')||{value:''}).value;
+  const fs=(document.getElementById('f-status')||{value:''}).value;
+  return records.map(normalizeRecord).filter(r=>{
+    if(fp&&r.案場!==fp)return false;
+    if(fe&&!(r.執行者||'').includes(fe))return false;
+    if(fs&&getMainStatus(r)!==fs)return false;
+    if(q){
+      const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
+      if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
+    }
+    return true;
+  });
+}
+
+function updateFilters(){
+  const ps=[...new Set(records.map(r=>r.案場))].sort();
+  const es=[...new Set(records.flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
+  const pSel=document.getElementById('f-proj'),eSel=document.getElementById('f-exec'),stSel=document.getElementById('f-status');
+  if(!pSel)return;
+  const pv=pSel.value,ev=eSel.value,sv=stSel.value;
+  pSel.innerHTML='<option value="">全部案場</option>'+ps.map(p=>`<option${p===pv?' selected':''}>${esc(p)}</option>`).join('');
+  eSel.innerHTML='<option value="">全部執行者</option>'+es.map(e=>`<option${e===ev?' selected':''}>${esc(e)}</option>`).join('');
+  stSel.innerHTML='<option value="">全部狀態</option>'+(cfg['狀態']||[]).map(s=>`<option${s===sv?' selected':''}>${esc(s)}</option>`).join('');
+}
+
+// ============================================================
+// 渲染：進度總表
+// ============================================================
+function renderMain(){
+  const filtered=getFiltered();
+  document.getElementById('result-count').textContent='共 '+filtered.length+' 筆';
+  const groups={};
+  filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
+  const el=document.getElementById('main-table');
+  if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有符合的資料</div>';return}
+  el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
+    const sid='s_'+proj.replace(/\W/g,'_');
+    return`<div class="proj-section">
+      <div class="proj-header" onclick="toggleSec('${sid}',this)">
+        <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
+      </div>
+      <div id="${sid}">
+        <table class="ptbl">
+          <thead><tr>
+            <th style="width:10%">執行者</th>
+            <th style="width:14%">施作位置／工作項目</th>
+            <th style="width:57%">進度記錄</th>
+            <th style="width:8%">狀態</th>
+            <th style="width:8%">備註</th>
+            <th style="width:3%"></th>
+          </tr></thead>
+          <tbody>${rows.map(renderRow).join('')}</tbody>
+        </table>
+      </div>
+    </div><div style="height:2px"></div>`;
+  }).join('');
+}
+
+function renderRow(r){
+  normalizeRecord(r);
+  const exs=(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean).map(e=>`<span class="ex-tag">${esc(e)}</span>`).join('');
+  const loc=r.施作位置?`<span class="loc-tag">${esc(r.施作位置)}</span>`:'';
+  const log=renderLog(r.進度記錄);
+  const note=r.備註?`<div style="font-size:12px;color:var(--muted);line-height:1.5">${esc(r.備註).replace(/\n/g,'<br>')}</div>`:'';
+  const st=getMainStatus(r);
+  const stCls='st-badge '+stClassName(st);
+  const trCls=isStuck(r)?' class="tr-stuck"':'';
+  const editable=canEditRecord(r);
+  const actionCell=editable
+    ?`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="編輯">✏️</button>`
+    :`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="檢視（唯讀）">👁️</button>`;
+  return`<tr${trCls}>
+    <td>${exs}${r.部門?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
+    <td>${loc}</td>
+    <td>${log}</td>
+    <td><span class="${stCls}">${esc(st)}</span></td>
+    <td>${note}</td>
+    <td>${actionCell}</td>
+  </tr>`;
+}
+
+function renderLog(logs){
+  if(!logs||!logs.length)return'';
+  // 支援舊字串格式（防護）
+  if(typeof logs==='string')logs=parseProgressString(logs);
+  return'<ul class="log-ul">'+logs.map(item=>{
+    if(!item)return'';
+    const dt=fmtLogDate(item.date);
+    const dtHtml=dt?`<span class="log-dt">${esc(dt)}</span>`:'';
+    const locHtml=item.location?`<span class="log-loc">${esc(item.location)}</span>`:'';
+    const stHtml=item.status?`<span class="log-status ${stClassName(item.status)}">${esc(item.status)}</span>`:'';
+    const stuckCls=item.status==='暫停/卡關'?' log-li-stuck':'';
+    return`<li class="log-li${stuckCls}">${dtHtml}<span class="log-tx">${locHtml}${stHtml}${esc(item.text||'')}</span></li>`;
+  }).join('')+'</ul>';
+}
+
+function toggleSec(id,hdr){
+  document.getElementById(id).classList.toggle('d-none');
+  hdr.classList.toggle('sec-collapsed');
+}
+
+// ============================================================
+// 渲染：歷史
+// ============================================================
+// ============================================================
+// 工時計算頁
+// ============================================================
+let wtSort={key:'work',dir:'desc'};
+
+function populateWtFilters(){
+  const ps=[...new Set(records.map(r=>r.案場))].sort();
+  const es=[...new Set(records.flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
+  const pSel=document.getElementById('wt-proj'),eSel=document.getElementById('wt-exec'),stSel=document.getElementById('wt-status');
+  if(!pSel)return;
+  const pv=pSel.value,ev=eSel.value,sv=stSel.value;
+  pSel.innerHTML='<option value="">全部案場</option>'+ps.map(p=>`<option${p===pv?' selected':''}>${esc(p)}</option>`).join('');
+  eSel.innerHTML='<option value="">全部執行者</option>'+es.map(e=>`<option${e===ev?' selected':''}>${esc(e)}</option>`).join('');
+  stSel.innerHTML='<option value="">全部狀態</option>'+(cfg['狀態']||[]).map(s=>`<option${s===sv?' selected':''}>${esc(s)}</option>`).join('');
+}
+
+function clearWtFilters(){
+  ['wt-q','wt-from','wt-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  ['wt-proj','wt-exec','wt-status'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  renderWorktime();
+}
+
+function getWorktimeRows(){
+  const q=(document.getElementById('wt-q')||{value:''}).value.toLowerCase();
+  const fp=(document.getElementById('wt-proj')||{value:''}).value;
+  const fe=(document.getElementById('wt-exec')||{value:''}).value;
+  const fs=(document.getElementById('wt-status')||{value:''}).value;
+  const fromV=(document.getElementById('wt-from')||{value:''}).value;
+  const toV=(document.getElementById('wt-to')||{value:''}).value;
+  const fromD=fromV?new Date(fromV):null;
+  const toD=toV?new Date(toV):null;
+  const out=[];
+  records.map(normalizeRecord).forEach(r=>{
+    if(fp&&r.案場!==fp)return;
+    if(fe&&!(r.執行者||'').includes(fe))return;
+    const st=getMainStatus(r);
+    if(fs&&st!==fs)return;
+    if(q){
+      const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
+      if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return;
+    }
+    // 日期區間：紀錄至少有一筆 log 落在區間內
+    if(fromD||toD){
+      const hit=(r.進度記錄||[]).some(l=>{
+        if(!l||!l.date)return false;
+        const d=new Date(l.date);
+        if(fromD&&d<fromD)return false;
+        if(toD&&d>toD)return false;
+        return true;
+      });
+      if(!hit)return;
+    }
+    const stat=calcWorkDays(r.進度記錄);
+    if(!stat)return; // 沒日期 log 算不出來，跳過
+    out.push({r,st,stat});
+  });
+  // 排序
+  const k=wtSort.key,dir=wtSort.dir==='desc'?-1:1;
+  const num=v=>typeof v==='number'?v:0;
+  out.sort((a,b)=>{
+    let av,bv;
+    switch(k){
+      case'proj':av=a.r.案場||'';bv=b.r.案場||'';break;
+      case'exec':av=a.r.執行者||'';bv=b.r.執行者||'';break;
+      case'loc':av=a.r.施作位置||'';bv=b.r.施作位置||'';break;
+      case'start':av=a.stat.startDate;bv=b.stat.startDate;break;
+      case'end':av=a.stat.endDate;bv=b.stat.endDate;break;
+      case'total':av=num(a.stat.total);bv=num(b.stat.total);break;
+      case'paused':av=num(a.stat.paused);bv=num(b.stat.paused);break;
+      case'status':av=a.st;bv=b.st;break;
+      default:av=num(a.stat.work);bv=num(b.stat.work);
+    }
+    return av<bv?-1*dir:av>bv?1*dir:0;
+  });
+  return out;
+}
+
+function wtSortBy(key){
+  if(wtSort.key===key)wtSort.dir=wtSort.dir==='desc'?'asc':'desc';
+  else{wtSort.key=key;wtSort.dir='desc'}
+  renderWorktime();
+}
+
+function renderWorktime(){
+  populateWtFilters();
+  const rows=getWorktimeRows();
+  const el=document.getElementById('wt-table');
+  const sumEl=document.getElementById('wt-summary');
+  if(!rows.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有符合的資料</div>';
+    sumEl.style.display='none';
+    return;
+  }
+  const ind=k=>wtSort.key===k?`<span class="sort-ind">${wtSort.dir==='desc'?'▼':'▲'}</span>`:'';
+  const cls=k=>wtSort.key===k?' class="sorted"':'';
+  const head=`<thead><tr>
+    <th style="width:36px">#</th>
+    <th${cls('proj')} onclick="wtSortBy('proj')">案場${ind('proj')}</th>
+    <th${cls('exec')} onclick="wtSortBy('exec')">執行者${ind('exec')}</th>
+    <th${cls('loc')} onclick="wtSortBy('loc')">施作位置${ind('loc')}</th>
+    <th${cls('start')} onclick="wtSortBy('start')">起始日${ind('start')}</th>
+    <th${cls('end')} onclick="wtSortBy('end')">終止日${ind('end')}</th>
+    <th${cls('total')} onclick="wtSortBy('total')">總曆時${ind('total')}</th>
+    <th${cls('paused')} onclick="wtSortBy('paused')">暫停天${ind('paused')}</th>
+    <th${cls('work')} onclick="wtSortBy('work')">工作天${ind('work')}</th>
+    <th${cls('status')} onclick="wtSortBy('status')">目前狀態${ind('status')}</th>
+  </tr></thead>`;
+  const body='<tbody>'+rows.map((row,i)=>{
+    const{r,st,stat}=row;
+    const trCls=stat.isStuck?' class="row-stuck"':'';
+    const stCls='st-badge '+stClassName(st);
+    return`<tr${trCls} onclick="openEdit('${esc(r.id)}')">
+      <td>${i+1}</td>
+      <td class="tl"><strong>${esc(r.案場)}</strong></td>
+      <td class="tl">${esc(r.執行者)}</td>
+      <td class="tl">${esc(r.施作位置||'')}</td>
+      <td>${esc(stat.startDate)}</td>
+      <td>${stat.isClosed?esc(stat.endDate):'<span style="color:var(--muted)">至今</span>'}</td>
+      <td>${stat.total}</td>
+      <td class="num-pause">${stat.paused}</td>
+      <td class="num-work">${stat.work}</td>
+      <td><span class="${stCls}">${esc(st)}</span></td>
+    </tr>`;
+  }).join('')+'</tbody>';
+  el.innerHTML=`<table class="wt-tbl">${head}${body}</table>`;
+  // 合計
+  const sumWork=rows.reduce((a,b)=>a+b.stat.work,0);
+  const sumPause=rows.reduce((a,b)=>a+b.stat.paused,0);
+  const avgWork=Math.round(sumWork/rows.length);
+  const stuckCount=rows.filter(x=>x.stat.isStuck).length;
+  sumEl.style.display='block';
+  sumEl.innerHTML=`📊 共 <strong>${rows.length}</strong> 筆｜總工作天 <strong style="color:var(--primary)">${sumWork}</strong> 天｜總暫停天 <strong style="color:#94a3b8">${sumPause}</strong> 天｜平均 <strong>${avgWork}</strong> 天/筆${stuckCount?`｜<span style="color:#dc2626;font-weight:700">⚠️ 仍卡關 ${stuckCount} 筆</span>`:''}`;
+}
+
+async function exportWorktimeExcel(){
+  const rows=getWorktimeRows();
+  if(!rows.length){toast('沒有資料可匯出','e');return}
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet('工時計算');
+  const visW=s=>{if(!s)return 0;let w=0;for(const ch of String(s))w+=/[一-鿿＀-￯]/.test(ch)?2.4:1;return w;};
+  const estLines=(s,cw)=>{if(!s)return 1;return String(s).split('\n').reduce((a,ln)=>a+Math.max(1,Math.ceil(visW(ln)/Math.max(6,cw-2))),0);};
+  const headers=['#','案場','執行者','施作位置','起始日','終止日','總曆時','暫停天','工作天','目前狀態'];
+  const minW=[5,22,18,20,14,14,8,8,8,12];
+  const maxW=[5,40,24,40,14,14,12,12,12,16];
+  const rd=rows.map((row,i)=>[i+1,row.r.案場,row.r.執行者,row.r.施作位置||'',row.stat.startDate,row.stat.isClosed?row.stat.endDate:'至今',row.stat.total,row.stat.paused,row.stat.work,row.st]);
+  const colW=headers.map((h,ci)=>{
+    let maxLine=visW(h);
+    rd.forEach(r=>String(r[ci]||'').split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);}));
+    return Math.min(maxW[ci],Math.max(minW[ci],Math.ceil(maxLine+2)));
+  });
+  ws.columns=headers.map((h,i)=>({header:h,width:colW[i]}));
+  const hr=ws.getRow(1);hr.height=26;
+  hr.eachCell(c=>{
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+    c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+    c.alignment={vertical:'middle',horizontal:'center'};
+  });
+  rd.forEach((arr,i)=>{
+    const row=ws.addRow(arr);
+    const maxLines=Math.max(...arr.map((v,ci)=>estLines(String(v||''),colW[ci])));
+    row.height=Math.max(24,maxLines*20+6);
+    const stuck=rows[i].stat.isStuck;
+    row.eachCell(c=>{
+      c.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:stuck?'FFFEF2F2':(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
+      if(stuck)c.font={color:{argb:'FF991B1B'}};
+    });
+    [2,3,4].forEach(idx=>{row.getCell(idx).alignment={vertical:'middle',horizontal:'left',wrapText:true}});
+    row.getCell(9).font={...(row.getCell(9).font||{}),bold:true,size:13,color:{argb:stuck?'FF991B1B':'FF1a3a5c'}};
+  });
+  // 合計列
+  const sumWork=rows.reduce((a,b)=>a+b.stat.work,0);
+  const sumPause=rows.reduce((a,b)=>a+b.stat.paused,0);
+  const sumTotal=rows.reduce((a,b)=>a+b.stat.total,0);
+  const sumRow=ws.addRow(['','合計','','','','',sumTotal,sumPause,sumWork,`平均 ${Math.round(sumWork/rows.length)} 天`]);
+  sumRow.height=28;
+  sumRow.eachCell(c=>{
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFEF3C7'}};
+    c.font={bold:true,color:{argb:'FF92400E'}};
+    c.alignment={vertical:'middle',horizontal:'center'};
+  });
+  const buf=await wb.xlsx.writeBuffer();
+  const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const a=document.createElement('a');a.href=url;a.download='工時計算_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.xlsx';a.click();
+  URL.revokeObjectURL(url);toast('已匯出 ✓','s');
+}
+
+function renderHistory(){
+  const q=(document.getElementById('hist-q')||{value:''}).value.toLowerCase();
+  const sorted=[...records.map(normalizeRecord)].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  const filtered=q?sorted.filter(r=>{
+    const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
+    return[r.案場,r.執行者,r.施作位置,logText].join(' ').toLowerCase().includes(q);
+  }):sorted;
+  const el=document.getElementById('hist-list');
+  if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有資料</div>';return}
+  el.innerHTML=filtered.map(r=>{
+    const last=(r.進度記錄||[]).slice(-1)[0]||{};
+    const lastTxt=last.text?`${last.date?fmtLogDate(last.date)+' ':''}${last.location?'['+last.location+'] ':''}${last.text}`:'—';
+    const dt=r.updatedAt?new Date(r.updatedAt).toLocaleDateString('zh-TW'):'—';
+    const st=getMainStatus(r);
+    const sub=[r.執行者,r.施作位置].filter(Boolean).join(' · ');
+    const stuckCls=isStuck(r)?' style="border-left-color:#dc2626;background:#fef2f2"':'';
+    return`<div class="hist-item"${stuckCls} onclick="openEdit('${esc(r.id)}')">
+      <div style="min-width:110px">
+        <div class="hist-proj">${esc(r.案場)}</div>
+        <div class="hist-time">更新：${esc(dt)}</div>
+        <div style="margin-top:5px"><span class="st-badge ${stClassName(st)}">${esc(st)}</span></div>
+      </div>
+      <div style="flex:1">
+        <div class="hist-wk">${esc(sub)}</div>
+        <div class="hist-last">${esc(lastTxt)}</div>
+        ${r.備註?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.備註.split('\n')[0])}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// 設定頁：API 狀態
+// ============================================================
+function renderSettingsFbStatus(){
+  const el=document.getElementById('api-status-txt');
+  if(!el)return;
+  const icon=document.getElementById('sync-icon');
+  if(icon&&icon.textContent.includes('✅')){
+    el.textContent='✅ 已連線至資料庫伺服器';el.style.color='var(--success)';
+  }else{
+    el.textContent='⚠️ 本機模式（伺服器未連線）';el.style.color='var(--warning)';
+  }
+}
+
+// ============================================================
+// 編輯 Modal
+// ============================================================
+function openEdit(id){
+  if(!isLoggedIn()){toast('請先登入','e');showLogin();return}
+  const r=id?normalizeRecord(records.find(x=>x.id===id)):null;
+  const readonly=id?!canEditRecord(r):false;  // 新增時 = 可編
+  document.getElementById('edit-id').value=id||'';
+  document.getElementById('modal-title-text').innerHTML=(id?'編輯紀錄':'新增紀錄')+(readonly?' <span class="ro-mini">👁️ 唯讀</span>':'');
+  document.getElementById('del-btn').style.display=(id&&!readonly)?'':'none';
+  document.getElementById('save-btn').style.display=readonly?'none':'';
+  const editor=document.getElementById('log-editor');
+  editor.innerHTML='';
+  updateDataLists();
+  if(id&&r){
+    document.getElementById('e-proj').value=r.案場||'';
+    document.getElementById('e-dept').value=r.部門||'';
+    document.getElementById('e-exec').value=r.執行者||'';
+    document.getElementById('e-loc').value=r.施作位置||'';
+    document.getElementById('e-note').value=r.備註||'';
+    const rows=r.進度記錄||[];
+    if(rows.length)rows.forEach(row=>addLogRow(row.date,row.location,row.status,row.text));
+    else addLogRow();
+  }else{
+    ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).value='');
+    // 新增時自動帶入當前執行者
+    if(currentUser)document.getElementById('e-exec').value=currentUser.name;
+    addLogRow();
+  }
+  // 唯讀模式：所有 input 設為 disabled
+  ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
+  document.querySelectorAll('#log-editor .fi').forEach(el=>el.disabled=readonly);
+  document.querySelectorAll('#log-editor .log-del').forEach(el=>el.style.display=readonly?'none':'');
+  document.querySelector('button[onclick="addLogRow()"]').style.display=readonly?'none':'';
+  document.getElementById('edit-overlay').classList.add('show');
+}
+function closeEdit(){document.getElementById('edit-overlay').classList.remove('show')}
+function overlayClick(e){if(e.target===e.currentTarget)closeEdit()}
+
+function saveRecord(){
+  const proj=document.getElementById('e-proj').value.trim();
+  if(!proj){alert('請填入案場名稱');return}
+  const id=document.getElementById('edit-id').value;
+  const r={
+    id:id||uid(),案場:proj,
+    部門:document.getElementById('e-dept').value.trim(),
+    執行者:document.getElementById('e-exec').value.trim(),
+    施作位置:document.getElementById('e-loc').value.trim(),
+    工作項目:'',
+    進度記錄:logRowsToArray(),
+    備註:document.getElementById('e-note').value.trim(),
+    updatedAt:new Date().toISOString()
+  };
+  if(id){const i=records.findIndex(x=>x.id===id);if(i>=0)records[i]=r;else records.push(r)}
+  else records.push(r);
+  fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit();
+  toast('已儲存 ✓','s');
+}
+function delRecord(){
+  const id=document.getElementById('edit-id').value;
+  if(!id||!confirm('確定刪除這筆紀錄？'))return;
+  records=records.filter(r=>r.id!==id);
+  fbSave();renderMain();renderHistory();updateFilters();closeEdit();
+  toast('已刪除','s');
+}
+
+
+// ============================================================
+// 匯出 Excel
+// ============================================================
+function logsToExcelText(logs){
+  if(!logs||!logs.length)return'';
+  return logs.map(p=>{
+    const dt=fmtLogDate(p.date);
+    const loc=p.location?`[${p.location}]`:'';
+    const st=p.status?`<${p.status}>`:'';
+    return[dt,loc,st,p.text].filter(Boolean).join(' ');
+  }).join('\n');
+}
+async function exportExcel(){
+  const data=getFiltered();
+  const wb=new ExcelJS.Workbook();
+  const ws=wb.addWorksheet('圖面進度表');
+  // 中文≈2.4、英數≈1 的視覺寬度（Excel CJK 實際渲染偏寬）
+  const visW=s=>{if(!s)return 0;let w=0;for(const ch of String(s))w+=/[一-鿿＀-￯]/.test(ch)?2.4:1;return w;};
+  // 估算單格在指定欄寬下會佔幾行（可用寬度扣 padding ≈ 2）
+  const estLines=(s,cw)=>{if(!s)return 1;return String(s).split('\n').reduce((a,ln)=>a+Math.max(1,Math.ceil(visW(ln)/Math.max(6,cw-2))),0);};
+  // 預設欄寬（最小值）與上限
+  const headers=['案場','部門','執行者','施作位置／工作項目','進度記錄','目前狀態','工作天','暫停天','備註'];
+  const minW=[22,14,18,20,60,12,8,8,26];
+  const maxW=[40,20,24,40,80,16,12,12,50];
+  const rowsData=data.map(r=>{
+    const st=getMainStatus(r);
+    const stat=calcWorkDays(r.進度記錄);
+    return [r.案場,r.部門,r.執行者,r.施作位置,logsToExcelText(r.進度記錄),st,stat?stat.work:'',stat?stat.paused:'',r.備註];
+  });
+  // 依實際內容算欄寬：取每欄最長一行的視覺寬 +2，夾在 [minW, maxW]
+  const colW=headers.map((h,ci)=>{
+    let maxLine=visW(h);
+    rowsData.forEach(rd=>{
+      String(rd[ci]||'').split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);});
+    });
+    return Math.min(maxW[ci],Math.max(minW[ci],Math.ceil(maxLine+2)));
+  });
+  ws.columns=headers.map((h,i)=>({header:h,width:colW[i]}));
+  const hr=ws.getRow(1);hr.height=26;
+  hr.eachCell(c=>{
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+    c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+    c.alignment={vertical:'middle',horizontal:'center'};
+  });
+  const SBG={'進行中':'FFDBEAFE','送審中':'FFFEF3C7','已下單':'FFFED7AA','報價中':'FFCFFAFE','已完成':'FFDCFCE7','待確認':'FFF1F5F9','已定案':'FF166534','暫停/卡關':'FFFECACA','恢復啟動':'FFBBF7D0'};
+  const SFG={'已定案':'FFFFFFFF','暫停/卡關':'FF991B1B'};
+  data.forEach((r,i)=>{
+    const st=getMainStatus(r);
+    const rd=rowsData[i];
+    const row=ws.addRow(rd);
+    // 取全列各儲存格估算行數的最大值來定列高（每行 20pt + 6pt buffer）
+    const maxLines=Math.max(...rd.map((v,ci)=>estLines(v,colW[ci])));
+    row.height=Math.max(24,maxLines*20+6);
+    const stuck=isStuck(r);
+    row.eachCell(c=>{
+      c.alignment={vertical:'top',wrapText:true};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:stuck?'FFFEF2F2':(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
+      if(stuck)c.font={color:{argb:'FF991B1B'}};
+    });
+    const sc=row.getCell(6);
+    if(SBG[st])sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:SBG[st]}};
+    if(SFG[st])sc.font={bold:true,color:{argb:SFG[st]}};
+    sc.alignment={vertical:'middle',horizontal:'center',wrapText:false};
+    // 工作天/暫停天：置中、粗體
+    [7,8].forEach(idx=>{
+      const c=row.getCell(idx);
+      c.alignment={vertical:'middle',horizontal:'center',wrapText:false};
+      c.font={...(c.font||{}),bold:true};
+    });
+  });
+  // ===== Sheet 2：卡關明細 =====
+  const stuckRows=[];
+  data.forEach(r=>{
+    const info=getCurrentStuckInfo(r.進度記錄);
+    if(info)stuckRows.push({
+      案場:r.案場||'',
+      執行者:r.執行者||'',
+      施作位置:info.location||r.施作位置||'',
+      卡關起始日:info.startDate,
+      卡關天數:info.days,
+      卡關原因:info.reason,
+      備註:r.備註||''
+    });
+  });
+  const ws2=wb.addWorksheet('卡關明細');
+  const h2=['#','案場','執行者','施作位置','卡關起始日','卡關天數','卡關原因','備註'];
+  const minW2=[5,22,18,20,14,10,40,26];
+  const maxW2=[5,40,24,40,14,12,80,50];
+  const colW2=h2.map((h,ci)=>{
+    let maxLine=visW(h);
+    stuckRows.forEach(rd=>{
+      const cells=[ci+1,rd.案場,rd.執行者,rd.施作位置,rd.卡關起始日,String(rd.卡關天數),rd.卡關原因,rd.備註];
+      String(cells[ci]||'').split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);});
+    });
+    return Math.min(maxW2[ci],Math.max(minW2[ci],Math.ceil(maxLine+2)));
+  });
+  ws2.columns=h2.map((h,i)=>({header:h,width:colW2[i]}));
+  const hr2=ws2.getRow(1);hr2.height=26;
+  hr2.eachCell(c=>{
+    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF991B1B'}};
+    c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
+    c.alignment={vertical:'middle',horizontal:'center'};
+  });
+  if(stuckRows.length===0){
+    const row=ws2.addRow(['','','','✅ 目前無卡關工項','','','','']);
+    row.height=28;
+    row.eachCell(c=>{c.alignment={vertical:'middle',horizontal:'center'};c.font={color:{argb:'FF166534'},bold:true};});
+  }else{
+    stuckRows.forEach((rd,i)=>{
+      const arr=[i+1,rd.案場,rd.執行者,rd.施作位置,rd.卡關起始日,rd.卡關天數,rd.卡關原因,rd.備註];
+      const row=ws2.addRow(arr);
+      const maxLines=Math.max(...arr.map((v,ci)=>estLines(String(v||''),colW2[ci])));
+      row.height=Math.max(24,maxLines*20+6);
+      row.eachCell(c=>{
+        c.alignment={vertical:'top',wrapText:true};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:i%2===0?'FFFEF2F2':'FFFFFFFF'}};
+        c.font={color:{argb:'FF991B1B'}};
+      });
+      // 序號/起始日/天數 置中
+      [1,5,6].forEach(idx=>{const c=row.getCell(idx);c.alignment={vertical:'middle',horizontal:'center',wrapText:false}});
+      // 卡關天數 highlight
+      const dc=row.getCell(6);dc.font={...(dc.font||{}),bold:true,size:13};
+    });
+  }
+
+  const buf=await wb.xlsx.writeBuffer();
+  const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const a=document.createElement('a');a.href=url;a.download='圖面進度表_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.xlsx';a.click();
+  URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（含卡關明細 ${stuckRows.length} 筆）`,'s');
+}
+
+// JSON 備份
+function exportJson(){
+  const b=new Blob([JSON.stringify({records,cfg},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='圖面進度表備份_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.json';a.click();
+}
+function importJson(e){
+  const f=e.target.files[0];if(!f)return;
+  const rdr=new FileReader();rdr.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(data.records&&data.cfg){
+        if(!confirm(`確定匯入 ${data.records.length} 筆資料＋設定？這會覆蓋現有資料。`))return;
+        records=data.records;cfg=data.cfg;
+      }else if(Array.isArray(data)&&data[0]?.id){
+        if(!confirm(`確定匯入 ${data.length} 筆資料？`))return;
+        records=data;
+      }else throw new Error();
+      fbSave();saveCfg();renderMain();renderHistory();renderCfgCards();updateDataLists();
+      toast('匯入成功 ✓','s');
+    }catch{alert('JSON 格式錯誤')}
+  };rdr.readAsText(f);e.target.value='';
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+/* ── PORTAL IDENTITY ──
+ * 從入口取得身分：優先讀 localStorage portal_v1，fallback URL 參數
+ */
+function initPortalUser(){
+  let pUser = null;
+  try {
+    const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    if (portal.currentUser?.name) pUser = portal.currentUser;
+  } catch(e){}
+  if (!pUser) {
+    const p = new URLSearchParams(location.search);
+    const n = p.get('user'); const d = p.get('dept');
+    if (n) pUser = { name:n, dept:d||'', roleId:p.get('roleId')||'' };
+  }
+  if (!pUser) return false;
+  // 入口角色 → 本 App 角色映射
+  let role = 'reporter';
+  if (pUser.roleId) {
+    try {
+      const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+      const r = (portal.roles||[]).find(x => x.id === pUser.roleId);
+      if (r && ['dept','cross','all'].includes(r.editLevel)) role = 'manager';
+    } catch(e){}
+  }
+  currentUser = { name:pUser.name, dept:pUser.dept||'', role };
+  try { localStorage.setItem('dtp_user', JSON.stringify(currentUser)); } catch(e){}
+  return true;
+}
+function backToPortal(){
+  location.href = '../portal/index.html';
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadCfg();
+  const hasPortal = initPortalUser();
+  updateNavUser();
+  updateDataLists();
+  initFb().then(()=>{
+    if (hasPortal || isLoggedIn()) {
+      document.getElementById('login-overlay').style.display = 'none';
+    } else {
+      // 沒入口身分：顯示「請從入口進入」提示
+      document.getElementById('login-overlay').style.display = 'flex';
+    }
+  });
+});
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
+  authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
+  databaseURL: "https://dailyconstructionreport-dfe1b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "dailyconstructionreport-dfe1b",
+  storageBucket: "dailyconstructionreport-dfe1b.firebasestorage.app",
+  messagingSenderId: "228712770866",
+  appId: "1:228712770866:web:07634a3df74781419cfb2b"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+window._fbSet = async (data) => { await set(ref(db, 'dtp'), data); };
+window._fbGet = async () => { const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
+</script>
+</body>
+</html>

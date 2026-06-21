@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工程日報表</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+:root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+nav{background:var(--primary);min-height:54px;display:flex;align-items:center;padding:0 16px;gap:4px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.25);flex-wrap:wrap}
+.nav-logo{color:#fff;font-size:15px;font-weight:800;margin-right:8px;white-space:nowrap}
+.nav-logo span{color:#93c5fd}
+.nav-v{background:#f59e0b;color:#1a3a5c;font-size:10px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:3px}
+.nav-btn{background:transparent;border:none;color:rgba(255,255,255,.75);padding:6px 11px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-btn.active{background:rgba(255,255,255,.2);color:#fff;font-weight:700}
+.nav-spacer{flex:1}
+.nav-user{color:rgba(255,255,255,.85);font-size:12px;display:flex;align-items:center;gap:5px;margin-left:4px}
+.nav-badge{background:rgba(255,255,255,.18);padding:2px 8px;border-radius:10px;font-size:11px}
+.container{max-width:1440px;margin:0 auto;padding:16px}
+.page{display:none}.page.active{display:block}
+.card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
+.card-header{padding:12px 16px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.card-title{font-weight:700;font-size:14px;color:var(--primary);display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';display:block;width:3px;height:16px;background:var(--primary);border-radius:2px}
+.card-body{padding:14px 16px}
+.g{display:grid;gap:12px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:640px){.g2,.g3,.g4,.g5,.g6{grid-template-columns:1fr 1fr}}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.fi{border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s;width:100%}
+.fi:focus{outline:none;border-color:var(--primary-l);box-shadow:0 0 0 3px rgba(37,99,170,.1)}
+.fi:disabled,.fi[readonly]{background:#f8fafc;color:var(--muted);border-color:#e2e8f0}
+textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border:none;border-radius:6px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-l)}
+.btn-a{background:var(--accent);color:#fff}.btn-a:hover{filter:brightness(1.1)}
+.btn-s{background:var(--success);color:#fff}.btn-s:hover{filter:brightness(1.1)}
+.btn-d{background:var(--danger);color:#fff}.btn-d:hover{filter:brightness(1.1)}
+.btn-o{background:#fff;border:1.5px solid var(--border);color:var(--text)}.btn-o:hover{background:var(--bg)}
+.btn-g{background:transparent;color:var(--muted);border:none}.btn-g:hover{background:var(--bg);color:var(--text)}
+.btn-xl{background:#166534;color:#fff}.btn-xl:hover{filter:brightness(1.1)}
+.btn-pdf{background:#b91c1c;color:#fff}.btn-pdf:hover{filter:brightness(1.1)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-icon{padding:5px;min-width:28px;justify-content:center}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.stat-card{padding:14px;border-radius:8px;text-align:center}
+.stat-blue{background:#dbeafe}.stat-green{background:#dcfce7}
+.stat-val{font-size:30px;font-weight:800;line-height:1}
+.stat-blue .stat-val{color:#1d4ed8}.stat-green .stat-val{color:#15803d}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:600}
+.summary-box{font-family:'Courier New',Consolas,monospace;font-size:13px;line-height:1.9;background:#f8fafc;border-color:#e2e8f0;color:var(--text);cursor:default}
+.tbl-wrap{overflow-x:auto}
+.wtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:1080px}
+.wtbl th{background:var(--primary);color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
+.wtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
+.wtbl tbody tr:nth-child(even) td{background:#f8fafc}
+.wtbl tbody tr:hover td{background:#eff6ff}
+.ci{border:1px solid #e2e8f0;background:#fff;border-radius:4px;padding:4px 6px;font-size:12px;font-family:inherit;color:var(--text);width:100%;min-width:48px}
+.ci:focus{outline:2px solid var(--primary-l);border-radius:4px;background:#fff}
+.ci[type="number"]{text-align:center;max-width:60px}
+.cs{display:block;width:100%;border:1px solid #cbd5e1;border-radius:4px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2364748b'/%3E%3C/svg%3E") no-repeat right 6px center;background-size:10px 6px;padding:4px 24px 4px 6px;font-size:12px;font-family:inherit;color:var(--text);cursor:pointer;-webkit-appearance:none;appearance:none;line-height:1.4;min-height:26px}
+.cs:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
+.tfoot-row td{background:#dbeafe!important;font-weight:700;text-align:center;padding:7px 6px}
+.row-zero td{background:rgba(251,191,36,.06)!important}
+.atype-warn{outline:2px solid var(--warning)!important;border-radius:4px}
+.prog-wrap{display:flex;flex-direction:column;gap:2px;align-items:center;min-width:56px}
+.prog-bar-bg{height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;width:52px}
+.prog-bar-fill{height:100%;background:var(--success);border-radius:2px;transition:width .3s}
+.mtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:380px}
+.mtbl th{background:#475569;color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
+.mtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
+.mtbl tbody tr:nth-child(even) td{background:#f8fafc}
+.mtbl tfoot td{background:#f1f5f9!important;font-weight:700;text-align:center;padding:6px}
+.stbl{width:100%;border-collapse:collapse;font-size:13px}
+.stbl th{background:var(--primary);color:#fff;padding:9px 11px;text-align:left;white-space:nowrap}
+.stbl td{border:1px solid var(--border);padding:9px 11px}
+.stbl tbody tr:nth-child(even) td{background:#f8fafc}
+.report-list{display:flex;flex-direction:column;gap:8px}
+.ritem{background:#fff;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);cursor:pointer;border-left:4px solid var(--primary);transition:all .15s}
+.ritem:hover{transform:translateX(3px)}
+.ritem-date{min-width:56px;text-align:center;font-weight:800;color:var(--primary)}
+.ritem-date .day{font-size:20px;line-height:1}
+.ritem-date .mon{font-size:11px;color:var(--muted)}
+.ritem-info{flex:1}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
+.ritem-actions{display:flex;gap:5px}
+.master-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.master-tbl th{background:var(--primary);color:#fff;padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap}
+.master-tbl td{border-bottom:1px solid var(--border);padding:10px 12px;vertical-align:middle}
+.master-row:hover td{background:#f0f7ff;cursor:pointer}
+.expand-btn{background:none;border:1.5px solid var(--border);border-radius:5px;width:24px;height:24px;cursor:pointer;font-weight:700;color:var(--primary);display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+.expand-btn.open{background:var(--primary);color:#fff;border-color:var(--primary)}
+.detail-row td{padding:0!important;border-bottom:2px solid var(--primary-l)}
+.detail-inner{padding:14px 16px;background:#f8fafc}
+.list-field{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding:2px 0}
+.list-row{display:flex;align-items:center;gap:4px}
+.list-row input{flex:1;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit;background:#fff}
+.list-row input:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
+.list-num{font-size:11px;color:var(--muted);min-width:18px;text-align:center;font-weight:600}
+.proj-checks{display:flex;flex-wrap:wrap;gap:6px}
+.proj-check{display:flex;align-items:center;gap:5px;font-size:12px;background:var(--bg);padding:4px 10px;border-radius:5px;cursor:pointer;user-select:none;border:1px solid var(--border)}
+.proj-check:hover{background:#e2e8f0}
+.proj-check input{cursor:pointer;width:13px;height:13px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:22px;width:90%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-title{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:16px}
+.login-modal{max-width:400px;text-align:center}
+.login-icon{font-size:52px;margin-bottom:8px}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.photo-thumb{border-radius:7px;overflow:hidden;border:2px solid var(--border);cursor:pointer;transition:border-color .15s}
+.photo-thumb:hover{border-color:var(--primary-l)}
+.photo-thumb img{width:100%;height:90px;object-fit:cover;display:block}
+.photo-thumb-info{padding:5px 7px;font-size:11px;background:#fff}
+.phase-tag{font-weight:700;padding:1px 6px;border-radius:3px;font-size:10px;display:inline-block;margin-bottom:2px}
+.ph-b{background:#fee2e2;color:#dc2626}.ph-d{background:#fef3c7;color:#b45309}.ph-a{background:#dcfce7;color:#15803d}
+.upload-btn{height:110px;border:2px dashed var(--border);border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);gap:5px;font-size:12px;transition:all .15s}
+.upload-btn:hover{border-color:var(--primary-l);color:var(--primary);background:#f0f7ff}
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:5px}
+.toast{background:#0f172a;color:#fff;padding:9px 15px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:7px;max-width:300px;animation:ti .25s ease}
+.toast-s{background:var(--success)}.toast-e{background:var(--danger)}
+@keyframes ti{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+.empty{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty-icon{font-size:44px;margin-bottom:10px}
+.empty h3{font-size:15px;color:var(--text);margin-bottom:5px}
+.flex{display:flex;align-items:center}.flex-b{display:flex;align-items:center;justify-content:space-between}
+.gap2{gap:8px}.mb2{margin-bottom:12px}.divider{height:1px;background:var(--bg);margin:14px 0}.flex-wrap{flex-wrap:wrap}
+input[type="file"]{display:none}
+#sync-icon{font-size:14px;color:rgba(255,255,255,.6);padding:0 5px;cursor:default}
+.ro-badge{background:#fef3c7;color:#b45309;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.rw-badge{background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+.readonly-form .cs,.readonly-form .ci,.readonly-form input.fi:not([readonly]),.readonly-form select.fi,.readonly-form textarea.fi{pointer-events:none;opacity:.7;background:#f8fafc!important}
+.readonly-form button.btn-a,.readonly-form button.btn-d,.readonly-form #add-row-btn,.readonly-form #add-mat-btn{display:none!important}
+.sig-area{display:none}
+@media(max-width:767px){
+  nav{padding:6px 10px 4px}
+  .nav-logo{font-size:13px}.nav-btn{padding:5px 8px;font-size:11px}.nav-spacer,.nav-user{display:none}
+}
+@media(max-width:767px){
+  .wtbl{min-width:unset}
+  .wtbl thead tr{display:none}
+  .wtbl tbody tr{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;padding:10px 8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07);position:relative;gap:3px 8px}
+  .wtbl td{display:flex;flex-direction:column;gap:2px;border:none;padding:3px 4px}
+  .wtbl td::before{content:attr(data-label);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .wtbl td:first-child{display:none}.col-wide{grid-column:span 2}
+  .col-del{position:absolute!important;top:8px;right:8px;padding:0;border:none;background:none;grid-column:unset!important}
+  .col-del::before{display:none!important}
+  .cs{width:100%;font-size:14px;padding:7px 30px 7px 10px;min-height:38px;border-radius:6px}
+  .ci{width:100%;font-size:14px;padding:7px 10px;border-radius:6px}
+  .ci[type="number"]{max-width:unset;text-align:left}
+}
+@media print{
+  .no-print{display:none!important}
+  nav{display:none}
+  .container{padding:0;max-width:none}
+  .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid;margin-bottom:8px}
+  body{background:#fff}
+  .wtbl th,.mtbl th,.stbl th,.master-tbl th{background:#1a3a5c!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tfoot-row td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  textarea.fi{display:none!important}
+  .pv{display:block!important;white-space:pre-wrap;font-size:13px;line-height:1.6;padding:4px 0}
+  .print-header{display:block!important;text-align:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary)}
+  .print-header h1{font-size:20px;font-weight:800;color:var(--primary)}
+  .print-header p{font-size:12px;color:var(--muted)}
+  .sig-area{display:flex!important;gap:0;margin-top:30px;border-top:1.5px solid #aaa;padding-top:20px}
+  .sig-box{flex:1;text-align:center;padding:0 10px}
+  .sig-line{border-bottom:1px solid #555;margin:32px 16px 5px}
+  .sig-lbl{font-size:11px;color:var(--muted);font-weight:700}
+}
+@media screen{.print-header{display:none}.pv{display:none}}
+</style>
+</head>
+<body>
+
+<!-- PORTAL REQUIRED（無入口身分時顯示，正常從入口進來會自動隱藏） -->
+<div id="login-overlay" class="overlay" style="display:none">
+  <div class="modal login-modal">
+    <div class="login-icon">🔐</div>
+    <h2 style="font-size:18px;font-weight:800;color:var(--primary);margin-bottom:8px">請從入口網頁登入</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px;line-height:1.6">本系統已整合至<br><strong>「石御石材工程管理系統」入口</strong><br>請先從入口選擇身分後再進入</p>
+    <a href="../portal/index.html" class="btn btn-p" style="width:100%;text-decoration:none;display:flex;align-items:center;justify-content:center">前往入口網頁 →</a>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="no-print">
+  <span class="nav-logo">工程 <span>日報表</span><span class="nav-v">v3</span></span>
+  <button class="nav-btn active" onclick="goPage('report')">📋 日報填寫</button>
+  <button class="nav-btn" onclick="goPage('mgmt')">📊 動態看板</button>
+  <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史資料</button>
+  <button class="nav-btn" onclick="goPage('export')">📤 報表下載</button>
+  <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
+  <span class="nav-spacer"></span>
+  <div style="display:flex;gap:5px">
+    <button class="btn btn-o btn-sm no-print" onclick="backToPortal()">🏠 返回入口</button>
+    <button class="btn btn-xl btn-sm no-print" onclick="exportExcel()">📊 Excel</button>
+    <button class="btn btn-pdf btn-sm no-print" onclick="printPDF()">🖨️ PDF</button>
+  </div>
+  <div class="nav-user">
+    <span id="nav-name" class="nav-badge"></span>
+    <span id="nav-dept" class="nav-badge" style="background:rgba(147,197,253,.25)"></span>
+  </div>
+  <span id="sync-icon" title="同步狀態"></span>
+</nav>
+
+<div class="print-header"><h1>工程日報表</h1><p id="ph-info"></p></div>
+
+<div class="container">
+
+<!-- ===== REPORT PAGE ===== -->
+<div id="page-report" class="page active">
+
+  <div class="stat-grid" id="stat-grid" style="display:none">
+    <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日出工累計</div></div>
+    <div class="stat-card stat-green"><div class="stat-val" id="st-tmrw">0</div><div class="stat-lbl">明日預估出工</div></div>
+  </div>
+
+  <!-- 基本資訊 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="flex gap2">
+        <span class="card-title">基本資訊</span>
+        <span id="access-badge" class="rw-badge no-print">✏️ 可編輯</span>
+      </div>
+      <div class="flex gap2 no-print">
+        <button class="btn btn-a btn-sm" onclick="newReport()">＋ 新增</button>
+        <button class="btn btn-o btn-sm" onclick="navDay(-1)">◀</button>
+        <button class="btn btn-o btn-sm" onclick="loadToday()">📅 今日</button>
+        <button class="btn btn-o btn-sm" onclick="navDay(1)">▶</button>
+        <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="g g5" style="gap:10px">
+        <div class="fg" style="grid-column:span 2">
+          <label class="fl">日期</label>
+          <input type="date" id="f-date" class="fi" onchange="onDateChange()">
+        </div>
+        <div class="fg">
+          <label class="fl">星期</label>
+          <input type="text" id="f-dow" class="fi" readonly>
+        </div>
+        <div class="fg">
+          <label class="fl">天氣</label>
+          <select id="f-weather" class="fi">
+            <option value="">選擇...</option>
+            <option value="晴">☀️ 晴</option>
+            <option value="多雲">⛅ 多雲</option>
+            <option value="陰">☁️ 陰</option>
+            <option value="小雨">🌧️ 小雨</option>
+            <option value="大雨">⛈️ 大雨</option>
+            <option value="颱風">🌀 颱風</option>
+            <option value="停工">⛔ 停工</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">部門</label>
+          <input type="text" id="f-dept" class="fi" readonly>
+        </div>
+        <div class="fg" style="grid-column:span 2">
+          <label class="fl">負責人</label>
+          <input type="text" id="f-reporter" class="fi" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 今日工作摘要 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">今日工作摘要</span>
+      <button class="btn btn-o btn-sm no-print" onclick="copySummary()">📋 複製</button>
+    </div>
+    <div class="card-body">
+      <textarea id="f-summary" class="fi summary-box" rows="4" readonly placeholder="— 請先在下方施工明細新增班組，摘要將自動生成 —"></textarea>
+      <p style="font-size:11px;color:var(--muted);margin-top:5px">* 自動從施工明細生成，點「複製」後可直接貼入電子郵件</p>
+      <div class="pv" id="f-summary-pv"></div>
+    </div>
+  </div>
+
+  <!-- 施工明細 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">施工明細</span>
+      <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRow()">＋ 新增班組</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="wtbl">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th style="min-width:120px">專案/工地名稱</th>
+            <th style="min-width:90px">施作位置</th>
+            <th style="min-width:100px">施工項目</th>
+            <th style="min-width:78px">今日班組</th>
+            <th style="width:64px">今日<br>出工</th>
+            <th style="min-width:78px">明日班組</th>
+            <th style="width:64px">明日<br>出工</th>
+            <th style="width:76px">完成<br>進度%</th>
+            <th style="min-width:90px">異常類型</th>
+            <th style="min-width:100px">異常說明</th>
+            <th class="no-print" style="width:30px">刪</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="4" style="text-align:right;padding-right:10px">合計</td>
+            <td></td><td id="tot-today">0</td>
+            <td></td><td id="tot-tmrw">0</td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- 材料明細 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">材料明細</span>
+      <button id="add-mat-btn" class="btn btn-a btn-sm no-print" onclick="addMatRow()">＋ 新增材料</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="mtbl">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th style="min-width:140px">材料名稱</th>
+            <th style="width:80px">數量</th>
+            <th style="width:80px">單位</th>
+            <th class="no-print" style="width:30px">刪</th>
+          </tr>
+        </thead>
+        <tbody id="mat-tbody"></tbody>
+      </table>
+    </div>
+    <div id="mat-empty" class="empty" style="min-height:60px;display:none">
+      <p>尚無材料明細，點「＋ 新增材料」新增</p>
+    </div>
+    <div style="padding:6px 12px;font-size:11px;color:var(--muted)" id="mat-carry-hint" style="display:none"></div>
+  </div>
+
+  <!-- 備註事項 -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">備註事項</span></div>
+    <div class="card-body">
+      <div class="g g2" style="gap:14px">
+        <div class="fg">
+          <label class="fl" style="margin-bottom:4px">與工地聯絡事項</label>
+          <textarea id="n-contact" class="fi" rows="4" placeholder="與營造廠、業主、其他工種的配合重點..." oninput="updPV(this)"></textarea>
+          <div class="pv" id="n-contact_pv"></div>
+        </div>
+        <div class="fg">
+          <label class="fl" style="margin-bottom:4px">其他工程配合重點</label>
+          <textarea id="n-other" class="fi" rows="4" placeholder="其他配合事項、臨時協調、注意事項..." oninput="updPV(this)"></textarea>
+          <div class="pv" id="n-other_pv"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 施工照片 -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">施工照片</span>
+      <div class="flex gap2 no-print">
+        <select id="ph-phase" class="fi" style="max-width:90px;padding:5px 7px;font-size:12px">
+          <option value="before">施工前</option>
+          <option value="during">施工中</option>
+          <option value="after">施工後</option>
+        </select>
+        <button class="btn btn-o btn-sm" onclick="$('ph-input').click()">📷 上傳</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
+      <div class="photo-grid" id="ph-grid">
+        <div class="upload-btn no-print" onclick="$('ph-input').click()">
+          <span style="font-size:22px">📷</span><span>點擊上傳照片</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作列 -->
+  <div class="card no-print">
+    <div class="card-body flex-b" style="padding:12px 16px">
+      <button class="btn btn-o btn-sm" onclick="clearForm()">🗑️ 清除表單</button>
+      <div class="flex gap2">
+        <button class="btn btn-xl btn-sm" onclick="exportExcel()">📊 匯出 Excel</button>
+        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 匯出 PDF</button>
+        <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存報表</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== MANAGEMENT PAGE ===== -->
+<div id="page-mgmt" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">管理總表</span>
+      <div class="flex gap2 no-print">
+        <button class="btn btn-xl btn-sm" onclick="exportMgmtExcel()">📊 匯出 Excel</button>
+        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ PDF</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+        <div class="fg" style="flex:0 0 auto">
+          <label class="fl">日期</label>
+          <input type="date" id="mg-date" class="fi" onchange="renderMgmt()">
+        </div>
+        <div class="fg" style="flex:0 0 auto">
+          <label class="fl">部門</label>
+          <select id="mg-dept" class="fi" onchange="renderMgmt()" style="max-width:150px">
+            <option value="">全部部門</option>
+          </select>
+        </div>
+        <div class="fg" style="flex:0 0 auto">
+          <label class="fl">專案/工地</label>
+          <select id="mg-proj" class="fi" onchange="renderMgmt()" style="max-width:160px">
+            <option value="">全部專案</option>
+          </select>
+        </div>
+        <button class="btn btn-o btn-sm" onclick="clearMgmtFilter()">清除</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="master-tbl">
+          <thead>
+            <tr>
+              <th style="width:36px"></th>
+              <th>日期</th>
+              <th>部門</th>
+              <th>負責人</th>
+              <th>今日出工</th>
+              <th>明日預估</th>
+            </tr>
+          </thead>
+          <tbody id="master-tbody"></tbody>
+        </table>
+      </div>
+      <div id="mgmt-empty" class="empty" style="display:none">
+        <div class="empty-icon">📊</div>
+        <h3>尚無符合條件的報表</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== HISTORY PAGE ===== -->
+<div id="page-history" class="page">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">歷史資料</span>
+      <div class="flex gap2 no-print">
+        <button class="btn btn-o btn-sm" onclick="exportAll()">📤 全部匯出</button>
+        <button class="btn btn-o btn-sm" onclick="$('imp-input').click()">📥 匯入</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="flex gap2" style="align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+        <div class="fg">
+          <label class="fl">月份</label>
+          <input type="month" id="filter-month" class="fi" style="max-width:160px" onchange="renderHistory()">
+        </div>
+        <div class="fg">
+          <label class="fl">部門</label>
+          <select id="filter-dept" class="fi" style="max-width:150px" onchange="renderHistory()">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <button class="btn btn-o btn-sm" onclick="clearHistFilter()">清除</button>
+      </div>
+      <div id="hist-list" class="report-list"></div>
+      <div id="hist-empty" class="empty" style="display:none">
+        <div class="empty-icon">🗂️</div><h3>尚無歷史報表</h3>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="imp-input" accept=".json" onchange="importData(event)">
+</div>
+
+<!-- ===== EXPORT PAGE ===== -->
+<div id="page-export" class="page">
+  <div class="card">
+    <div class="card-header"><span class="card-title">總表匯出</span></div>
+    <div class="card-body">
+
+      <!-- 專案/工地 -->
+      <div style="margin-bottom:12px">
+        <div class="flex-b mb2">
+          <label class="fl" style="margin:0">專案/工地（可多選）</label>
+          <div class="flex gap2">
+            <button class="btn btn-g btn-sm" onclick="exSelectAll(true)">全選</button>
+            <button class="btn btn-g btn-sm" onclick="exSelectAll(false)">全不選</button>
+          </div>
+        </div>
+        <div class="proj-checks" id="ex-proj-checks"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 日期區間 -->
+      <div style="margin-bottom:12px">
+        <label class="fl" style="margin-bottom:6px;display:block">日期區間</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <button class="btn btn-o btn-sm" onclick="setExDateRange('week')">本週</button>
+          <button class="btn btn-o btn-sm" onclick="setExDateRange('month')">本月</button>
+          <button class="btn btn-o btn-sm" onclick="setExDateRange('quarter')">本季</button>
+          <button class="btn btn-o btn-sm" onclick="setExDateRange('year')">今年</button>
+        </div>
+        <div class="g g2" style="gap:8px;max-width:380px">
+          <div class="fg"><label class="fl">起始日</label><input type="date" id="ex-date-from" class="fi"></div>
+          <div class="fg"><label class="fl">結束日</label><input type="date" id="ex-date-to" class="fi"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 進階篩選 -->
+      <div class="g g3" style="gap:12px;margin-bottom:12px">
+        <div class="fg">
+          <label class="fl">施作位置</label>
+          <select id="ex-loc" class="fi"><option value="">全部</option></select>
+        </div>
+        <div class="fg">
+          <label class="fl">施工班組</label>
+          <select id="ex-lead" class="fi"><option value="">全部</option></select>
+        </div>
+        <div class="fg">
+          <label class="fl">材料名稱</label>
+          <select id="ex-mat" class="fi"><option value="">全部</option></select>
+        </div>
+        <div class="fg">
+          <label class="fl">部門</label>
+          <select id="ex-dept" class="fi"><option value="">全部</option></select>
+        </div>
+        <div class="fg">
+          <label class="fl">最小出工數</label>
+          <input type="number" id="ex-w-min" class="fi" min="0" step="0.5" placeholder="0">
+        </div>
+        <div class="fg">
+          <label class="fl">最大出工數</label>
+          <input type="number" id="ex-w-max" class="fi" min="0" step="0.5" placeholder="不限">
+        </div>
+      </div>
+
+      <div class="flex gap2">
+        <button class="btn btn-p" onclick="previewExport()">🔍 預覽結果</button>
+        <button class="btn btn-xl" onclick="doExport()">📊 匯出 Excel</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 預覽表格 -->
+  <div class="card" id="ex-preview-card" style="display:none">
+    <div class="card-header">
+      <span class="card-title">預覽</span>
+      <span id="ex-count" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="stbl" id="ex-tbl">
+        <thead>
+          <tr>
+            <th>日期</th><th>部門</th><th>負責人</th><th>專案/工地</th>
+            <th>施作位置</th><th>施工項目</th><th>今日班組</th>
+            <th>今日出工</th><th>明日班組</th><th>明日出工</th>
+            <th>完成進度%</th><th>異常類型</th><th>異常說明</th>
+          </tr>
+        </thead>
+        <tbody id="ex-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS PAGE ===== -->
+<div id="page-settings" class="page">
+  <div class="card">
+    <div class="card-header" style="flex-direction:column;align-items:stretch;gap:0;padding-bottom:0">
+      <div class="flex-b" style="padding-bottom:10px;justify-content:flex-end">
+        <div class="flex gap2">
+          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存設定</button>
+          <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回入口</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+
+      <!-- 群組一已移除：部門與使用者改由入口網頁集中管理 -->
+      <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:14px;color:#1e40af;font-size:13px;line-height:1.6">
+        ℹ️ <strong>部門與使用者管理已移至入口網頁集中管理</strong><br>
+        如需新增/編輯部門、員工、權限角色，請至
+        <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 群組二：專案/工地維護 -->
+      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組二：專案/工地維護</span>
+        <div class="flex gap2">
+          <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
+          <button class="btn btn-a btn-sm no-print" onclick="openProjModal()">＋ 新增</button>
+          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table class="stbl">
+          <thead><tr>
+            <th style="width:36px;text-align:center">#</th>
+            <th>專案/工地名稱</th>
+            <th>說明</th>
+            <th class="no-print" style="width:90px">操作</th>
+          </tr></thead>
+          <tbody id="proj-tbody"></tbody>
+        </table>
+      </div>
+      <div id="proj-empty" class="empty" style="display:none">
+        <div class="empty-icon" style="font-size:28px">📋</div>
+        <h3 style="font-size:13px">尚無專案，點「＋ 新增專案」建立</h3>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 群組三：材料名稱與單位 -->
+      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組三：材料名稱與單位</span>
+        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+      </div>
+      <div class="g g2" style="gap:16px;align-items:start">
+        <div class="fg">
+          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matnames')">＋ 新增</button></div>
+          <div class="list-field" id="lf-matnames"></div>
+        </div>
+        <div class="fg">
+          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matunits')">＋ 新增</button></div>
+          <div class="list-field" id="lf-matunits"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- 群組四：施工明細設定 -->
+      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組四：施工明細設定</span>
+        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+      </div>
+      <div class="g g3" style="gap:12px">
+        <div class="fg">
+          <div class="flex-b mb2"><label class="fl" style="margin:0">施作位置</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-locs')">＋ 新增</button></div>
+          <div class="list-field" id="lf-locs"></div>
+        </div>
+        <div class="fg">
+          <div class="flex-b mb2"><label class="fl" style="margin:0">施工項目</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-works')">＋ 新增</button></div>
+          <div class="list-field" id="lf-works"></div>
+        </div>
+        <div class="fg">
+          <div class="flex-b mb2"><label class="fl" style="margin:0">班組/領班</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-leads')">＋ 新增</button></div>
+          <div class="list-field" id="lf-leads"></div>
+        </div>
+      </div>
+
+      <!-- 底部按鈕 -->
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <button class="btn btn-p" onclick="saveSettings()">💾 儲存設定</button>
+        <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回入口</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</div><!-- /container -->
+
+<!-- PROJ MODAL -->
+<div id="proj-overlay" class="overlay">
+  <div class="modal">
+    <div class="modal-title" id="pm-title">新增專案/工地</div>
+    <div class="g" style="gap:10px;margin-bottom:14px">
+      <div class="fg"><label class="fl">專案/工地名稱 *</label><input type="text" id="pm-name" class="fi" placeholder="例：260526.雙橡園3B1"></div>
+      <div class="fg"><label class="fl">說明（選填）</label><input type="text" id="pm-note" class="fi" placeholder="備註說明"></div>
+    </div>
+    <div class="flex gap2" style="justify-content:flex-end">
+      <button class="btn btn-o" onclick="closeProjModal()">取消</button>
+      <button class="btn btn-a" onclick="saveProj()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div id="user-overlay" class="overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title" id="um-title">新增人員</div>
+    <div class="g" style="gap:12px;margin-bottom:16px">
+      <div class="fg"><label class="fl">姓名 *</label><input type="text" id="um-name" class="fi" placeholder="例：廖昌裕"></div>
+      <div class="fg">
+        <label class="fl">部門 *</label>
+        <select id="um-dept" class="fi"><option value="">— 請選擇 —</option></select>
+      </div>
+      <div class="fg">
+        <label class="fl">角色</label>
+        <select id="um-role" class="fi">
+          <option value="reporter">填報人員（可編輯自己的報表）</option>
+          <option value="manager">管理主管（可編輯全部）</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">密碼</label><input type="password" id="um-pw" class="fi" placeholder="留空表示不設定"></div>
+    </div>
+    <div class="flex gap2" style="justify-content:flex-end">
+      <button class="btn btn-o" onclick="closeUserModal()">取消</button>
+      <button class="btn btn-a" onclick="saveUser()">儲存</button>
+    </div>
+    <input type="hidden" id="um-id">
+  </div>
+</div>
+
+<!-- PHOTO MODAL -->
+<div id="ph-overlay" class="overlay" onclick="closePh(event)">
+  <div class="modal" style="max-width:660px;padding:0;overflow:hidden">
+    <img id="ph-img" src="" style="width:100%;display:block;max-height:62vh;object-fit:contain;background:#000">
+    <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="ph-phase-lbl" class="phase-tag"></span>
+        <span id="ph-cap" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="flex gap2">
+        <button class="btn btn-d btn-sm" onclick="deletePhoto()">🗑️ 刪除</button>
+        <button class="btn btn-o btn-sm" onclick="$('ph-overlay').classList.remove('show')">✕</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const DOW = ['日','一','二','三','四','五','六'];
+const today = () => new Date().toISOString().slice(0,10);
+let rowN = 0, matN = 0;
+let editProjId = null, editUserId = null, viewPhIdx = -1;
+
+const S = {
+  page: 'report',
+  report: null,
+  reports: [],
+  cfg: {
+    projects: [],
+    depts: ['專案管理部','工程部','景觀部','監造部'],
+    leads: [],
+    locs: [],
+    works: [],
+    matNames: [],
+    matUnits: [],
+    users: []
+  },
+  user: { name:'', dept:'', role:'reporter' },
+  projSort: 'desc'
+};
+
+function blankReport() {
+  return {
+    id: uid(), date: today(), dept:'', reporter:'', weather:'',
+    workItems: [], materials: [],
+    notes: { contact:'', other:'' },
+    photos: [], createdAt: new Date().toISOString()
+  };
+}
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── STORAGE ── */
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
+    S.reports = d.reports || [];
+    if (d.cfg) {
+      S.cfg = {...S.cfg, ...d.cfg};
+      if (!S.cfg.projects) S.cfg.projects=[];
+      if (!S.cfg.users) S.cfg.users=[];
+      if (!S.cfg.matNames) S.cfg.matNames=[];
+      if (!S.cfg.matUnits) S.cfg.matUnits=['片','支','桶','包','箱','才','m','m²','公斤','公升'];
+      if (!S.cfg.depts?.length) S.cfg.depts=['專案管理部','工程部','景觀部','監造部'];
+    }
+    if (d.user) S.user={...S.user,...d.user};
+    if (d.projSort) S.projSort = d.projSort;
+  } catch(e){}
+}
+function save() {
+  try {
+    localStorage.setItem('cdr_v3', JSON.stringify({
+      reports: S.reports, cfg: S.cfg, user: S.user,
+      projSort: S.projSort, updatedAt: Date.now()
+    }));
+    setSyncIcon('💾');
+    setTimeout(()=>setSyncIcon(''),1500);
+  } catch(e) { toast('儲存失敗：'+e.message,'e'); }
+}
+function setSyncIcon(s) { const el=$('sync-icon'); if(el) el.textContent=s; }
+
+/* ── LOGIN ── */
+function populateLoginDepts() {
+  const sel = $('login-dept'), cur = sel.value;
+  sel.innerHTML = '<option value="">— 請選擇部門 —</option>';
+  const userDepts = [...new Set(S.cfg.users.map(u=>u.dept))];
+  const all = [...new Set([...userDepts,...(S.cfg.depts||[])])].filter(Boolean);
+  all.forEach(d => sel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d})));
+  if (cur) sel.value = cur;
+}
+function onLoginDeptChange() {
+  const dept = $('login-dept').value;
+  const dl = $('login-name-list');
+  dl.innerHTML = '';
+  S.cfg.users.filter(u=>u.dept===dept).forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.name; dl.appendChild(opt);
+  });
+  $('login-name').value = '';
+  setTimeout(()=>$('login-name').focus(), 50);
+}
+function doLogin() {
+  const name = $('login-name').value;
+  const dept = $('login-dept').value;
+  const pw = $('login-pw').value;
+  const remember = $('login-remember').checked;
+  if (!dept) { toast('請選擇部門','e'); return; }
+  if (!name) { toast('請選擇姓名','e'); return; }
+  const user = S.cfg.users.find(u=>u.name===name&&u.dept===dept);
+  if (user && !user.password && pw) {
+    toast('此帳號未設定密碼，請留空直接登入','e');
+    $('login-pw').value=''; $('login-pw').focus(); return;
+  }
+  if (user && user.password && user.password!==pw) {
+    toast('密碼錯誤','e'); $('login-pw').focus(); return;
+  }
+  S.user = { name, dept, role: user?.role||'reporter' };
+  if (remember) localStorage.setItem('cdr_v3_remember', JSON.stringify({name, dept}));
+  else localStorage.removeItem('cdr_v3_remember');
+  save();
+  $('login-overlay').classList.remove('show');
+  updateNavUser();
+  initReport();
+  if (!user) toast(`歡迎，${name}！（未在人員清單中，可至設定頁新增）`);
+  else toast(`歡迎，${name}！`,'s');
+}
+function switchUser() {
+  populateLoginDepts();
+  $('login-dept').value = S.user.dept||'';
+  if (S.user.dept) onLoginDeptChange();
+  setTimeout(()=>{ $('login-name').value = S.user.name||''; },80);
+  $('login-pw').value='';
+  $('login-overlay').classList.add('show');
+  setTimeout(()=>$('login-pw').focus(), 250);
+}
+function updateNavUser() {
+  $('nav-name').textContent = S.user.name||'未登入';
+  $('nav-dept').textContent = S.user.dept||'';
+}
+
+/* ── PERMISSION ── */
+function canEdit(report) {
+  if (!report || !report.dept) return true;
+  if (S.user.role==='manager') return true;
+  return report.reporter===S.user.name && report.dept===S.user.dept;
+}
+function applyPermissions() {
+  const editable = canEdit(S.report);
+  const badge = $('access-badge');
+  const page = $('page-report');
+  if (editable) {
+    badge.textContent='✏️ 可編輯'; badge.className='rw-badge no-print';
+    page.classList.remove('readonly-form');
+  } else {
+    badge.textContent='👁️ 唯讀'; badge.className='ro-badge no-print';
+    page.classList.add('readonly-form');
+  }
+}
+
+/* ── NAVIGATION ── */
+function goPage(p) {
+  S.page = p;
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $(`page-${p}`).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    if (b.getAttribute('onclick')?.includes(`'${p}'`)) b.classList.add('active');
+  });
+  if (p==='history')  { renderHistory(); populateHistFilters(); }
+  if (p==='settings') loadCfgForm();
+  if (p==='mgmt')    { renderMgmt(); populateMgmtFilters(); }
+  if (p==='export')  initExportPage();
+}
+
+/* ── DATE ── */
+function onDateChange() {
+  const v = $('f-date').value;
+  if (!v) return;
+  $('f-dow').value = '星期'+DOW[new Date(v+'T00:00:00').getDay()];
+  checkDeptDateDuplicate();
+  autoCarryFromPrev();
+}
+function navDay(d) {
+  const cur = new Date($('f-date').value+'T00:00:00');
+  cur.setDate(cur.getDate()+d);
+  $('f-date').value = cur.toISOString().slice(0,10);
+  onDateChange();
+}
+function loadToday() {
+  $('f-date').value = today();
+  onDateChange();
+}
+
+/* ── COMPOSITE KEY CHECK ── */
+function checkDeptDateDuplicate() {
+  const dept = S.user.dept;
+  const date = $('f-date').value;
+  if (!dept||!date) return;
+  const existing = S.reports.find(r=>r.dept===dept && r.date===date);
+  if (existing && existing.id!==S.report.id) {
+    if (confirm(`⚠️ ${dept} 在 ${date} 已有日報表，是否載入繼續編輯？`)) {
+      loadReport(existing);
+    }
+  }
+}
+
+/* ── AUTO CARRY ── */
+function getPrevReport() {
+  const curDate = $('f-date').value || today();
+  const same = S.reports.filter(r => r.dept === S.user.dept && r.date < curDate);
+  if (!same.length) return null;
+  same.sort((a, b) => b.date.localeCompare(a.date));
+  return same[0];
+}
+function autoCarryFromPrev() {
+  const prev = getPrevReport();
+  if (!prev) return;
+  // Carry notes only if currently empty
+  if (prev.notes?.contact && !$('n-contact').value) {
+    $('n-contact').value = prev.notes.contact;
+    autoGrow($('n-contact'));
+  }
+  if (prev.notes?.other && !$('n-other').value) {
+    $('n-other').value = prev.notes.other;
+    autoGrow($('n-other'));
+  }
+  // Carry materials (qty=0) only if table is empty
+  if (prev.materials?.length && $('mat-tbody').children.length===0) {
+    prev.materials.forEach(m => addMatRow({...m, qty:0, id:uid()}));
+    const hint = $('mat-carry-hint');
+    hint.textContent = `✓ 已帶入昨日（${prev.date}）材料 ${prev.materials.length} 筆，數量已歸零，請填入今日實際用量`;
+    hint.style.display='block';
+  }
+}
+
+/* ── REPORT LOAD / SAVE ── */
+function initReport() {
+  const newR = blankReport();
+  newR.dept = S.user.dept;
+  newR.reporter = S.user.name;
+  S.report = newR;
+  renderReport();
+  applyPermissions();
+  loadToday();
+}
+function newReport() {
+  if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
+    if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
+  }
+  const newR = blankReport();
+  newR.dept = S.user.dept;
+  newR.reporter = S.user.name;
+  S.report = newR;
+  renderReport();
+  applyPermissions();
+  $('f-date').value = today();
+  onDateChange();
+  toast('已建立新日報表','s');
+}
+function renderReport() {
+  $('f-date').value = S.report.date||today();
+  $('f-dow').value = S.report.date?'星期'+DOW[new Date(S.report.date+'T00:00:00').getDay()]:'';
+  $('f-weather').value = S.report.weather||'';
+  $('f-dept').value = S.report.dept||S.user.dept||'';
+  $('f-reporter').value = S.report.reporter||S.user.name||'';
+  $('n-contact').value = S.report.notes?.contact||'';
+  $('n-other').value = S.report.notes?.other||'';
+  $('tbody').innerHTML=''; rowN=0;
+  (S.report.workItems||[]).forEach(it=>addRow(it));
+  $('mat-tbody').innerHTML=''; matN=0;
+  (S.report.materials||[]).forEach(m=>addMatRow(m));
+  renderPhotos();
+  recalc(); buildSummary();
+  autoGrowAll();
+  toggleMatEmpty();
+}
+function syncReport() {
+  S.report.date = $('f-date').value;
+  S.report.weather = $('f-weather').value;
+  S.report.dept = $('f-dept').value||S.user.dept;
+  S.report.reporter = $('f-reporter').value;
+  S.report.notes = {
+    contact: $('n-contact').value,
+    other: $('n-other').value
+  };
+  S.report.workItems = collectRows();
+  S.report.materials = collectMatRows();
+  buildSummary();
+}
+function saveReport() {
+  syncReport();
+  if (!S.report.dept) { toast('請確認部門（需先登入）','e'); return; }
+  const idx = S.reports.findIndex(r=>r.id===S.report.id);
+  if (idx>=0) S.reports[idx]=S.report;
+  else S.reports.push(S.report);
+  save();
+  toast('日報表已儲存','s');
+}
+function loadReport(r) {
+  S.report = JSON.parse(JSON.stringify(r));
+  renderReport();
+  applyPermissions();
+}
+function clearForm() {
+  if (!confirm('確定清除目前表單？')) return;
+  S.report = blankReport();
+  S.report.dept = S.user.dept;
+  S.report.reporter = S.user.name;
+  renderReport();
+  applyPermissions();
+}
+
+/* ── WORK TABLE ── */
+function addRow(it) {
+  const tbody = $('tbody'); const n=++rowN;
+  const aOpts = [['','— 無 —'],['material','🧱 材料未到'],['weather','🌧️ 天候影響'],['previous','⏳ 前項未完'],['other','❓ 其他']]
+    .map(([v,l])=>`<option value="${v}"${it?.atype===v?' selected':''}>${l}</option>`).join('');
+  const v = f => it?(it[f]??''):'';
+  const prog = it?Math.min(100,Math.max(0,parseFloat(it.progress)||0)):0;
+  const tr = document.createElement('tr');
+  tr.dataset.rn = n;
+  tr.innerHTML = `
+    <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
+    <td data-label="專案/工地"><select class="cs" data-f="proj" onchange="onRowChange(this)">${projOpts(v('projId'))}</select></td>
+    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)">${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
+    <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)">${selOpts(S.cfg.works,v('work'),'施工項目...')}</select></td>
+    <td data-label="今日班組"><select class="cs" data-f="lead" onchange="syncReport()">${selOpts(S.cfg.leads,v('lead'),'班組/領班...')}</select></td>
+    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
+    <td data-label="明日班組"><select class="cs" data-f="lead2" onchange="syncReport()">${selOpts(S.cfg.leads,v('lead2'),'班組/領班...')}</select></td>
+    <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
+    <td data-label="完成進度%">
+      <div class="prog-wrap">
+        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center">
+        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${prog}%"></div></div>
+      </div>
+    </td>
+    <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()">${aOpts}</select></td>
+    <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="說明..." oninput="syncReport()"></td>
+    <td class="col-del no-print"><button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button></td>`;
+  tbody.appendChild(tr);
+  renum(); recalc(); buildSummary();
+}
+function projOpts(curId) {
+  const sorted = getSortedProjects();
+  return `<option value="">— 選擇專案 —</option>` +
+    sorted.map(p=>`<option value="${p.id}"${curId===p.id?' selected':''}>${escHtml(p.name)}</option>`).join('');
+}
+function selOpts(presets, cur, ph) {
+  const list = presets||[];
+  const extra = cur&&!list.includes(cur)?[cur]:[];
+  return `<option value="">${ph}</option>`+[...extra,...list]
+    .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
+}
+function onRowChange(el) { buildSummary(); syncReport(); }
+function updProg(inp) {
+  const v = Math.min(100,Math.max(0,parseFloat(inp.value)||0));
+  const fill = inp.closest('.prog-wrap')?.querySelector('.prog-bar-fill');
+  if (fill) fill.style.width=v+'%';
+}
+function delRow(btn) { btn.closest('tr').remove(); renum(); recalc(); buildSummary(); syncReport(); }
+function renum() { $('tbody').querySelectorAll('.rnum').forEach((td,i)=>td.textContent=i+1); }
+function recalc() {
+  let t0=0, t1=0;
+  $('tbody').querySelectorAll('tr').forEach(tr=>{
+    const w0 = parseFloat(tr.querySelector('[data-f="w0"]')?.value)||0;
+    const w1 = parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0;
+    t0+=w0; t1+=w1;
+    if (w0===0 && tr.querySelector('[data-f="lead"]')?.value) {
+      tr.classList.add('row-zero');
+      const at=tr.querySelector('[data-f="atype"]');
+      if (at&&!at.value) at.classList.add('atype-warn');
+    } else {
+      tr.classList.remove('row-zero');
+      tr.querySelector('[data-f="atype"]')?.classList.remove('atype-warn');
+    }
+  });
+  $('tot-today').textContent = t0%1===0?t0:t0.toFixed(1);
+  $('tot-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
+  $('st-today').textContent = t0%1===0?t0:t0.toFixed(1);
+  $('st-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
+  const cnt = $('tbody').children.length;
+  $('stat-grid').style.display = cnt>0?'grid':'none';
+}
+function collectRows() {
+  const rows=[];
+  $('tbody').querySelectorAll('tr').forEach(tr=>{
+    const projSel = tr.querySelector('[data-f="proj"]');
+    const projId = projSel?.value||'';
+    const projName = projSel?.selectedOptions[0]?.text||'';
+    rows.push({
+      id: tr.dataset.id||uid(),
+      projId, projName: projId?projName:'',
+      loc: tr.querySelector('[data-f="loc"]')?.value||'',
+      work: tr.querySelector('[data-f="work"]')?.value||'',
+      lead: tr.querySelector('[data-f="lead"]')?.value||'',
+      w0: parseFloat(tr.querySelector('[data-f="w0"]')?.value)||0,
+      lead2: tr.querySelector('[data-f="lead2"]')?.value||'',
+      w1: parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0,
+      progress: parseFloat(tr.querySelector('[data-f="progress"]')?.value)||0,
+      atype: tr.querySelector('[data-f="atype"]')?.value||'',
+      anote: tr.querySelector('[data-f="anote"]')?.value||''
+    });
+  });
+  return rows;
+}
+
+/* ── SUMMARY ── */
+function buildSummary() {
+  const lines=[];
+  $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
+    const projSel = tr.querySelector('[data-f="proj"]');
+    const projName = projSel?.value?(projSel.selectedOptions[0]?.text||''):'';
+    const loc = tr.querySelector('[data-f="loc"]')?.value||'';
+    const work = tr.querySelector('[data-f="work"]')?.value||'';
+    if (projName||loc||work) {
+      lines.push(`${i+1}. ${[projName,loc,work].filter(Boolean).join(' ｜ ')}`);
+    }
+  });
+  const txt = lines.join('\n');
+  $('f-summary').value = txt;
+  $('f-summary-pv').textContent = txt;
+  autoGrow($('f-summary'));
+  if (S.report) S.report.summary = txt;
+}
+function copySummary() {
+  const txt = $('f-summary').value;
+  if (!txt) { toast('尚無內容可複製','e'); return; }
+  navigator.clipboard?.writeText(txt).then(()=>toast('✓ 已複製到剪貼簿','s'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');
+      ta.value=txt; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      toast('✓ 已複製到剪貼簿','s');
+    });
+}
+
+/* ── MATERIAL TABLE ── */
+function addMatRow(m) {
+  const tbody = $('mat-tbody'); const n=++matN;
+  const tr = document.createElement('tr');
+  tr.dataset.mid = m?.id||uid();
+  tr.innerHTML = `
+    <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
+    <td><select class="cs" data-f="mname" onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
+    <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center" oninput="syncReport()"></td>
+    <td><select class="cs" data-f="munit">${matUnitOpts(m?.unit||'')}</select></td>
+    <td class="no-print"><button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button></td>`;
+  tbody.appendChild(tr);
+  mnumAll(); toggleMatEmpty();
+}
+function matNameOpts(cur) {
+  const list = S.cfg.matNames||[];
+  const extra = cur&&!list.includes(cur)?[cur]:[];
+  return `<option value="">— 選擇材料 —</option>`+[...extra,...list]
+    .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
+}
+function matUnitOpts(cur) {
+  const list = S.cfg.matUnits||[];
+  const extra = cur&&!list.includes(cur)?[cur]:[];
+  return `<option value=""></option>`+[...extra,...list]
+    .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
+}
+function onMatNameChange(sel) {
+  // Auto-fill unit if material has default unit mapping
+  syncReport();
+}
+function delMatRow(btn) { btn.closest('tr').remove(); mnumAll(); toggleMatEmpty(); syncReport(); }
+function mnumAll() { $('mat-tbody').querySelectorAll('.mnum').forEach((td,i)=>td.textContent=i+1); }
+function toggleMatEmpty() {
+  const empty = $('mat-empty');
+  if (empty) empty.style.display = $('mat-tbody').children.length===0?'block':'none';
+}
+function collectMatRows() {
+  const rows=[];
+  $('mat-tbody').querySelectorAll('tr').forEach(tr=>{
+    rows.push({
+      id: tr.dataset.mid||uid(),
+      name: tr.querySelector('[data-f="mname"]')?.value||'',
+      qty: parseFloat(tr.querySelector('[data-f="mq"]')?.value)||0,
+      unit: tr.querySelector('[data-f="munit"]')?.value||''
+    });
+  });
+  return rows;
+}
+
+/* ── PHOTOS ── */
+function uploadPhotos(e) {
+  const phase=$('ph-phase').value;
+  Array.from(e.target.files).forEach(f=>{
+    if (!f.type.startsWith('image/')) return;
+    const rd=new FileReader();
+    rd.onload=ev=>{
+      S.report.photos.push({id:uid(),data:ev.target.result,phase,name:f.name,ts:Date.now()});
+      renderPhotos();
+    };
+    rd.readAsDataURL(f);
+  });
+  e.target.value='';
+}
+function renderPhotos() {
+  const grid=$('ph-grid');
+  grid.innerHTML='<div class="upload-btn no-print" onclick="$(\'ph-input\').click()"><span style="font-size:22px">📷</span><span>點擊上傳照片</span></div>';
+  (S.report.photos||[]).forEach((p,i)=>{
+    const phaseMap={before:'施工前',during:'施工中',after:'施工後'};
+    const cls={before:'ph-b',during:'ph-d',after:'ph-a'}[p.phase]||'ph-d';
+    const div=document.createElement('div');
+    div.className='photo-thumb';
+    div.onclick=()=>openPh(i);
+    div.innerHTML=`<img src="${p.data}" alt="${escHtml(p.name)}"><div class="photo-thumb-info"><span class="phase-tag ${cls}">${phaseMap[p.phase]||p.phase}</span><br>${escHtml(p.name)}</div>`;
+    grid.appendChild(div);
+  });
+}
+function openPh(i) {
+  viewPhIdx=i;
+  const p=S.report.photos[i];
+  $('ph-img').src=p.data; $('ph-cap').textContent=p.name;
+  const cls={before:'ph-b',during:'ph-d',after:'ph-a'}[p.phase]||'ph-d';
+  $('ph-phase-lbl').className='phase-tag '+cls;
+  $('ph-phase-lbl').textContent={before:'施工前',during:'施工中',after:'施工後'}[p.phase]||p.phase;
+  $('ph-overlay').classList.add('show');
+}
+function closePh(e){if(e.target===$('ph-overlay'))$('ph-overlay').classList.remove('show');}
+function deletePhoto(){
+  if(viewPhIdx<0)return;
+  S.report.photos.splice(viewPhIdx,1);
+  $('ph-overlay').classList.remove('show');
+  renderPhotos();
+}
+
+/* ── NOTES PV ── */
+function updPV(el){const pv=$(el.id+'_pv');if(pv)pv.textContent=el.value;}
+
+/* ── AUTO GROW ── */
+function autoGrow(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function autoGrowAll(){document.querySelectorAll('textarea.fi').forEach(autoGrow);}
+document.addEventListener('input',e=>{if(e.target.matches('textarea.fi'))autoGrow(e.target);});
+
+/* ── PRINT / PDF ── */
+function buildPrintTitle(){
+  const parts=['工程日報表', S.report.date||today()];
+  if(S.report.reporter) parts.push(S.report.reporter);
+  return parts.join('_');
+}
+function printPDF(){
+  syncReport();
+  const info=[S.report.dept, S.report.reporter, S.report.date].filter(Boolean).join(' | ');
+  $('ph-info').textContent=info;
+  document.title=buildPrintTitle();
+  window.print();
+}
+window.addEventListener('beforeprint',()=>{document.title=buildPrintTitle();});
+window.addEventListener('afterprint',()=>{document.title='工程日報表';});
+
+/* ── HISTORY ── */
+function renderHistory() {
+  const m=$('filter-month').value;
+  const dept=$('filter-dept').value;
+  let list=[...S.reports].filter(r=>{
+    if (m && !r.date.startsWith(m)) return false;
+    if (dept && r.dept!==dept) return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+  const el=$('hist-list');
+  el.innerHTML='';
+  $('hist-empty').style.display=list.length?'none':'block';
+  list.forEach(r=>{
+    const d=new Date(r.date+'T00:00:00');
+    const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
+    const div=document.createElement('div');
+    div.className='ritem';
+    div.innerHTML=`
+      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
+      <div class="ritem-info">
+        <h3>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</h3>
+        <p>${r.date} ／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
+      </div>
+      <div class="ritem-actions">
+        <button class="btn btn-o btn-sm" onclick="loadReport(S.reports.find(x=>x.id==='${r.id}'));goPage('report')">開啟</button>
+        <button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+function populateHistFilters() {
+  const sel=$('filter-dept');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">全部</option>';
+  [...new Set(S.reports.map(r=>r.dept).filter(Boolean))].forEach(d=>
+    sel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
+  );
+  if(cur) sel.value=cur;
+}
+function clearHistFilter(){$('filter-month').value='';$('filter-dept').value='';renderHistory();}
+function deleteReport(id){
+  if(!confirm('確定刪除這筆報表？'))return;
+  S.reports=S.reports.filter(r=>r.id!==id);
+  save(); renderHistory();
+}
+function exportAll(){
+  const blob=new Blob([JSON.stringify({reports:S.reports,cfg:S.cfg},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='cdr_v3_backup_'+today()+'.json'; a.click();
+}
+function importData(e){
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(d.reports) S.reports=[...S.reports,...d.reports.filter(r=>!S.reports.find(x=>x.id===r.id))];
+      if(d.cfg){S.cfg={...S.cfg,...d.cfg};}
+      save(); renderHistory();
+      toast(`匯入成功：${d.reports?.length||0} 筆報表`,'s');
+    }catch(err){toast('匯入失敗：格式錯誤','e');}
+  };
+  rd.readAsText(f); e.target.value='';
+}
+
+/* ── MANAGEMENT ── */
+function renderMgmt(){
+  const date=$('mg-date').value;
+  const dept=$('mg-dept').value;
+  const proj=$('mg-proj').value;
+  let list=[...S.reports].filter(r=>{
+    if(date&&r.date!==date)return false;
+    if(dept&&r.dept!==dept)return false;
+    if(proj&&!(r.workItems||[]).some(wi=>wi.projId===proj))return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date)||a.dept?.localeCompare(b.dept||'')||0);
+  const tbody=$('master-tbody'); tbody.innerHTML='';
+  $('mgmt-empty').style.display=list.length?'none':'block';
+  list.forEach(r=>{
+    const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
+    const t1=(r.workItems||[]).reduce((s,wi)=>s+(wi.w1||0),0);
+    const tr=document.createElement('tr');
+    tr.className='master-row';
+    tr.innerHTML=`
+      <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
+      <td>${r.date}</td>
+      <td>${escHtml(r.dept||'—')}</td>
+      <td>${escHtml(r.reporter||'—')}</td>
+      <td style="text-align:center;font-weight:700">${t0%1===0?t0:t0.toFixed(1)}</td>
+      <td style="text-align:center">${t1%1===0?t1:t1.toFixed(1)}</td>`;
+    tbody.appendChild(tr);
+    const det=document.createElement('tr');
+    det.className='detail-row'; det.id='det-'+r.id; det.style.display='none';
+    det.innerHTML=`<td colspan="6"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
+    tbody.appendChild(det);
+  });
+}
+function toggleDetail(btn,id){
+  const det=$('det-'+id);
+  const open=det.style.display!=='none';
+  det.style.display=open?'none':'table-row';
+  btn.classList.toggle('open',!open);
+  btn.textContent=open?'▶':'▼';
+  if(!open){
+    const r=S.reports.find(x=>x.id===id); if(!r)return;
+    const inner=$('det-inner-'+id);
+    const rows=(r.workItems||[]).map((wi,i)=>`
+      <tr><td>${i+1}</td><td>${escHtml(wi.projName||'—')}</td><td>${escHtml(wi.loc||'—')}</td>
+      <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wi.lead||'—')}</td>
+      <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td></tr>`).join('');
+    inner.innerHTML=`<table class="stbl" style="font-size:12px">
+      <thead><tr><th>#</th><th>專案/工地</th><th>施作位置</th><th>施工項目</th><th>班組</th><th>出工</th><th>進度</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
+      ${r.notes?.contact?`<p style="margin-top:8px;font-size:12px"><strong>工聯絡：</strong>${escHtml(r.notes.contact)}</p>`:''}`;
+  }
+}
+function populateMgmtFilters(){
+  const dSel=$('mg-dept'), pSel=$('mg-proj');
+  const cd=dSel.value, cp=pSel.value;
+  dSel.innerHTML='<option value="">全部部門</option>';
+  [...new Set(S.reports.map(r=>r.dept).filter(Boolean))].forEach(d=>
+    dSel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
+  );
+  pSel.innerHTML='<option value="">全部專案</option>';
+  S.cfg.projects.forEach(p=>
+    pSel.appendChild(Object.assign(document.createElement('option'),{value:p.id,textContent:p.name}))
+  );
+  if(cd) dSel.value=cd; if(cp) pSel.value=cp;
+}
+function clearMgmtFilter(){$('mg-date').value='';$('mg-dept').value='';$('mg-proj').value='';renderMgmt();}
+function exportMgmtExcel(){doExportExcel(getFilteredRows());}
+
+/* ── EXPORT PAGE ── */
+function initExportPage(){
+  const checks=$('ex-proj-checks');
+  checks.innerHTML='';
+  S.cfg.projects.forEach(p=>{
+    const lbl=document.createElement('label');
+    lbl.className='proj-check';
+    lbl.innerHTML=`<input type="checkbox" value="${p.id}" checked> ${escHtml(p.name)}`;
+    checks.appendChild(lbl);
+  });
+  // Populate filter selects
+  ['ex-loc','ex-lead','ex-mat','ex-dept'].forEach(id=>{
+    const sel=$(id); const cur=sel.value;
+    sel.innerHTML='<option value="">全部</option>';
+    let items=[];
+    if(id==='ex-loc') items=[...new Set(S.reports.flatMap(r=>r.workItems||[]).map(wi=>wi.loc).filter(Boolean))];
+    if(id==='ex-lead') items=[...new Set(S.reports.flatMap(r=>r.workItems||[]).map(wi=>wi.lead).filter(Boolean))];
+    if(id==='ex-mat') items=[...new Set(S.reports.flatMap(r=>r.materials||[]).map(m=>m.name).filter(Boolean))];
+    if(id==='ex-dept') items=[...new Set(S.reports.map(r=>r.dept).filter(Boolean))];
+    items.forEach(v=>sel.appendChild(Object.assign(document.createElement('option'),{value:v,textContent:v})));
+    if(cur) sel.value=cur;
+  });
+}
+function setExDateRange(type){
+  const now=new Date();
+  let from,to;
+  const fmt=d=>d.toISOString().slice(0,10);
+  if(type==='week'){
+    const day=now.getDay();
+    from=new Date(now); from.setDate(now.getDate()-day);
+    to=new Date(from); to.setDate(from.getDate()+6);
+  } else if(type==='month'){
+    from=new Date(now.getFullYear(),now.getMonth(),1);
+    to=new Date(now.getFullYear(),now.getMonth()+1,0);
+  } else if(type==='quarter'){
+    const q=Math.floor(now.getMonth()/3);
+    from=new Date(now.getFullYear(),q*3,1);
+    to=new Date(now.getFullYear(),q*3+3,0);
+  } else {
+    from=new Date(now.getFullYear(),0,1);
+    to=new Date(now.getFullYear(),11,31);
+  }
+  $('ex-date-from').value=fmt(from);
+  $('ex-date-to').value=fmt(to);
+}
+function exSelectAll(v){$('ex-proj-checks').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=v);}
+function getExRows(){
+  const selProjIds=new Set([...$('ex-proj-checks').querySelectorAll('input:checked')].map(cb=>cb.value));
+  const from=$('ex-date-from').value;
+  const to=$('ex-date-to').value;
+  const locF=$('ex-loc').value;
+  const leadF=$('ex-lead').value;
+  const matF=$('ex-mat').value;
+  const deptF=$('ex-dept').value;
+  const wMin=parseFloat($('ex-w-min').value)||0;
+  const wMax=parseFloat($('ex-w-max').value)||Infinity;
+  const rows=[];
+  S.reports.forEach(r=>{
+    if(deptF&&r.dept!==deptF)return;
+    if(from&&r.date<from)return;
+    if(to&&r.date>to)return;
+    (r.workItems||[]).forEach(wi=>{
+      if(selProjIds.size>0&&!selProjIds.has(wi.projId))return;
+      if(locF&&wi.loc!==locF)return;
+      if(leadF&&wi.lead!==leadF)return;
+      if(wi.w0<wMin||wi.w0>wMax)return;
+      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi});
+    });
+    if(matF){
+      (r.materials||[]).filter(m=>m.name===matF).forEach(m=>{
+        rows.push({date:r.date,dept:r.dept,reporter:r.reporter,projId:'',projName:'',
+          loc:'',work:'',lead:'',w0:'',lead2:'',w1:'',progress:'',atype:'',anote:'',
+          _matRow:true,matName:m.name,matQty:m.qty,matUnit:m.unit});
+      });
+    }
+  });
+  return rows.sort((a,b)=>b.date.localeCompare(a.date));
+}
+function previewExport(){
+  const rows=getExRows();
+  const tbody=$('ex-tbody'); tbody.innerHTML='';
+  $('ex-count').textContent=`共 ${rows.length} 筆`;
+  if(!rows.length){$('ex-preview-card').style.display='none';toast('無符合條件的資料','e');return;}
+  $('ex-preview-card').style.display='block';
+  rows.slice(0,200).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=[r.date,r.dept,r.reporter,r._matRow?'(材料)':escHtml(r.projName||''),
+      escHtml(r.loc||''),escHtml(r.work||''),escHtml(r.lead||''),
+      r.w0!==''?r.w0:'',escHtml(r.lead2||''),r.w1!==''?r.w1:'',
+      r.progress!==''?r.progress+'%':'',escHtml(r.atype||''),escHtml(r.anote||'')]
+      .map(v=>`<td>${v}</td>`).join('');
+    tbody.appendChild(tr);
+  });
+  if(rows.length>200) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="13" style="text-align:center;color:var(--muted)">... 僅顯示前 200 筆，匯出 Excel 將包含全部 ${rows.length} 筆</td></tr>`);
+}
+function doExport(){
+  const rows=getExRows();
+  if(!rows.length){toast('無符合條件的資料','e');return;}
+  doExportExcel(rows);
+}
+function getFilteredRows(){return getExRows();}
+
+/* ── EXCEL EXPORT ── */
+async function doExportExcel(rows){
+  if(!rows||!rows.length){toast('無資料可匯出','e');return;}
+  toast('產生 Excel 中…');
+  try{
+    const wb=new ExcelJS.Workbook();
+    const ws=wb.addWorksheet('工程日報表');
+    const headers=['日期','部門','負責人','專案/工地','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成進度%','異常類型','異常說明'];
+    ws.addRow(headers);
+    ws.getRow(1).eachCell(cell=>{
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+      cell.font={color:{argb:'FFFFFFFF'},bold:true};
+      cell.alignment={horizontal:'center',vertical:'middle'};
+      cell.border={bottom:{style:'thin',color:{argb:'FF93C5FD'}}};
+    });
+    ws.getRow(1).height=22;
+    rows.forEach((r,i)=>{
+      const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.loc||'',r.work||'',
+        r.lead||'',r.w0,r.lead2||'',r.w1,r.progress,r.atype||'',r.anote||'']);
+      if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
+      row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
+    });
+    ws.columns=[110,90,70,160,120,120,90,60,90,60,70,90,160].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    const dates=rows.map(r=>r.date).filter(Boolean).sort();
+    const fnDate=dates.length?(dates[0]===dates[dates.length-1]?dates[0]:`${dates[0]}_${dates[dates.length-1]}`):today();
+    a.download=`工程日報表_${fnDate}.xlsx`; a.click();
+    toast('Excel 已匯出','s');
+  }catch(e){toast('匯出失敗：'+e.message,'e');}
+}
+async function exportExcel(){
+  syncReport();
+  const r=S.report;
+  const hasWork=(r.workItems||[]).length>0;
+  const hasMat=(r.materials||[]).length>0;
+  const hasNote=!!(r.notes?.contact||r.notes?.other);
+  if(!hasWork&&!hasMat&&!hasNote){toast('無資料可匯出','e');return;}
+  toast('產生 Excel 中…');
+  try{
+    const wb=new ExcelJS.Workbook();
+    const ws=wb.addWorksheet('工程日報表');
+    const HEAD={argb:'FF1A3A5C'},ALT={argb:'FFF8FAFC'},BD={argb:'FFCBD5E1'};
+    const styleHead=cell=>{
+      cell.fill={type:'pattern',pattern:'solid',fgColor:HEAD};
+      cell.font={color:{argb:'FFFFFFFF'},bold:true};
+      cell.alignment={horizontal:'center',vertical:'middle'};
+    };
+    // 基本資訊
+    ws.addRow(['工程日報表']).font={size:16,bold:true};
+    ws.mergeCells('A1:M1');
+    ws.getCell('A1').alignment={horizontal:'center'};
+    ws.addRow([]);
+    const info=ws.addRow(['日期',r.date||'','部門',r.dept||'','填報人',r.reporter||'','天氣',r.weather||'']);
+    [1,3,5,7].forEach(c=>{const cell=info.getCell(c);cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};});
+    ws.addRow([]);
+    // 工項
+    if(hasWork){
+      const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      const headers=['#','專案/工地','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成%','異常類型','異常說明'];
+      const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
+      (r.workItems||[]).forEach((wi,i)=>{
+        const row=ws.addRow([i+1,wi.projName||'',wi.loc||'',wi.work||'',wi.lead||'',wi.w0||0,wi.lead2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
+        if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
+        row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
+      });
+      ws.addRow([]);
+    }
+    // 材料
+    if(hasMat){
+      const tr=ws.addRow(['【材料管制】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      const headers=['#','材料名稱','單位','數量','備註'];
+      const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
+      (r.materials||[]).forEach((m,i)=>{
+        const row=ws.addRow([i+1,m.name||'',m.unit||'',m.qty||0,m.note||'']);
+        if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
+        row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
+      });
+      ws.addRow([]);
+    }
+    // 備註
+    if(hasNote){
+      const tr=ws.addRow(['【備註事項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      if(r.notes?.contact){const row=ws.addRow(['與工地聯絡事項',r.notes.contact]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
+      if(r.notes?.other){const row=ws.addRow(['其他工程配合重點',r.notes.other]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
+    }
+    ws.columns=[6,22,18,28,14,10,14,10,10,14,28].map(w=>({width:w}));
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=`工程日報表_${r.date||today()}.xlsx`; a.click();
+    toast('Excel 已匯出','s');
+  }catch(e){toast('匯出失敗：'+e.message,'e');}
+}
+
+/* ── SETTINGS ── */
+function loadCfgForm(){
+  loadListField('lf-depts',S.cfg.depts);
+  loadListField('lf-locs',S.cfg.locs);
+  loadListField('lf-works',S.cfg.works);
+  loadListField('lf-leads',S.cfg.leads);
+  loadListField('lf-matnames',S.cfg.matNames);
+  loadListField('lf-matunits',S.cfg.matUnits);
+  renderProjTable();
+  renderUsersTable();
+}
+function saveSettings(){
+  S.cfg.depts = readListField('lf-depts');
+  S.cfg.locs = readListField('lf-locs');
+  S.cfg.works = readListField('lf-works');
+  S.cfg.leads = readListField('lf-leads');
+  S.cfg.matNames = readListField('lf-matnames');
+  S.cfg.matUnits = readListField('lf-matunits');
+  save(); toast('設定已儲存','s');
+  // Refresh form dropdowns
+  if(S.page==='report') renderReport();
+}
+
+/* ── LIST FIELD ── */
+function loadListField(id, arr){
+  const el=$(id); el.innerHTML='';
+  (arr||[]).forEach((v,i)=>{
+    const row=document.createElement('div');
+    row.className='list-row';
+    row.innerHTML=`<span class="list-num">${i+1}</span><input type="text" value="${escHtml(v)}" placeholder="輸入項目..."><button class="btn btn-g btn-icon btn-sm" onclick="this.closest('.list-row').remove();renumListField('${id}')">✕</button>`;
+    el.appendChild(row);
+  });
+}
+function addListRow(id){
+  const el=$(id); const n=el.children.length+1;
+  const row=document.createElement('div');
+  row.className='list-row';
+  row.innerHTML=`<span class="list-num">${n}</span><input type="text" placeholder="輸入項目..." autofocus><button class="btn btn-g btn-icon btn-sm" onclick="this.closest('.list-row').remove();renumListField('${id}')">✕</button>`;
+  el.appendChild(row);
+  row.querySelector('input').focus();
+}
+function renumListField(id){
+  $(id).querySelectorAll('.list-num').forEach((span,i)=>span.textContent=i+1);
+}
+function readListField(id){
+  return [...$(id).querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
+}
+
+/* ── PROJECT TABLE ── */
+function getSortedProjects(){
+  const projs=[...S.cfg.projects];
+  projs.sort((a,b)=>{
+    const da=(a.name.match(/^(\d+)/)||[''])[1];
+    const db=(b.name.match(/^(\d+)/)||[''])[1];
+    return S.projSort==='desc'?db.localeCompare(da)||b.name.localeCompare(a.name):da.localeCompare(db)||a.name.localeCompare(b.name);
+  });
+  return projs;
+}
+function toggleProjSort(){
+  S.projSort=S.projSort==='desc'?'asc':'desc';
+  $('sort-lbl').textContent=S.projSort==='desc'?'新→舊':'舊→新';
+  renderProjTable();
+}
+function isProjLocked(id){ return S.reports.some(r=>(r.workItems||[]).some(wi=>wi.projId===id)); }
+function renderProjTable(){
+  const sorted=getSortedProjects();
+  const tbody=$('proj-tbody'); tbody.innerHTML='';
+  $('proj-empty').style.display=sorted.length?'none':'block';
+  sorted.forEach((p,i)=>{
+    const locked=isProjLocked(p.id);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="text-align:center">${i+1}</td>
+      <td>${escHtml(p.name)}</td>
+      <td style="color:var(--muted);font-size:12px">${escHtml(p.note||'')}</td>
+      <td class="no-print">
+        <button class="btn btn-o btn-sm" onclick="openProjModal('${p.id}')">編輯</button>
+        ${locked?'<span style="font-size:11px;color:var(--warning);margin-left:4px">🔒 使用中</span>':`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`}
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+function openProjModal(id){
+  editProjId=id||null;
+  $('pm-title').textContent=id?'編輯專案':'新增專案/工地';
+  const p=id?S.cfg.projects.find(x=>x.id===id):null;
+  $('pm-name').value=p?.name||'';
+  $('pm-note').value=p?.note||'';
+  $('proj-overlay').classList.add('show');
+  setTimeout(()=>$('pm-name').focus(),100);
+}
+function closeProjModal(){$('proj-overlay').classList.remove('show');}
+function saveProj(){
+  const name=$('pm-name').value.trim();
+  if(!name){toast('請輸入專案名稱','e');return;}
+  if(editProjId){
+    const p=S.cfg.projects.find(x=>x.id===editProjId);
+    if(p){p.name=name;p.note=$('pm-note').value.trim();}
+  } else {
+    S.cfg.projects.push({id:uid(),name,note:$('pm-note').value.trim()});
+  }
+  closeProjModal(); renderProjTable(); save(); toast('專案已儲存','s');
+}
+function deleteProj(id){
+  if(isProjLocked(id)){toast('此專案已在日報表中使用，無法刪除','e');return;}
+  if(!confirm('確定刪除此專案？'))return;
+  S.cfg.projects=S.cfg.projects.filter(p=>p.id!==id);
+  renderProjTable(); save();
+}
+
+/* ── USER TABLE ── */
+function renderUsersTable(){
+  const tbody=$('users-tbody'); tbody.innerHTML='';
+  const hasUsers=S.cfg.users.length>0;
+  $('users-tbl').style.display=hasUsers?'table':'none';
+  $('users-empty').style.display=hasUsers?'none':'block';
+  S.cfg.users.forEach((u,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td style="text-align:center">${i+1}</td>
+      <td>${escHtml(u.name)}</td>
+      <td>${escHtml(u.dept)}</td>
+      <td style="font-size:12px;color:var(--muted)">${u.role==='manager'?'管理主管':'填報人員'}</td>
+      <td style="font-size:12px">${u.password?'✅ 已設定':'— 未設定'}</td>
+      <td class="no-print">
+        <button class="btn btn-o btn-sm" onclick="openUserModal('${u.id}')">編輯</button>
+        <button class="btn btn-d btn-sm" onclick="deleteUser('${u.id}')">刪除</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+function openUserModal(id){
+  editUserId=id||null;
+  $('um-title').textContent=id?'編輯人員':'新增人員';
+  const u=id?S.cfg.users.find(x=>x.id===id):null;
+  $('um-name').value=u?.name||'';
+  $('um-pw').value='';
+  $('um-role').value=u?.role||'reporter';
+  $('um-id').value=id||'';
+  // Populate dept dropdown
+  const sel=$('um-dept');
+  sel.innerHTML='<option value="">— 請選擇 —</option>';
+  const allDepts=[...new Set([...(S.cfg.depts||[]),...S.cfg.users.map(x=>x.dept)])].filter(Boolean);
+  allDepts.forEach(d=>sel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d})));
+  if(u?.dept) sel.value=u.dept;
+  $('user-overlay').classList.add('show');
+}
+function closeUserModal(){$('user-overlay').classList.remove('show');}
+function saveUser(){
+  const name=$('um-name').value.trim();
+  const dept=$('um-dept').value;
+  const role=$('um-role').value;
+  const pw=$('um-pw').value;
+  if(!name){toast('請輸入姓名','e');return;}
+  if(!dept){toast('請選擇部門','e');return;}
+  if(editUserId){
+    const u=S.cfg.users.find(x=>x.id===editUserId);
+    if(u){ u.name=name; u.dept=dept; u.role=role; if(pw) u.password=pw; }
+  } else {
+    if(S.cfg.users.find(u=>u.name===name&&u.dept===dept)){toast('此部門已有同名人員','e');return;}
+    S.cfg.users.push({id:uid(),name,dept,role,password:pw||''});
+  }
+  closeUserModal(); renderUsersTable(); save(); toast('人員已儲存','s');
+}
+function deleteUser(id){
+  if(!confirm('確定刪除此人員？'))return;
+  S.cfg.users=S.cfg.users.filter(u=>u.id!==id);
+  renderUsersTable(); save();
+}
+
+/* ── TOAST ── */
+function toast(msg,type=''){
+  const wrap=$('toasts');
+  const div=document.createElement('div');
+  div.className='toast'+(type?' toast-'+type:'');
+  div.textContent=msg; wrap.appendChild(div);
+  setTimeout(()=>div.remove(),3000);
+}
+
+/* ── PORTAL IDENTITY ──
+ * 從入口網頁取得已登入身分：優先讀 localStorage portal_v1（同網域共享），
+ * fallback 讀 URL 參數 (?user=X&dept=Y&roleId=Z)。
+ */
+function initPortalUser(){
+  let pUser = null;
+  try {
+    const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    if (portal.currentUser?.name) pUser = portal.currentUser;
+  } catch(e){}
+  if (!pUser) {
+    const p = new URLSearchParams(location.search);
+    const n = p.get('user'); const d = p.get('dept');
+    if (n) pUser = { name:n, dept:d||'', roleId:p.get('roleId')||'' };
+  }
+  if (pUser) {
+    // 入口角色 → 本 App 內部角色映射（manager/reporter）
+    let role = 'reporter';
+    if (pUser.roleId) {
+      try {
+        const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+        const r = (portal.roles||[]).find(x => x.id === pUser.roleId);
+        if (r && ['dept','cross','all'].includes(r.editLevel)) role = 'manager';
+      } catch(e){}
+    }
+    S.user = { name:pUser.name, dept:pUser.dept||'', role };
+    save();
+    return true;
+  }
+  return false;
+}
+function backToPortal(){
+  location.href = '../portal/index.html';
+}
+
+/* ── INIT ── */
+function init(){
+  load();
+  if (initPortalUser()) {
+    // 來自入口：直接進入系統
+    $('login-overlay').style.display = 'none';
+    updateNavUser();
+    initReport();
+  } else {
+    // 沒入口身分：顯示「請從入口進入」提示頁
+    $('login-overlay').style.display = 'flex';
+  }
+}
+init();
+</script>
+</body>
+</html>

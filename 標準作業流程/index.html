@@ -40,6 +40,11 @@
       .s-i2{background:#ffedd5;color:#9a3412}
       .s-x2{background:#f3f4f6;color:#4b5563}
     }
+    @media (min-width:768px){
+      body.wide .max-w-lg.mx-auto.min-h-screen,
+      body.wide #top-header,
+      body.wide #bottom-nav{max-width:64rem!important}
+    }
   </style>
 </head>
 <body>
@@ -49,7 +54,10 @@
   <div class="flex items-center h-14 px-4 gap-3">
     <button id="btn-back" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-2xl flex-shrink-0 hidden">&#8249;</button>
     <div id="back-placeholder" class="w-9 flex-shrink-0"></div>
-    <h1 id="page-title" class="flex-1 text-base font-semibold truncate">標準作業流程</h1>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-semibold truncate leading-tight">查檢表（標準作業流程)</div>
+      <div id="page-title" class="text-xs text-blue-200 truncate leading-tight mt-0.5">檢核填寫</div>
+    </div>
     <span id="sync-icon" class="text-xs mr-1"></span>
     <button id="btn-settings" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-lg flex-shrink-0">&#9881;&#65039;</button>
   </div>
@@ -66,13 +74,13 @@
       <h2 class="text-xl font-bold text-gray-800">標準作業流程</h2>
       <p class="text-sm text-gray-500 mt-1">選擇工法開始現場查驗</p>
     </div>
-    <div id="template-cards" class="space-y-3 mb-6"></div>
+    <div id="template-cards" class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 mb-6"></div>
     <div id="recent-section">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-sm font-semibold text-gray-600">最近記錄</h3>
         <button onclick="goTo('history')" class="text-xs text-blue-600">查看全部 &#8250;</button>
       </div>
-      <div id="recent-list" class="space-y-2"></div>
+      <div id="recent-list" class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2"></div>
     </div>
     <div id="no-recent" class="hidden text-center py-8 text-gray-400 text-sm">尚無記錄，點選上方工法開始填寫</div>
   </div>
@@ -177,7 +185,7 @@
         <option value="draft">草稿</option>
       </select>
     </div>
-    <div id="history-list" class="space-y-3"></div>
+    <div id="history-list" class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3"></div>
   </div>
 
   <!-- ===== DETAIL ===== -->
@@ -192,9 +200,14 @@
 
   <!-- ===== SETTINGS ===== -->
   <div id="view-settings" class="view p-4 space-y-4">
+    <div id="cfg-templates"   class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
     <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
-    <div id="cfg-departments" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="departments" data-label="部門管理"  data-icon="🏢"></div>
-    <div id="cfg-personnel"   class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="personnel"   data-label="人員管理"  data-icon="👤"></div>
+    <!-- 部門管理 / 人員管理 已移除：改由入口網頁集中管理 -->
+    <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
+      ℹ️ <strong>部門管理 / 人員管理 已移至入口網頁集中管理</strong><br>
+      如需新增/編輯部門、員工，請至
+      <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+    </div>
     <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
     <div class="bg-white rounded-2xl p-4 shadow-sm">
       <h3 class="text-sm font-semibold text-gray-700 mb-2">☁️ 雲端同步狀態</h3>
@@ -209,9 +222,9 @@
 <!-- BOTTOM NAV -->
 <nav id="bottom-nav" class="no-print fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg" style="max-width:512px;margin:0 auto">
   <div class="flex">
-    <button onclick="goTo('home')"     id="nav-home"    class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">🏠</span>首頁</button>
-    <button onclick="goTo('history')"  id="nav-history" class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">📂</span>歷史</button>
-    <button onclick="goTo('settings')" id="nav-settings"class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">⚙️</span>設定</button>
+    <button onclick="goTo('home')"     id="nav-home"    class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">🏠</span>檢核填寫</button>
+    <button onclick="goTo('history')"  id="nav-history" class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">📂</span>歷史資料</button>
+    <button onclick="goTo('settings')" id="nav-settings"class="flex-1 flex flex-col items-center py-2 text-xs text-gray-400"><span class="text-lg mb-0">⚙️</span>系統設定</button>
   </div>
 </nav>
 </div><!-- max-w-lg -->
@@ -345,8 +358,15 @@ function badgeClass(s){
 function borderClass(s){
   return s==='正常'?'border-l-normal':s==='不正常'?'border-l-abnormal':s==='改善後合格'?'border-l-improved':s==='未列入'?'border-l-na':'';
 }
-function tplIcon(id){ return id==='t1'?'🪵':'🪨'; }
-function tplBg(id){ return id==='t1'?'background:#eff6ff':'background:#fffbeb'; }
+function tplIcon(id){
+  var t=TEMPLATES.find(function(x){return x.id===id;});
+  return t&&t.icon?t.icon:'📋';
+}
+function tplBg(id){
+  if(id==='t1') return 'background:#eff6ff';
+  if(id==='t2') return 'background:#fffbeb';
+  return 'background:#f3f4f6';
+}
 
 function infoRow(label, val){
   return '<div class="flex justify-between py-1"><span class="text-gray-500">'+esc(label)+'</span><span class="font-medium text-right" style="max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(val||'—')+'</span></div>';
@@ -365,8 +385,8 @@ function goBack(){
 }
 
 var PAGE_TITLES = {
-  home:'標準作業流程','new-header':'基本資訊',checklist:'查驗中',
-  complete:'查驗完成',history:'歷史記錄',detail:'查核詳情',settings:'設定'
+  home:'檢核填寫','new-header':'基本資訊',checklist:'查驗中',
+  complete:'查驗完成',history:'歷史資料',detail:'查核詳情',settings:'系統設定'
 };
 var BOTTOM_NAV_VIEWS = {home:true,history:true,settings:true};
 
@@ -396,6 +416,9 @@ function showView(v){
   // bottom nav
   var showNav = BOTTOM_NAV_VIEWS[v];
   $('bottom-nav').style.display = showNav ? '' : 'none';
+
+  // wide layout for list views (home/history)
+  document.body.classList.toggle('wide', v==='home' || v==='history');
   ['home','history','settings'].forEach(function(n){
     var btn=$('nav-'+n);
     btn.className='flex-1 flex flex-col items-center py-2 text-xs transition-colors '+(v===n?'text-blue-700':'text-gray-400');
@@ -731,18 +754,43 @@ function renderHistory(){
     return;
   }
   $('history-list').innerHTML=list.map(function(r){
-    return '<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all">'
+    return '<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all">'
       +'<div class="flex items-start gap-3">'
-      +'<div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
-      +'<div class="flex-1 min-w-0">'
+      +'<div onclick="openReportForEdit(\''+r.id+'\')" class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 cursor-pointer" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
+      +'<div onclick="openReportForEdit(\''+r.id+'\')" class="flex-1 min-w-0 cursor-pointer">'
       +'<div class="flex items-center justify-between">'
       +'<span class="font-semibold text-gray-800 text-sm truncate">'+esc(r.caseName)+'</span>'
       +'<span class="text-xs flex-shrink-0 ml-2 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</span>'
       +'</div>'
       +'<div class="text-xs text-gray-500 mt-1 truncate">'+esc(r.templateName)+'</div>'
       +'<div class="text-xs text-gray-400 mt-1">'+esc(r.date)+' · '+esc(r.personnel)+'</div>'
-      +'</div></div></div>';
+      +'</div>'
+      +'<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
+      +'<button onclick="openReportForEdit(\''+r.id+'\')" class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">📂 開啟</button>'
+      +'<button onclick="deleteReportFromHistory(\''+r.id+'\')" class="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 whitespace-nowrap">🗑️ 刪除</button>'
+      +'</div>'
+      +'</div></div>';
   }).join('');
+}
+
+function openReportForEdit(id){
+  var r=S.reports.find(function(x){return x.id===id;});
+  if(!r) return;
+  S.report=JSON.parse(JSON.stringify(r));
+  goTo('checklist');
+}
+function deleteReportFromHistory(id){
+  var r=S.reports.find(function(x){return x.id===id;});
+  if(!r) return;
+  if(!confirm('確定刪除這筆報表？\n\n'+(r.caseName||'')+' · '+(r.date||'')+'\n刪除後無法復原。')) return;
+  S.reports=S.reports.filter(function(x){return x.id!==id;});
+  saveLS();
+  if(window._sopSet){
+    window._sopSet('reports/'+id, null).then(function(){ showToast('已刪除並同步'); }).catch(function(){ showToast('已刪除（本機）'); });
+  } else {
+    showToast('已刪除');
+  }
+  renderHistory();
 }
 
 // ====== DETAIL ======
@@ -791,10 +839,9 @@ function deleteReport(id){
 
 // ====== SETTINGS ======
 function renderSettings(){
+  renderTemplatesSection();
   var secs=[
     {key:'cases',label:'案場管理',icon:'📍'},
-    {key:'departments',label:'部門管理',icon:'🏢'},
-    {key:'personnel',label:'人員管理',icon:'👤'},
     {key:'contractors',label:'施工廠商',icon:'🔨'}
   ];
   secs.forEach(function(sec){
@@ -824,6 +871,128 @@ function addCfgItem(key){
   S.config[key].push(v);
   inp.value='';
   renderSettings();
+}
+
+// ====== TEMPLATES EDITOR ======
+function syncTemplatesToConfig(){ S.config.templates = TEMPLATES; }
+function syncTemplatesFromConfig(){
+  if(S.config.templates && Array.isArray(S.config.templates) && S.config.templates.length){
+    TEMPLATES.length = 0;
+    S.config.templates.forEach(function(t){ TEMPLATES.push(t); });
+  }
+}
+function renderTemplatesSection(){
+  var el = $('cfg-templates');
+  if(!el) return;
+  if(!S.editingTplId && TEMPLATES.length) S.editingTplId = TEMPLATES[0].id;
+  var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || TEMPLATES[0];
+  var selOpts = TEMPLATES.map(function(t){
+    return '<option value="'+esc(t.id)+'"'+(tpl && t.id === tpl.id ? ' selected' : '')+'>'+esc(t.icon||'')+' '+esc(t.name)+'</option>';
+  }).join('');
+  var itemsHtml = '';
+  if(tpl && tpl.items && tpl.items.length){
+    itemsHtml = tpl.items.map(function(it, i){
+      return '<div class="border border-gray-200 rounded-lg p-3 mb-2 bg-gray-50">'
+        +'<div class="flex items-start gap-2 mb-2">'
+        +'<span class="text-xs text-gray-400 mt-2 w-6 text-center font-medium">'+(i+1)+'.</span>'
+        +'<input type="text" value="'+esc(it.name)+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" '
+        +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'name\',this.value)" placeholder="查驗項目名稱">'
+        +'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>'
+        +'</div>'
+        +'<textarea class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 resize-y" rows="3" '
+        +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'criterion\',this.value)" placeholder="查驗準則（可多行）...">'+esc(it.criterion||'')+'</textarea>'
+        +'</div>';
+    }).join('');
+  } else {
+    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此工法尚無查驗項目，點下方新增</div>';
+  }
+  var tplInfoHtml = '';
+  if(tpl){
+    tplInfoHtml = '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">'
+      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ 工法資訊</div>'
+      +'<div class="space-y-2">'
+      +'<div class="flex items-center gap-2">'
+      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">名稱</label>'
+      +'<input type="text" value="'+esc(tpl.name||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
+      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="工法名稱">'
+      +'</div>'
+      +'<div class="flex items-center gap-2">'
+      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
+      +'<input type="text" value="'+esc(tpl.materialLabel||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
+      +'onblur="updateTemplate(\''+tpl.id+'\',\'materialLabel\',this.value)" placeholder="例：材質名稱 / 石材種類">'
+      +'</div>'
+      +'<div class="flex items-center gap-2">'
+      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">圖示</label>'
+      +'<input type="text" value="'+esc(tpl.icon||'')+'" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center" '
+      +'onblur="updateTemplate(\''+tpl.id+'\',\'icon\',this.value)" placeholder="📋" maxlength="2">'
+      +'<span class="text-xs text-gray-400">（單一 emoji）</span>'
+      +'</div>'
+      +'</div>'
+      +'<button onclick="removeTemplate(\''+tpl.id+'\')" class="mt-3 text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>'
+      +'</div>';
+  }
+  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-3">🔧 工法管理</h3>'
+    +'<div class="mb-3">'
+    +'<label class="block text-xs text-gray-500 mb-1">選擇工法</label>'
+    +'<div class="flex gap-2">'
+    +'<select onchange="switchTplEditor(this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+selOpts+'</select>'
+    +'<button onclick="addTemplate()" class="px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 flex-shrink-0">+ 新增工法</button>'
+    +'</div>'
+    +'</div>'
+    +tplInfoHtml
+    +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗項目（共 '+(tpl.items||[]).length+' 項）</div>'
+      +itemsHtml
+      +'<button onclick="addTplItem(\''+tpl.id+'\')" class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗項目</button>') : '<div class="text-xs text-gray-400 py-3 text-center">尚無工法，點上方「+ 新增工法」</div>')
+    +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
+}
+function switchTplEditor(tplId){ S.editingTplId = tplId; renderTemplatesSection(); }
+function addTplItem(tplId){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  if(!tpl.items) tpl.items = [];
+  tpl.items.push({ id: uid(), name: '', criterion: '' });
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+}
+function removeTplItem(tplId, itemId){
+  if(!confirm('確定刪除此查驗項目？\n（既有歷史報表為快照儲存，不會受影響）')) return;
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl || !tpl.items) return;
+  tpl.items = tpl.items.filter(function(it){ return it.id !== itemId; });
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+}
+function updateTplItem(tplId, itemId, field, value){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl || !tpl.items) return;
+  var item = tpl.items.find(function(it){ return it.id === itemId; });
+  if(!item) return;
+  item[field] = value;
+  syncTemplatesToConfig();
+}
+function addTemplate(){
+  var newTpl = { id: uid(), name: '新工法', materialLabel: '材質', icon: '📋', items: [] };
+  TEMPLATES.push(newTpl);
+  S.editingTplId = newTpl.id;
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+}
+function updateTemplate(tplId, field, value){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  tpl[field] = value;
+  syncTemplatesToConfig();
+}
+function removeTemplate(tplId){
+  if(TEMPLATES.length <= 1){ alert('至少需保留一個工法'); return; }
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  if(!confirm('確定刪除工法「' + tpl.name + '」？\n（既有歷史報表為快照儲存，仍會正常顯示；只是無法再新建此工法的報表）')) return;
+  var idx = TEMPLATES.findIndex(function(t){ return t.id === tplId; });
+  TEMPLATES.splice(idx, 1);
+  S.editingTplId = TEMPLATES[0] ? TEMPLATES[0].id : null;
+  syncTemplatesToConfig();
+  renderTemplatesSection();
 }
 function removeCfgItem(key,idx){
   S.config[key].splice(idx,1);
@@ -858,9 +1027,11 @@ function buildPrintHTML(r){
   }).join('');
 
   return '<div style="font-family:sans-serif;max-width:760px;margin:0 auto;padding:16px">'
+    +'<table class="outer-wrap" style="width:100%">'
+    +'<thead><tr><td>'
     +'<div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #1e3a5f;padding-bottom:10px">'
-    +'<h1 style="font-size:17pt;color:#1e3a5f;margin:0 0 3px">標準作業流程查核表</h1>'
-    +'<p style="font-size:10pt;color:#666;margin:0">'+esc(r.templateName)+'</p></div>'
+    +'<h1 style="font-size:17pt;color:#1e3a5f;margin:0 0 5px">標準作業流程查核表</h1>'
+    +'<p style="font-size:15pt;color:#1e3a5f;font-weight:600;margin:0">'+esc(r.templateName)+'</p></div>'
     +'<table style="width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10pt">'
     +'<tr><td style="color:#666;width:15%;padding:2px 0">案場</td><td style="font-weight:600;padding:2px 8px;width:35%">'+esc(r.caseName)+'</td><td style="color:#666;width:12%">日期</td><td style="font-weight:600;padding:2px 8px">'+esc(r.date)+'</td></tr>'
     +'<tr><td style="color:#666;padding:2px 0">施作範圍</td><td style="font-weight:600;padding:2px 8px">'+esc(r.area)+'</td><td style="color:#666">部門</td><td style="font-weight:600;padding:2px 8px">'+esc(r.department||'')+'</td></tr>'
@@ -868,18 +1039,17 @@ function buildPrintHTML(r){
     +'<tr><td style="color:#666;padding:2px 0">填表人員</td><td style="font-weight:600;padding:2px 8px">'+esc(r.personnel)+'</td><td style="color:#666">施工廠商</td><td style="font-weight:600;padding:2px 8px">'+esc(r.contractor||'')+'</td></tr>'
     +'<tr><td style="color:#666;padding:2px 0">施工人員</td><td colspan="3" style="font-weight:600;padding:2px 8px">'+esc(r.workers||'')+'</td></tr>'
     +'</table>'
+    +'</td></tr></thead>'
+    +'<tbody><tr><td>'
     +'<table style="width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:14px">'
     +'<thead><tr style="background:#e8f0fe"><th style="border:1px solid #ccc;padding:6px;text-align:center">#</th>'
     +'<th style="border:1px solid #ccc;padding:6px;text-align:left">查檢項目</th>'
     +'<th style="border:1px solid #ccc;padding:6px;text-align:center">查檢狀況</th>'
     +'<th style="border:1px solid #ccc;padding:6px;text-align:left">狀況說明 / 照片</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
-    +'<div style="display:flex;gap:36px;margin-top:18px;padding-top:14px;border-top:1px solid #ddd">'
-    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">填表人：'+esc(r.personnel)+'</div></div>'
-    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">主管核簽</div></div>'
-    +'<div style="flex:1;text-align:center"><div style="border-bottom:1px solid #333;height:36px;margin-bottom:4px"></div><div style="font-size:9pt;color:#666">客戶確認</div></div>'
-    +'</div>'
     +'<div style="text-align:right;margin-top:10px;font-size:8pt;color:#bbb">列印：'+new Date().toLocaleString('zh-TW')+'</div>'
+    +'</td></tr></tbody>'
+    +'</table>'
     +'</div>';
 }
 
@@ -891,7 +1061,10 @@ function openPrint(html){
     +'.s-n2{background:#dcfce7;color:#166534}.s-a2{background:#fee2e2;color:#991b1b}'
     +'.s-i2{background:#ffedd5;color:#9a3412}.s-x2{background:#f3f4f6;color:#4b5563}'
     +'table td,table th{border:1px solid #ccc;padding:5px 7px;vertical-align:top}'
-    +'@media print{@page{margin:12mm}}</style></head><body>'+html+'</body></html>';
+    +'.outer-wrap,.outer-wrap>thead>tr>td,.outer-wrap>tbody>tr>td{border:0!important;padding:0!important}'
+    +'.outer-wrap thead{display:table-header-group}'
+    +'@media print{@page{margin:12mm 12mm 18mm 12mm;@bottom-right{content:"第 " counter(page) " 頁，共 " counter(pages) " 頁";font-size:9pt;color:#666}}}'
+    +'</style></head><body>'+html+'</body></html>';
   w.document.write(doc);
   w.document.close();
   setTimeout(function(){ w.print(); }, 600);
@@ -900,20 +1073,50 @@ function openPrint(html){
 function printCurrentReport(){ openPrint(buildPrintHTML(JSON.parse(JSON.stringify(S.report)))); }
 function printReportData(r){ openPrint(buildPrintHTML(r)); }
 
+// ====== PORTAL INTEGRATION ======
+// 從入口網頁同步 部門/人員 清單（如有），並抓當前登入身分預填表單
+function syncFromPortal(){
+  try {
+    var portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    if (portal.departments && portal.departments.length) {
+      S.config.departments = portal.departments.map(function(d){return d.name;});
+    }
+    if (portal.employees && portal.employees.length) {
+      S.config.personnel = portal.employees.map(function(e){return e.name;});
+    }
+    // 預填表單填寫人
+    if (portal.currentUser && portal.currentUser.name) {
+      S.currentUser = { name: portal.currentUser.name, dept: portal.currentUser.dept || '' };
+    }
+  } catch(e){}
+  // URL 參數 fallback
+  if (!S.currentUser) {
+    var p = new URLSearchParams(location.search);
+    var n = p.get('user');
+    if (n) S.currentUser = { name:n, dept:p.get('dept')||'' };
+  }
+}
+
 // ====== INIT ======
 (function init(){
   // load local
   var local=loadLS();
   if(local){
-    if(local.config) { ['cases','departments','personnel','contractors'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
+    if(local.config) { ['cases','departments','personnel','contractors','templates'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
     if(local.reports) S.reports=local.reports;
   }
+  syncFromPortal();  // 從入口拉最新部門/人員 + 帶入登入身分
+  syncTemplatesFromConfig();
+  syncTemplatesToConfig();
 
   // load Firebase
   if(window._sopGet){
     Promise.all([window._sopGet('config'), window._sopGet('reports')]).then(function(res){
       var fbCfg=res[0], fbRpts=res[1];
-      if(fbCfg){ ['cases','departments','personnel','contractors'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; }); }
+      if(fbCfg){
+        ['cases','departments','personnel','contractors','templates'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; });
+        syncTemplatesFromConfig();
+      }
       if(fbRpts){
         var cloud=Object.values(fbRpts);
         cloud.forEach(function(r){
