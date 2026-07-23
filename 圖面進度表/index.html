@@ -252,13 +252,14 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史資料</button>
   <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
   <span class="nav-spacer"></span>
-  <div class="nav-user" id="nav-user" onclick="backToPortal()" title="點此返回入口">
+  <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
+  <button class="nav-xbtn" onclick="exportExcel()">📊 匯出 Excel</button>
+  <div class="nav-user" id="nav-user" onclick="backToPortal()" title="點此返回主系統">
     <span class="nav-user-role r-reporter" id="nav-user-role">—</span>
     <span class="nav-user-name" id="nav-user-name">未登入</span>
     <span class="nav-user-dept" id="nav-user-dept"></span>
     <span style="font-size:11px;opacity:.6">🔄</span>
   </div>
-  <button class="nav-xbtn" onclick="exportExcel()">📊 匯出 Excel</button>
   <span id="sync-icon" title="雲端同步狀態">☁️</span>
 </nav>
 
@@ -311,7 +312,7 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   <div class="card">
     <div class="set-top-bar">
       <button class="btn btn-p btn-sm" onclick="manualSave()">💾 儲存設定</button>
-      <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回入口</button>
+      <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
     </div>
     <div class="card-body">
 
@@ -568,13 +569,29 @@ let records=[], cfg={}, currentUser=null;
 // ============================================================
 function isManager(){return currentUser&&currentUser.role==='manager'}
 function isLoggedIn(){return !!(currentUser&&currentUser.name)}
+function _execList(r){ return String((r&&r.執行者)||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean); }
+// 權限執行層：依入口角色的檢視/編輯範圍過濾（欄位＝部門 / 執行者）
+function canViewRecord(r){
+  const u=currentUser||{}; const level=u.viewLevel||'dept';
+  if(level==='all') return true;
+  if(r && u.name && _execList(r).includes(u.name)) return true;  // 保險：執行者含本人的紀錄，不論部門一律可見
+  if(!r||!r.部門) return true;                       // 沒標部門的舊資料一律可見
+  if(level==='dept') return r.部門===u.dept;
+  if(level==='cross') return r.部門===u.dept || (u.crossDepts||[]).includes(r.部門);
+  if(level==='self') return _execList(r).includes(u.name);
+  return r.部門===u.dept;
+}
+function visibleRecords(){ return records.map(normalizeRecord).filter(canViewRecord); }
 function canEditRecord(r){
   if(!isLoggedIn())return false;
-  if(isManager())return true;
-  if(!r||!r.執行者)return false;
-  // 執行者欄位「包含」當前登入姓名（多人用、分隔）
-  const execs=String(r.執行者).split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean);
-  return execs.includes(currentUser.name);
+  if(!r)return false;
+  const u=currentUser||{};
+  const el=u.editLevel || (u.role==='manager'?'dept':'self');
+  if(el==='none') return false;
+  if(el==='all') return true;
+  if(el==='dept') return r.部門===u.dept;
+  if(el==='cross') return r.部門===u.dept || (u.crossDepts||[]).includes(r.部門);
+  return _execList(r).includes(u.name);              // self：執行者含本人
 }
 
 const CFG_KEYS=[
@@ -686,7 +703,7 @@ function fmtLogDate(iso){
 }
 function getAllLocations(){
   const set=new Set();
-  records.forEach(r=>{(r.進度記錄||[]).forEach(p=>{if(p.location)set.add(p.location)})});
+  visibleRecords().forEach(r=>{(r.進度記錄||[]).forEach(p=>{if(p.location)set.add(p.location)})});
   return[...set].sort();
 }
 function toast(msg,type=''){
@@ -961,6 +978,16 @@ async function fbSave(){
   saveLocal();saveCfgLocal();
   if(!window._fbSet){setSyncIcon('err');return}
   try{
+    // 防空包覆蓋：本機 0 筆時先確認雲端也沒資料才寫；雲端有資料就拒絕覆蓋，
+    // 避免某台空白/舊設定裝置把整包空資料推上雲、清掉全部歷史（2026-07-21 資料遺失事故防呆，仿工程日報表）
+    if(records.length===0 && window._fbGet){
+      const cloud=await window._fbGet();
+      if(cloud && cloud.records && Object.keys(cloud.records).length>0){
+        console.warn('[防呆] 本機 0 筆但雲端有 '+Object.keys(cloud.records).length+' 筆 → 跳過覆蓋，避免清空雲端歷史');
+        setSyncIcon('ok');
+        return;
+      }
+    }
     const recObj={};records.forEach(r=>{recObj[r.id]=r});
     await window._fbSet({records:recObj,cfg});
     setSyncIcon('ok');
@@ -1011,7 +1038,7 @@ function getFiltered(){
   const fp=(document.getElementById('f-proj')||{value:''}).value;
   const fe=(document.getElementById('f-exec')||{value:''}).value;
   const fs=(document.getElementById('f-status')||{value:''}).value;
-  return records.map(normalizeRecord).filter(r=>{
+  return records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
     if(fp&&r.案場!==fp)return false;
     if(fe&&!(r.執行者||'').includes(fe))return false;
     if(fs&&getMainStatus(r)!==fs)return false;
@@ -1024,8 +1051,8 @@ function getFiltered(){
 }
 
 function updateFilters(){
-  const ps=[...new Set(records.map(r=>r.案場))].sort();
-  const es=[...new Set(records.flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
+  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort();
+  const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   const pSel=document.getElementById('f-proj'),eSel=document.getElementById('f-exec'),stSel=document.getElementById('f-status');
   if(!pSel)return;
   const pv=pSel.value,ev=eSel.value,sv=stSel.value;
@@ -1119,8 +1146,8 @@ function toggleSec(id,hdr){
 let wtSort={key:'work',dir:'desc'};
 
 function populateWtFilters(){
-  const ps=[...new Set(records.map(r=>r.案場))].sort();
-  const es=[...new Set(records.flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
+  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort();
+  const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   const pSel=document.getElementById('wt-proj'),eSel=document.getElementById('wt-exec'),stSel=document.getElementById('wt-status');
   if(!pSel)return;
   const pv=pSel.value,ev=eSel.value,sv=stSel.value;
@@ -1145,7 +1172,7 @@ function getWorktimeRows(){
   const fromD=fromV?new Date(fromV):null;
   const toD=toV?new Date(toV):null;
   const out=[];
-  records.map(normalizeRecord).forEach(r=>{
+  visibleRecords().forEach(r=>{
     if(fp&&r.案場!==fp)return;
     if(fe&&!(r.執行者||'').includes(fe))return;
     const st=getMainStatus(r);
@@ -1302,7 +1329,7 @@ async function exportWorktimeExcel(){
 
 function renderHistory(){
   const q=(document.getElementById('hist-q')||{value:''}).value.toLowerCase();
-  const sorted=[...records.map(normalizeRecord)].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  const sorted=[...visibleRecords()].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
   const filtered=q?sorted.filter(r=>{
     const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
     return[r.案場,r.執行者,r.施作位置,logText].join(' ').toLowerCase().includes(q);
@@ -1585,16 +1612,21 @@ function initPortalUser(){
     if (n) pUser = { name:n, dept:d||'', roleId:p.get('roleId')||'' };
   }
   if (!pUser) return false;
-  // 入口角色 → 本 App 角色映射
-  let role = 'reporter';
+  // 入口角色 → 帶入權限範圍（檢視 / 編輯 / 跨部門互看清單）
+  let role = 'reporter', viewLevel='dept', editLevel='self', crossDepts=[];
   if (pUser.roleId) {
     try {
       const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
       const r = (portal.roles||[]).find(x => x.id === pUser.roleId);
-      if (r && ['dept','cross','all'].includes(r.editLevel)) role = 'manager';
+      if (r) {
+        viewLevel = r.level || 'dept';
+        editLevel = r.editLevel || 'self';
+        crossDepts = r.crossDepts || [];
+        if (['dept','cross','all'].includes(editLevel)) role = 'manager';
+      }
     } catch(e){}
   }
-  currentUser = { name:pUser.name, dept:pUser.dept||'', role };
+  currentUser = { name:pUser.name, dept:pUser.dept||'', role, viewLevel, editLevel, crossDepts };
   try { localStorage.setItem('dtp_user', JSON.stringify(currentUser)); } catch(e){}
   return true;
 }

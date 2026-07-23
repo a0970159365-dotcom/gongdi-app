@@ -217,7 +217,7 @@ input[type="file"]{display:none}
   <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
   <span class="nav-spacer"></span>
   <div style="display:flex;gap:5px">
-    <button class="btn btn-o btn-sm no-print" onclick="backToPortal()">🏠 返回入口</button>
+    <button class="btn btn-o btn-sm no-print" onclick="backToPortal()">🏠 返回主系統</button>
     <button class="btn btn-xl btn-sm no-print" onclick="exportExcel()">📊 Excel</button>
     <button class="btn btn-pdf btn-sm no-print" onclick="printPDF()">🖨️ PDF</button>
   </div>
@@ -234,6 +234,11 @@ input[type="file"]{display:none}
 
 <!-- ===== REPORT PAGE ===== -->
 <div id="page-report" class="page active">
+
+  <!-- 從歷史資料開啟時顯示的返回列（參考查檢表 SOP） -->
+  <div id="report-backbar" class="no-print" style="display:none;margin-bottom:10px">
+    <button class="btn btn-o btn-sm" onclick="backToHistory()" style="font-weight:700">‹ 返回歷史資料</button>
+  </div>
 
   <div class="stat-grid" id="stat-grid" style="display:none">
     <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日出工累計</div></div>
@@ -610,7 +615,7 @@ input[type="file"]{display:none}
       <div class="flex-b" style="padding-bottom:10px;justify-content:flex-end">
         <div class="flex gap2">
           <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存設定</button>
-          <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回入口</button>
+          <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
         </div>
       </div>
     </div>
@@ -693,7 +698,7 @@ input[type="file"]{display:none}
       <!-- 底部按鈕 -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <button class="btn btn-p" onclick="saveSettings()">💾 儲存設定</button>
-        <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回入口</button>
+        <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回主系統</button>
       </div>
 
     </div>
@@ -824,13 +829,25 @@ function save() {
     };
     localStorage.setItem('cdr_v3', JSON.stringify(data));
     // Firebase 整包同步（跨裝置，圖示持久顯示，仿圖面進度表）
-    if(window._cdrSet){
-      setSyncIcon('☁️');
-      window._cdrSet('all', data)
-        .then(()=>setSyncIcon('☁️✅'))
-        .catch(()=>setSyncIcon('☁️❌'));
-    }
+    if(window._cdrSet) pushCloud(data);
   } catch(e) { toast('儲存失敗：'+e.message,'e'); }
+}
+// 防空包覆蓋：本機 0 筆時，先確認雲端也沒資料才寫；雲端有資料就拒絕覆蓋，避免某台空白裝置清空全部歷史（2026-07-21 資料遺失事故防呆）
+async function pushCloud(data) {
+  if(!window._cdrSet) return;
+  setSyncIcon('☁️');
+  try {
+    if((data.reports||[]).length === 0 && window._cdrGet){
+      const cloud = await window._cdrGet('all');
+      if(cloud && (cloud.reports||[]).length > 0){
+        console.warn('[防呆] 本機 0 筆但雲端有 '+cloud.reports.length+' 筆 → 跳過覆蓋，避免清空雲端歷史');
+        setSyncIcon('☁️✅');
+        return;
+      }
+    }
+    await window._cdrSet('all', data);
+    setSyncIcon('☁️✅');
+  } catch(e) { setSyncIcon('☁️❌'); }
 }
 function setSyncIcon(s) { const el=$('sync-icon'); if(el) el.textContent=s; }
 
@@ -893,11 +910,28 @@ function updateNavUser() {
   $('nav-dept').textContent = S.user.dept||'';
 }
 
-/* ── PERMISSION ── */
+/* ── PERMISSION（權限執行層：依入口角色的檢視/編輯範圍過濾資料） ── */
+function inScope(report, level){
+  const u = S.user||{};
+  if (!report || !report.dept) return true;   // 沒標部門的舊資料一律可見/可編
+  if (level === 'all')   return true;
+  if (level === 'self')  return report.reporter===u.name && report.dept===u.dept;
+  if (level === 'dept')  return report.dept===u.dept;
+  if (level === 'cross') return report.dept===u.dept || (u.crossDepts||[]).includes(report.dept);
+  return report.dept===u.dept;
+}
+function canView(report){
+  const u=S.user||{};
+  if(report && report.reporter && u.name && report.reporter===u.name) return true;  // 保險：填報人本人的報表，不論部門一律可見
+  return inScope(report, u.viewLevel || 'dept');
+}
+function visibleReports(){ return S.reports.filter(canView); }
 function canEdit(report) {
+  const u = S.user||{};
   if (!report || !report.dept) return true;
-  if (S.user.role==='manager') return true;
-  return report.reporter===S.user.name && report.dept===S.user.dept;
+  const el = u.editLevel || (u.role==='manager' ? 'dept' : 'self');
+  if (el === 'none') return false;
+  return inScope(report, el);
 }
 function applyPermissions() {
   const editable = canEdit(S.report);
@@ -918,6 +952,8 @@ function goPage(p) {
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   $(`page-${p}`).classList.add('active');
+  window.scrollTo(0,0);   // 切頁一律回頂端（修：從歷史「開啟」報表後捲軸停在中段，像跳到日報填寫）
+  { const _bb=$('report-backbar'); if(_bb) _bb.style.display='none'; }   // 切頁先收返回列；只有從歷史開啟才會再顯示
   document.querySelectorAll('.nav-btn').forEach(b=>{
     if (b.getAttribute('onclick')?.includes(`'${p}'`)) b.classList.add('active');
   });
@@ -1056,6 +1092,15 @@ function loadReport(r) {
   renderReport();
   applyPermissions();
 }
+/* 從歷史資料開啟報表 → 切到報表頁並顯示「‹ 返回歷史資料」返回列 */
+function openReportFromHistory(id){
+  const r = S.reports.find(x=>x.id===id);
+  if(!r){ toast('找不到這筆報表','e'); return; }
+  loadReport(r);
+  goPage('report');
+  const bb=$('report-backbar'); if(bb) bb.style.display='';
+}
+function backToHistory(){ goPage('history'); }
 function clearForm() {
   if (!confirm('確定清除目前表單？')) return;
   S.report = blankReport();
@@ -1310,7 +1355,7 @@ window.addEventListener('afterprint',()=>{document.title='工程日報表';});
 function renderHistory() {
   const m=$('filter-month').value;
   const dept=$('filter-dept').value;
-  let list=[...S.reports].filter(r=>{
+  let list=[...visibleReports()].filter(r=>{
     if (m && !r.date.startsWith(m)) return false;
     if (dept && r.dept!==dept) return false;
     return true;
@@ -1330,7 +1375,7 @@ function renderHistory() {
         <p>${r.date} ／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
       </div>
       <div class="ritem-actions">
-        <button class="btn btn-o btn-sm" onclick="loadReport(S.reports.find(x=>x.id==='${r.id}'));goPage('report')">開啟</button>
+        <button class="btn btn-o btn-sm" onclick="openReportFromHistory('${r.id}')">開啟</button>
         <button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>
       </div>`;
     el.appendChild(div);
@@ -1340,7 +1385,7 @@ function populateHistFilters() {
   const sel=$('filter-dept');
   const cur=sel.value;
   sel.innerHTML='<option value="">全部</option>';
-  [...new Set(S.reports.map(r=>r.dept).filter(Boolean))].forEach(d=>
+  [...new Set(visibleReports().map(r=>r.dept).filter(Boolean))].forEach(d=>
     sel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
   );
   if(cur) sel.value=cur;
@@ -1377,7 +1422,7 @@ function renderMgmt(){
   const date=$('mg-date').value;
   const dept=$('mg-dept').value;
   const proj=$('mg-proj').value;
-  let list=[...S.reports].filter(r=>{
+  let list=[...visibleReports()].filter(r=>{
     if(date&&r.date!==date)return false;
     if(dept&&r.dept!==dept)return false;
     if(proj&&!(r.workItems||[]).some(wi=>wi.projId===proj))return false;
@@ -1427,7 +1472,7 @@ function populateMgmtFilters(){
   const dSel=$('mg-dept'), pSel=$('mg-proj');
   const cd=dSel.value, cp=pSel.value;
   dSel.innerHTML='<option value="">全部部門</option>';
-  [...new Set(S.reports.map(r=>r.dept).filter(Boolean))].forEach(d=>
+  [...new Set(visibleReports().map(r=>r.dept).filter(Boolean))].forEach(d=>
     dSel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
   );
   pSel.innerHTML='<option value="">全部專案</option>';
@@ -1454,10 +1499,10 @@ function initExportPage(){
     const sel=$(id); const cur=sel.value;
     sel.innerHTML='<option value="">全部</option>';
     let items=[];
-    if(id==='ex-loc') items=[...new Set(S.reports.flatMap(r=>r.workItems||[]).map(wi=>wi.loc).filter(Boolean))];
-    if(id==='ex-lead') items=[...new Set(S.reports.flatMap(r=>r.workItems||[]).map(wi=>wi.lead).filter(Boolean))];
-    if(id==='ex-mat') items=[...new Set(S.reports.flatMap(r=>r.materials||[]).map(m=>m.name).filter(Boolean))];
-    if(id==='ex-dept') items=[...new Set(S.reports.map(r=>r.dept).filter(Boolean))];
+    if(id==='ex-loc') items=[...new Set(visibleReports().flatMap(r=>r.workItems||[]).map(wi=>wi.loc).filter(Boolean))];
+    if(id==='ex-lead') items=[...new Set(visibleReports().flatMap(r=>r.workItems||[]).map(wi=>wi.lead).filter(Boolean))];
+    if(id==='ex-mat') items=[...new Set(visibleReports().flatMap(r=>r.materials||[]).map(m=>m.name).filter(Boolean))];
+    if(id==='ex-dept') items=[...new Set(visibleReports().map(r=>r.dept).filter(Boolean))];
     items.forEach(v=>sel.appendChild(Object.assign(document.createElement('option'),{value:v,textContent:v})));
     if(cur) sel.value=cur;
   });
@@ -1496,7 +1541,7 @@ function getExRows(){
   const wMin=parseFloat($('ex-w-min').value)||0;
   const wMax=parseFloat($('ex-w-max').value)||Infinity;
   const rows=[];
-  S.reports.forEach(r=>{
+  visibleReports().forEach(r=>{
     if(deptF&&r.dept!==deptF)return;
     if(from&&r.date<from)return;
     if(to&&r.date>to)return;
@@ -1827,17 +1872,24 @@ function initPortalUser(){
     if (n) pUser = { name:n, dept:d||'', roleId:p.get('roleId')||'' };
   }
   if (pUser) {
-    // 入口角色 → 本 App 內部角色映射（manager/reporter）
-    let role = 'reporter';
+    // 從入口角色帶入權限範圍（檢視範圍 / 編輯範圍 / 跨部門互看清單）
+    let role = 'reporter', viewLevel = 'dept', editLevel = 'self', crossDepts = [];
     if (pUser.roleId) {
       try {
         const portal = JSON.parse(localStorage.getItem('portal_v1')||'{}');
         const r = (portal.roles||[]).find(x => x.id === pUser.roleId);
-        if (r && ['dept','cross','all'].includes(r.editLevel)) role = 'manager';
+        if (r) {
+          viewLevel = r.level || 'dept';
+          editLevel = r.editLevel || 'self';
+          crossDepts = r.crossDepts || [];
+          if (['dept','cross','all'].includes(editLevel)) role = 'manager';
+        }
       } catch(e){}
     }
-    S.user = { name:pUser.name, dept:pUser.dept||'', role };
-    save();
+    S.user = { name:pUser.name, dept:pUser.dept||'', role, viewLevel, editLevel, crossDepts };
+    // ⚠️ 不在這裡 save()：入口帶身分時雲端資料還沒拉回、本機可能是空的，
+    // 若這裡 save() 會把本機 updatedAt 蓋成現在 → 隨後的雲端同步誤判「本機較新」而不拉雲端 → 歷史永遠空白（2026-07-21 修）。
+    // 身分放記憶體即可，等雲端同步或使用者實際操作時再落地。
     return true;
   }
   return false;
@@ -1864,10 +1916,14 @@ function init(){
       var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
       var localTime = localData.updatedAt || 0;
       var cloudTime = cloud.updatedAt || 0;
-      if(cloudTime > localTime){
+      // 讀取端防呆：雲端較新，「或」本機是空的但雲端有資料 → 一律拉雲端。
+      // 後者可救回「本機 updatedAt 被過早 save 汙染成現在、但其實 0 筆」的情況（2026-07-21 修）
+      var localEmptyCloudHas = (localData.reports||[]).length === 0 && (cloud.reports||[]).length > 0;
+      if(cloudTime > localTime || localEmptyCloudHas){
         S.reports = cloud.reports || [];
         if(cloud.cfg) S.cfg = {...S.cfg, ...cloud.cfg};
-        if(cloud.user) S.user = {...S.user, ...cloud.user};
+        // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
+        // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
         if(cloud.projSort) S.projSort = cloud.projSort;
         localStorage.setItem('cdr_v3', JSON.stringify(cloud));
         if(S.page) goPage(S.page);

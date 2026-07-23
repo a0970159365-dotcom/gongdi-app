@@ -306,7 +306,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 
         <a class="app-card" data-app="sop" data-base-url="../標準作業流程/index.html" href="../標準作業流程/index.html" target="_blank">
           <div class="ic">📐</div>
-          <h3>標準作業流程</h3>
+          <h3>查檢表（標準作業流程）</h3>
           <p class="desc">SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>工地現場用</div>
           <div class="enter-btn">進入系統 →</div>
@@ -315,15 +315,6 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title"><div class="bar"></div><h2>即將推出（F 版整合功能）</h2></div>
-      <div class="coming-cards">
-        <div class="coming-card"><div class="ic">🗂️</div><div class="body"><h4>共用主表</h4><p>跨 App 共用的基礎資料集中管理</p></div><div class="tag" style="background:#64748b">待客戶確認</div></div>
-        <div class="coming-card"><div class="ic">🔔</div><div class="body"><h4>跨系統通知</h4><p>卡關事件即時推送</p></div><div class="tag">F版</div></div>
-        <div class="coming-card"><div class="ic">📥</div><div class="body"><h4>IIS 本地化部署</h4><p>離開 Firebase，落地內網</p></div><div class="tag">F版</div></div>
-        <div class="coming-card"><div class="ic">🛡️</div><div class="body"><h4>稽核日誌</h4><p>誰改了什麼、何時改</p></div><div class="tag">F版</div></div>
-      </div>
-    </div>
   </main>
 
   <!-- ===== SETTINGS ===== -->
@@ -381,7 +372,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
     <div class="section">
       <div class="section-title">
         <div class="bar"></div><h2>🔑 權限設定</h2>
-        <div class="note" id="role-lock-note" style="display:none;color:var(--accent);font-weight:600">🔒 僅限主管/總經理室人員可編輯</div>
+        <div class="note" id="role-lock-note" style="display:none;color:var(--accent);font-weight:600">🔒 僅限部門主管 / 副總 / 系統管理員可編輯</div>
       </div>
       <div class="tab-toolbar">
         <div class="count">共 <strong id="role-count">0</strong> 個角色</div>
@@ -490,11 +481,16 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         <div class="hint">F 版上線後將用於登入；現階段可先空白</div>
       </div>
       <div class="form-row">
+        <label>離職日 <span style="color:var(--muted);font-weight:400">（留空＝在職）</span></label>
+        <input class="fi" id="emp-resign" type="date">
+        <div class="hint">填了離職日後，過了該日期此員工即無法登入 / 進入系統；資料保留不刪除，避免已建報表異常</div>
+      </div>
+      <div class="form-row">
         <label>可用子系統 <span style="color:var(--muted);font-weight:400">（勾選此員工能進入哪些 App）</span></label>
         <div class="checkbox-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
           <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr" checked> 📋 工程日報表</label>
           <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp" checked> 📊 圖面進度管理</label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-sop" checked> 📐 標準作業流程</label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-sop" checked> 📐 查檢表（標準作業流程）</label>
         </div>
       </div>
     </div>
@@ -878,20 +874,32 @@ function getRoleTagClass(name) { return ROLE_TAG_CLASS[name] || 'role-tag-defaul
  * 規則：(a) 部門 = 總經理室 永遠可以；
  *       (b) 角色的編輯範圍 ≥ 同部門（dept/cross/all）即可
  */
+/* ── 離職停用判定 ──
+ * resignDate（YYYY-MM-DD）填了、且今天已「過了」該日期 → 停用（離職日當天仍可用，隔天起停用）
+ * 資料保留不刪除，只是無法登入 / 進入系統
+ */
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+}
+function isResigned(emp) {
+  return !!(emp && emp.resignDate && todayStr() > emp.resignDate);
+}
+
 function canEditRoles() {
+  // 僅「部門主管 / 副總 / 系統管理員」類角色可編輯權限設定（依角色名稱判定，涵蓋
+  // 部門主管、各事業處(主管)、副總經理、系統管理員；一般員工、(員工)角色、總經理室看全部者皆唯讀）
   if (!S.currentUser) return false;
-  if (S.currentUser.dept === '總經理室') {
-    console.log('[canEditRoles] ✅ 允許 — 部門為總經理室');
-    return true;
-  }
   const r = getRole(S.currentUser.roleId);
   if (!r) {
     console.log('[canEditRoles] ❌ 拒絕 — 找不到角色（roleId=' + S.currentUser.roleId + '）');
     return false;
   }
-  const can = ['dept','cross','all'].includes(r.editLevel);
+  const can = /主管|副總|系統管理員/.test(r.name || '');
   console.log('[canEditRoles]', can ? '✅ 允許' : '❌ 拒絕',
-    '— 角色：', r.name, '· 編輯範圍：', r.editLevel || '(無)');
+    '— 角色：', r.name);
   return can;
 }
 
@@ -920,6 +928,7 @@ function updateAppCardLinks() {
   const u = S.currentUser;
   const emp = u ? S.employees.find(e => e.id === u.id) : null;
   const appAccess = emp?.appAccess || {cdr:true,dtp:true,sop:true};
+  const resigned = isResigned(emp);  // 離職停用 → 三個 App 全鎖
   const qs = u ? new URLSearchParams({
     user: u.name || '',
     dept: u.dept || '',
@@ -929,22 +938,25 @@ function updateAppCardLinks() {
     const base = card.getAttribute('data-base-url');
     const app = card.getAttribute('data-app');
     card.href = qs ? (base + '?' + qs) : base;
-    // 若沒勾此 App 的使用權，視覺上灰掉並阻擋點擊
-    const allowed = !u || appAccess[app] !== false;
+    // 離職停用 → 全鎖；否則若沒勾此 App 的使用權才灰掉
+    const allowed = !u || (!resigned && appAccess[app] !== false);
     if (allowed) {
       card.classList.remove('app-card-disabled');
       card.removeAttribute('data-blocked');
     } else {
       card.classList.add('app-card-disabled');
-      card.setAttribute('data-blocked', '1');
+      card.setAttribute('data-blocked', resigned ? 'resign' : '1');
     }
   });
 }
 document.addEventListener('click', e => {
-  const card = e.target.closest('.app-card[data-blocked="1"]');
+  const card = e.target.closest('.app-card[data-blocked]');
   if (card) {
     e.preventDefault();
-    toast('此帳號未開放使用該系統，請聯絡管理員', 'error');
+    const msg = card.getAttribute('data-blocked') === 'resign'
+      ? '此帳號已離職停用，無法進入系統，請聯絡管理員'
+      : '此帳號未開放使用該系統，請聯絡管理員';
+    toast(msg, 'error');
   }
 });
 
@@ -987,7 +999,9 @@ function onLoginDeptChange() {
     list.map(e => {
       const r = getRole(e.roleId);
       const tag = r ? `（${r.name}）` : '';
-      return `<option value="${esc(e.name)}">${esc(e.name)}${esc(tag)}</option>`;
+      const off = isResigned(e);
+      const offTag = off ? '（已離職停用）' : '';
+      return `<option value="${esc(e.name)}"${off?' disabled':''}>${esc(e.name)}${esc(tag)}${esc(offTag)}</option>`;
     }).join('');
 }
 function doLogin() {
@@ -998,6 +1012,11 @@ function doLogin() {
   if (!name) { toast('請選擇姓名', 'error'); return; }
   const emp = S.employees.find(e => e.name === name && e.dept === dept);
   if (!emp) { toast('查無此員工', 'error'); return; }
+  // 離職停用：過了離職日即不得登入 / 切換身分（資料保留，僅停權）
+  if (isResigned(emp)) {
+    toast(`此帳號已於 ${emp.resignDate} 離職停用，請聯絡管理員`, 'error');
+    return;
+  }
   // 密碼驗證：若該員工有設密碼則必須輸入正確
   if (emp.password) {
     if (!pw) { toast('此帳號已設密碼，請輸入密碼', 'error'); $('login-pw').focus(); return; }
@@ -1173,12 +1192,14 @@ function renderEmps() {
     const appsHtml = `
       <span class="app-icon ${ac.cdr?'on':'off'}" title="工程日報表">📋</span>
       <span class="app-icon ${ac.dtp?'on':'off'}" title="圖面進度管理">📊</span>
-      <span class="app-icon ${ac.sop?'on':'off'}" title="標準作業流程">📐</span>`;
+      <span class="app-icon ${ac.sop?'on':'off'}" title="查檢表（標準作業流程）">📐</span>`;
     return `
     <tr>
       <td><span class="seq">${idx+1}</span></td>
       <td><span class="code-pill">${esc(e.code||'—')}</span></td>
-      <td><strong>${esc(e.name)}</strong></td>
+      <td><strong>${esc(e.name)}</strong>${isResigned(e)
+          ? ` <span style="display:inline-block;font-size:11px;font-weight:800;color:var(--danger);background:#fee2e2;padding:2px 7px;border-radius:9px;margin-left:4px">🚫 已停用 ${esc(e.resignDate)}</span>`
+          : (e.resignDate ? ` <span style="display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:#f1f5f9;padding:2px 7px;border-radius:9px;margin-left:4px">離職日 ${esc(e.resignDate)}</span>` : '')}</td>
       <td><span class="tag-pill">${esc(e.dept||'—')}</span></td>
       <td>${roleCell}</td>
       <td>${appsHtml}</td>
@@ -1202,6 +1223,7 @@ function openEmpModal() {
   $('emp-dept').value = '';
   $('emp-roleid').value = S.roles[0]?.id || '';
   $('emp-pw').value = '';
+  $('emp-resign').value = '';
   $('emp-app-cdr').checked = true;
   $('emp-app-dtp').checked = true;
   $('emp-app-sop').checked = true;
@@ -1220,6 +1242,7 @@ function editEmp(id) {
   $('emp-dept').value = e.dept || '';
   $('emp-roleid').value = e.roleId || '';
   $('emp-pw').value = e.password || '';
+  $('emp-resign').value = e.resignDate || '';
   $('emp-app-cdr').checked = !!e.appAccess?.cdr;
   $('emp-app-dtp').checked = !!e.appAccess?.dtp;
   $('emp-app-sop').checked = !!e.appAccess?.sop;
@@ -1231,6 +1254,7 @@ function saveEmp() {
   const dept = $('emp-dept').value;
   const roleId = $('emp-roleid').value;
   const password = $('emp-pw').value.trim();
+  const resignDate = $('emp-resign').value || '';
   const appAccess = {
     cdr: $('emp-app-cdr').checked,
     dtp: $('emp-app-dtp').checked,
@@ -1248,9 +1272,9 @@ function saveEmp() {
   if (dup) { toast(`「${dept}」已存在同名員工`, 'error'); return; }
   if (S.editEmpId) {
     const i = S.employees.findIndex(e => e.id === S.editEmpId);
-    if (i >= 0) S.employees[i] = { ...S.employees[i], code, name, dept, roleId, password, appAccess };
+    if (i >= 0) S.employees[i] = { ...S.employees[i], code, name, dept, roleId, password, resignDate, appAccess };
   } else {
-    S.employees.push({ id: uid(), code, name, dept, roleId, password, appAccess });
+    S.employees.push({ id: uid(), code, name, dept, roleId, password, resignDate, appAccess });
   }
   saveAll();
   renderEmps();
