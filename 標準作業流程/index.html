@@ -52,7 +52,7 @@
 <!-- TOP HEADER -->
 <header id="top-header" class="no-print fixed top-0 left-0 right-0 z-40 bg-blue-900 text-white shadow-md" style="max-width:512px;margin:0 auto">
   <div class="flex items-center h-14 px-4 gap-3">
-    <button id="btn-back" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-blue-800 text-2xl flex-shrink-0 hidden">&#8249;</button>
+    <button id="btn-back" class="flex items-center gap-1 rounded-full font-bold flex-shrink-0 hidden" style="background:#f59e0b;color:#fff;padding:5px 13px;box-shadow:0 2px 6px rgba(245,158,11,.45)"><span style="font-size:18px;line-height:1;margin-top:-1px">&#8249;</span><span id="btn-back-label" class="text-sm whitespace-nowrap">返回</span></button>
     <div id="back-placeholder" class="w-9 flex-shrink-0"></div>
     <div class="flex-1 min-w-0">
       <div class="text-sm font-semibold truncate leading-tight">查檢表（標準作業流程)</div>
@@ -412,6 +412,12 @@ function showView(v){
   var canBack = S.viewStack.length>1;
   $('btn-back').classList.toggle('hidden', !canBack);
   $('back-placeholder').classList.toggle('hidden', canBack);
+  // 動態文字：上一步是歷史資料 → 「返回歷史資料」，其他情況 → 「返回」
+  if(canBack){
+    var _prev = S.viewStack[S.viewStack.length-2];
+    var _lbl = $('btn-back-label');
+    if(_lbl) _lbl.textContent = (_prev==='history') ? '返回歷史資料' : '返回';
+  }
 
   // settings button
   $('btn-settings').classList.toggle('hidden', v==='settings');

@@ -106,6 +106,13 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .app-card-disabled .enter-btn{background:var(--muted)}
 .app-card-disabled::after{content:'🔒 無權限';position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;color:var(--danger);background:#fee2e2;padding:3px 8px;border-radius:10px}
 
+/* ── 暫不列入測試（微暗，避免誤按；比「無權限」淡） ── */
+.app-card-dim{opacity:.6;filter:grayscale(.4);cursor:default}
+.app-card-dim:hover{transform:none;box-shadow:var(--shadow-sm);border-color:transparent}
+.app-card-dim:hover::before{opacity:0}
+.app-card-dim .enter-btn{background:var(--muted)}
+.app-card-dim::after{content:'修改中';position:absolute;top:14px;right:14px;font-size:11px;font-weight:800;color:#92600a;background:#fef3c7;padding:3px 8px;border-radius:10px}
+
 /* ── COMING SOON ── */
 .coming-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media(max-width:900px){.coming-cards{grid-template-columns:1fr 1fr}}
@@ -296,7 +303,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn">進入系統 →</div>
         </a>
 
-        <a class="app-card" data-app="dtp" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html" target="_blank">
+        <a class="app-card app-card-dim" data-app="dtp" data-testlock="1" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html" target="_blank">
           <div class="ic ic-green">📊</div>
           <h3>圖面進度管理</h3>
           <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
@@ -959,6 +966,11 @@ document.addEventListener('click', e => {
     toast(msg, 'error');
   }
 });
+// 暫不列入測試的系統（圖面進度管理）：攔截點擊避免誤按（capture 階段先於連結導向）
+document.addEventListener('click', e => {
+  const c = e.target.closest('.app-card[data-testlock]');
+  if (c) { e.preventDefault(); e.stopPropagation(); toast('圖面進度管理修改中，暫不開放', 'warn'); }
+}, true);
 
 /* ============================================================
  * 切換登入身分
