@@ -343,7 +343,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <div class="section-title"><div class="bar"></div><h2>子系統入口</h2><div class="note">點擊卡片進入系統</div></div>
       <div class="cards">
 
-        <a class="app-card" data-app="cdr" data-base-url="../工程日報表/index-v3.html" href="../工程日報表/index-v3.html" target="_blank">
+        <a class="app-card" data-app="cdr" data-base-url="../工程日報表/index-v3.html" href="../工程日報表/index-v3.html">
           <div class="ic ic-accent">📋</div>
           <h3>工程日報表</h3>
           <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
@@ -351,7 +351,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn">進入系統 →</div>
         </a>
 
-        <a class="app-card app-card-dim" data-app="dtp" data-testlock="1" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html" target="_blank">
+        <a class="app-card app-card-dim" data-app="dtp" data-testlock="1" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html">
           <div class="ic ic-green">📊</div>
           <h3>圖面進度管理</h3>
           <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
@@ -359,7 +359,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn">進入系統 →</div>
         </a>
 
-        <a class="app-card" data-app="sop" data-base-url="../標準作業流程/index.html" href="../標準作業流程/index.html" target="_blank">
+        <a class="app-card" data-app="sop" data-base-url="../標準作業流程/index.html" href="../標準作業流程/index.html">
           <div class="ic">📐</div>
           <h3>查檢表（標準作業流程）</h3>
           <p class="desc">SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用</p>
@@ -1020,6 +1020,22 @@ document.addEventListener('click', e => {
  * 登入閘門（未登入 → 蓋住整個網頁，驗證通過才進系統）
  * ============================================================ */
 
+/* ── 分頁工作階段（Session）──
+ * 登入身分寫在 localStorage（子 App 同網域共讀），但「這個分頁是否已登入」記在
+ * sessionStorage。sessionStorage 只活在當前分頁：重新整理／同分頁跳到子 App 再返回
+ * 都還在；分頁關掉或瀏覽器重開就沒了 → 下次開網頁一律回到空白登入畫面。
+ */
+const SESSION_KEY = 'portal_session';
+function hasSession() {
+  try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch(e){ return false; }
+}
+function startSession() {
+  try { sessionStorage.setItem(SESSION_KEY, '1'); } catch(e){}
+}
+function endSession() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch(e){}
+}
+
 /* 共用驗證：部門 + 姓名 + 密碼 → { ok, emp, msg } */
 function authEmployee(dept, name, pw) {
   if (!dept) return { ok:false, msg:'請選擇部門' };
@@ -1080,16 +1096,18 @@ function doGateLogin() {
   const emp = res.emp;
   S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
   saveLS();
+  startSession();   // 這個分頁進入已登入狀態（關掉分頁即失效）
   hideLoginGate();
   updateNavUser();
   renderRoles();
   renderNotifBell();
   toast(`歡迎，${emp.name}！`, 'success');
 }
-/* 登出 → 清除登入身分（三個子 App 也會因此失去身分而被擋下） */
+/* 登出 → 清除登入身分 + 結束分頁工作階段（三個子 App 也會因此被擋下） */
 function logout() {
   S.currentUser = null;
   saveLS();
+  endSession();
   updateNavUser();
   showView('home');
   showLoginGate();
@@ -1896,8 +1914,16 @@ renderEmps();
 renderRoles();
 renderNotifBell();
 attachCloudWatch();
-// ── 登入閘門：沒有登入身分就蓋住整個網頁，驗證通過才看得到子系統 ──
-if (S.currentUser) hideLoginGate(); else showLoginGate();
+// ── 登入閘門 ──
+// 必須「這個分頁有工作階段」+「有登入身分」才放行；否則清掉殘留身分、回到空白登入畫面。
+// → 關掉分頁 / 重開瀏覽器 / 直接點書籤進來，一律重新登入（不會沿用上次的人）。
+if (hasSession() && S.currentUser) {
+  hideLoginGate();
+} else {
+  if (S.currentUser) { S.currentUser = null; saveLS(); updateNavUser(); }
+  endSession();
+  showLoginGate();
+}
 console.log('[Portal] v0.3 booted ·',
   S.departments.length,'depts,',
   S.employees.length,'emps,',

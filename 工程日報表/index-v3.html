@@ -1861,10 +1861,13 @@ function toast(msg,type=''){
  * 從入口網頁取得已登入身分：優先讀 localStorage portal_v1（同網域共享），
  * fallback 讀 URL 參數 (?user=X&dept=Y&roleId=Z)。
  */
-/* 唯一認可的身分來源＝入口網頁登入後寫進 localStorage 的 portal_v1.currentUser
- * （URL 參數不算數，否則任何人手打 ?user=XXX 就能繞過入口登入） */
+/* 進站條件（兩個都要成立）：
+ * ① sessionStorage 有入口的分頁工作階段 —— 由入口登入後在同一分頁跳過來才會有，
+ *    關掉分頁或直接開本頁網址都沒有 → 擋下（URL 參數 ?user=XXX 也不算數）
+ * ② localStorage portal_v1.currentUser 有登入身分（入口登出會清掉） */
 function portalLoggedIn(){
   try {
+    if (sessionStorage.getItem('portal_session') !== '1') return false;
     const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
