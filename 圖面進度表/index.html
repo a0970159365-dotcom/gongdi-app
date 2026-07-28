@@ -236,7 +236,7 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 <body>
 
 <!-- ===== PORTAL REQUIRED OVERLAY（無入口身分時才顯示）===== -->
-<div id="login-overlay" class="overlay" style="display:none">
+<div id="login-overlay" class="overlay" style="display:none;z-index:9999;align-items:center;background:linear-gradient(135deg,#0f2440 0%,#1a3a5c 55%,#0f2440 100%)">
   <div class="modal-box login-modal">
     <div class="login-icon">🔐</div>
     <div class="login-title">請從入口網頁登入</div>
@@ -1600,6 +1600,14 @@ function importJson(e){
 /* ── PORTAL IDENTITY ──
  * 從入口取得身分：優先讀 localStorage portal_v1，fallback URL 參數
  */
+/* 唯一認可的身分來源＝入口網頁登入後寫進 localStorage 的 portal_v1.currentUser
+ * （URL 參數不算數，否則任何人手打 ?user=XXX 就能繞過入口登入） */
+function portalLoggedIn(){
+  try {
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    return !!(p.currentUser && p.currentUser.name);
+  } catch(e){ return false; }
+}
 function initPortalUser(){
   let pUser = null;
   try {
@@ -1636,16 +1644,17 @@ function backToPortal(){
 
 document.addEventListener('DOMContentLoaded',()=>{
   loadCfg();
-  const hasPortal = initPortalUser();
+  // 未從入口登入 → 立刻蓋上閘門，不做任何初始化（避免資料先閃現）
+  if (!portalLoggedIn()) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    return;
+  }
+  initPortalUser();
   updateNavUser();
   updateDataLists();
   initFb().then(()=>{
-    if (hasPortal || isLoggedIn()) {
-      document.getElementById('login-overlay').style.display = 'none';
-    } else {
-      // 沒入口身分：顯示「請從入口進入」提示
-      document.getElementById('login-overlay').style.display = 'flex';
-    }
+    document.getElementById('login-overlay').style.display = 'none';
   });
 });
 </script>

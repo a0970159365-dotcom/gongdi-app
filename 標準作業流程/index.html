@@ -49,6 +49,22 @@
 </head>
 <body>
 
+<!-- ===== 登入閘門：沒有入口登入身分時蓋住整頁（不透明，背景資料完全看不到）===== -->
+<div id="portal-gate" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;
+     padding:20px;background:linear-gradient(135deg,#0f2440 0%,#1e3a8a 55%,#0f2440 100%);overflow-y:auto">
+  <div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);max-width:360px;width:100%;
+       padding:32px 26px;text-align:center;margin:auto">
+    <div style="font-size:50px;margin-bottom:8px">🔐</div>
+    <div style="font-size:18px;font-weight:800;color:#1e3a8a;margin-bottom:10px">請先從入口網頁登入</div>
+    <div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">
+      本系統已整合至<br><strong>「石御石材工程管理系統」入口</strong><br>請先登入後再進入
+    </div>
+    <a href="../portal/index.html"
+       style="display:block;background:#1e3a8a;color:#fff;font-weight:800;font-size:14.5px;text-decoration:none;
+              border-radius:8px;padding:12px">前往入口網頁 →</a>
+  </div>
+</div>
+
 <!-- TOP HEADER -->
 <header id="top-header" class="no-print fixed top-0 left-0 right-0 z-40 bg-blue-900 text-white shadow-md" style="max-width:512px;margin:0 auto">
   <div class="flex items-center h-14 px-4 gap-3">
@@ -1155,6 +1171,22 @@ function canEditReport(r){
   return r.personnel===u.name;                    // self：填表人為本人
 }
 
+// ====== 登入閘門 ======
+// 唯一認可的身分來源＝入口網頁登入後寫進 localStorage 的 portal_v1.currentUser
+// （URL 參數不算數，否則任何人手打 ?user=XXX 就能繞過入口登入）
+function portalLoggedIn(){
+  try {
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    return !!(p.currentUser && p.currentUser.name);
+  } catch(e){ return false; }
+}
+function enforcePortalLogin(){
+  if (portalLoggedIn()) { document.getElementById('portal-gate').style.display='none'; return true; }
+  document.getElementById('portal-gate').style.display='flex';
+  document.body.style.overflow='hidden';
+  return false;
+}
+
 // ====== INIT ======
 (function init(){
   // load local
@@ -1164,6 +1196,7 @@ function canEditReport(r){
     if(local.reports) S.reports=local.reports;
   }
   syncFromPortal();  // 從入口拉最新部門/人員 + 帶入登入身分
+  if (!enforcePortalLogin()) return;  // 未從入口登入 → 顯示閘門，不初始化任何內容
   syncTemplatesFromConfig();
   syncTemplatesToConfig();
 

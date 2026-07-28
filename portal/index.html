@@ -225,6 +225,25 @@ tr:hover{background:#fafbfc}
 .fi:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,58,92,.1)}
 select.fi{cursor:pointer}
 
+/* ── 登入閘門（未登入時全屏遮蔽，背景完全看不到）── */
+.login-gate{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center;padding:20px;
+  background:linear-gradient(135deg,#0f2440 0%,#1a3a5c 55%,#123 100%);overflow-y:auto}
+.login-gate.show{display:flex}
+.gate-box{background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);width:100%;max-width:380px;padding:30px 26px 24px;margin:auto}
+.gate-logo{text-align:center;margin-bottom:6px}
+.gate-logo img{width:52px;height:52px;object-fit:contain}
+.gate-title{text-align:center;font-size:18px;font-weight:800;color:var(--primary);margin-bottom:3px}
+.gate-sub{text-align:center;font-size:12.5px;color:var(--text-light);margin-bottom:20px}
+.gate-row{margin-bottom:13px}
+.gate-row label{display:block;font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:5px}
+.gate-btn{width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14.5px;
+  font-weight:800;cursor:pointer;font-family:inherit;margin-top:6px;transition:background .15s}
+.gate-btn:hover{background:var(--primary-l)}
+.gate-err{background:#fef2f2;border:1px solid #fecaca;color:var(--danger);font-size:12.5px;font-weight:700;
+  border-radius:6px;padding:8px 11px;margin-bottom:12px;display:none}
+.gate-err.show{display:block}
+.gate-foot{text-align:center;font-size:11.5px;color:var(--text-light);margin-top:16px;line-height:1.7}
+
 /* ── TOAST ── */
 .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--primary);color:#fff;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:all .25s}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
@@ -259,6 +278,33 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 </head>
 <body>
 
+<!-- ===== 登入閘門：未登入時蓋住整個網頁，驗證通過才看得到系統 ===== -->
+<div class="login-gate" id="login-gate">
+  <div class="gate-box">
+    <div class="gate-logo"><img src="logo.png" alt="石御石材"></div>
+    <div class="gate-title">石御石材工程管理系統</div>
+    <div class="gate-sub">請登入後使用</div>
+
+    <div class="gate-err" id="gate-err"></div>
+
+    <div class="gate-row">
+      <label>部門</label>
+      <select class="fi" id="gate-dept" onchange="onGateDeptChange()"><option value="">請選擇部門</option></select>
+    </div>
+    <div class="gate-row">
+      <label>姓名</label>
+      <select class="fi" id="gate-name"><option value="">請先選擇部門</option></select>
+    </div>
+    <div class="gate-row">
+      <label>密碼</label>
+      <input class="fi" id="gate-pw" type="password" placeholder="請輸入密碼" autocomplete="current-password">
+    </div>
+
+    <button class="gate-btn" onclick="doGateLogin()">登 入</button>
+    <div class="gate-foot">忘記密碼或無法登入，請聯絡系統管理員</div>
+  </div>
+</div>
+
 <nav>
   <div class="nav-logo">
     <div class="logo-icon"><img src="logo.png" alt="石御石材"></div>
@@ -280,6 +326,8 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
     </div>
     <span class="switch-ic">🔄</span>
   </div>
+  <button class="btn btn-secondary" id="nav-logout" onclick="logout()" title="登出並回到登入畫面"
+          style="margin-left:8px;padding:7px 12px">🚪 登出</button>
 </nav>
 
 <div class="container">
@@ -485,7 +533,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <div class="form-row">
         <label>登入密碼</label>
         <input class="fi" id="emp-pw" placeholder="留空表示尚未設定" maxlength="30" autocomplete="new-password">
-        <div class="hint">F 版上線後將用於登入；現階段可先空白</div>
+        <div class="hint">登入畫面會驗證此密碼。<strong>留空＝該員工登入時密碼欄可不填</strong>；設定後即強制驗證</div>
       </div>
       <div class="form-row">
         <label>離職日 <span style="color:var(--muted);font-weight:400">（留空＝在職）</span></label>
@@ -855,11 +903,7 @@ function ensureSeed() {
     changed = true;
   }
   if (migrateRoles()) changed = true;
-  if (!S.currentUser && S.employees.length) {
-    const e = S.employees[0];
-    S.currentUser = { id: e.id, name: e.name, dept: e.dept, roleId: e.roleId };
-    changed = true;
-  }
+  // ⚠️ 不再自動登入第一位員工 —— 未登入一律走登入閘門（doGateLogin）
   if (changed) saveLS();
 }
 
@@ -973,6 +1017,92 @@ document.addEventListener('click', e => {
 }, true);
 
 /* ============================================================
+ * 登入閘門（未登入 → 蓋住整個網頁，驗證通過才進系統）
+ * ============================================================ */
+
+/* 共用驗證：部門 + 姓名 + 密碼 → { ok, emp, msg } */
+function authEmployee(dept, name, pw) {
+  if (!dept) return { ok:false, msg:'請選擇部門' };
+  if (!name) return { ok:false, msg:'請選擇姓名' };
+  const emp = S.employees.find(e => e.name === name && e.dept === dept);
+  if (!emp) return { ok:false, msg:'查無此員工，請聯絡管理員' };
+  if (isResigned(emp)) return { ok:false, msg:`此帳號已於 ${emp.resignDate} 離職停用，請聯絡管理員` };
+  if (emp.password) {
+    if (!pw)                return { ok:false, msg:'請輸入密碼' };
+    if (pw !== emp.password) return { ok:false, msg:'密碼錯誤，請重新輸入' };
+  }
+  return { ok:true, emp };
+}
+
+/* 填入閘門的部門下拉（雲端資料更新後也會重跑） */
+function fillGateDepts() {
+  const sel = $('gate-dept');
+  if (!sel) return;
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">請選擇部門</option>' +
+    S.departments.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
+  if (keep && S.departments.some(d => d.name === keep)) { sel.value = keep; onGateDeptChange(); }
+}
+function onGateDeptChange() {
+  const dept = $('gate-dept').value;
+  const sel  = $('gate-name');
+  if (!dept) { sel.innerHTML = '<option value="">請先選擇部門</option>'; return; }
+  const list = S.employees.filter(e => e.dept === dept);
+  if (!list.length) { sel.innerHTML = '<option value="">此部門尚無員工</option>'; return; }
+  sel.innerHTML = '<option value="">請選擇姓名</option>' +
+    list.map(e => {
+      const off = isResigned(e);
+      return `<option value="${esc(e.name)}"${off?' disabled':''}>${esc(e.name)}${off?'（已離職停用）':''}</option>`;
+    }).join('');
+}
+function gateError(msg) {
+  const box = $('gate-err');
+  if (!msg) { box.classList.remove('show'); box.textContent = ''; return; }
+  box.textContent = '⚠️ ' + msg;
+  box.classList.add('show');
+}
+function showLoginGate() {
+  fillGateDepts();
+  $('gate-name').innerHTML = '<option value="">請先選擇部門</option>';
+  $('gate-pw').value = '';
+  gateError('');
+  $('login-gate').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => $('gate-dept').focus(), 120);
+}
+function hideLoginGate() {
+  $('login-gate').classList.remove('show');
+  document.body.style.overflow = '';
+}
+function doGateLogin() {
+  const res = authEmployee($('gate-dept').value, $('gate-name').value, $('gate-pw').value);
+  if (!res.ok) { gateError(res.msg); $('gate-pw').focus(); return; }
+  const emp = res.emp;
+  S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
+  saveLS();
+  hideLoginGate();
+  updateNavUser();
+  renderRoles();
+  renderNotifBell();
+  toast(`歡迎，${emp.name}！`, 'success');
+}
+/* 登出 → 清除登入身分（三個子 App 也會因此失去身分而被擋下） */
+function logout() {
+  S.currentUser = null;
+  saveLS();
+  updateNavUser();
+  showView('home');
+  showLoginGate();
+}
+/* 閘門內按 Enter 直接送出 */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && $('login-gate')?.classList.contains('show')) {
+    e.preventDefault();
+    doGateLogin();
+  }
+});
+
+/* ============================================================
  * 切換登入身分
  * ============================================================ */
 function openLoginModal() {
@@ -1017,23 +1147,14 @@ function onLoginDeptChange() {
     }).join('');
 }
 function doLogin() {
-  const dept = $('login-dept').value;
-  const name = $('login-name').value;
-  const pw = $('login-pw').value;
-  if (!dept) { toast('請選擇部門', 'error'); return; }
-  if (!name) { toast('請選擇姓名', 'error'); return; }
-  const emp = S.employees.find(e => e.name === name && e.dept === dept);
-  if (!emp) { toast('查無此員工', 'error'); return; }
-  // 離職停用：過了離職日即不得登入 / 切換身分（資料保留，僅停權）
-  if (isResigned(emp)) {
-    toast(`此帳號已於 ${emp.resignDate} 離職停用，請聯絡管理員`, 'error');
+  // 與登入閘門共用同一套驗證（部門 / 姓名 / 離職停用 / 密碼）
+  const res = authEmployee($('login-dept').value, $('login-name').value, $('login-pw').value);
+  if (!res.ok) {
+    toast(res.msg, 'error');
+    if (/密碼/.test(res.msg)) $('login-pw').focus();
     return;
   }
-  // 密碼驗證：若該員工有設密碼則必須輸入正確
-  if (emp.password) {
-    if (!pw) { toast('此帳號已設密碼，請輸入密碼', 'error'); $('login-pw').focus(); return; }
-    if (pw !== emp.password) { toast('密碼錯誤', 'error'); $('login-pw').focus(); return; }
-  }
+  const emp = res.emp;
   // 登入成功
   S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
   saveLS();
@@ -1537,6 +1658,13 @@ function attachCloudWatch() {
       migrateEmployees();  // 雲端可能含舊 role 字串，同步後立刻轉成 roleId
       saveLS();
       renderEmps();
+      // 登入閘門開著時，用雲端最新名單重填姓名下拉（避免只看到本機種子資料）
+      if ($('login-gate')?.classList.contains('show')) onGateDeptChange();
+      // 已登入者若在雲端被刪除或已離職 → 強制登出（管理員停用後其他裝置會即時被踢出）
+      if (S.currentUser) {
+        const me = S.employees.find(e => e.id === S.currentUser.id);
+        if (!me || isResigned(me)) { logout(); toast('此帳號已停用，請重新登入', 'error'); }
+      }
     }
   });
   window._fbWatch('roles', val => {
@@ -1754,6 +1882,7 @@ Object.assign(window, {
   openRoleModal, editRole, saveRole, delRole, onRoleLevelChange, onRoleNamePresetChange,
   onEmpDeptChange,
   openLoginModal, onLoginDeptChange, doLogin,
+  onGateDeptChange, doGateLogin, logout,
   toggleNotifPanel, onNotifClick, markAsRead, markAllRead, createNotification,
 });
 
@@ -1767,6 +1896,8 @@ renderEmps();
 renderRoles();
 renderNotifBell();
 attachCloudWatch();
+// ── 登入閘門：沒有登入身分就蓋住整個網頁，驗證通過才看得到子系統 ──
+if (S.currentUser) hideLoginGate(); else showLoginGate();
 console.log('[Portal] v0.3 booted ·',
   S.departments.length,'depts,',
   S.employees.length,'emps,',
