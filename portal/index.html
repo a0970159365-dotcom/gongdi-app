@@ -235,6 +235,10 @@ select.fi{cursor:pointer}
 .gate-title{text-align:center;font-size:18px;font-weight:800;color:var(--primary);margin-bottom:3px}
 .gate-sub{text-align:center;font-size:12.5px;color:var(--text-light);margin-bottom:20px}
 .gate-row{margin-bottom:13px}
+.gate-remember{display:flex;align-items:center;gap:7px;margin:-2px 0 4px;cursor:pointer;
+  font-size:12.5px;color:var(--text);user-select:none}
+.gate-remember input{width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex:none}
+.gate-remember-hint{font-size:11.5px;color:var(--danger);margin:0 0 14px 22px;line-height:1.5}
 .gate-row label{display:block;font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:5px}
 .gate-btn{width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:11px;font-size:14.5px;
   font-weight:800;cursor:pointer;font-family:inherit;margin-top:6px;transition:background .15s}
@@ -300,7 +304,13 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <input class="fi" id="gate-pw" type="password" placeholder="請輸入密碼" autocomplete="current-password">
     </div>
 
-    <button class="gate-btn" onclick="doGateLogin()">登 入</button>
+    <label class="gate-remember">
+      <input type="checkbox" id="gate-remember">
+      <span>記住我 — 下次打開自動帶入，按「登入」即可</span>
+    </label>
+    <div class="gate-remember-hint">⚠️ 共用電腦建議不要勾</div>
+
+    <button class="gate-btn" id="gate-submit" onclick="doGateLogin()">登 入</button>
     <div class="gate-foot">忘記密碼或無法登入，請聯絡系統管理員</div>
   </div>
 </div>
@@ -1078,6 +1088,36 @@ function gateError(msg) {
   box.textContent = '⚠️ ' + msg;
   box.classList.add('show');
 }
+/* ── 記住我 ──
+ * 勾選後把「部門 / 姓名 / 密碼」記在 localStorage，下次打開閘門自動帶入，
+ * 使用者只要按「登入」即可。注意：仍然會顯示登入畫面、仍然要按登入鈕，
+ * 不是自動登入（分頁工作階段的規則沒有被改動）。
+ */
+const REMEMBER_KEY = 'portal_remember';
+function loadRemembered() {
+  try { return JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); } catch(e){ return null; }
+}
+function saveRemembered(dept, name, pw) {
+  try { localStorage.setItem(REMEMBER_KEY, JSON.stringify({ dept, name, pw })); } catch(e){}
+}
+function clearRemembered() {
+  try { localStorage.removeItem(REMEMBER_KEY); } catch(e){}
+}
+/* 把記住的資料帶回閘門欄位。若該員工已被刪除／離職／換部門就帶不回來 → 清掉記錄重新來過 */
+function applyRemembered() {
+  const cb = $('gate-remember');
+  const r = loadRemembered();
+  if (!r || !r.name) { if (cb) cb.checked = false; return false; }
+  if (!S.departments.some(d => d.name === r.dept)) { clearRemembered(); if (cb) cb.checked = false; return false; }
+  const emp = S.employees.find(e => e.name === r.name && e.dept === r.dept);
+  if (!emp || isResigned(emp)) { clearRemembered(); if (cb) cb.checked = false; return false; }
+  $('gate-dept').value = r.dept;
+  onGateDeptChange();
+  $('gate-name').value = r.name;
+  $('gate-pw').value = r.pw || '';
+  if (cb) cb.checked = true;
+  return true;
+}
 function showLoginGate() {
   fillGateDepts();
   $('gate-name').innerHTML = '<option value="">請先選擇部門</option>';
@@ -1085,7 +1125,9 @@ function showLoginGate() {
   gateError('');
   $('login-gate').classList.add('show');
   document.body.style.overflow = 'hidden';
-  setTimeout(() => $('gate-dept').focus(), 120);
+  // 有記住的帳號 → 直接帶入並把焦點放在登入鈕（按 Enter 或點一下就進去）
+  const filled = applyRemembered();
+  setTimeout(() => (filled ? $('gate-submit') : $('gate-dept')).focus(), 120);
 }
 function hideLoginGate() {
   $('login-gate').classList.remove('show');
@@ -1095,6 +1137,9 @@ function doGateLogin() {
   const res = authEmployee($('gate-dept').value, $('gate-name').value, $('gate-pw').value);
   if (!res.ok) { gateError(res.msg); $('gate-pw').focus(); return; }
   const emp = res.emp;
+  // 記住我：勾了就存起來供下次帶入；沒勾就把之前記的清掉
+  if ($('gate-remember')?.checked) saveRemembered(emp.dept, emp.name, $('gate-pw').value);
+  else clearRemembered();
   S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
   saveLS();
   startSession();   // 這個分頁進入已登入狀態（關掉分頁即失效）
@@ -1678,7 +1723,12 @@ function attachCloudWatch() {
       saveLS();
       renderEmps();
       // 登入閘門開著時，用雲端最新名單重填姓名下拉（避免只看到本機種子資料）
-      if ($('login-gate')?.classList.contains('show')) onGateDeptChange();
+      if ($('login-gate')?.classList.contains('show')) {
+        const picked = $('gate-name').value;   // 使用者（或「記住我」）已經選好的姓名
+        onGateDeptChange();                    // 重填會清掉選擇，所以下面要還原
+        if (picked) $('gate-name').value = picked;
+        else applyRemembered();                // 還沒選過 → 這時才帶入記住的帳號
+      }
       // 已登入者若在雲端被刪除或已離職 → 強制登出（管理員停用後其他裝置會即時被踢出）
       if (S.currentUser) {
         const me = S.employees.find(e => e.id === S.currentUser.id);
