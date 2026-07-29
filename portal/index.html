@@ -351,7 +351,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn">進入系統 →</div>
         </a>
 
-        <a class="app-card app-card-dim" data-app="dtp" data-testlock="1" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html">
+        <a class="app-card" data-app="dtp" data-base-url="../圖面進度表/index.html" href="../圖面進度表/index.html">
           <div class="ic ic-green">📊</div>
           <h3>圖面進度管理</h3>
           <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
@@ -1010,10 +1010,11 @@ document.addEventListener('click', e => {
     toast(msg, 'error');
   }
 });
-// 暫不列入測試的系統（圖面進度管理）：攔截點擊避免誤按（capture 階段先於連結導向）
+// 暫不列入測試的系統：卡片加 class="app-card-dim" + data-testlock="1" 即可擋下點擊
+// （2026-07-29 圖面進度管理已解鎖開放測試，目前無卡片使用；保留機制供未來重複使用）
 document.addEventListener('click', e => {
   const c = e.target.closest('.app-card[data-testlock]');
-  if (c) { e.preventDefault(); e.stopPropagation(); toast('圖面進度管理修改中，暫不開放', 'warn'); }
+  if (c) { e.preventDefault(); e.stopPropagation(); toast('此系統修改中，暫不開放', 'warn'); }
 }, true);
 
 /* ============================================================

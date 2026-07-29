@@ -191,6 +191,8 @@ input[type="file"]{display:none}
     window._cdrSet    = function(p,d){ return _db.ref('cdr_v3/'+p).set(d); };
     window._cdrGet    = function(p){ return _db.ref('cdr_v3/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
     window._cdrRemove = function(p){ return _db.ref('cdr_v3/'+p).remove(); };
+    // 一次讀回整個 cdr_v3 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
+    window._cdrGetRoot = function(){ return _db.ref('cdr_v3').once('value').then(function(s){ return s.exists()?s.val():null; }); };
   } catch(e){ console.warn('Firebase init failed:',e); }
 })();
 </script>
@@ -832,20 +834,53 @@ function save() {
     if(window._cdrSet) pushCloud(data);
   } catch(e) { toast('儲存失敗：'+e.message,'e'); }
 }
-// 防空包覆蓋：本機 0 筆時，先確認雲端也沒資料才寫；雲端有資料就拒絕覆蓋，避免某台空白裝置清空全部歷史（2026-07-21 資料遺失事故防呆）
+/* ── per-record 同步（2026-07-29 治本改造）──
+ * 舊版：每次存檔都把 {reports,cfg,user,projSort} 整包 set 到 cdr_v3/all，靠 updatedAt 誰新誰贏。
+ *       → 只要有一台裝置本機資料不全又存了檔，整包空白推上雲就把全部歷史蓋掉（2026-07-21 事故真因）。
+ * 新版：記住「上次推上雲的每筆內容」快照，存檔時只寫「有變動的那幾筆」到 cdr_v3/reports/{id}，
+ *       cfg / projSort 各自獨立節點。沒動到的報表連碰都不碰。
+ * 舊節點 cdr_v3/all 刻意保留不刪：(1) 尚未硬刷的舊版裝置還讀得到；(2) 當作遷移前的天然備份。
+ * 呼叫端（save()）完全不用改。
+ */
+var _lastPushed = {};   // id -> 上次推上雲的 JSON 字串
+function _snapshotReports(list){
+  var m={}; (list||[]).forEach(function(r){ if(r&&r.id) m[r.id]=JSON.stringify(r); }); return m;
+}
 async function pushCloud(data) {
   if(!window._cdrSet) return;
   setSyncIcon('☁️');
   try {
-    if((data.reports||[]).length === 0 && window._cdrGet){
-      const cloud = await window._cdrGet('all');
-      if(cloud && (cloud.reports||[]).length > 0){
-        console.warn('[防呆] 本機 0 筆但雲端有 '+cloud.reports.length+' 筆 → 跳過覆蓋，避免清空雲端歷史');
+    var reports = data.reports || [];
+    // 防呆一：本機 0 筆時先確認雲端也沒資料才寫；雲端有資料就整個跳過（2026-07-21 資料遺失事故防呆）
+    if(reports.length === 0 && window._cdrGet){
+      const cloudReports = await window._cdrGet('reports');
+      const cloudAll = cloudReports ? null : await window._cdrGet('all');
+      const cloudCnt = cloudReports ? Object.keys(cloudReports).length : ((cloudAll&&cloudAll.reports||[]).length);
+      if(cloudCnt > 0){
+        console.warn('[防呆] 本機 0 筆但雲端有 '+cloudCnt+' 筆 → 跳過同步，避免清空雲端歷史');
         setSyncIcon('☁️✅');
         return;
       }
     }
-    await window._cdrSet('all', data);
+    var cur = _snapshotReports(reports);
+    var dels = Object.keys(_lastPushed).filter(function(id){ return !(id in cur); });
+    // 防呆二：正常操作一次只會刪一筆（deleteReport）。一次要刪多筆＝本機資料異常，
+    // 整個 push 放棄且不更新快照，下次存檔會重試。
+    if(dels.length > 1){
+      console.warn('[防呆] 這次同步會刪掉 '+dels.length+' 筆雲端報表（正常應為 0~1 筆）→ 放棄本次同步');
+      setSyncIcon('☁️❌');
+      return;
+    }
+    var jobs = [];
+    reports.forEach(function(r){
+      if(r && r.id && _lastPushed[r.id] !== cur[r.id]) jobs.push(window._cdrSet('reports/'+r.id, r));
+    });
+    dels.forEach(function(id){ jobs.push(window._cdrRemove('reports/'+id)); });
+    jobs.push(window._cdrSet('cfg', data.cfg));
+    jobs.push(window._cdrSet('projSort', data.projSort || null));
+    jobs.push(window._cdrSet('updatedAt', data.updatedAt));
+    await Promise.all(jobs);
+    _lastPushed = cur;
     setSyncIcon('☁️✅');
   } catch(e) { setSyncIcon('☁️❌'); }
 }
@@ -1915,31 +1950,51 @@ function init(){
   load();  // 1. 先讀本機（快）
 
   // 2. Firebase 拉雲端，用 updatedAt 判新舊
-  if(window._cdrGet){
-    window._cdrGet('all').then(function(cloud){
-      if(!cloud) {
-        // 雲端沒資料 → 本機有就推一次（首次同步）
-        var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
-        if((localData.reports||[]).length && window._cdrSet){
-          window._cdrSet('all', localData);
-        }
+  if(window._cdrGetRoot){
+    window._cdrGetRoot().then(function(root){
+      root = root || {};
+      var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
+      // 新格式 cdr_v3/reports/{id} 優先；沒有才吃舊格式 cdr_v3/all（整包），並在下面自動遷移
+      var newReports = root.reports ? Object.values(root.reports) : null;
+      var cloud = null, fromLegacy = false;
+      if(newReports && newReports.length){
+        cloud = { reports:newReports, cfg:root.cfg, projSort:root.projSort, updatedAt:root.updatedAt || 0 };
+      } else if(root.all && (root.all.reports||[]).length){
+        cloud = root.all; fromLegacy = true;
+      }
+      if(!cloud){
+        // 雲端沒資料 → 本機有就推一次（首次同步，走 per-record）
+        if((localData.reports||[]).length) pushCloud(localData);
         return;
       }
-      var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
       var localTime = localData.updatedAt || 0;
       var cloudTime = cloud.updatedAt || 0;
       // 讀取端防呆：雲端較新，「或」本機是空的但雲端有資料 → 一律拉雲端。
       // 後者可救回「本機 updatedAt 被過早 save 汙染成現在、但其實 0 筆」的情況（2026-07-21 修）
       var localEmptyCloudHas = (localData.reports||[]).length === 0 && (cloud.reports||[]).length > 0;
-      if(cloudTime > localTime || localEmptyCloudHas){
+      var takeCloud = cloudTime > localTime || localEmptyCloudHas;
+      if(takeCloud){
         S.reports = cloud.reports || [];
         if(cloud.cfg) S.cfg = {...S.cfg, ...cloud.cfg};
         // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
         // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
-        if(cloud.projSort) S.projSort = cloud.projSort;
-        localStorage.setItem('cdr_v3', JSON.stringify(cloud));
+        // 本機快照存「現在這台的身分」而非雲端的 user，避免下次 load() 又把舊身分讀回來
+        localStorage.setItem('cdr_v3', JSON.stringify({
+          reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime
+        }));
         if(S.page) goPage(S.page);
         toast('已從雲端同步最新資料 ☁️','s');
+      }
+      // per-record 同步基準＝雲端目前有哪幾筆。舊格式時留空 → 只會新增不會刪，最安全。
+      _lastPushed = fromLegacy ? {} : _snapshotReports(cloud.reports);
+      if(fromLegacy){
+        // 一次性遷移：舊 cdr_v3/all → 新 cdr_v3/reports/{id}。
+        // cdr_v3/all 刻意保留不刪（當備份，也讓還沒硬刷的舊版裝置繼續運作）
+        var mig = takeCloud
+          ? { reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now() }
+          : { reports:localData.reports||[], cfg:localData.cfg||S.cfg, projSort:localData.projSort, updatedAt:localData.updatedAt||Date.now() };
+        console.info('[遷移] cdr_v3/all（舊整包）→ cdr_v3/reports/{id}（per-record），共 '+(mig.reports||[]).length+' 筆');
+        pushCloud(mig);
       }
     }).catch(function(e){ console.warn('Firebase load failed:',e); });
   }

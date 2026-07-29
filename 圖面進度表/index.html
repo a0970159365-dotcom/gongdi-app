@@ -589,6 +589,10 @@ function canEditRecord(r){
   const el=u.editLevel || (u.role==='manager'?'dept':'self');
   if(el==='none') return false;
   if(el==='all') return true;
+  // 保險：沒標部門的舊資料，只要執行者含本人就可編。
+  // 對齊 canViewRecord 的「沒標部門一律可見」——否則檢視放行、編輯擋掉，
+  // 就會變成「看得到卻全部唯讀」（2026-07-29 規劃設計部主管回報的問題）
+  if(!r.部門 && _execList(r).includes(u.name)) return true;
   if(el==='dept') return r.部門===u.dept;
   if(el==='cross') return r.部門===u.dept || (u.crossDepts||[]).includes(r.部門);
   return _execList(r).includes(u.name);              // self：執行者含本人
@@ -974,22 +978,45 @@ function updateDataLists(){
 // ============================================================
 // Firebase 同步
 // ============================================================
+/* ── per-record 同步（2026-07-29 治本改造）──
+ * 舊版：每次存檔都把整個 dtp 節點（records + cfg）整包 set 上雲 → 任何一台裝置資料不全，
+ *       推上去就把全部歷史蓋掉（2026-07-21 工程日報表就是這樣掉資料的）。
+ * 新版：記住「上次推上雲的每筆內容」快照，存檔時只寫「有變動的那幾筆」到 dtp/records/{id}，
+ *       沒動到的紀錄連碰都不碰 → 單一裝置再怎麼壞也不可能一次清掉別人的資料。
+ * 呼叫端（saveRecord / delRecord / saveCfg / importJson…）完全不用改。
+ */
+let _lastPushed={};   // id -> 上次推上雲的 JSON 字串
+function _snapshot(list){const m={};(list||[]).forEach(r=>{if(r&&r.id)m[r.id]=JSON.stringify(r)});return m}
+
 async function fbSave(){
   saveLocal();saveCfgLocal();
-  if(!window._fbSet){setSyncIcon('err');return}
+  if(!window._fbSetPath){setSyncIcon('err');return}
   try{
-    // 防空包覆蓋：本機 0 筆時先確認雲端也沒資料才寫；雲端有資料就拒絕覆蓋，
-    // 避免某台空白/舊設定裝置把整包空資料推上雲、清掉全部歷史（2026-07-21 資料遺失事故防呆，仿工程日報表）
+    // 防呆一：本機 0 筆時先確認雲端也沒資料才寫；雲端有資料就整個跳過
+    // （避免某台空白/舊設定裝置把資料清光，2026-07-21 資料遺失事故防呆）
     if(records.length===0 && window._fbGet){
       const cloud=await window._fbGet();
       if(cloud && cloud.records && Object.keys(cloud.records).length>0){
-        console.warn('[防呆] 本機 0 筆但雲端有 '+Object.keys(cloud.records).length+' 筆 → 跳過覆蓋，避免清空雲端歷史');
+        console.warn('[防呆] 本機 0 筆但雲端有 '+Object.keys(cloud.records).length+' 筆 → 跳過同步，避免清空雲端歷史');
         setSyncIcon('ok');
         return;
       }
     }
-    const recObj={};records.forEach(r=>{recObj[r.id]=r});
-    await window._fbSet({records:recObj,cfg});
+    const cur=_snapshot(records);
+    const dels=Object.keys(_lastPushed).filter(id=>!(id in cur));
+    // 防呆二：正常操作一次只會刪一筆（delRecord）。一次要刪多筆＝本機資料異常，
+    // 整個 push 放棄且不更新快照，下次存檔會重試。
+    if(dels.length>1){
+      console.warn('[防呆] 這次同步會刪掉 '+dels.length+' 筆雲端紀錄（正常應為 0~1 筆）→ 放棄本次同步');
+      setSyncIcon('err');
+      return;
+    }
+    const jobs=[];
+    records.forEach(r=>{ if(r&&r.id&&_lastPushed[r.id]!==cur[r.id]) jobs.push(window._fbSetPath('records/'+r.id,r)); });
+    dels.forEach(id=>jobs.push(window._fbSetPath('records/'+id,null)));
+    jobs.push(window._fbSetPath('cfg',cfg));
+    await Promise.all(jobs);
+    _lastPushed=cur;
     setSyncIcon('ok');
   }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err')}
 }
@@ -1001,6 +1028,9 @@ async function initFb(){
     const data=await window._fbGet();
     if(data&&data.records){
       records=Object.values(data.records).map(normalizeRecord);
+      // 記下「雲端目前有哪幾筆」當作 per-record 同步的比較基準；
+      // 沒有這份基準就無法分辨「使用者刪了一筆」與「這台裝置本來就沒讀到」→ 一律不刪最安全
+      _lastPushed=_snapshot(Object.values(data.records));
       if(data.cfg&&Object.keys(data.cfg).length){cfg={...buildDefaultCfg(),...data.cfg};ensureStatusOptions();saveCfgLocal()}
       saveLocal();setSyncIcon('ok');
     }else{
@@ -1676,7 +1706,8 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-window._fbSet = async (data) => { await set(ref(db, 'dtp'), data); };
+window._fbSet = async (data) => { await set(ref(db, 'dtp'), data); };   // 整包寫（已不再用於一般存檔，保留備援）
+window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp/' + path), val); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
 </script>
 </body>
