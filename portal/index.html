@@ -209,6 +209,8 @@ tr:hover{background:#fafbfc}
 
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,36,64,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px)}
+/* 修改密碼可從登入閘門（z-index:500）裡開啟，必須疊在閘門之上，否則會被整片蓋住看不到 */
+#mypw-modal{z-index:600}
 .modal-overlay.show{display:flex;animation:fadeIn .15s}
 .modal{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-lg);max-width:480px;width:100%;max-height:90vh;overflow:auto}
 .modal-header{padding:18px 22px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between}
@@ -247,9 +249,12 @@ select.fi{cursor:pointer}
   border-radius:6px;padding:8px 11px;margin-bottom:12px;display:none}
 .gate-err.show{display:block}
 .gate-foot{text-align:center;font-size:11.5px;color:var(--text-light);margin-top:16px;line-height:1.7}
+.gate-link{display:inline-block;color:var(--primary);font-size:12.5px;font-weight:700;cursor:pointer;
+  text-decoration:underline;margin-bottom:4px}
+.gate-link:hover{color:var(--primary-l)}
 
 /* ── TOAST ── */
-.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--primary);color:#fff;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:200;opacity:0;transition:all .25s}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--primary);color:#fff;padding:11px 22px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);z-index:700;opacity:0;transition:all .25s}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .toast.success{background:var(--success)}
 .toast.error{background:var(--danger)}
@@ -311,7 +316,10 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
     <div class="gate-remember-hint">⚠️ 共用電腦建議不要勾</div>
 
     <button class="gate-btn" id="gate-submit" onclick="doGateLogin()">登 入</button>
-    <div class="gate-foot">忘記密碼或無法登入，請聯絡系統管理員</div>
+    <div class="gate-foot">
+      <a class="gate-link" onclick="openMyPwModal('gate')">🔑 修改密碼</a><br>
+      忘記密碼或無法登入，請聯絡系統管理員
+    </div>
   </div>
 </div>
 
@@ -652,8 +660,42 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       </div>
     </div>
     <div class="modal-footer">
+      <button class="btn btn-secondary" style="margin-right:auto" onclick="openMyPwModal('switch')">🔑 修改密碼</button>
       <button class="btn btn-secondary" onclick="closeModal('login-modal')">取消</button>
       <button class="btn btn-primary" onclick="doLogin()">切換登入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 修改我的密碼 Modal（所有登入者皆可用，只能改自己的） ===== -->
+<div class="modal-overlay" id="mypw-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔑 修改我的密碼</h3>
+      <button class="modal-close" onclick="closeModal('mypw-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label>目前登入身分</label>
+        <div class="fi" id="mypw-who" style="background:var(--bg);font-weight:700"></div>
+      </div>
+      <div class="form-row" id="mypw-old-row">
+        <label>目前密碼 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="mypw-old" type="password" maxlength="30" autocomplete="current-password">
+      </div>
+      <div class="form-row">
+        <label>新密碼 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="mypw-new" type="password" maxlength="30" autocomplete="new-password">
+        <div class="hint">設定後，下次登入就要輸入新密碼</div>
+      </div>
+      <div class="form-row">
+        <label>再輸入一次新密碼 <span style="color:var(--danger)">*</span></label>
+        <input class="fi" id="mypw-new2" type="password" maxlength="30" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('mypw-modal')">取消</button>
+      <button class="btn btn-primary" onclick="doChangeMyPw()">確定修改</button>
     </div>
   </div>
 </div>
@@ -972,6 +1014,7 @@ function updateNavUser() {
     $('user-dept').textContent = '點此選擇身分';
     $('user-avatar').textContent = '?';
     updateAppCardLinks();
+    updateNavPerms();
     return;
   }
   $('user-name').textContent = u.name;
@@ -980,6 +1023,16 @@ function updateNavUser() {
   $('user-dept').textContent = (u.dept || '—') + roleText;
   $('user-avatar').textContent = (u.name||'?').charAt(0);
   updateAppCardLinks();
+  updateNavPerms();
+}
+
+/* ── 依角色顯示/隱藏 nav 按鈕 ──
+ * ⚙️ 設定：只有主管/副總/系統管理員看得到（一般員工不需要也不該進去）
+ * 修改密碼不放 nav —— 入口在「登入畫面」與「🔄 切換登入身分」視窗裡
+ */
+function updateNavPerms() {
+  const st = $('nav-settings');
+  if (st) st.style.display = canEditRoles() ? '' : 'none';
 }
 
 /* ── 把當前登入身分帶進 3 個子 App 的卡片連結 ──
@@ -1120,13 +1173,21 @@ function applyRemembered() {
 }
 function showLoginGate() {
   fillGateDepts();
-  $('gate-name').innerHTML = '<option value="">請先選擇部門</option>';
   $('gate-pw').value = '';
   gateError('');
   $('login-gate').classList.add('show');
   document.body.style.overflow = 'hidden';
   // 有記住的帳號 → 直接帶入並把焦點放在登入鈕（按 Enter 或點一下就進去）
   const filled = applyRemembered();
+  if (!filled) {
+    // 沒有記住的帳號 → 部門與姓名一起清空，回到乾淨的空白登入畫面。
+    // ⚠️ 絕對不可以「只清姓名、留著部門」：登出時部門欄還留著上次的值，
+    // 畫面會變成「部門已選好、姓名卻寫請先選擇部門」，而使用者再選同一個部門
+    // 不會觸發 onchange（值沒變）→ 姓名清單永遠出不來，整個卡死。
+    // （2026-07-29 用戶回報「登出再登入，姓名下拉一直說請先選擇部門」就是這個）
+    $('gate-dept').value = '';
+    onGateDeptChange();
+  }
   setTimeout(() => (filled ? $('gate-submit') : $('gate-dept')).focus(), 120);
 }
 function hideLoginGate() {
@@ -1230,6 +1291,8 @@ function doLogin() {
 
 /* ── View routing ── */
 function showView(v) {
+  // 系統設定只開放給「主管 / 副總 / 系統管理員」；一般員工連直接呼叫也進不去
+  if (v === 'settings' && !canEditRoles()) { toast('您沒有進入系統設定的權限', 'error'); return; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   $('page-'+v).classList.add('active');
   document.querySelectorAll('nav .nav-btn').forEach(b => b.classList.remove('active'));
@@ -1424,8 +1487,17 @@ function openEmpModal() {
   $('emp-app-cdr').checked = true;
   $('emp-app-dtp').checked = true;
   $('emp-app-sop').checked = true;
+  setRoleFieldLock(false);   // 新增員工：角色可自由選
   openModal('emp-modal');
   setTimeout(()=>$('emp-name').focus(), 100);
+}
+/* 編輯到「自己」那一筆時鎖住權限角色下拉（對應 saveEmp 的禁止自我提權） */
+function setRoleFieldLock(locked) {
+  const sel = $('emp-roleid'), hint = $('emp-role-hint');
+  if (sel) sel.disabled = locked;
+  if (hint) hint.innerHTML = locked
+    ? '🔒 <strong>不可變更自己的權限角色</strong>，請由其他管理者代為調整'
+    : '決定該員工可看到哪些資料、可進入哪些子系統';
 }
 function editEmp(id) {
   const e = S.employees.find(x => x.id === id);
@@ -1443,9 +1515,11 @@ function editEmp(id) {
   $('emp-app-cdr').checked = !!e.appAccess?.cdr;
   $('emp-app-dtp').checked = !!e.appAccess?.dtp;
   $('emp-app-sop').checked = !!e.appAccess?.sop;
+  setRoleFieldLock(!!(S.currentUser && id === S.currentUser.id));
   openModal('emp-modal');
 }
 function saveEmp() {
+  if (!canEditRoles()) { toast('您沒有編輯員工資料的權限', 'error'); return; }
   const code = $('emp-code').value.trim();
   const name = $('emp-name').value.trim();
   const dept = $('emp-dept').value;
@@ -1461,6 +1535,14 @@ function saveEmp() {
   if (!name) { toast('請輸入姓名', 'error'); $('emp-name').focus(); return; }
   if (!dept) { toast('請選擇所屬部門', 'error'); $('emp-dept').focus(); return; }
   if (!roleId) { toast('請選擇權限角色', 'error'); $('emp-roleid').focus(); return; }
+  // 禁止自我提權：不可變更自己的權限角色（系統管理員本人也一樣，需由其他有權限者代改）
+  if (S.editEmpId && S.currentUser && S.editEmpId === S.currentUser.id) {
+    const me = S.employees.find(e => e.id === S.editEmpId);
+    if (me && roleId !== me.roleId) {
+      toast('不可變更自己的權限角色，請由其他管理者代為調整', 'error');
+      return;
+    }
+  }
   // 編號重複檢查
   const dupCode = S.employees.find(e => e.code === code && e.id !== S.editEmpId);
   if (dupCode) { toast(`編號「${code}」已被使用`, 'error'); $('emp-code').focus(); return; }
@@ -1696,9 +1778,81 @@ function syncBidirectional(roleId, oldCrossDepts) {
     });
   });
 }
+/* ============================================================
+ * 修改我的密碼（所有登入者都能用，但只能改自己的）
+ * 主管可在後台先幫員工設好密碼，員工之後可自行修改。
+ * ============================================================ */
+/* 依來源決定「要改誰的密碼」：
+ *   'gate'   登入閘門 —— 還沒登入，取畫面上選的部門/姓名，一律要驗目前密碼
+ *   'switch' 切換登入身分 —— 同上
+ *   其他     nav 的修改密碼 —— 取目前登入身分
+ * 回傳 { emp, typed }；typed 是使用者已經在該畫面打過的密碼，用來預填省得再打一次
+ */
+function resolvePwTarget(source) {
+  if (source === 'gate' || source === 'switch') {
+    const p = source === 'gate' ? 'gate' : 'login';
+    const dept = $(p + '-dept').value, name = $(p + '-name').value;
+    if (!dept || !name) { toast('請先選擇部門與姓名', 'error'); return null; }
+    const emp = S.employees.find(e => e.name === name && e.dept === dept);
+    if (!emp) { toast('查無此員工，請聯絡管理員', 'error'); return null; }
+    return { emp, typed: $(p + '-pw').value };
+  }
+  const u = S.currentUser;
+  if (!u) { toast('請先登入', 'error'); return null; }
+  const emp = S.employees.find(e => e.id === u.id);
+  if (!emp) { toast('查無此帳號，請重新登入', 'error'); return null; }
+  return { emp, typed: '' };
+}
+function openMyPwModal(source) {
+  const t = resolvePwTarget(source);
+  if (!t) return;
+  const emp = t.emp;
+  if (isResigned(emp)) { toast('此帳號已離職停用，無法修改密碼', 'error'); return; }
+  S.pwCtx = { id: emp.id, source: source || 'nav' };
+  $('mypw-who').textContent = (emp.dept || '—') + '　' + emp.name;
+  // 還沒設定過密碼的人不需要輸入舊密碼
+  $('mypw-old-row').style.display = emp.password ? '' : 'none';
+  $('mypw-old').value = emp.password ? (t.typed || '') : '';   // 已經在登入畫面打過就幫他帶入
+  $('mypw-new').value = '';
+  $('mypw-new2').value = '';
+  openModal('mypw-modal');
+  setTimeout(() => (emp.password && !$('mypw-old').value ? $('mypw-old') : $('mypw-new')).focus(), 100);
+}
+function doChangeMyPw() {
+  const ctx = S.pwCtx;
+  if (!ctx || !ctx.id) { toast('請重新開啟修改密碼視窗', 'error'); return; }
+  const i = S.employees.findIndex(e => e.id === ctx.id);
+  if (i < 0) { toast('查無此帳號', 'error'); return; }
+  const emp = S.employees[i];
+  const oldPw = $('mypw-old').value;
+  const nw  = $('mypw-new').value.trim();
+  const nw2 = $('mypw-new2').value.trim();
+  if (emp.password && oldPw !== emp.password) { toast('目前密碼不正確', 'error'); $('mypw-old').focus(); return; }
+  if (!nw) { toast('請輸入新密碼', 'error'); $('mypw-new').focus(); return; }
+  if (nw !== nw2) { toast('兩次輸入的新密碼不一致', 'error'); $('mypw-new2').focus(); return; }
+  S.employees[i] = { ...emp, password: nw };
+  saveAll();
+  renderEmps();
+  // 這台若勾了「記住我」，同步更新記住的密碼，否則下次自動帶入的會是舊密碼、登入失敗
+  const rem = loadRemembered();
+  if (rem && rem.name === emp.name && rem.dept === emp.dept) saveRemembered(emp.dept, emp.name, nw);
+  // 從登入畫面／切換身分進來的：把新密碼回填該畫面，關掉視窗就能直接按登入
+  if (ctx.source === 'gate')   $('gate-pw').value  = nw;
+  if (ctx.source === 'switch') $('login-pw').value = nw;
+  const fromLogin = ctx.source === 'gate' || ctx.source === 'switch';
+  S.pwCtx = null;
+  closeModal('mypw-modal');
+  toast(fromLogin ? '密碼已更新，請按「登入」繼續' : '密碼已更新', 'success');
+}
+
 function delEmp(id) {
+  if (!canEditRoles()) { toast('您沒有刪除員工的權限', 'error'); return; }
   const e = S.employees.find(x => x.id === id);
   if (!e) return;
+  // 防呆：不可刪自己（會把自己鎖在系統外）、不可刪系統管理員（最高權限帳號要保留）
+  if (S.currentUser && id === S.currentUser.id) { toast('不可刪除自己的帳號', 'error'); return; }
+  const r = getRole(e.roleId);
+  if (r && /系統管理員/.test(r.name || '')) { toast('不可刪除系統管理員帳號', 'error'); return; }
   if (!confirm(`確定刪除員工「${e.name}」？`)) return;
   S.employees = S.employees.filter(x => x.id !== id);
   saveAll();
@@ -1952,6 +2106,7 @@ Object.assign(window, {
   onEmpDeptChange,
   openLoginModal, onLoginDeptChange, doLogin,
   onGateDeptChange, doGateLogin, logout,
+  openMyPwModal, doChangeMyPw,
   toggleNotifPanel, onNotifClick, markAsRead, markAllRead, createNotification,
 });
 
