@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>石御石材工程管理系統</title>
+<!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
+<script>window.APP_VERSION='2026-07-30.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -487,7 +489,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 
   <footer>
     <div>© 石御石材 · 工程管理系統</div>
-    <div class="ver">Portal v0.1 · 2026-06-14 · 階段 1（入口殼 + 基礎資料）</div>
+    <div class="ver">Portal · 版本 <span id="app-ver-txt">—</span></div>
   </footer>
 </div>
 
@@ -759,8 +761,9 @@ setTimeout(()=>{ if(document.getElementById('sync-text').textContent==='連線�
 
 <script>
 /* ============================================================
- * 石御石材 工程管理系統 · Portal v0.1
- * 階段 1：入口殼 + 部門 CRUD + 員工 CRUD
+ * 石御石材 工程管理系統 · Portal
+ * 版本號＝檔頭的 window.APP_VERSION（單一來源，勿在別處手寫死字串）
+ * 入口殼 + 部門 CRUD + 員工 CRUD + 登入閘門 + 權限控管
  * Firebase 路徑：portal/{departments,employees,roles}
  * localStorage key：portal_v1
  * ============================================================ */
@@ -2130,11 +2133,142 @@ if (hasSession() && S.currentUser) {
   endSession();
   showLoginGate();
 }
-console.log('[Portal] v0.3 booted ·',
+console.log('[Portal] ' + (window.APP_VERSION || '?') + ' booted ·',
   S.departments.length,'depts,',
   S.employees.length,'emps,',
   S.roles.length,'roles,',
   S.notifications.length,'notifs · user:', S.currentUser?.name);
+</script>
+
+<!-- ══════ 版本檢查：偵測到新版就跳橫幅，由使用者自己點更新（2026-07-30 新增） ══════ -->
+<script>
+(function(){
+  var MY_VER = window.APP_VERSION || '';
+  var MY_KEY = window.APP_KEY || '';
+  if (!MY_VER) return;                       // 沒埋版本標記就整個不啟用
+  var snoozeUntil = 0;                       // 按 ✕ 後暫停提示到這個時間（重要更新不受影響）
+  var barCritical = false;                   // 目前這條橫幅是不是「重要更新」
+  var styleAdded = false;
+  var FONT = "'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif";
+
+  // 橫幅是 fixed top:0，而導覽列多半是 sticky top:0 → 不處理會蓋住 nav 上的按鈕。
+  // 顯示橫幅時把內容與 sticky 導覽列往下推，關掉時還原。
+  var savedLayout = null;
+  function shiftLayout(bar){
+    if (!window.getComputedStyle || !document.querySelectorAll) return;
+    var h = bar.offsetHeight || 44;
+    var body = document.body;
+    if (!body) return;
+    var cur = parseFloat(window.getComputedStyle(body).paddingTop) || 0;
+    savedLayout = { bodyPad: body.style.paddingTop, navs: [] };
+    body.style.paddingTop = (cur + h) + 'px';
+    var els = document.querySelectorAll('nav');
+    for (var i = 0; i < els.length; i++) {
+      var pos = window.getComputedStyle(els[i]).position;
+      if (pos === 'sticky' || pos === 'fixed') {
+        savedLayout.navs.push({ el: els[i], top: els[i].style.top });
+        els[i].style.top = h + 'px';
+      }
+    }
+  }
+  function unshiftLayout(){
+    if (!savedLayout) return;
+    if (document.body) document.body.style.paddingTop = savedLayout.bodyPad;
+    for (var i = 0; i < savedLayout.navs.length; i++)
+      savedLayout.navs[i].el.style.top = savedLayout.navs[i].top;
+    savedLayout = null;
+  }
+
+  function addStyle(){
+    if (styleAdded) return;
+    styleAdded = true;
+    var st = document.createElement('style');
+    st.textContent =
+      '#app-update-bar{position:fixed;top:0;left:0;right:0;z-index:99999;'
+      + 'background:linear-gradient(90deg,#f59e0b,#f97316);color:#fff;font:600 14px/1.4 ' + FONT + ';'
+      + 'padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:10px;'
+      + 'box-shadow:0 2px 10px rgba(0,0,0,.25)}'
+      + '#app-update-bar.crit{background:linear-gradient(90deg,#dc2626,#b91c1c)}'
+      + '#app-update-bar button{font:inherit;border:0;border-radius:6px;padding:6px 14px;cursor:pointer}'
+      + '#app-update-bar .go{background:#fff;color:#b45309}'
+      + '#app-update-bar.crit .go{color:#b91c1c}'
+      + '#app-update-bar .later{background:transparent;color:#fff;opacity:.85;padding:6px 9px;font-size:16px}'
+      + '@media(max-width:480px){#app-update-bar{font-size:13px;flex-wrap:wrap;gap:8px}}'
+      + '@media print{#app-update-bar{display:none!important}}';
+    document.head.appendChild(st);
+  }
+
+  function showBar(newVer, must){
+    var old = document.getElementById('app-update-bar');
+    if (old) {
+      // 已經有一般橫幅、後來才發現是重要更新 → 升級（否則直接跳過）
+      if (must && !barCritical) { old.remove(); unshiftLayout(); }
+      else return;
+    }
+    if (!must && Date.now() < snoozeUntil) return;   // 重要更新不受 ✕ 的暫停影響
+    barCritical = !!must;
+    addStyle();
+    var bar = document.createElement('div');
+    bar.id = 'app-update-bar';
+    if (must) bar.className = 'crit';
+    var msg = document.createElement('span');
+    msg.textContent = must ? '⚠️ 重要更新，請立即載入新版' : '🔄 系統已更新，請載入新版';
+    var go = document.createElement('button');
+    go.className = 'go';
+    go.textContent = '立即更新';
+    go.onclick = function(){
+      // 重載會丟掉未存檔的內容（日報表／查檢表填一半最有感）→ 先問過再更新
+      if (window.confirm && !window.confirm('更新會重新載入頁面，未存檔的內容會遺失。\n\n確定要現在更新嗎？')) return;
+      try {
+        // 換 URL（帶新版本號）才能真正繞過瀏覽器快取；保留原有的 query 參數與 hash
+        var u = new URL(location.href);
+        u.searchParams.set('v', newVer);
+        location.href = u.href;
+      } catch(e){ location.reload(); }
+    };
+    bar.appendChild(msg); bar.appendChild(go);
+    if (!must) {                               // 只有一般更新才給關；重要更新不給關
+      var later = document.createElement('button');
+      later.className = 'later';
+      later.textContent = '✕';
+      later.title = '暫時關閉提示（10 分鐘後再提醒）';
+      later.onclick = function(){ bar.remove(); unshiftLayout(); snoozeUntil = Date.now() + 10 * 60 * 1000; };
+      bar.appendChild(later);
+    }
+    (document.body || document.documentElement).appendChild(bar);
+    shiftLayout(bar);                          // 橫幅不遮住導覽列與內容
+  }
+
+  function check(){
+    var url;
+    try { url = new URL('../version.json', location.href).href; } catch(e){ return; }
+    fetch(url + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(j){
+        if (!j) return;
+        var v = (j.apps && j.apps[MY_KEY]) || j.version;
+        if (!v || v === MY_VER) return;
+        // critical：true＝所有 App 都算重要；陣列＝只有列到的 App 算重要（改到資料寫入方式才標）
+        var c = j.critical;
+        var must = c === true ||
+                   (Object.prototype.toString.call(c) === '[object Array]' && c.indexOf(MY_KEY) > -1);
+        showBar(v, must);
+      })
+      .catch(function(){});                  // 離線／抓不到 → 安靜略過，不影響使用
+  }
+
+  // 頁尾版本字樣＝直接吃 APP_VERSION，不再手寫死字串（只有入口頁有這個元素）
+  function stampFooter(){
+    var el = document.getElementById('app-ver-txt');
+    if (el) el.textContent = MY_VER;
+  }
+  function boot(){ stampFooter(); check(); }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  setInterval(check, 15 * 60 * 1000);        // 長時間開著的分頁也會發現新版
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) check(); });
+})();
 </script>
 
 </body>
