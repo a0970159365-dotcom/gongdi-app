@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>圖面進度管理系統</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-07-30.1';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-07-30.2';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -383,8 +383,13 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
       <!-- 資料備份 -->
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bg);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--muted)">資料備份：</span>
-        <button class="btn btn-o btn-sm" onclick="exportJson()">⬇️ 匯出 JSON</button>
+        <button class="btn btn-o btn-sm" onclick="exportJson()">⬇️ 匯出備份檔</button>
+        <!-- 「⬆️ 匯入 JSON」2026-07-30 起隱藏。原因：importJson() 是「整包覆蓋」（records=data.records），
+             一個錯檔案就會取代全部紀錄，而 fbSave 防呆二（一次刪超過 1 筆就放棄同步）會讓本機與雲端從此不一致；
+             而且本頁沒有權限檢查，任何登入者都按得到。函式本身保留，需要時從 console 呼叫 importJson(event)，
+             或改用 Firebase REST 逐筆寫入（只增不減 + 備份 + 讀回核對，較安全）。要恢復按鈕就把下一行取消註解。
         <label class="btn btn-o btn-sm" style="cursor:pointer">⬆️ 匯入 JSON <input type="file" accept=".json" onchange="importJson(event)" style="display:none"></label>
+        -->
         <span id="api-status-txt" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
       </div>
 
@@ -1622,7 +1627,7 @@ function importJson(e){
       }else throw new Error();
       fbSave();saveCfg();renderMain();renderHistory();renderCfgCards();updateDataLists();
       toast('匯入成功 ✓','s');
-    }catch{alert('JSON 格式錯誤')}
+    }catch{alert('備份檔格式錯誤')}
   };rdr.readAsText(f);e.target.value='';
 }
 
