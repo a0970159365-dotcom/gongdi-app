@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 不讓搜尋引擎收錄（內部系統，不應被 Google 搜到）。注意：不要在 robots.txt 用 Disallow 擋，
+     否則爬蟲讀不到這行 noindex，反而可能只列出網址而無法移除。 -->
+<meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-07-30.2';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-07-30.3';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;

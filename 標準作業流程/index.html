@@ -6,9 +6,11 @@
   <meta name="theme-color" content="#1e3a5f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- 不讓搜尋引擎收錄（內部系統）。不要改用 robots.txt Disallow，否則爬蟲讀不到這行。 -->
+  <meta name="robots" content="noindex, nofollow">
   <title>標準作業流程</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-07-30.2';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-07-30.3';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
