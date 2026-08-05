@@ -6,9 +6,9 @@
 <!-- 不讓搜尋引擎收錄（內部系統，不應被 Google 搜到）。注意：不要在 robots.txt 用 Disallow 擋，
      否則爬蟲讀不到這行 noindex，反而可能只列出網址而無法移除。 -->
 <meta name="robots" content="noindex, nofollow">
-<title>石御石材工程管理系統</title>
+<title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-05.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-05.2';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -31,6 +31,10 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .nav-logo .logo-icon{width:36px;height:36px;background:#fff;border-radius:6px;padding:3px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .nav-logo .logo-icon img{width:100%;height:100%;object-fit:contain;display:block}
 .nav-logo span{color:#93c5fd}
+/* 測試版標記 —— 要撤掉時把這三個 class 與四處用到的地方一起移除即可 */
+.beta-nav{background:#f59e0b;color:#7c2d12;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:8px;letter-spacing:.5px}
+.beta-tag{background:#f59e0b;color:#7c2d12;font-size:12px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle}
+.badge-beta{background:#fef3c7!important;color:#92400e!important;border-color:#fcd34d!important}
 .nav-v{background:#f59e0b;color:var(--primary);font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;margin-left:4px}
 .nav-spacer{flex:1}
 .nav-btn{background:transparent;border:none;color:rgba(255,255,255,.75);padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:5px}
@@ -300,7 +304,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 <div class="login-gate" id="login-gate">
   <div class="gate-box">
     <div class="gate-logo"><img src="logo.png" alt="石御石材"></div>
-    <div class="gate-title">石御石材工程管理系統</div>
+    <div class="gate-title">石御石材工程管理系統<span class="beta-tag">測試版</span></div>
     <div class="gate-sub">請登入後使用</div>
 
     <div class="gate-err" id="gate-err"></div>
@@ -335,7 +339,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 <nav>
   <div class="nav-logo">
     <div class="logo-icon"><img src="logo.png" alt="石御石材"></div>
-    石御石材<span>工程管理系統</span>
+    石御石材<span>工程管理系統</span><span class="beta-nav">測試版</span>
   </div>
   <button class="nav-btn active" id="nav-home" onclick="showView('home')">🏠 首頁</button>
   <button class="nav-btn" id="nav-settings" onclick="showView('settings')">⚙️ 設定</button>
@@ -362,7 +366,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
   <!-- ===== HOME ===== -->
   <main id="page-home" class="page active">
     <div class="hero">
-      <div class="badge">🚀 整合管理平台</div>
+      <div class="badge badge-beta">🧪 測試版 · 整合管理平台</div>
       <h1>石御石材工程管理系統</h1>
     </div>
 
