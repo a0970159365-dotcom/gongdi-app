@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-05.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -820,7 +820,7 @@ function renderHistory(){
       +'</div>'
       +'<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
       +'<button onclick="openReportForEdit(\''+r.id+'\')" class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">📂 開啟</button>'
-      +'<button onclick="deleteReportFromHistory(\''+r.id+'\')" class="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 whitespace-nowrap">🗑️ 刪除</button>'
+      +(portalCanDelete()?'<button onclick="deleteReportFromHistory(\''+r.id+'\')" class="px-3 py-1 text-xs bg-red-100 text-red-600 rounded-lg hover:bg-red-200 whitespace-nowrap">🗑️ 刪除</button>':'')
       +'</div>'
       +'</div></div>';
   }).join('');
@@ -834,6 +834,7 @@ function openReportForEdit(id){
   goTo('checklist');
 }
 function deleteReportFromHistory(id){
+  if(!requireDelete()) return;
   var r=S.reports.find(function(x){return x.id===id;});
   if(!r) return;
   if(!confirm('確定刪除這筆報表？\n\n'+(r.caseName||'')+' · '+(r.date||'')+'\n刪除後無法復原。')) return;
@@ -883,6 +884,7 @@ function renderDetail(){
 }
 
 function deleteReport(id){
+  if(!requireDelete()) return;
   if(!confirm('確定刪除此查核記錄？')) return;
   S.reports=S.reports.filter(function(r){return r.id!==id;});
   saveLS();
@@ -904,7 +906,7 @@ function renderSettings(){
     var listHtml=items.map(function(item,i){
       return '<div class="flex items-center gap-2 mb-2">'
         +'<span class="flex-1 text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">'+esc(item)+'</span>'
-        +'<button onclick="removeCfgItem(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded-lg">&#10005;</button>'
+        +(portalCanDelete()?'<button onclick="removeCfgItem(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded-lg">&#10005;</button>':'')
         +'</div>';
     }).join('');
     if(!items.length) listHtml='<div class="text-xs text-gray-400 py-1 mb-2">尚無資料</div>';
@@ -951,7 +953,7 @@ function renderTemplatesSection(){
         +'<span class="text-xs text-gray-400 mt-2 w-6 text-center font-medium">'+(i+1)+'.</span>'
         +'<input type="text" value="'+esc(it.name)+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" '
         +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'name\',this.value)" placeholder="查驗項目名稱">'
-        +'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>'
+        +(portalCanDelete()?'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>':'')
         +'</div>'
         +'<textarea class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 resize-y" rows="3" '
         +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'criterion\',this.value)" placeholder="查驗準則（可多行）...">'+esc(it.criterion||'')+'</textarea>'
@@ -982,7 +984,7 @@ function renderTemplatesSection(){
       +'<span class="text-xs text-gray-400">（單一 emoji）</span>'
       +'</div>'
       +'</div>'
-      +'<button onclick="removeTemplate(\''+tpl.id+'\')" class="mt-3 text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>'
+      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="mt-3 text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>':'')
       +'</div>';
   }
   el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-3">🔧 工法管理</h3>'
@@ -1009,6 +1011,7 @@ function addTplItem(tplId){
   renderTemplatesSection();
 }
 function removeTplItem(tplId, itemId){
+  if(!requireDelete()) return;
   if(!confirm('確定刪除此查驗項目？\n（既有歷史報表為快照儲存，不會受影響）')) return;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl || !tpl.items) return;
@@ -1038,6 +1041,7 @@ function updateTemplate(tplId, field, value){
   syncTemplatesToConfig();
 }
 function removeTemplate(tplId){
+  if(!requireDelete()) return;
   if(TEMPLATES.length <= 1){ alert('至少需保留一個工法'); return; }
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
@@ -1049,6 +1053,7 @@ function removeTemplate(tplId){
   renderTemplatesSection();
 }
 function removeCfgItem(key,idx){
+  if(!requireDelete()) return;
   S.config[key].splice(idx,1);
   renderSettings();
 }
@@ -1186,6 +1191,26 @@ function canEditReport(r){
 // ① sessionStorage 有入口的分頁工作階段 —— 由入口登入後在同一分頁跳過來才會有，
 //    關掉分頁或直接開本頁網址都沒有 → 擋下（URL 參數 ?user=XXX 也不算數）
 // ② localStorage portal_v1.currentUser 有登入身分（入口登出會清掉）
+/* ── 刪除權（2026-08-12）──
+ * 入口的權限設定可以逐一角色勾「可刪除資料」。沒勾的人，刪除鈕直接不渲染出來，
+ * 用途是避免同仁誤刪共用設定（工法／案場／施工廠商／查驗項目）與歷史報表。
+ * 刻意不含「正在填的這張查檢表裡移除剛拍的照片」——那是填表過程，鎖了沒法用。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanDelete(){
+  try{
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser; if(!u || !u.roleId) return false;
+    var r = (p.roles||[]).find(function(x){ return x.id === u.roleId; });
+    return !!(r && r.canDelete);
+  }catch(e){ return false; }
+}
+function requireDelete(){
+  if(portalCanDelete()) return true;
+  showToast('只有具備刪除權的角色可以刪除，請聯絡系統管理員');
+  return false;
+}
+
 function portalLoggedIn(){
   try {
     if (sessionStorage.getItem('portal_session') !== '1') return false;

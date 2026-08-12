@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-05.1';window.APP_KEY='dtp_pm';</script>
+<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='dtp_pm';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -114,6 +114,8 @@ textarea.fi{resize:vertical;min-height:60px}
 .wt-tbl .num-work{color:var(--primary);font-weight:800;font-size:14px}
 .wt-tbl .num-pause{color:#94a3b8;font-weight:700}
 .wt-tbl tr.row-stuck .num-pause{color:#dc2626}
+/* 表格橫向捲動容器：小螢幕不壓縮欄位，改成左右滑，欄位比例與桌機一致（2026-08-06） */
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .ptbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 .ptbl th{background:#f8fafc;color:var(--primary);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;font-size:12px}
 .ptbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:top}
@@ -227,6 +229,9 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   .ptbl th,.ptbl td{padding:6px 7px}
   .ptbl th{font-size:11px}
   .ptbl td{font-size:12px}
+  /* 欄位不再被擠壓變形，超出寬度就左右滑（外層 .tbl-scroll 負責捲動） */
+  .ptbl{min-width:720px}
+  .wt-tbl{min-width:900px}
   .g3{grid-template-columns:repeat(2,1fr)}
   .card-body{padding:12px 14px}
   .filter-bar{padding:8px 12px;gap:6px}
@@ -791,12 +796,13 @@ function renderUsers(){
       <td>${u.password?'<span style="color:#16a34a">✓ 已設定</span>':'<span style="color:var(--muted)">— 未設</span>'}</td>
       <td><div class="tbl-act">
         <button class="btn btn-o btn-sm" onclick="openUserModal('${esc(u.id)}')">編輯</button>
-        <button class="btn btn-d btn-sm" onclick="delUserById('${esc(u.id)}')">刪除</button>
+        ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="delUserById('${esc(u.id)}')">刪除</button>`:''}
       </div></td>
     </tr>`).join('');
 }
 function delUserById(id){
   if(!isManager()){toast('需管理主管權限','e');return}
+  if(!requireDelete())return;
   const u=(cfg.users||[]).find(x=>x.id===id);
   if(!u)return;
   if(!confirm(`確定刪除「${u.name}」？`))return;
@@ -808,7 +814,7 @@ function openUserModal(id){
   if(cfg.users&&cfg.users.length>0&&!isManager()){toast('需管理主管權限','e');return}
   document.getElementById('um-id').value=id||'';
   document.getElementById('um-title').textContent=id?'編輯人員':'新增人員';
-  document.getElementById('um-del').style.display=id?'':'none';
+  document.getElementById('um-del').style.display=(id&&portalCanDelete())?'':'none';
   const u=id?(cfg.users||[]).find(x=>x.id===id):null;
   document.getElementById('um-name').value=u?u.name:'';
   document.getElementById('um-dept').value=u?u.dept:'';
@@ -817,7 +823,7 @@ function openUserModal(id){
   updateDataLists();
   document.getElementById('user-overlay').classList.add('show');
 }
-function closeUserModal(){document.getElementById('user-overlay').classList.remove('show')}
+function closeUserModal(){document.getElementById('user-overlay').classList.remove('show');flushPendingRemote()}
 function saveUser(){
   const id=document.getElementById('um-id').value;
   const name=document.getElementById('um-name').value.trim();
@@ -843,6 +849,7 @@ function saveUser(){
   closeUserModal();toast('已儲存 ✓','s');
 }
 function delUser(){
+  if(!requireDelete())return;
   const id=document.getElementById('um-id').value;
   if(!id||!confirm('確定刪除此人員？'))return;
   cfg.users=(cfg.users||[]).filter(u=>u.id!==id);
@@ -872,7 +879,9 @@ function cfgAdd(key){
   if(inp)inp.value='';
 }
 function cfgDel(key,idx){
+  if(!requireDelete())return;
   cfg[key].splice(idx,1);
+  markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
 function cfgAddFromBtn(key){
@@ -894,7 +903,7 @@ function renderCfgLists(){
       :arr.map((v,i)=>`<div class="cfg-row">
           <span class="cfg-row-num">${i+1}</span>
           <span class="cfg-row-lbl">${esc(v)}</span>
-          <button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>
+          ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
   });
 }
@@ -955,6 +964,46 @@ function updateDataLists(){
 let _lastPushed={};   // id -> 上次推上雲的 JSON 字串
 function _snapshot(list){const m={};(list||[]).forEach(r=>{if(r&&r.id)m[r.id]=JSON.stringify(r)});return m}
 
+// ── 設定（cfg）同步：整包覆蓋改為聯集合併（2026-08-06 修正）────────────────
+// 問題：紀錄是一筆一筆寫（安全），但 cfg 是整包 set → 兩台裝置同時開著時，
+//       後存的那台會把對方剛新增的案場／執行者整個洗掉。
+//       （實際發生過：紀錄裡有「楊再昕」「王靖翔」，設定清單的「執行者」卻是空的。）
+// 做法：一般存檔 → 先讀雲端 cfg，把雲端有、本機沒有的選項補進來，再寫回（不會刪別人的）。
+//       設定頁按「✕ 刪除」→ 標記 _cfgAuthoritative，這次用本機版本直接覆蓋（刪除是明確意圖）。
+let _cfgAuthoritative=false;
+function markCfgAuthoritative(){_cfgAuthoritative=true}
+function _mergeCfg(mine,cloud){
+  const out={...mine};
+  Object.keys(cloud||{}).forEach(k=>{
+    const c=cloud[k];
+    if(!Array.isArray(c))return;
+    // users 這類物件陣列無法用 includes 比對，會重複累加 → 不做聯集，保留本機
+    if(c.some(v=>v&&typeof v==='object'))return;
+    const m=Array.isArray(out[k])?out[k]:[];
+    const add=c.filter(v=>!m.includes(v));
+    if(add.length)out[k]=m.concat(add);
+    else if(!Array.isArray(out[k]))out[k]=m;
+  });
+  return out;
+}
+async function pushCfg(authoritative){
+  if(!window._fbSetPath)return;
+  if(!authoritative&&window._fbGetPath){
+    try{
+      const cloud=await window._fbGetPath('cfg');
+      if(cloud&&typeof cloud==='object'){
+        const merged=_mergeCfg(cfg,cloud);
+        if(JSON.stringify(merged)!==JSON.stringify(cfg)){
+          cfg=merged;saveCfgLocal();
+          if(typeof renderCfgLists==='function')renderCfgLists();
+          if(typeof updateDataLists==='function')updateDataLists();
+        }
+      }
+    }catch(e){console.warn('讀雲端 cfg 失敗，改為直接寫入:',e)}
+  }
+  await window._fbSetPath('cfg',cfg);
+}
+
 async function fbSave(){
   saveLocal();saveCfgLocal();
   if(!window._fbSetPath){setSyncIcon('err');return}
@@ -981,7 +1030,8 @@ async function fbSave(){
     const jobs=[];
     records.forEach(r=>{ if(r&&r.id&&_lastPushed[r.id]!==cur[r.id]) jobs.push(window._fbSetPath('records/'+r.id,r)); });
     dels.forEach(id=>jobs.push(window._fbSetPath('records/'+id,null)));
-    jobs.push(window._fbSetPath('cfg',cfg));
+    jobs.push(pushCfg(_cfgAuthoritative));
+    _cfgAuthoritative=false;
     await Promise.all(jobs);
     _lastPushed=cur;
     setSyncIcon('ok');
@@ -1006,6 +1056,64 @@ async function initFb(){
     }
   }catch(e){console.warn('Firebase 連線失敗，使用本機資料:',e);setSyncIcon('err');loadLocal()}
   renderMain();renderHistory();updateFilters();updateDataLists();
+  startWatch();
+}
+
+// ── 即時同步（2026-08-06 新增）──────────────────────────────────────────
+// 原本只在開啟頁面時讀一次雲端，之後不再更新 → 手機改完，筆電不重整就看不到，
+// 兩台顯示的資料與下拉選單長期不一致。改成持續監聽，雲端一變就套用到畫面。
+let _watchStarted=false, _pendingRemote=null;
+function isEditingNow(){
+  return ['edit-overlay','user-overlay'].some(id=>{
+    const el=document.getElementById(id);
+    return el&&el.classList.contains('show');
+  });
+}
+function applyRemote(data){
+  if(!data)return;                       // 雲端整包空白 → 不動本機（防呆，避免被清空）
+  let changed=false;
+  if(data.records&&Object.keys(data.records).length){
+    const incMap={};
+    Object.values(data.records).map(normalizeRecord).forEach(r=>{if(r&&r.id)incMap[r.id]=r});
+    const cloudSnap=_snapshot(Object.values(incMap));
+    // 保留本機還沒成功推上雲的修改：_lastPushed 是「最後一次確認寫進雲端的版本」，
+    // 本機與它不同就代表這筆正在同步中 → 以本機為準，免得剛編輯好的內容被雲端舊值蓋回去。
+    records.forEach(r=>{
+      if(r&&r.id&&_lastPushed[r.id]!==JSON.stringify(r))incMap[r.id]=r;
+    });
+    const merged=Object.values(incMap);
+    // 用「id 排序後」比對，避免只是先後順序不同就判定有變動而重繪整頁
+    const norm=list=>{const m=_snapshot(list);return Object.keys(m).sort().map(k=>k+'='+m[k]).join('')};
+    if(norm(merged)!==norm(records)){
+      records=merged;saveLocal();changed=true;
+    }
+    _lastPushed=cloudSnap;
+  }
+  if(data.cfg&&Object.keys(data.cfg).length){
+    const nc={...buildDefaultCfg(),...data.cfg};
+    if(JSON.stringify(nc)!==JSON.stringify(cfg)){
+      cfg=nc;ensureStatusOptions();saveCfgLocal();changed=true;
+    }
+  }
+  if(!changed)return;
+  renderMain();renderHistory();updateFilters();updateDataLists();
+  const wt=document.getElementById('page-worktime');
+  if(wt&&wt.classList.contains('active')&&typeof renderWorktime==='function')renderWorktime();
+  const st=document.getElementById('page-settings');
+  if(st&&st.classList.contains('active')){renderCfgLists();if(typeof renderUsers==='function')renderUsers()}
+  setSyncIcon('ok');
+}
+function startWatch(){
+  if(_watchStarted||!window._fbWatch)return;
+  _watchStarted=true;
+  window._fbWatch(data=>{
+    // 使用者正在編輯視窗裡打字時不要抽換底下的資料，先收著，關掉視窗再套用
+    if(isEditingNow()){_pendingRemote=data;return}
+    applyRemote(data);
+  });
+}
+function flushPendingRemote(){
+  if(_pendingRemote){const d=_pendingRemote;_pendingRemote=null;applyRemote(d)}
 }
 function saveLocal(){localStorage.setItem('dtp_pm_rec',JSON.stringify(records))}
 function saveCfgLocal(){localStorage.setItem('dtp_pm_cfg',JSON.stringify(cfg))}
@@ -1074,7 +1182,7 @@ function renderMain(){
       <div class="proj-header" onclick="toggleSec('${sid}',this)">
         <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
       </div>
-      <div id="${sid}">
+      <div id="${sid}" class="tbl-scroll">
         <table class="ptbl">
           <thead><tr>
             <th style="width:10%">執行者</th>
@@ -1261,7 +1369,7 @@ function renderWorktime(){
       <td><span class="${stCls}">${esc(st)}</span></td>
     </tr>`;
   }).join('')+'</tbody>';
-  el.innerHTML=`<table class="wt-tbl">${head}${body}</table>`;
+  el.innerHTML=`<div class="tbl-scroll"><table class="wt-tbl">${head}${body}</table></div>`;
   // 合計
   const sumWork=rows.reduce((a,b)=>a+b.stat.work,0);
   const sumPause=rows.reduce((a,b)=>a+b.stat.paused,0);
@@ -1378,7 +1486,7 @@ function openEdit(id){
   const readonly=id?!canEditRecord(r):false;  // 新增時 = 可編
   document.getElementById('edit-id').value=id||'';
   document.getElementById('modal-title-text').innerHTML=(id?'編輯紀錄':'新增紀錄')+(readonly?' <span class="ro-mini">👁️ 唯讀</span>':'');
-  document.getElementById('del-btn').style.display=(id&&!readonly)?'':'none';
+  document.getElementById('del-btn').style.display=(id&&!readonly&&portalCanDelete())?'':'none';
   document.getElementById('save-btn').style.display=readonly?'none':'';
   const editor=document.getElementById('log-editor');
   editor.innerHTML='';
@@ -1405,7 +1513,7 @@ function openEdit(id){
   document.querySelector('button[onclick="addLogRow()"]').style.display=readonly?'none':'';
   document.getElementById('edit-overlay').classList.add('show');
 }
-function closeEdit(){document.getElementById('edit-overlay').classList.remove('show')}
+function closeEdit(){document.getElementById('edit-overlay').classList.remove('show');flushPendingRemote()}
 function overlayClick(e){if(e.target===e.currentTarget)closeEdit()}
 
 function saveRecord(){
@@ -1428,6 +1536,7 @@ function saveRecord(){
   toast('已儲存 ✓','s');
 }
 function delRecord(){
+  if(!requireDelete())return;
   const id=document.getElementById('edit-id').value;
   if(!id||!confirm('確定刪除這筆紀錄？'))return;
   records=records.filter(r=>r.id!==id);
@@ -1601,6 +1710,26 @@ function importJson(e){
  * ① sessionStorage 有入口的分頁工作階段 —— 由入口登入後在同一分頁跳過來才會有，
  *    關掉分頁或直接開本頁網址都沒有 → 擋下（URL 參數 ?user=XXX 也不算數）
  * ② localStorage portal_v1.currentUser 有登入身分（入口登出會清掉） */
+/* ── 刪除權（2026-08-12）──
+ * 入口的權限設定可以逐一角色勾「可刪除資料」。沒勾的人，刪除鈕直接不渲染出來，
+ * 用途是避免同仁誤刪共用設定（案場／施作位置／狀態／人員）與歷史紀錄。
+ * 刻意不含「編輯視窗裡刪掉一列進度說明」——那是填寫過程，鎖了沒法用。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanDelete(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    return !!(r && r.canDelete);
+  }catch(e){ return false; }
+}
+function requireDelete(){
+  if(portalCanDelete()) return true;
+  toast('只有具備刪除權的角色可以刪除，請聯絡系統管理員','e');
+  return false;
+}
+
 function portalLoggedIn(){
   try {
     if (sessionStorage.getItem('portal_session') !== '1') return false;
@@ -1661,7 +1790,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 const firebaseConfig = {
   apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
   authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
@@ -1676,6 +1805,9 @@ const db = getDatabase(app);
 window._fbSet = async (data) => { await set(ref(db, 'dtp_pm'), data); };   // 整包寫（已不再用於一般存檔，保留備援）
 window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp_pm/' + path), val); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { const s = await get(ref(db, 'dtp_pm')); return s.exists() ? s.val() : null; };
+window._fbGetPath = async (path) => { const s = await get(ref(db, 'dtp_pm/' + path)); return s.exists() ? s.val() : null; };
+// 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-06 新增）
+window._fbWatch = (cb) => { onValue(ref(db, 'dtp_pm'), (s) => { try { cb(s.exists() ? s.val() : null); } catch (e) { console.warn('watch callback error:', e); } }); };
 </script>
 <!-- ══════ 版本檢查：偵測到新版就跳橫幅，由使用者自己點更新（2026-07-30 新增） ══════ -->
 <script>

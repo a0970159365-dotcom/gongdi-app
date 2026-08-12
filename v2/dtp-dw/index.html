@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-05.1';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -833,12 +833,13 @@ function renderUsers(){
       <td>${u.password?'<span style="color:#16a34a">✓ 已設定</span>':'<span style="color:var(--muted)">— 未設</span>'}</td>
       <td><div class="tbl-act">
         <button class="btn btn-o btn-sm" onclick="openUserModal('${esc(u.id)}')">編輯</button>
-        <button class="btn btn-d btn-sm" onclick="delUserById('${esc(u.id)}')">刪除</button>
+        ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="delUserById('${esc(u.id)}')">刪除</button>`:''}
       </div></td>
     </tr>`).join('');
 }
 function delUserById(id){
   if(!isManager()){toast('需管理主管權限','e');return}
+  if(!requireDelete())return;
   const u=(cfg.users||[]).find(x=>x.id===id);
   if(!u)return;
   if(!confirm(`確定刪除「${u.name}」？`))return;
@@ -850,7 +851,7 @@ function openUserModal(id){
   if(cfg.users&&cfg.users.length>0&&!isManager()){toast('需管理主管權限','e');return}
   document.getElementById('um-id').value=id||'';
   document.getElementById('um-title').textContent=id?'編輯人員':'新增人員';
-  document.getElementById('um-del').style.display=id?'':'none';
+  document.getElementById('um-del').style.display=(id&&portalCanDelete())?'':'none';
   const u=id?(cfg.users||[]).find(x=>x.id===id):null;
   document.getElementById('um-name').value=u?u.name:'';
   document.getElementById('um-dept').value=u?u.dept:'';
@@ -885,6 +886,7 @@ function saveUser(){
   closeUserModal();toast('已儲存 ✓','s');
 }
 function delUser(){
+  if(!requireDelete())return;
   const id=document.getElementById('um-id').value;
   if(!id||!confirm('確定刪除此人員？'))return;
   cfg.users=(cfg.users||[]).filter(u=>u.id!==id);
@@ -914,6 +916,7 @@ function cfgAdd(key){
   if(inp)inp.value='';
 }
 function cfgDel(key,idx){
+  if(!requireDelete())return;
   cfg[key].splice(idx,1);
   saveCfg();renderCfgLists();updateDataLists();
 }
@@ -936,7 +939,7 @@ function renderCfgLists(){
       :arr.map((v,i)=>`<div class="cfg-row">
           <span class="cfg-row-num">${i+1}</span>
           <span class="cfg-row-lbl">${esc(v)}</span>
-          <button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>
+          ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
   });
 }
@@ -1420,7 +1423,7 @@ function openEdit(id){
   const readonly=id?!canEditRecord(r):false;  // 新增時 = 可編
   document.getElementById('edit-id').value=id||'';
   document.getElementById('modal-title-text').innerHTML=(id?'編輯紀錄':'新增紀錄')+(readonly?' <span class="ro-mini">👁️ 唯讀</span>':'');
-  document.getElementById('del-btn').style.display=(id&&!readonly)?'':'none';
+  document.getElementById('del-btn').style.display=(id&&!readonly&&portalCanDelete())?'':'none';
   document.getElementById('save-btn').style.display=readonly?'none':'';
   const editor=document.getElementById('log-editor');
   editor.innerHTML='';
@@ -1470,6 +1473,7 @@ function saveRecord(){
   toast('已儲存 ✓','s');
 }
 function delRecord(){
+  if(!requireDelete())return;
   const id=document.getElementById('edit-id').value;
   if(!id||!confirm('確定刪除這筆紀錄？'))return;
   records=records.filter(r=>r.id!==id);
@@ -1643,6 +1647,26 @@ function importJson(e){
  * ① sessionStorage 有入口的分頁工作階段 —— 由入口登入後在同一分頁跳過來才會有，
  *    關掉分頁或直接開本頁網址都沒有 → 擋下（URL 參數 ?user=XXX 也不算數）
  * ② localStorage portal_v1.currentUser 有登入身分（入口登出會清掉） */
+/* ── 刪除權（2026-08-12）──
+ * 入口的權限設定可以逐一角色勾「可刪除資料」。沒勾的人，刪除鈕直接不渲染出來，
+ * 用途是避免同仁誤刪共用設定（案場／施作位置／狀態／人員）與歷史紀錄。
+ * 刻意不含「編輯視窗裡刪掉一列進度說明」——那是填寫過程，鎖了沒法用。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanDelete(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    return !!(r && r.canDelete);
+  }catch(e){ return false; }
+}
+function requireDelete(){
+  if(portalCanDelete()) return true;
+  toast('只有具備刪除權的角色可以刪除，請聯絡系統管理員','e');
+  return false;
+}
+
 function portalLoggedIn(){
   try {
     if (sessionStorage.getItem('portal_session') !== '1') return false;
