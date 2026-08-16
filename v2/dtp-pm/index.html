@@ -7,7 +7,8 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='dtp_pm';</script>
+<!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
+<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -539,6 +540,46 @@ let records=[], cfg={}, currentUser=null;
 // ============================================================
 // 權限
 // ============================================================
+/* ── 部門範圍鎖（2026-08-16 新增，與 cdr-pm 同一套邏輯）──────────────
+ * 背景：App 使用權改成「全開給所有人」之後，跑錯 App 的人（例如瑪摩處的人點進「專案管理」）
+ *       會看到空白列表，卻仍能新增自己的紀錄 → 資料填到錯的系統裡。
+ * 做法：window.APP_DEPTS 宣告「這支 App 服務哪些部門」。
+ *       使用者「看得到的部門」與 APP_DEPTS 沒有交集 → 整支 App 唯讀（看得到、填不了）。
+ * 三個刻意放行的情況：① 沒宣告 APP_DEPTS ② 檢視範圍＝全公司（level='all'）③ 沒登入／查不到部門。 */
+function appOutOfScope(){
+  try{
+    var want = window.APP_DEPTS;
+    if (!want || !want.length) return false;
+    var u = currentUser || {};
+    if (!u.name) return false;
+    if ((u.viewLevel||'dept') === 'all') return false;
+    var mine = [u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    if (!mine.length) return false;
+    for (var i=0;i<want.length;i++) if (mine.indexOf(want[i]) >= 0) return false;
+    return true;
+  }catch(e){ return false; }
+}
+/* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function appLockGuard(){
+  if (!appOutOfScope()) return false;
+  toast('👁️ 這是「'+(window.APP_DEPTS||[]).join('、')+'」的系統，你只能檢視，不能新增或修改','e');
+  return true;
+}
+/* 唯讀提示條 + 收掉「＋ 新增紀錄」（只在被鎖時執行一次） */
+function applyAppLock(){
+  if (!appOutOfScope()) return;
+  if (document.getElementById('app-scope-bar')) return;
+  var depts = (window.APP_DEPTS||[]).join('、');
+  var bar = document.createElement('div');
+  bar.id = 'app-scope-bar';
+  bar.className = 'no-print';
+  bar.style.cssText = 'background:#fef3c7;border-bottom:2px solid #f59e0b;color:#92400e;'
+    + 'font-weight:700;font-size:13.5px;padding:9px 14px;text-align:center;line-height:1.7';
+  bar.innerHTML = '👁️ 唯讀模式 — 這是「'+depts+'」的系統，你的權限只能檢視，不能新增或修改。'
+    + '<br><span style="font-weight:500;font-size:12.5px">要填自己部門的資料，請回入口網頁選對應的系統。</span>';
+  document.body.insertBefore(bar, document.body.firstChild);
+  document.querySelectorAll('[onclick*="openEdit(null)"]').forEach(function(b){ b.style.display='none'; });
+}
 function isManager(){return currentUser&&currentUser.role==='manager'}
 function isLoggedIn(){return !!(currentUser&&currentUser.name)}
 function _execList(r){ return String((r&&r.執行者)||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean); }
@@ -556,6 +597,7 @@ function canViewRecord(r){
 function visibleRecords(){ return records.map(normalizeRecord).filter(canViewRecord); }
 function canEditRecord(r){
   if(!isLoggedIn())return false;
+  if(appOutOfScope())return false;   // 部門範圍鎖：跑錯 App 的人一律唯讀
   if(!r)return false;
   const u=currentUser||{};
   const el=u.editLevel || (u.role==='manager'?'dept':'self');
@@ -825,6 +867,7 @@ function openUserModal(id){
 }
 function closeUserModal(){document.getElementById('user-overlay').classList.remove('show');flushPendingRemote()}
 function saveUser(){
+  if(appLockGuard())return;
   const id=document.getElementById('um-id').value;
   const name=document.getElementById('um-name').value.trim();
   const dept=document.getElementById('um-dept').value.trim();
@@ -849,6 +892,7 @@ function saveUser(){
   closeUserModal();toast('已儲存 ✓','s');
 }
 function delUser(){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   const id=document.getElementById('um-id').value;
   if(!id||!confirm('確定刪除此人員？'))return;
@@ -866,9 +910,10 @@ function loadCfg(){
   ensureStatusOptions();
 }
 function saveCfg(){localStorage.setItem('dtp_pm_cfg',JSON.stringify(cfg));fbSave()}
-function manualSave(){saveCfg();toast('已儲存設定 ✓','s')}
+function manualSave(){if(appLockGuard())return;saveCfg();toast('已儲存設定 ✓','s')}
 
 function cfgAdd(key){
+  if(appLockGuard())return;
   const inp=document.getElementById('cfg-inp-'+key);
   const val=(inp&&inp.value||'').trim();
   if(!val)return;
@@ -879,12 +924,14 @@ function cfgAdd(key){
   if(inp)inp.value='';
 }
 function cfgDel(key,idx){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   cfg[key].splice(idx,1);
   markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
 function cfgAddFromBtn(key){
+  if(appLockGuard())return;
   const ir=document.getElementById('ir-'+key);
   if(ir){ir.style.display='flex';const inp=document.getElementById('cfg-inp-'+key);if(inp)inp.focus()}
 }
@@ -1483,7 +1530,7 @@ function renderSettingsFbStatus(){
 function openEdit(id){
   if(!isLoggedIn()){toast('請先登入','e');showLogin();return}
   const r=id?normalizeRecord(records.find(x=>x.id===id)):null;
-  const readonly=id?!canEditRecord(r):false;  // 新增時 = 可編
+  const readonly=appOutOfScope()||(id?!canEditRecord(r):false);  // 新增時 = 可編；但部門範圍鎖一律唯讀
   document.getElementById('edit-id').value=id||'';
   document.getElementById('modal-title-text').innerHTML=(id?'編輯紀錄':'新增紀錄')+(readonly?' <span class="ro-mini">👁️ 唯讀</span>':'');
   document.getElementById('del-btn').style.display=(id&&!readonly&&portalCanDelete())?'':'none';
@@ -1517,6 +1564,7 @@ function closeEdit(){document.getElementById('edit-overlay').classList.remove('s
 function overlayClick(e){if(e.target===e.currentTarget)closeEdit()}
 
 function saveRecord(){
+  if(appLockGuard())return;
   const proj=document.getElementById('e-proj').value.trim();
   if(!proj){alert('請填入案場名稱');return}
   const id=document.getElementById('edit-id').value;
@@ -1536,6 +1584,7 @@ function saveRecord(){
   toast('已儲存 ✓','s');
 }
 function delRecord(){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   const id=document.getElementById('edit-id').value;
   if(!id||!confirm('確定刪除這筆紀錄？'))return;
@@ -1683,6 +1732,7 @@ function exportJson(){
   a.download='進度表-專案管理_備份_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.json';a.click();
 }
 function importJson(e){
+  if(appLockGuard()){e.target.value='';return}
   const f=e.target.files[0];if(!f)return;
   const rdr=new FileReader();rdr.onload=ev=>{
     try{
@@ -1737,6 +1787,52 @@ function portalLoggedIn(){
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
 }
+
+/* ── 使用權限閘門（2026-08-13 新增）──────────────────────────────────
+ * 入口網頁只是把沒開通的卡片變灰，知道網址的人直接貼網址照樣進得來。
+ * 這裡在子 App 自己再檢查一次：依 window.APP_KEY 讀登入者的 appAccess，
+ * 沒開通（或已離職停用）就蓋上擋門，不初始化任何內容。
+ * ⚠️ 這仍是「畫面層」控管——資料庫規則目前對外開放，真正的伺服器端驗證要等 F 版。
+ * 查不到員工資料時一律放行，避免資料缺漏把人鎖在門外。 */
+function portalAppAllowed(){
+  try{
+    var key = window.APP_KEY || '';
+    if (!key) return true;
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser;
+    if (!u) return true;
+    var emps = p.employees || [];
+    var emp = emps.filter(function(e){ return e && e.id === u.id; })[0]
+           || emps.filter(function(e){ return e && e.name === u.name; })[0];
+    if (!emp) return true;                                  // 查無此人 → 放行，交給入口控管
+    var d = new Date(), pad = function(n){ return (n<10?'0':'')+n; };
+    var today = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    if (emp.resignDate && today > emp.resignDate) return false;         // 離職停用 → 全鎖
+    return !(emp.appAccess && emp.appAccess[key] === false);
+  }catch(e){ return true; }
+}
+function showNoAccessGate(){
+  var g = document.getElementById('app-access-gate');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'app-access-gate';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;'
+      + 'justify-content:center;padding:20px;overflow-y:auto;'
+      + 'background:linear-gradient(135deg,#0f172a 0%,#334155 55%,#0f172a 100%)';
+    var nm = (document.title||'本系統').replace(/（測試版）/g,'');
+    g.innerHTML = '<div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);'
+      + 'max-width:360px;width:100%;padding:32px 26px;text-align:center;margin:auto">'
+      + '<div style="font-size:50px;margin-bottom:8px">🚫</div>'
+      + '<div style="font-size:18px;font-weight:800;color:#b91c1c;margin-bottom:10px">沒有這個系統的使用權限</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">你的帳號尚未開通<br>'
+      + '<strong>「' + nm + '」</strong><br>需要使用請洽系統管理員</div>'
+      + '<a href="../portal/index.html" style="display:block;background:#334155;color:#fff;font-weight:800;'
+      + 'font-size:14.5px;text-decoration:none;padding:11px;border-radius:9px">← 回入口網頁</a></div>';
+    document.body.appendChild(g);
+  }
+  g.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
 function initPortalUser(){
   let pUser = null;
   try {
@@ -1780,8 +1876,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     return;
   }
   initPortalUser();
+  if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
   updateNavUser();
   updateDataLists();
+  applyAppLock();   // 部門範圍鎖：不在 APP_DEPTS 範圍內 → 掛唯讀提示條、收掉「＋ 新增紀錄」
   initFb().then(()=>{
     document.getElementById('login-overlay').style.display = 'none';
   });

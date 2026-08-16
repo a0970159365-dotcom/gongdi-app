@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -1045,7 +1045,8 @@ function canEditRoles() {
     console.log('[canEditRoles] ❌ 拒絕 — 找不到角色（roleId=' + S.currentUser.roleId + '）');
     return false;
   }
-  const can = /主管|副總|系統管理員/.test(r.name || '');
+  // 2026-08-13 補上「總經理」：總經理室的權限等同總經理，原本因為角色名沒有「主管/副總」被誤擋
+  const can = /主管|副總|總經理|系統管理員/.test(r.name || '');
   console.log('[canEditRoles]', can ? '✅ 允許' : '❌ 拒絕',
     '— 角色：', r.name);
   return can;

@@ -7,7 +7,8 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='cdr_pm';</script>
+<!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
+<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1060,6 +1061,7 @@ function doLogin() {
   $('login-overlay').classList.remove('show');
   updateNavUser();
   initReport();
+  applyAppLock();   // 本機登入（非從入口進來）也要吃部門範圍鎖
   if (!user) toast(`歡迎，${name}！（未在人員清單中，可至設定頁新增）`);
   else toast(`歡迎，${name}！`,'s');
 }
@@ -1075,6 +1077,52 @@ function switchUser() {
 function updateNavUser() {
   $('nav-name').textContent = S.user.name||'未登入';
   $('nav-dept').textContent = S.user.dept||'';
+}
+
+/* ── 部門範圍鎖（2026-08-16 新增）────────────────────────────────
+ * 背景：App 使用權改成「全開給所有人」之後，跑錯 App 的人（例如瑪摩處的人點進「專案管理」）
+ *       會看到空白列表，卻仍能新增自己的日報 → 資料填到錯的系統裡。
+ * 做法：window.APP_DEPTS 宣告「這支 App 服務哪些部門」。
+ *       使用者「看得到的部門」與 APP_DEPTS 沒有交集 → 整支 App 唯讀（看得到、填不了）。
+ * 三個刻意放行的情況（避免把人鎖在門外，與 portalAppAllowed() 的精神一致）：
+ *   ① 沒宣告 APP_DEPTS 的 App → 行為完全不變
+ *   ② 檢視範圍＝全公司（level='all'，副總／總經理室／系統管理員）→ 不受限
+ *   ③ 還沒登入、或身分查不到部門 → 放行
+ */
+function appOutOfScope(){
+  try{
+    var want = window.APP_DEPTS;
+    if (!want || !want.length) return false;              // ① 沒宣告 → 不啟用
+    var u = S.user || {};
+    if (!u.name) return false;                            // ③ 還沒登入 → 不判定
+    if ((u.viewLevel||'dept') === 'all') return false;    // ② 看全公司 → 不受限
+    var mine = [u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    if (!mine.length) return false;                       // ③ 沒部門資料 → 放行
+    for (var i=0;i<want.length;i++) if (mine.indexOf(want[i]) >= 0) return false;
+    return true;
+  }catch(e){ return false; }
+}
+/* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function appLockGuard(){
+  if (!appOutOfScope()) return false;
+  toast('👁️ 這是「'+(window.APP_DEPTS||[]).join('、')+'」的系統，你只能檢視，不能新增或修改','e');
+  return true;
+}
+/* 唯讀提示條 + 收掉寫入類按鈕（只在被鎖時執行一次） */
+function applyAppLock(){
+  if (!appOutOfScope()) return;
+  if (document.getElementById('app-scope-bar')) return;
+  var depts = (window.APP_DEPTS||[]).join('、');
+  var bar = document.createElement('div');
+  bar.id = 'app-scope-bar';
+  bar.className = 'no-print';
+  bar.style.cssText = 'background:#fef3c7;border-bottom:2px solid #f59e0b;color:#92400e;'
+    + 'font-weight:700;font-size:13.5px;padding:9px 14px;text-align:center;line-height:1.7';
+  bar.innerHTML = '👁️ 唯讀模式 — 這是「'+depts+'」的系統，你的權限只能檢視，不能新增或修改。'
+    + '<br><span style="font-weight:500;font-size:12.5px">要填自己部門的資料，請回入口網頁選對應的系統。</span>';
+  document.body.insertBefore(bar, document.body.firstChild);
+  document.querySelectorAll('[onclick*="saveReport"],[onclick*="newReport"],[onclick*="clearForm"]')
+    .forEach(function(b){ b.style.display='none'; });
 }
 
 /* ── PERMISSION（權限執行層：依入口角色的檢視/編輯範圍過濾資料） ── */
@@ -1099,6 +1147,7 @@ function visibleReports(){ return S.reports.filter(canView); }
  *         「不能改別人的東西」改由每一列的 canEditRow() 把關（別人的列鎖住並顯示 🔒）。
  * 這樣同一張日報才能多人一起填，又不會互相改到對方的內容。 */
 function canEdit(report) {
+  if (appOutOfScope()) return false;   // 部門範圍鎖：跑錯 App 的人一律唯讀
   const u = S.user||{};
   if (!report || !report.dept) return true;
   const el = u.editLevel || (u.role==='manager' ? 'dept' : 'self');
@@ -1210,6 +1259,7 @@ function initReport() {
   loadToday();
 }
 function newReport() {
+  if (appLockGuard()) return;
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
     if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
   }
@@ -1254,6 +1304,7 @@ function syncReport() {
   buildSummary();
 }
 function saveReport() {
+  if (appLockGuard()) return;
   syncReport();
   if (!S.report.dept) { toast('請確認部門（需先登入）','e'); return; }
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
@@ -1736,6 +1787,7 @@ function clearHistFilter(){
   renderHistory();
 }
 function deleteReport(id){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   if(!confirm('確定刪除這筆報表？'))return;
   S.reports=S.reports.filter(r=>r.id!==id);
@@ -1748,6 +1800,7 @@ function exportAll(){
   a.download='日報表-專案管理_備份_'+today()+'.json'; a.click();
 }
 function importData(e){
+  if(appLockGuard()){ e.target.value=''; return; }
   const f=e.target.files[0]; if(!f)return;
   const rd=new FileReader();
   rd.onload=ev=>{
@@ -2190,6 +2243,7 @@ function loadCfgForm(){
   renderProjTable();
 }
 function saveSettings(){
+  if(appLockGuard())return;
   S.cfg.matNames = readListField('lf-matnames');
   S.cfg.matUnits = readListField('lf-matunits');
   tlCleanup();   // 兩層設定在編輯當下已寫進 S.cfg，這裡只清空白
@@ -2228,10 +2282,11 @@ function readListField(id){
 /* ── PROJECT TABLE ── */
 function getSortedProjects(){
   const projs=[...S.cfg.projects];
+  const nm  =p=>(p&&p.name)||'';                          // 名稱可能是 undefined
+  const lead=p=>(nm(p).match(/^(\d+)/)||[])[1]||'';        // 開頭不是數字就當空字串
   projs.sort((a,b)=>{
-    const da=(a.name.match(/^(\d+)/)||[''])[1];
-    const db=(b.name.match(/^(\d+)/)||[''])[1];
-    return S.projSort==='desc'?db.localeCompare(da)||b.name.localeCompare(a.name):da.localeCompare(db)||a.name.localeCompare(b.name);
+    const da=lead(a), db=lead(b);
+    return S.projSort==='desc'?db.localeCompare(da)||nm(b).localeCompare(nm(a)):da.localeCompare(db)||nm(a).localeCompare(nm(b));
   });
   return projs;
 }
@@ -2269,6 +2324,7 @@ function openProjModal(id){
 }
 function closeProjModal(){$('proj-overlay').classList.remove('show');}
 function saveProj(){
+  if(appLockGuard())return;
   const name=$('pm-name').value.trim();
   if(!name){toast('請輸入專案名稱','e');return;}
   if(editProjId){
@@ -2277,9 +2333,10 @@ function saveProj(){
   } else {
     S.cfg.projects.push({id:uid(),name,note:$('pm-note').value.trim()});
   }
-  closeProjModal(); renderProjTable(); save(); toast('專案已儲存','s');
+  save(); closeProjModal(); renderProjTable(); toast('專案已儲存','s');   // 先存檔，畫面出錯也不賠掉資料
 }
 function deleteProj(id){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   if(isProjLocked(id)){toast('此專案已在日報表中使用，無法刪除','e');return;}
   if(!confirm('確定刪除此專案？'))return;
@@ -2325,6 +2382,7 @@ function openUserModal(id){
 }
 function closeUserModal(){$('user-overlay').classList.remove('show');}
 function saveUser(){
+  if(appLockGuard())return;
   const name=$('um-name').value.trim();
   const dept=$('um-dept').value;
   const role=$('um-role').value;
@@ -2341,6 +2399,7 @@ function saveUser(){
   closeUserModal(); renderUsersTable(); save(); toast('人員已儲存','s');
 }
 function deleteUser(id){
+  if(appLockGuard())return;
   if(!requireDelete())return;
   if(!confirm('確定刪除此人員？'))return;
   S.cfg.users=S.cfg.users.filter(u=>u.id!==id);
@@ -2390,6 +2449,52 @@ function portalLoggedIn(){
     const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
+}
+
+/* ── 使用權限閘門（2026-08-13 新增）──────────────────────────────────
+ * 入口網頁只是把沒開通的卡片變灰，知道網址的人直接貼網址照樣進得來。
+ * 這裡在子 App 自己再檢查一次：依 window.APP_KEY 讀登入者的 appAccess，
+ * 沒開通（或已離職停用）就蓋上擋門，不初始化任何內容。
+ * ⚠️ 這仍是「畫面層」控管——資料庫規則目前對外開放，真正的伺服器端驗證要等 F 版。
+ * 查不到員工資料時一律放行，避免資料缺漏把人鎖在門外。 */
+function portalAppAllowed(){
+  try{
+    var key = window.APP_KEY || '';
+    if (!key) return true;
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser;
+    if (!u) return true;
+    var emps = p.employees || [];
+    var emp = emps.filter(function(e){ return e && e.id === u.id; })[0]
+           || emps.filter(function(e){ return e && e.name === u.name; })[0];
+    if (!emp) return true;                                  // 查無此人 → 放行，交給入口控管
+    var d = new Date(), pad = function(n){ return (n<10?'0':'')+n; };
+    var today = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    if (emp.resignDate && today > emp.resignDate) return false;         // 離職停用 → 全鎖
+    return !(emp.appAccess && emp.appAccess[key] === false);
+  }catch(e){ return true; }
+}
+function showNoAccessGate(){
+  var g = document.getElementById('app-access-gate');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'app-access-gate';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;'
+      + 'justify-content:center;padding:20px;overflow-y:auto;'
+      + 'background:linear-gradient(135deg,#0f172a 0%,#334155 55%,#0f172a 100%)';
+    var nm = (document.title||'本系統').replace(/（測試版）/g,'');
+    g.innerHTML = '<div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);'
+      + 'max-width:360px;width:100%;padding:32px 26px;text-align:center;margin:auto">'
+      + '<div style="font-size:50px;margin-bottom:8px">🚫</div>'
+      + '<div style="font-size:18px;font-weight:800;color:#b91c1c;margin-bottom:10px">沒有這個系統的使用權限</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">你的帳號尚未開通<br>'
+      + '<strong>「' + nm + '」</strong><br>需要使用請洽系統管理員</div>'
+      + '<a href="../portal/index.html" style="display:block;background:#334155;color:#fff;font-weight:800;'
+      + 'font-size:14.5px;text-decoration:none;padding:11px;border-radius:9px">← 回入口網頁</a></div>';
+    document.body.appendChild(g);
+  }
+  g.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
 }
 function initPortalUser(){
   let pUser = null;
@@ -2484,11 +2589,13 @@ function init(){
   }
 
   if (portalLoggedIn() && initPortalUser()) {
+    if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
     // 已從入口登入：直接進入系統
     $('login-overlay').style.display = 'none';
     document.body.style.overflow = '';
     updateNavUser();
     initReport();
+    applyAppLock();   // 部門範圍鎖：不在 APP_DEPTS 範圍內 → 掛唯讀提示條、收掉寫入按鈕
   } else {
     // 未從入口登入：蓋上閘門，不初始化任何內容
     $('login-overlay').style.display = 'flex';

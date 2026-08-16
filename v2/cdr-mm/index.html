@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1773,10 +1773,11 @@ function readListField(id){
 /* ── PROJECT TABLE ── */
 function getSortedProjects(){
   const projs=[...S.cfg.projects];
+  const nm  =p=>(p&&p.name)||'';                          // 名稱可能是 undefined
+  const lead=p=>(nm(p).match(/^(\d+)/)||[])[1]||'';        // 開頭不是數字就當空字串
   projs.sort((a,b)=>{
-    const da=(a.name.match(/^(\d+)/)||[''])[1];
-    const db=(b.name.match(/^(\d+)/)||[''])[1];
-    return S.projSort==='desc'?db.localeCompare(da)||b.name.localeCompare(a.name):da.localeCompare(db)||a.name.localeCompare(b.name);
+    const da=lead(a), db=lead(b);
+    return S.projSort==='desc'?db.localeCompare(da)||nm(b).localeCompare(nm(a)):da.localeCompare(db)||nm(a).localeCompare(nm(b));
   });
   return projs;
 }
@@ -1822,7 +1823,7 @@ function saveProj(){
   } else {
     S.cfg.projects.push({id:uid(),name,note:$('pm-note').value.trim()});
   }
-  closeProjModal(); renderProjTable(); save(); toast('專案已儲存','s');
+  save(); closeProjModal(); renderProjTable(); toast('專案已儲存','s');   // 先存檔，畫面出錯也不賠掉資料
 }
 function deleteProj(id){
   if(!requireDelete())return;
@@ -1936,6 +1937,52 @@ function portalLoggedIn(){
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
 }
+
+/* ── 使用權限閘門（2026-08-13 新增）──────────────────────────────────
+ * 入口網頁只是把沒開通的卡片變灰，知道網址的人直接貼網址照樣進得來。
+ * 這裡在子 App 自己再檢查一次：依 window.APP_KEY 讀登入者的 appAccess，
+ * 沒開通（或已離職停用）就蓋上擋門，不初始化任何內容。
+ * ⚠️ 這仍是「畫面層」控管——資料庫規則目前對外開放，真正的伺服器端驗證要等 F 版。
+ * 查不到員工資料時一律放行，避免資料缺漏把人鎖在門外。 */
+function portalAppAllowed(){
+  try{
+    var key = window.APP_KEY || '';
+    if (!key) return true;
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser;
+    if (!u) return true;
+    var emps = p.employees || [];
+    var emp = emps.filter(function(e){ return e && e.id === u.id; })[0]
+           || emps.filter(function(e){ return e && e.name === u.name; })[0];
+    if (!emp) return true;                                  // 查無此人 → 放行，交給入口控管
+    var d = new Date(), pad = function(n){ return (n<10?'0':'')+n; };
+    var today = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    if (emp.resignDate && today > emp.resignDate) return false;         // 離職停用 → 全鎖
+    return !(emp.appAccess && emp.appAccess[key] === false);
+  }catch(e){ return true; }
+}
+function showNoAccessGate(){
+  var g = document.getElementById('app-access-gate');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'app-access-gate';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;'
+      + 'justify-content:center;padding:20px;overflow-y:auto;'
+      + 'background:linear-gradient(135deg,#0f172a 0%,#334155 55%,#0f172a 100%)';
+    var nm = (document.title||'本系統').replace(/（測試版）/g,'');
+    g.innerHTML = '<div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);'
+      + 'max-width:360px;width:100%;padding:32px 26px;text-align:center;margin:auto">'
+      + '<div style="font-size:50px;margin-bottom:8px">🚫</div>'
+      + '<div style="font-size:18px;font-weight:800;color:#b91c1c;margin-bottom:10px">沒有這個系統的使用權限</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">你的帳號尚未開通<br>'
+      + '<strong>「' + nm + '」</strong><br>需要使用請洽系統管理員</div>'
+      + '<a href="../portal/index.html" style="display:block;background:#334155;color:#fff;font-weight:800;'
+      + 'font-size:14.5px;text-decoration:none;padding:11px;border-radius:9px">← 回入口網頁</a></div>';
+    document.body.appendChild(g);
+  }
+  g.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
 function initPortalUser(){
   let pUser = null;
   try {
@@ -2029,6 +2076,7 @@ function init(){
   }
 
   if (portalLoggedIn() && initPortalUser()) {
+    if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
     // 已從入口登入：直接進入系統
     $('login-overlay').style.display = 'none';
     document.body.style.overflow = '';

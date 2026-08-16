@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -114,6 +114,8 @@ textarea.fi{resize:vertical;min-height:60px}
 .wt-tbl .num-work{color:var(--primary);font-weight:800;font-size:14px}
 .wt-tbl .num-pause{color:#94a3b8;font-weight:700}
 .wt-tbl tr.row-stuck .num-pause{color:#dc2626}
+/* 表格橫向捲動容器：小螢幕不壓縮欄位，改成左右滑，欄位比例與桌機一致（2026-08-13 比照 dtp-pm） */
+.tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .ptbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 .ptbl th{background:#f8fafc;color:var(--primary);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;font-size:12px}
 .ptbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:top}
@@ -227,6 +229,9 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   .ptbl th,.ptbl td{padding:6px 7px}
   .ptbl th{font-size:11px}
   .ptbl td{font-size:12px}
+  /* 欄位不再被擠壓變形，超出寬度就左右滑（外層 .tbl-scroll 負責捲動） */
+  .ptbl{min-width:720px}
+  .wt-tbl{min-width:900px}
   .g3{grid-template-columns:repeat(2,1fr)}
   .card-body{padding:12px 14px}
   .filter-bar{padding:8px 12px;gap:6px}
@@ -860,7 +865,7 @@ function openUserModal(id){
   updateDataLists();
   document.getElementById('user-overlay').classList.add('show');
 }
-function closeUserModal(){document.getElementById('user-overlay').classList.remove('show')}
+function closeUserModal(){document.getElementById('user-overlay').classList.remove('show');flushPendingRemote()}
 function saveUser(){
   const id=document.getElementById('um-id').value;
   const name=document.getElementById('um-name').value.trim();
@@ -918,6 +923,7 @@ function cfgAdd(key){
 function cfgDel(key,idx){
   if(!requireDelete())return;
   cfg[key].splice(idx,1);
+  markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
 function cfgAddFromBtn(key){
@@ -1000,6 +1006,45 @@ function updateDataLists(){
 let _lastPushed={};   // id -> 上次推上雲的 JSON 字串
 function _snapshot(list){const m={};(list||[]).forEach(r=>{if(r&&r.id)m[r.id]=JSON.stringify(r)});return m}
 
+// ── 設定（cfg）同步：整包覆蓋改為聯集合併（2026-08-13 比照 dtp-pm 2026-08-06 修正）──
+// 問題：紀錄是一筆一筆寫（安全），但 cfg 是整包 set → 兩台裝置同時開著時，
+//       後存的那台會把對方剛新增的案場／執行者整個洗掉。
+// 做法：一般存檔 → 先讀雲端 cfg，把雲端有、本機沒有的選項補進來，再寫回（不會刪別人的）。
+//       設定頁按「✕ 刪除」→ 標記 _cfgAuthoritative，這次用本機版本直接覆蓋（刪除是明確意圖）。
+let _cfgAuthoritative=false;
+function markCfgAuthoritative(){_cfgAuthoritative=true}
+function _mergeCfg(mine,cloud){
+  const out={...mine};
+  Object.keys(cloud||{}).forEach(k=>{
+    const c=cloud[k];
+    if(!Array.isArray(c))return;
+    // users 這類物件陣列無法用 includes 比對，會重複累加 → 不做聯集，保留本機
+    if(c.some(v=>v&&typeof v==='object'))return;
+    const m=Array.isArray(out[k])?out[k]:[];
+    const add=c.filter(v=>!m.includes(v));
+    if(add.length)out[k]=m.concat(add);
+    else if(!Array.isArray(out[k]))out[k]=m;
+  });
+  return out;
+}
+async function pushCfg(authoritative){
+  if(!window._fbSetPath)return;
+  if(!authoritative&&window._fbGetPath){
+    try{
+      const cloud=await window._fbGetPath('cfg');
+      if(cloud&&typeof cloud==='object'){
+        const merged=_mergeCfg(cfg,cloud);
+        if(JSON.stringify(merged)!==JSON.stringify(cfg)){
+          cfg=merged;saveCfgLocal();
+          if(typeof renderCfgLists==='function')renderCfgLists();
+          if(typeof updateDataLists==='function')updateDataLists();
+        }
+      }
+    }catch(e){console.warn('讀雲端 cfg 失敗，改為直接寫入:',e)}
+  }
+  await window._fbSetPath('cfg',cfg);
+}
+
 async function fbSave(){
   saveLocal();saveCfgLocal();
   if(!window._fbSetPath){setSyncIcon('err');return}
@@ -1026,7 +1071,8 @@ async function fbSave(){
     const jobs=[];
     records.forEach(r=>{ if(r&&r.id&&_lastPushed[r.id]!==cur[r.id]) jobs.push(window._fbSetPath('records/'+r.id,r)); });
     dels.forEach(id=>jobs.push(window._fbSetPath('records/'+id,null)));
-    jobs.push(window._fbSetPath('cfg',cfg));
+    jobs.push(pushCfg(_cfgAuthoritative));
+    _cfgAuthoritative=false;
     await Promise.all(jobs);
     _lastPushed=cur;
     setSyncIcon('ok');
@@ -1051,6 +1097,64 @@ async function initFb(){
     }
   }catch(e){console.warn('Firebase 連線失敗，使用本機資料:',e);setSyncIcon('err');loadLocal()}
   renderMain();renderHistory();updateFilters();updateDataLists();
+  startWatch();
+}
+
+// ── 即時同步（2026-08-13 比照 dtp-pm 2026-08-06 新增）──────────────────────
+// 原本只在開啟頁面時讀一次雲端，之後不再更新 → 手機改完，筆電不重整就看不到，
+// 兩台顯示的資料與下拉選單長期不一致。改成持續監聽，雲端一變就套用到畫面。
+let _watchStarted=false, _pendingRemote=null;
+function isEditingNow(){
+  return ['edit-overlay','user-overlay'].some(id=>{
+    const el=document.getElementById(id);
+    return el&&el.classList.contains('show');
+  });
+}
+function applyRemote(data){
+  if(!data)return;                       // 雲端整包空白 → 不動本機（防呆，避免被清空）
+  let changed=false;
+  if(data.records&&Object.keys(data.records).length){
+    const incMap={};
+    Object.values(data.records).map(normalizeRecord).forEach(r=>{if(r&&r.id)incMap[r.id]=r});
+    const cloudSnap=_snapshot(Object.values(incMap));
+    // 保留本機還沒成功推上雲的修改：_lastPushed 是「最後一次確認寫進雲端的版本」，
+    // 本機與它不同就代表這筆正在同步中 → 以本機為準，免得剛編輯好的內容被雲端舊值蓋回去。
+    records.forEach(r=>{
+      if(r&&r.id&&_lastPushed[r.id]!==JSON.stringify(r))incMap[r.id]=r;
+    });
+    const merged=Object.values(incMap);
+    // 用「id 排序後」比對，避免只是先後順序不同就判定有變動而重繪整頁
+    const norm=list=>{const m=_snapshot(list);return Object.keys(m).sort().map(k=>k+'='+m[k]).join('')};
+    if(norm(merged)!==norm(records)){
+      records=merged;saveLocal();changed=true;
+    }
+    _lastPushed=cloudSnap;
+  }
+  if(data.cfg&&Object.keys(data.cfg).length){
+    const nc={...buildDefaultCfg(),...data.cfg};
+    if(JSON.stringify(nc)!==JSON.stringify(cfg)){
+      cfg=nc;ensureStatusOptions();saveCfgLocal();changed=true;
+    }
+  }
+  if(!changed)return;
+  renderMain();renderHistory();updateFilters();updateDataLists();
+  const wt=document.getElementById('page-worktime');
+  if(wt&&wt.classList.contains('active')&&typeof renderWorktime==='function')renderWorktime();
+  const st=document.getElementById('page-settings');
+  if(st&&st.classList.contains('active')){renderCfgLists();if(typeof renderUsers==='function')renderUsers()}
+  setSyncIcon('ok');
+}
+function startWatch(){
+  if(_watchStarted||!window._fbWatch)return;
+  _watchStarted=true;
+  window._fbWatch(data=>{
+    // 使用者正在編輯視窗裡打字時不要抽換底下的資料，先收著，關掉視窗再套用
+    if(isEditingNow()){_pendingRemote=data;return}
+    applyRemote(data);
+  });
+}
+function flushPendingRemote(){
+  if(_pendingRemote){const d=_pendingRemote;_pendingRemote=null;applyRemote(d)}
 }
 function saveLocal(){localStorage.setItem('dtp_rec',JSON.stringify(records))}
 function saveCfgLocal(){localStorage.setItem('dtp_cfg',JSON.stringify(cfg))}
@@ -1119,7 +1223,7 @@ function renderMain(){
       <div class="proj-header" onclick="toggleSec('${sid}',this)">
         <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
       </div>
-      <div id="${sid}">
+      <div id="${sid}" class="tbl-scroll">
         <table class="ptbl">
           <thead><tr>
             <th style="width:10%">執行者</th>
@@ -1306,7 +1410,7 @@ function renderWorktime(){
       <td><span class="${stCls}">${esc(st)}</span></td>
     </tr>`;
   }).join('')+'</tbody>';
-  el.innerHTML=`<table class="wt-tbl">${head}${body}</table>`;
+  el.innerHTML=`<div class="tbl-scroll"><table class="wt-tbl">${head}${body}</table></div>`;
   // 合計
   const sumWork=rows.reduce((a,b)=>a+b.stat.work,0);
   const sumPause=rows.reduce((a,b)=>a+b.stat.paused,0);
@@ -1450,7 +1554,7 @@ function openEdit(id){
   document.querySelector('button[onclick="addLogRow()"]').style.display=readonly?'none':'';
   document.getElementById('edit-overlay').classList.add('show');
 }
-function closeEdit(){document.getElementById('edit-overlay').classList.remove('show')}
+function closeEdit(){document.getElementById('edit-overlay').classList.remove('show');flushPendingRemote()}
 function overlayClick(e){if(e.target===e.currentTarget)closeEdit()}
 
 function saveRecord(){
@@ -1674,6 +1778,52 @@ function portalLoggedIn(){
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
 }
+
+/* ── 使用權限閘門（2026-08-13 新增）──────────────────────────────────
+ * 入口網頁只是把沒開通的卡片變灰，知道網址的人直接貼網址照樣進得來。
+ * 這裡在子 App 自己再檢查一次：依 window.APP_KEY 讀登入者的 appAccess，
+ * 沒開通（或已離職停用）就蓋上擋門，不初始化任何內容。
+ * ⚠️ 這仍是「畫面層」控管——資料庫規則目前對外開放，真正的伺服器端驗證要等 F 版。
+ * 查不到員工資料時一律放行，避免資料缺漏把人鎖在門外。 */
+function portalAppAllowed(){
+  try{
+    var key = window.APP_KEY || '';
+    if (!key) return true;
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser;
+    if (!u) return true;
+    var emps = p.employees || [];
+    var emp = emps.filter(function(e){ return e && e.id === u.id; })[0]
+           || emps.filter(function(e){ return e && e.name === u.name; })[0];
+    if (!emp) return true;                                  // 查無此人 → 放行，交給入口控管
+    var d = new Date(), pad = function(n){ return (n<10?'0':'')+n; };
+    var today = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    if (emp.resignDate && today > emp.resignDate) return false;         // 離職停用 → 全鎖
+    return !(emp.appAccess && emp.appAccess[key] === false);
+  }catch(e){ return true; }
+}
+function showNoAccessGate(){
+  var g = document.getElementById('app-access-gate');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'app-access-gate';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;'
+      + 'justify-content:center;padding:20px;overflow-y:auto;'
+      + 'background:linear-gradient(135deg,#0f172a 0%,#334155 55%,#0f172a 100%)';
+    var nm = (document.title||'本系統').replace(/（測試版）/g,'');
+    g.innerHTML = '<div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);'
+      + 'max-width:360px;width:100%;padding:32px 26px;text-align:center;margin:auto">'
+      + '<div style="font-size:50px;margin-bottom:8px">🚫</div>'
+      + '<div style="font-size:18px;font-weight:800;color:#b91c1c;margin-bottom:10px">沒有這個系統的使用權限</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">你的帳號尚未開通<br>'
+      + '<strong>「' + nm + '」</strong><br>需要使用請洽系統管理員</div>'
+      + '<a href="../portal/index.html" style="display:block;background:#334155;color:#fff;font-weight:800;'
+      + 'font-size:14.5px;text-decoration:none;padding:11px;border-radius:9px">← 回入口網頁</a></div>';
+    document.body.appendChild(g);
+  }
+  g.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
 function initPortalUser(){
   let pUser = null;
   try {
@@ -1717,6 +1867,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     return;
   }
   initPortalUser();
+  if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
   updateNavUser();
   updateDataLists();
   initFb().then(()=>{
@@ -1727,7 +1878,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 const firebaseConfig = {
   apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
   authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
@@ -1742,6 +1893,9 @@ const db = getDatabase(app);
 window._fbSet = async (data) => { await set(ref(db, 'dtp'), data); };   // 整包寫（已不再用於一般存檔，保留備援）
 window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp/' + path), val); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
+window._fbGetPath = async (path) => { const s = await get(ref(db, 'dtp/' + path)); return s.exists() ? s.val() : null; };
+// 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-13 新增）
+window._fbWatch = (cb) => { onValue(ref(db, 'dtp'), (s) => { try { cb(s.exists() ? s.val() : null); } catch (e) { console.warn('watch callback error:', e); } }); };
 </script>
 <!-- ══════ 版本檢查：偵測到新版就跳橫幅，由使用者自己點更新（2026-07-30 新增） ══════ -->
 <script>

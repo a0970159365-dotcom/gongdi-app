@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-12.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -101,6 +101,11 @@
         <h3 class="text-sm font-semibold text-gray-600">最近記錄</h3>
         <button onclick="goTo('history')" class="text-xs text-blue-600">查看全部 &#8250;</button>
       </div>
+      <!-- 兩種顯示方式（2026-08-13 新增）：依日期／依案場分類 -->
+      <div class="flex mb-3 bg-gray-100 rounded-xl p-1 text-sm max-w-xs">
+        <button id="rm-date" onclick="setRecentMode('date')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依日期</button>
+        <button id="rm-case" onclick="setRecentMode('case')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依案場</button>
+      </div>
       <div id="recent-list" class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2"></div>
     </div>
     <div id="no-recent" class="hidden text-center py-8 text-gray-400 text-sm">尚無記錄，點選上方工法開始填寫</div>
@@ -132,6 +137,9 @@
     </div>
     <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
       <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">人員資訊</h3>
+      <div id="identity-hint" class="hidden text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+        🔒 部門與填表人員依你的登入身分自動帶入，不可修改
+      </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">部門</label>
         <select id="f-dept" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -196,15 +204,21 @@
 
   <!-- ===== HISTORY ===== -->
   <div id="view-history" class="view p-4">
-    <div class="flex gap-2 mb-4">
-      <select id="h-filter-tpl" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="">全部工法</option>
+    <div class="space-y-2 mb-4">
+      <!-- 案場篩選（2026-08-13 新增） -->
+      <select id="h-filter-case" onchange="renderHistory()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">全部案場</option>
       </select>
-      <select id="h-filter-status" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="">全部狀態</option>
-        <option value="completed">已完成</option>
-        <option value="draft">草稿</option>
-      </select>
+      <div class="flex gap-2">
+        <select id="h-filter-tpl" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">全部工法</option>
+        </select>
+        <select id="h-filter-status" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">全部狀態</option>
+          <option value="completed">已完成</option>
+          <option value="draft">草稿</option>
+        </select>
+      </div>
     </div>
     <div id="history-list" class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3"></div>
   </div>
@@ -337,6 +351,8 @@ var TEMPLATES = [
 var S = {
   view: 'home',
   viewStack: ['home'],
+  // 首頁「最近記錄」的顯示方式：'date'＝依日期／'case'＝依案場分類（2026-08-13 新增，記住上次選的）
+  recentMode: (function(){ try{ return localStorage.getItem('sop_recent_mode')==='case' ? 'case' : 'date'; }catch(e){ return 'date'; } })(),
   report: {},
   reports: [],
   selectedReportId: null,
@@ -473,9 +489,9 @@ function showView(v){
 
 // ====== HOME ======
 function renderHome(){
-  // template cards
+  // template cards（已作廢的工法不出現，不能再新建）
   var html='';
-  TEMPLATES.forEach(function(t){
+  liveTemplates().forEach(function(t){
     html+='<button onclick="selectTemplate(\''+t.id+'\')" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
       +'<div class="flex items-center gap-4">'
       +'<div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style="'+tplBg(t.id)+'">'+t.icon+'</div>'
@@ -486,26 +502,70 @@ function renderHome(){
   });
   $('template-cards').innerHTML=html;
 
-  // recent
-  var recent=[].concat(visibleReports()).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).slice(0,5);
-  if(recent.length===0){
+  // recent（2026-08-13：兩種顯示 — 依日期／依案場分類）
+  var all=[].concat(visibleReports()).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  if(all.length===0){
     $('recent-section').classList.add('hidden');
     $('no-recent').classList.remove('hidden');
+    return;
+  }
+  $('recent-section').classList.remove('hidden');
+  $('no-recent').classList.add('hidden');
+  paintRecentTabs();
+
+  var list=$('recent-list');
+  if(S.recentMode==='case'){
+    // 依案場分組，組內仍是新到舊；案場依「該案場最新一筆」排序
+    list.className='space-y-3';
+    var groups={}, order=[];
+    all.forEach(function(r){
+      var k=r.caseName||'（未填案場）';
+      if(!groups[k]){ groups[k]=[]; order.push(k); }
+      groups[k].push(r);
+    });
+    list.innerHTML=order.map(function(k){
+      return '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">'
+        +'<div class="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">'
+        +'<span class="text-sm font-semibold text-gray-700 truncate">📍 '+esc(k)+'</span>'
+        +'<span class="text-xs text-gray-400 flex-shrink-0 ml-2">'+groups[k].length+' 筆</span>'
+        +'</div>'
+        +groups[k].slice(0,5).map(recentRow).join('')
+        +(groups[k].length>5?'<div class="px-3 py-2 text-xs text-gray-400 text-center">還有 '+(groups[k].length-5)+' 筆，請至「歷史資料」查看</div>':'')
+        +'</div>';
+    }).join('');
   } else {
-    $('recent-section').classList.remove('hidden');
-    $('no-recent').classList.add('hidden');
-    var rh='';
-    recent.forEach(function(r){
-      rh+='<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">'
+    list.className='space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2';
+    list.innerHTML=all.slice(0,5).map(function(r){
+      return '<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">'
         +'<div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
         +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800 truncate">'+esc(r.caseName)+'</div>'
         +'<div class="text-xs text-gray-500 truncate">'+esc(r.templateName)+' · '+esc(r.personnel)+'</div></div>'
         +'<div class="text-right flex-shrink-0"><div class="text-xs text-gray-400">'+esc(r.date)+'</div>'
         +'<div class="text-xs mt-1 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</div></div>'
         +'</div>';
-    });
-    $('recent-list').innerHTML=rh;
+    }).join('');
   }
+}
+// 依案場分組時，組內每一列（案場名已在標題，這裡不重複顯示）
+function recentRow(r){
+  return '<div onclick="viewReport(\''+r.id+'\')" class="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b border-gray-50 last:border-0">'
+    +'<div class="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
+    +'<div class="flex-1 min-w-0"><div class="text-sm text-gray-800 truncate">'+esc(r.templateName)+'</div>'
+    +'<div class="text-xs text-gray-500 truncate">'+esc(r.date)+' · '+esc(r.personnel)+'</div></div>'
+    +'<div class="text-xs flex-shrink-0 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓':'草稿')+'</div>'
+    +'</div>';
+}
+function paintRecentTabs(){
+  ['date','case'].forEach(function(m){
+    var b=$('rm-'+m); if(!b) return;
+    b.className='flex-1 py-1.5 rounded-lg font-medium transition-all'
+      + (S.recentMode===m ? ' bg-white text-blue-700 shadow-sm' : ' text-gray-500');
+  });
+}
+function setRecentMode(m){
+  S.recentMode = (m==='case' ? 'case' : 'date');
+  try{ localStorage.setItem('sop_recent_mode', S.recentMode); }catch(e){}
+  renderHome();
 }
 
 // ====== HEADER FORM ======
@@ -528,6 +588,35 @@ function renderHeaderForm(){
   $('f-date').value=today();
   if(S.config.departments.length) $('f-dept').value=S.config.departments[0];
   if(S.config.personnel.length)   $('f-person').value=S.config.personnel[0];
+  lockIdentityFields();
+}
+
+/* ── 部門／填表人員：自動帶入登入身分並鎖住（2026-08-13 新增）──
+ * 以前這兩欄是可以自己選的下拉，等於誰都能掛別人的名字送出。
+ * 現在直接吃入口登入的身分、變灰不可改。
+ * 只有在真的抓不到登入身分時才維持可選（本機測試／URL 進來沒帶身分的情況）。 */
+function lockIdentityFields(){
+  var u = S.currentUser || {};
+  var pairs = [['f-person', u.name], ['f-dept', u.dept]];
+  pairs.forEach(function(p){
+    var el = $(p[0]), val = p[1];
+    if(!el) return;
+    if(!val){                                   // 抓不到身分 → 保持原本可選，不要把人卡死
+      el.disabled = false;
+      el.classList.remove('bg-gray-100','text-gray-600','cursor-not-allowed');
+      el.removeAttribute('title');
+      return;
+    }
+    // 清單裡沒有這個人／這個部門時補一個選項，否則 value 設不進去會變空白
+    var has = Array.prototype.some.call(el.options, function(o){ return o.value === val; });
+    if(!has) el.insertAdjacentHTML('beforeend','<option value="'+esc(val)+'">'+esc(val)+'</option>');
+    el.value = val;
+    el.disabled = true;                          // disabled 的 select 讀 .value 仍讀得到，送出不受影響
+    el.classList.add('bg-gray-100','text-gray-600','cursor-not-allowed');
+    el.title = '依登入身分自動帶入，不可修改';
+  });
+  var hint = $('identity-hint');
+  if(hint) hint.classList.toggle('hidden', !(u.name));
 }
 
 function handleCaseSelect(){
@@ -795,11 +884,22 @@ function renderHistory(){
   // fill filter template select
   var sel=$('h-filter-tpl');
   if(sel.options.length<=1){
-    TEMPLATES.forEach(function(t){ sel.innerHTML+='<option value="'+t.id+'">'+esc(t.name)+'</option>'; });
+    // 已作廢的工法也要留在篩選清單裡，否則舊報表篩不到
+    TEMPLATES.forEach(function(t){ sel.innerHTML+='<option value="'+t.id+'">'+esc(t.name)+(t.void?'（已作廢）':'')+'</option>'; });
   }
-  var ft=sel.value, fs=$('h-filter-status').value;
-  var list=[].concat(visibleReports())
-    .filter(function(r){ return (!ft||r.templateId===ft)&&(!fs||r.status===fs); })
+  // 案場篩選（2026-08-13 新增）：選項直接從現有報表長出來，每次重繪都更新但保留使用者當下的選擇
+  var csel=$('h-filter-case');
+  var mine=[].concat(visibleReports());
+  var cases=[]; mine.forEach(function(r){ var c=r.caseName||''; if(c&&cases.indexOf(c)<0)cases.push(c); });
+  cases.sort();
+  var keep=csel.value;
+  csel.innerHTML='<option value="">全部案場</option>'
+    +cases.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+  if(cases.indexOf(keep)>=0) csel.value=keep;   // 選的案場還在就保留，被篩掉就退回「全部」
+
+  var ft=sel.value, fs=$('h-filter-status').value, fc=csel.value;
+  var list=mine
+    .filter(function(r){ return (!ft||r.templateId===ft)&&(!fs||r.status===fs)&&(!fc||r.caseName===fc); })
     .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
 
   if(list.length===0){
@@ -943,7 +1043,8 @@ function renderTemplatesSection(){
   if(!S.editingTplId && TEMPLATES.length) S.editingTplId = TEMPLATES[0].id;
   var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || TEMPLATES[0];
   var selOpts = TEMPLATES.map(function(t){
-    return '<option value="'+esc(t.id)+'"'+(tpl && t.id === tpl.id ? ' selected' : '')+'>'+esc(t.icon||'')+' '+esc(t.name)+'</option>';
+    return '<option value="'+esc(t.id)+'"'+(tpl && t.id === tpl.id ? ' selected' : '')+'>'
+      +esc(t.icon||'')+' '+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
   }).join('');
   var itemsHtml = '';
   if(tpl && tpl.items && tpl.items.length){
@@ -984,7 +1085,17 @@ function renderTemplatesSection(){
       +'<span class="text-xs text-gray-400">（單一 emoji）</span>'
       +'</div>'
       +'</div>'
-      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="mt-3 text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>':'')
+      // 作廢／恢復（2026-08-13 新增）：作廢後首頁選不到、不能再新建，歷史報表完全不受影響
+      +'<div class="mt-3 flex items-center gap-3 flex-wrap">'
+      +(tpl.void
+        ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
+        : '<button onclick="voidTemplate(\''+tpl.id+'\')" class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此工法</button>')
+      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>':'')
+      +'</div>'
+      +'<div class="text-xs text-gray-500 mt-2">'
+      +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
+                 : '作廢＝停用但不刪除，歷史報表不受影響，隨時可恢復。')
+      +'</div>'
       +'</div>';
   }
   el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-3">🔧 工法管理</h3>'
@@ -994,6 +1105,8 @@ function renderTemplatesSection(){
     +'<select onchange="switchTplEditor(this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+selOpts+'</select>'
     +'<button onclick="addTemplate()" class="px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 flex-shrink-0">+ 新增工法</button>'
     +'</div>'
+    // 複製工法（2026-08-13 新增）：整份複製，含所有查驗項目與準則
+    +(tpl?'<button onclick="duplicateTemplate(\''+tpl.id+'\')" class="mt-2 w-full border-2 border-dashed border-indigo-300 text-indigo-600 font-medium py-2 rounded-xl text-sm hover:bg-indigo-50">⧉ 複製目前這個工法（含所有查驗項目）</button>':'')
     +'</div>'
     +tplInfoHtml
     +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗項目（共 '+(tpl.items||[]).length+' 項）</div>'
@@ -1034,6 +1147,52 @@ function addTemplate(){
   syncTemplatesToConfig();
   renderTemplatesSection();
 }
+/* ── 複製工法（2026-08-13 新增）──
+ * 整份複製：名稱、材質標籤、圖示、所有查驗項目與準則都帶過去。
+ * 每個項目都給新 id，否則兩個工法共用同一個項目 id，改一邊會動到另一邊。 */
+function duplicateTemplate(tplId){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  if(!confirm('要複製工法「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
+  var copy = {
+    id: uid(),
+    name: tpl.name + '（複本）',
+    materialLabel: tpl.materialLabel,
+    icon: tpl.icon,
+    items: (tpl.items||[]).map(function(it){
+      return { id: uid(), name: it.name, criterion: it.criterion || '' };
+    })
+  };
+  TEMPLATES.push(copy);
+  S.editingTplId = copy.id;
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+  showToast('已複製 — 請改名後儲存設定');
+}
+/* ── 作廢／恢復（2026-08-13 新增）──
+ * 作廢＝停用不刪除：首頁選不到、不能新建；既有歷史報表為快照儲存，完全不受影響。
+ * 用 void 旗標而不是真的刪掉，隨時可恢復，也不會讓歷史報表的工法名稱變成孤兒。 */
+function voidTemplate(tplId){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  var live = TEMPLATES.filter(function(t){ return !t.void; });
+  if(live.length <= 1){ alert('至少要保留一個可用的工法，無法全部作廢。'); return; }
+  if(!confirm('確定把工法「'+tpl.name+'」設為作廢？\n\n・首頁不會再出現，無法新建這個工法的報表\n・既有歷史報表照常顯示、可列印\n・之後隨時可以在這裡按「恢復使用」')) return;
+  tpl.void = true;
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+  showToast('已作廢 — 記得拉到最下方按「儲存設定」');
+}
+function restoreTemplate(tplId){
+  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
+  if(!tpl) return;
+  delete tpl.void;
+  syncTemplatesToConfig();
+  renderTemplatesSection();
+  showToast('已恢復使用 — 記得拉到最下方按「儲存設定」');
+}
+/* 首頁／新建流程只吃「沒作廢」的工法；歷史與列印一律吃全部（含已作廢） */
+function liveTemplates(){ return TEMPLATES.filter(function(t){ return !t.void; }); }
 function updateTemplate(tplId, field, value){
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
@@ -1218,8 +1377,57 @@ function portalLoggedIn(){
     return !!(p.currentUser && p.currentUser.name);
   } catch(e){ return false; }
 }
+
+/* ── 使用權限閘門（2026-08-13 新增）──────────────────────────────────
+ * 入口網頁只是把沒開通的卡片變灰，知道網址的人直接貼網址照樣進得來。
+ * 這裡在子 App 自己再檢查一次：依 window.APP_KEY 讀登入者的 appAccess，
+ * 沒開通（或已離職停用）就蓋上擋門，不初始化任何內容。
+ * ⚠️ 這仍是「畫面層」控管——資料庫規則目前對外開放，真正的伺服器端驗證要等 F 版。
+ * 查不到員工資料時一律放行，避免資料缺漏把人鎖在門外。 */
+function portalAppAllowed(){
+  try{
+    var key = window.APP_KEY || '';
+    if (!key) return true;
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u = p.currentUser;
+    if (!u) return true;
+    var emps = p.employees || [];
+    var emp = emps.filter(function(e){ return e && e.id === u.id; })[0]
+           || emps.filter(function(e){ return e && e.name === u.name; })[0];
+    if (!emp) return true;                                  // 查無此人 → 放行，交給入口控管
+    var d = new Date(), pad = function(n){ return (n<10?'0':'')+n; };
+    var today = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    if (emp.resignDate && today > emp.resignDate) return false;         // 離職停用 → 全鎖
+    return !(emp.appAccess && emp.appAccess[key] === false);
+  }catch(e){ return true; }
+}
+function showNoAccessGate(){
+  var g = document.getElementById('app-access-gate');
+  if (!g) {
+    g = document.createElement('div');
+    g.id = 'app-access-gate';
+    g.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;'
+      + 'justify-content:center;padding:20px;overflow-y:auto;'
+      + 'background:linear-gradient(135deg,#0f172a 0%,#334155 55%,#0f172a 100%)';
+    var nm = (document.title||'本系統').replace(/（測試版）/g,'');
+    g.innerHTML = '<div style="background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.45);'
+      + 'max-width:360px;width:100%;padding:32px 26px;text-align:center;margin:auto">'
+      + '<div style="font-size:50px;margin-bottom:8px">🚫</div>'
+      + '<div style="font-size:18px;font-weight:800;color:#b91c1c;margin-bottom:10px">沒有這個系統的使用權限</div>'
+      + '<div style="font-size:13px;color:#64748b;line-height:1.8;margin-bottom:22px">你的帳號尚未開通<br>'
+      + '<strong>「' + nm + '」</strong><br>需要使用請洽系統管理員</div>'
+      + '<a href="../portal/index.html" style="display:block;background:#334155;color:#fff;font-weight:800;'
+      + 'font-size:14.5px;text-decoration:none;padding:11px;border-radius:9px">← 回入口網頁</a></div>';
+    document.body.appendChild(g);
+  }
+  g.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
 function enforcePortalLogin(){
-  if (portalLoggedIn()) { document.getElementById('portal-gate').style.display='none'; return true; }
+  if (portalLoggedIn()) {
+    if (!portalAppAllowed()) { showNoAccessGate(); return false; }   // 沒開通這支 App → 擋下
+    document.getElementById('portal-gate').style.display='none'; return true;
+  }
   document.getElementById('portal-gate').style.display='flex';
   document.body.style.overflow='hidden';
   return false;
