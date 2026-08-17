@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -997,17 +997,25 @@ function isResigned(emp) {
   return !!(emp && emp.resignDate && todayStr() > emp.resignDate);
 }
 
+/* 2026-08-17：改讀角色上的「權限設定」勾選框（canManageRoles），與 v2 入口同一套判斷。
+ * 這支舊版入口沒有勾選框 UI（勾選在 v2 入口做），但一定要認同一個欄位 ——
+ * 不然在 v2 取消某角色的「權限設定」之後，那個人只要改開舊版入口的網址就繞過去了。
+ * 舊資料還沒有這個欄位時退回原本的名稱比對，不會把人鎖在門外。
+ * 「總經理」是 2026-08-13 補的：總經理室權限等同總經理，原本因名稱沒有「主管/副總」被誤擋。 */
+const LEGACY_ROLE_ADMIN_RE = /主管|副總|總經理|系統管理員/;
+function roleCanManageRoles(r) {
+  if (!r) return false;
+  if (typeof r.canManageRoles === 'boolean') return r.canManageRoles;
+  return LEGACY_ROLE_ADMIN_RE.test(r.name || '');
+}
 function canEditRoles() {
-  // 僅「部門主管 / 副總 / 系統管理員」類角色可編輯權限設定（依角色名稱判定，涵蓋
-  // 部門主管、各事業處(主管)、副總經理、系統管理員；一般員工、(員工)角色、總經理室看全部者皆唯讀）
   if (!S.currentUser) return false;
   const r = getRole(S.currentUser.roleId);
   if (!r) {
     console.log('[canEditRoles] ❌ 拒絕 — 找不到角色（roleId=' + S.currentUser.roleId + '）');
     return false;
   }
-  // 2026-08-13 補上「總經理」：總經理室的權限等同總經理，原本因為角色名沒有「主管/副總」被誤擋
-  const can = /主管|副總|總經理|系統管理員/.test(r.name || '');
+  const can = roleCanManageRoles(r);
   console.log('[canEditRoles]', can ? '✅ 允許' : '❌ 拒絕',
     '— 角色：', r.name);
   return can;

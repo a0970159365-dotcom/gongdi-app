@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-17.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -197,7 +197,7 @@ input[type="file"]{display:none}
 }
 @media screen{.print-header{display:none}.pv{display:none}}
 /* ── 設定維護權（2026-08-17）──
- * 角色沒勾「可維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
+ * 角色沒勾「維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
  * 欄位也改不動。用 CSS 而非逐一 style.display 是因為兩層設定會重繪，重繪後規則自動生效。*/
 body.no-mng #page-settings [data-mng]{display:none!important}
 body.no-mng #page-settings input,
@@ -1210,7 +1210,7 @@ function applyAppLock(){
 }
 
 /* ── 設定維護權（2026-08-17）────────────────────────────────────────
- * 入口的權限設定可以逐一角色勾「可維護設定」。沒勾的人進系統設定頁只能看：
+ * 入口的權限設定可以逐一角色勾「維護設定」。沒勾的人進系統設定頁只能看：
  * 清單照常顯示（要查「有沒有這家廠商」查得到），但「＋ 新增」「💾 儲存設定」不出現、欄位也改不動。
  * 用途是避免同仁誤加共用清單（案場／施作位置／施工項目／廠商／材料）。
  * 舊資料還沒有這個欄位時，比照入口的遷移規則（名稱含「主管」或看全公司）判斷，避免主管突然被擋。
@@ -1249,7 +1249,7 @@ function applyMngSettingsUI(){
     bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
       + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
     bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、廠商、材料，但不能新增或修改。'
-      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「權限設定」勾選「可維護設定」即可開通）。</span>';
+      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「⚙️ 設定 → 權限設定」把這個角色的「資料維護」打勾即可開通）。</span>';
   }
   if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
 }
@@ -2856,7 +2856,7 @@ function init(){
     updateNavUser();
     initReport();
     applyAppLock();   // 部門範圍鎖：不在 APP_DEPTS 範圍內 → 掛唯讀提示條、收掉寫入按鈕
-    applyMngSettingsUI();   // 設定維護權：沒勾「可維護設定」→ 設定頁只能看
+    applyMngSettingsUI();   // 設定維護權：沒勾「維護設定」→ 設定頁只能看
   } else {
     // 未從入口登入：蓋上閘門，不初始化任何內容
     $('login-overlay').style.display = 'flex';

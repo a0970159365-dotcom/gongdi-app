@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-08-17.2';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -241,7 +241,7 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 }
 @media(max-width:767px){nav{padding:6px 10px}.nav-logo{font-size:13px}.nav-btn{padding:5px 7px;font-size:11px}.nav-spacer{display:none}.nav-user{padding:3px 8px;font-size:11px}}
 /* ── 設定維護權（2026-08-17）──
- * 角色沒勾「可維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
+ * 角色沒勾「維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
  * 欄位也改不動。用 CSS 而非逐一 style.display 是因為清單會重繪，重繪後規則自動生效。*/
 body.no-mng #page-settings [data-mng]{display:none!important}
 body.no-mng #page-settings input,
@@ -1783,7 +1783,7 @@ function requireDelete(){
 }
 
 /* ── 設定維護權（2026-08-17）────────────────────────────────────────
- * 入口的權限設定可以逐一角色勾「可維護設定」。沒勾的人進系統設定頁只能看：
+ * 入口的權限設定可以逐一角色勾「維護設定」。沒勾的人進系統設定頁只能看：
  * 清單照常顯示（要查「有沒有這個案場」查得到），但「＋ 新增」「💾 儲存設定」不出現、欄位也改不動。
  * 用途是避免同仁誤加共用清單（案場／施作位置／工作項目／狀態）。
  * 舊資料還沒有這個欄位時，比照入口的遷移規則（名稱含「主管」或看全公司）判斷，避免主管突然被擋。
@@ -1822,7 +1822,7 @@ function applyMngSettingsUI(){
     bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
       + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
     bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、施作位置、狀態，但不能新增或修改。'
-      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「權限設定」勾選「可維護設定」即可開通）。</span>';
+      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「⚙️ 設定 → 權限設定」把這個角色的「資料維護」打勾即可開通）。</span>';
   }
   if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
 }
@@ -1926,7 +1926,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
   updateNavUser();
   updateDataLists();
-  applyMngSettingsUI();   // 設定維護權：沒勾「可維護設定」→ 設定頁只能看
+  applyMngSettingsUI();   // 設定維護權：沒勾「維護設定」→ 設定頁只能看
   initFb().then(()=>{
     document.getElementById('login-overlay').style.display = 'none';
   });
