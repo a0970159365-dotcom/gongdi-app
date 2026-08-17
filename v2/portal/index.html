@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-17.2';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-17.3';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -640,6 +640,24 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         <label>描述</label>
         <input class="fi" id="role-desc" placeholder="說明這個角色的用途" maxlength="100">
       </div>
+      <!-- 以下六項的上下順序＝權限角色表的欄位順序（2026-08-17 用戶要求兩邊一致）：
+           系統設定刪除｜人員權限｜資料檢視｜資料編輯｜資料維護｜跨部門互看 -->
+      <div class="form-row">
+        <label>系統設定刪除</label>
+        <label class="checkbox-item" style="font-weight:600">
+          <input type="checkbox" id="role-can-delete">
+          可刪除系統設定的各種清單、以及歷史報表／紀錄
+        </label>
+        <div class="hint">不勾選的角色，刪除按鈕直接不會出現，只能新增和修改。用來避免同仁誤刪共用設定與歷史資料。</div>
+      </div>
+      <div class="form-row">
+        <label>人員權限</label>
+        <label class="checkbox-item" style="font-weight:600">
+          <input type="checkbox" id="role-can-manage-roles">
+          可維護入口的部門、員工、權限角色
+        </label>
+        <div class="hint">不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「資料維護」分開，所以可以「能加廠商但不能改別人的權限」。</div>
+      </div>
       <div class="form-row">
         <label>資料檢視 <span style="color:var(--danger)">*</span></label>
         <div class="level-radio-group">
@@ -648,11 +666,6 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <label class="level-radio"><input type="radio" name="role-level" value="cross" onchange="onRoleLevelChange()"><span class="level-pill level-cross">跨部門</span> 本部門 + 指定部門</label>
           <label class="level-radio"><input type="radio" name="role-level" value="all" onchange="onRoleLevelChange()"><span class="level-pill level-all">全部</span> 全公司</label>
         </div>
-      </div>
-      <div class="form-row" id="role-cross-box" style="display:none">
-        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
-        <div id="role-cross-list" class="checkbox-list"></div>
-        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
       </div>
       <div class="form-row">
         <label>資料編輯 <span style="color:var(--danger)">*</span></label>
@@ -672,21 +685,14 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         </label>
         <div class="hint">不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</div>
       </div>
-      <div class="form-row">
-        <label>人員權限</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-manage-roles">
-          可維護入口的部門、員工、權限角色
-        </label>
-        <div class="hint">不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「資料維護」分開，所以可以「能加廠商但不能改別人的權限」。</div>
-      </div>
-      <div class="form-row">
-        <label>系統設定刪除</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-delete">
-          可刪除系統設定的各種清單、以及歷史報表／紀錄
-        </label>
-        <div class="hint">不勾選的角色，刪除按鈕直接不會出現，只能新增和修改。用來避免同仁誤刪共用設定與歷史資料。</div>
+      <!-- 跨部門互看清單：只有「資料檢視」選了跨部門才顯示。
+           排在最後是為了跟表格順序一致；因為它離「資料檢視」變遠了，
+           顯示時多一條提示告訴使用者「往下看」，免得選了跨部門卻沒發現要勾部門。 -->
+      <div class="form-row" id="role-cross-box" style="display:none">
+        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
+        <div class="hint" style="margin-bottom:8px;color:var(--accent);font-weight:600">⬇️ 「資料檢視」選了跨部門，請在這裡勾要互看哪些部門。</div>
+        <div id="role-cross-list" class="checkbox-list"></div>
+        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
       </div>
     </div>
     <div class="modal-footer">
