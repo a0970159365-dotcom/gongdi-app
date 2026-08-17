@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -486,6 +486,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
             <th>角色名稱</th>
             <th style="width:110px">檢視範圍</th>
             <th style="width:110px">編輯範圍</th>
+            <th style="width:100px">維護設定</th>
             <th style="width:90px">刪除權</th>
             <th>跨部門互看</th>
             <th style="text-align:right;width:140px">操作</th>
@@ -658,6 +659,14 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <label class="level-radio"><input type="radio" name="role-edit-level" value="cross"><span class="level-pill level-cross">跨部門</span> 可改本部門 + 指定部門</label>
           <label class="level-radio"><input type="radio" name="role-edit-level" value="all"><span class="level-pill level-all">全部</span> 全公司</label>
         </div>
+      </div>
+      <div class="form-row">
+        <label>設定維護權限</label>
+        <label class="checkbox-item" style="font-weight:600">
+          <input type="checkbox" id="role-can-manage-settings">
+          可維護設定（各 App 系統設定頁的新增／儲存）
+        </label>
+        <div class="hint">不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</div>
       </div>
       <div class="form-row">
         <label>刪除權限</label>
@@ -845,15 +854,15 @@ const SEED_EMPS = [
 ];
 const SEED_ROLES = [
   { id:'r1', code:'R001', name:'一般員工', desc:'可檢視和編輯自己建立的資料；可檢視同部門人員的資料',
-    level:'dept', editLevel:'self', canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
+    level:'dept', editLevel:'self', canManageSettings:false, canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
   { id:'r2', code:'R002', name:'部門主管', desc:'可檢視和編輯本部門所有人員建立的資料',
-    level:'dept', editLevel:'dept', canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
+    level:'dept', editLevel:'dept', canManageSettings:true, canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
   { id:'r3', code:'R003', name:'跨部門協作', desc:'可檢視本部門 + 指定其他部門資料（雙向互看）',
-    level:'cross', editLevel:'cross', canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
+    level:'cross', editLevel:'cross', canManageSettings:false, canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
   { id:'r4', code:'R004', name:'系統管理員', desc:'可檢視和編輯全公司所有資料',
-    level:'all', editLevel:'all', canDelete:true, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
+    level:'all', editLevel:'all', canManageSettings:true, canDelete:true, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
   { id:'r5', code:'R005', name:'總經理室', desc:'可檢視全公司所有部門人員資料',
-    level:'all', editLevel:'none', canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
+    level:'all', editLevel:'none', canManageSettings:true, canDelete:false, crossDepts:[], appAccess:{cdr:true,cdr_pm:true,dtp:true,dtp_pm:true,sop:true} },
 ];
 
 /* ── State ── */
@@ -932,6 +941,13 @@ function migrateRoles() {
     // 之後管理者在權限設定裡自行勾選要開給誰，這裡不再覆寫。
     if (typeof r.canDelete !== 'boolean') {
       r.canDelete = (r.name === '系統管理員');
+      changed = true;
+    }
+    // 缺 canManageSettings（2026-08-17 新增的「可維護設定」）→ 依現況預設，讓大家權限與加這個欄位之前一致：
+    // 「主管級」= 名稱含「主管」，或檢視範圍是全公司（副總／總經理室／系統管理員）→ 預設可維護。
+    // 一般員工與各「（員工）」角色 → 預設不可。之後由管理者在權限設定裡自行勾選，這裡不再覆寫。
+    if (typeof r.canManageSettings !== 'boolean') {
+      r.canManageSettings = (/主管/.test(r.name || '') || r.level === 'all');
       changed = true;
     }
     // 強制更新描述（如名稱對應到 ROLE_DESC_UPDATES）
@@ -1643,7 +1659,7 @@ function renderRoles() {
   const addBtn = $('btn-add-role'); if (addBtn) addBtn.style.display = canEdit ? '' : 'none';
   const lockNote = $('role-lock-note'); if (lockNote) lockNote.style.display = canEdit ? 'none' : '';
   if (!S.roles.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">尚無角色資料</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">尚無角色資料</td></tr>';
     return;
   }
   tbody.innerHTML = S.roles.map((r, idx) => {
@@ -1667,6 +1683,9 @@ function renderRoles() {
         </td>
         <td><span class="level-pill level-${r.level}">${LEVEL_LABEL[r.level]||r.level}</span></td>
         <td><span class="level-pill level-${editLv}">${EDIT_LEVEL_LABEL[editLv]||editLv}</span></td>
+        <td>${r.canManageSettings
+              ? '<span class="level-pill level-all">可維護</span>'
+              : '<span class="level-pill level-none">唯讀</span>'}</td>
         <td>${r.canDelete
               ? '<span class="level-pill level-all">可刪除</span>'
               : '<span class="level-pill level-none">不可刪</span>'}</td>
@@ -1696,10 +1715,10 @@ function onRoleLevelChange() {
 /* ── 角色名稱下拉變更時，同步建議「可看範圍」 ── */
 const ROLE_NAME_PRESETS = {
   '一般員工':   { level:'dept',  editLevel:'self' },
-  '部門主管':   { level:'dept',  editLevel:'dept' },
+  '部門主管':   { level:'dept',  editLevel:'dept', canManageSettings:true },
   '跨部門協作': { level:'cross', editLevel:'cross' },
-  '系統管理員': { level:'all',   editLevel:'all',  canDelete:true },
-  '總經理室':   { level:'all',   editLevel:'none' },
+  '系統管理員': { level:'all',   editLevel:'all',  canManageSettings:true, canDelete:true },
+  '總經理室':   { level:'all',   editLevel:'none', canManageSettings:true },
 };
 function onRoleNamePresetChange() {
   const sel = $('role-name-sel').value;
@@ -1716,6 +1735,7 @@ function onRoleNamePresetChange() {
       const p = ROLE_NAME_PRESETS[sel];
       document.querySelectorAll('input[name="role-level"]').forEach(r => r.checked = (r.value === p.level));
       document.querySelectorAll('input[name="role-edit-level"]').forEach(r => r.checked = (r.value === p.editLevel));
+      $('role-can-manage-settings').checked = !!p.canManageSettings;
       $('role-can-delete').checked = !!p.canDelete;
       onRoleLevelChange();
     }
@@ -1749,6 +1769,7 @@ function openRoleModal() {
   $('role-desc').value = '';
   document.querySelectorAll('input[name="role-level"]').forEach(r => r.checked = (r.value === 'self'));
   document.querySelectorAll('input[name="role-edit-level"]').forEach(r => r.checked = (r.value === 'self'));
+  $('role-can-manage-settings').checked = false;
   $('role-can-delete').checked = false;
   $('role-cross-box').style.display = 'none';
   openModal('role-modal');
@@ -1766,6 +1787,7 @@ function editRole(id) {
   document.querySelectorAll('input[name="role-level"]').forEach(x => x.checked = (x.value === r.level));
   const editLv = r.editLevel || r.level || 'self';
   document.querySelectorAll('input[name="role-edit-level"]').forEach(x => x.checked = (x.value === editLv));
+  $('role-can-manage-settings').checked = !!r.canManageSettings;
   $('role-can-delete').checked = !!r.canDelete;
   if (r.level === 'cross') {
     $('role-cross-box').style.display = 'block';
@@ -1781,6 +1803,7 @@ function saveRole() {
   const desc = $('role-desc').value.trim();
   const level = document.querySelector('input[name="role-level"]:checked')?.value || 'self';
   const editLevel = document.querySelector('input[name="role-edit-level"]:checked')?.value || 'self';
+  const canManageSettings = $('role-can-manage-settings').checked;
   const canDelete = $('role-can-delete').checked;
   let crossDepts = [];
   if (level === 'cross') {
@@ -1799,9 +1822,9 @@ function saveRole() {
 
   if (S.editRoleId) {
     const i = S.roles.findIndex(r => r.id === S.editRoleId);
-    if (i >= 0) S.roles[i] = { ...S.roles[i], code, name, desc, level, editLevel, canDelete, crossDepts };
+    if (i >= 0) S.roles[i] = { ...S.roles[i], code, name, desc, level, editLevel, canManageSettings, canDelete, crossDepts };
   } else {
-    S.roles.push({ id: uid(), code, name, desc, level, editLevel, canDelete, crossDepts });
+    S.roles.push({ id: uid(), code, name, desc, level, editLevel, canManageSettings, canDelete, crossDepts });
   }
   // 對稱模式：crossDepts 由子 App 的資料過濾邏輯雙向解讀，這邊不需動其他角色的設定
 

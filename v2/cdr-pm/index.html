@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -196,6 +196,13 @@ input[type="file"]{display:none}
   .sig-lbl{font-size:11px;color:var(--muted);font-weight:700}
 }
 @media screen{.print-header{display:none}.pv{display:none}}
+/* ── 設定維護權（2026-08-17）──
+ * 角色沒勾「可維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
+ * 欄位也改不動。用 CSS 而非逐一 style.display 是因為兩層設定會重繪，重繪後規則自動生效。*/
+body.no-mng #page-settings [data-mng]{display:none!important}
+body.no-mng #page-settings input,
+body.no-mng #page-settings textarea,
+body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#6b7280}
 </style>
 
 <!-- Firebase compat SDK（跨裝置同步） -->
@@ -271,6 +278,13 @@ input[type="file"]{display:none}
   <div class="stat-grid" id="stat-grid" style="display:none">
     <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日出工累計</div></div>
     <div class="stat-card stat-green"><div class="stat-val" id="st-tmrw">0</div><div class="stat-lbl">明日預估出工</div></div>
+  </div>
+
+  <!-- 同日已有報表提示（2026-08-16 取代原本會跳出來擋路的 confirm 對話框） -->
+  <div id="dup-notice" class="no-print" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
+       border-radius:10px;padding:11px 14px;margin-bottom:14px;align-items:center;gap:10px;flex-wrap:wrap">
+    <span id="dup-notice-text" style="flex:1;min-width:200px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7"></span>
+    <button class="btn btn-p btn-sm" onclick="joinDupReport()">👥 加入一起填</button>
   </div>
 
   <!-- 基本資訊 -->
@@ -658,7 +672,7 @@ input[type="file"]{display:none}
     <div class="card-header" style="flex-direction:column;align-items:stretch;gap:0;padding-bottom:0">
       <div class="flex-b" style="padding-bottom:10px;justify-content:flex-end">
         <div class="flex gap2">
-          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存設定</button>
+          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存設定</button>
           <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
         </div>
       </div>
@@ -679,8 +693,8 @@ input[type="file"]{display:none}
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組二：專案/工地維護</span>
         <div class="flex gap2">
           <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
-          <button class="btn btn-a btn-sm no-print" onclick="openProjModal()">＋ 新增</button>
-          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+          <button class="btn btn-a btn-sm no-print" data-mng onclick="openProjModal()">＋ 新增</button>
+          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
         </div>
       </div>
       <div class="tbl-wrap">
@@ -704,15 +718,15 @@ input[type="file"]{display:none}
       <!-- 群組三：材料名稱與單位 -->
       <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組三：材料名稱與單位</span>
-        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
       </div>
       <div class="g g2" style="gap:16px;align-items:start">
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matnames')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matnames')">＋ 新增</button></div>
           <div class="list-field" id="lf-matnames"></div>
         </div>
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matunits')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
           <div class="list-field" id="lf-matunits"></div>
         </div>
       </div>
@@ -722,13 +736,13 @@ input[type="file"]{display:none}
       <!-- 群組四：施工明細設定 -->
       <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組四：施工明細設定</span>
-        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
       </div>
       <!-- 4-1 施作位置 → 施工項目（兩層） -->
       <div class="fg" style="margin-bottom:18px">
         <div class="flex-b mb2">
           <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
-          <button class="btn btn-a btn-sm" onclick="addLocGroup()">＋ 新增施作位置</button>
+          <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
         </div>
         <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
         <div id="loc-groups"></div>
@@ -738,7 +752,7 @@ input[type="file"]{display:none}
       <div class="fg">
         <div class="flex-b mb2">
           <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
-          <button class="btn btn-a btn-sm" onclick="addVendorGroup()">＋ 新增廠商</button>
+          <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
         </div>
         <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
         <div id="vendor-groups"></div>
@@ -746,7 +760,7 @@ input[type="file"]{display:none}
 
       <!-- 底部按鈕 -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <button class="btn btn-p" onclick="saveSettings()">💾 儲存設定</button>
+        <button class="btn btn-p" data-mng onclick="saveSettings()">💾 儲存設定</button>
         <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回主系統</button>
       </div>
 
@@ -756,6 +770,40 @@ input[type="file"]{display:none}
 </div><!-- /container -->
 
 <!-- PROJ MODAL -->
+<!-- CARRY MODAL：按「＋ 新增」時，自己選要不要帶入舊資料、帶哪一張、帶哪些東西（2026-08-16） -->
+<div id="carry-overlay" class="overlay">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title">新增日報表</div>
+
+    <!-- 今天已經有人建過 → 提醒先加入共編，不要又開一張 -->
+    <div id="carry-today-note" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
+         border-radius:8px;padding:11px 13px;margin-bottom:14px;font-size:13px;line-height:1.7">
+      <div id="carry-today-text" style="font-weight:700;color:#92400e;margin-bottom:8px"></div>
+      <button class="btn btn-p btn-sm" onclick="carryJoinToday()">👥 加入一起填</button>
+    </div>
+
+    <div class="fl" style="margin-bottom:6px">要帶入哪一張的內容？</div>
+    <div id="carry-list" style="max-height:230px;overflow-y:auto;border:1.5px solid var(--border);
+         border-radius:8px;padding:6px;margin-bottom:14px"></div>
+
+    <div class="fl" style="margin-bottom:6px">要帶什麼過來？</div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;font-size:13px">
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-mat" checked> 材料明細<span style="color:var(--muted)">（數量歸零）</span></label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-notes" checked> 注意事項</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-work"> 工項</label>
+    </div>
+
+    <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-o" onclick="closeCarryModal()">取消</button>
+      <button class="btn btn-o" onclick="carryBlank()">不用，空白就好</button>
+      <button class="btn btn-a" onclick="carryApply()">帶入</button>
+    </div>
+  </div>
+</div>
+
 <div id="proj-overlay" class="overlay">
   <div class="modal">
     <div class="modal-title" id="pm-title">新增專案/工地</div>
@@ -947,7 +995,7 @@ var _lastPushed = {};   // id -> 上次推上雲的 JSON 字串
  *   ③ 雲端有、我這台沒有的別人列 → 補進來（那是我載入之後他們才新增的）
  * 靠 workItem.id 對應，所以每一列的 id 必須穩定（addRow 會沿用既有 id）。
  */
-function mergeWorkItems(localItems, cloudItems, me){
+function mergeRows(localItems, cloudItems, me){
   var cloudById = new Map((cloudItems||[]).map(function(x){ return [x.id, x]; }));
   var localIds  = new Set((localItems||[]).map(function(x){ return x.id; }).filter(Boolean));
   // ①②：保持我這台的排列順序；別人的列換成雲端版本
@@ -959,6 +1007,44 @@ function mergeWorkItems(localItems, cloudItems, me){
     return x && x.id && !localIds.has(x.id) && x.owner && x.owner !== me;
   });
   return kept.concat(extra);
+}
+var mergeWorkItems = mergeRows;   // 舊名稱保留
+
+/* ── 整張報表合併（2026-08-16 擴大保護範圍）────────────────────────
+ * 舊版只合併 workItems，materials／photos／天氣／注意事項是「整包用我這台的蓋上去」
+ * → 兩個人同時填，後存的人會把先存的人填的材料、注意事項洗掉（看起來像「填的東西不見了」）。
+ *
+ * 現在分兩種欄位處理：
+ *   Ａ 一列一列的（workItems / materials / photos）→ 逐列合併，別人的列以雲端為準（mergeRows）
+ *   Ｂ 整格文字的（date / weather / notes…）→ 沒辦法逐列，改用「基準值比對」：
+ *        我打開這張報表當下的值＝基準。存檔時我這台的值跟基準一樣＝我沒動過 → 保留雲端最新版；
+ *        不一樣＝我真的改了 → 用我的。這樣「我沒碰的欄位」永遠不會蓋掉別人剛改的。
+ * 沒有基準（例如匯入進來、不是當下編輯的那張）→ 一律沿用舊行為（用我的），不冒然改動。
+ */
+var _baselines = {};   // 報表 id -> 打開當下的 JSON 快照
+function rememberBaseline(r){ try{ if(r&&r.id) _baselines[r.id]=JSON.stringify(r); }catch(e){} }
+function _pickScalar(mine, theirs, base){
+  if (base === undefined) return mine;                                  // 沒基準 → 照舊
+  if (JSON.stringify(mine) !== JSON.stringify(base)) return mine;       // 我改過 → 用我的
+  return theirs !== undefined ? theirs : mine;                          // 我沒改 → 保留雲端
+}
+function mergeReport(local, cloud, me, base){
+  if (!cloud) return local;
+  var out = Object.assign({}, local);
+  out.workItems = mergeRows(local.workItems, cloud.workItems, me);
+  out.materials = mergeRows(local.materials, cloud.materials, me);
+  out.photos    = mergeRows(local.photos,    cloud.photos,    me);
+  ['date','dept','reporter','weather'].forEach(function(k){
+    out[k] = _pickScalar(local[k], cloud[k], base ? base[k] : undefined);
+  });
+  var lb=local.notes||{}, cb=cloud.notes||{}, bb=(base&&base.notes)||null;
+  out.notes = {
+    contact: _pickScalar(lb.contact, cb.contact, bb ? bb.contact : undefined),
+    other:   _pickScalar(lb.other,   cb.other,   bb ? bb.other   : undefined)
+  };
+  // 摘要要含別人的列，否則只剩我自己那幾條
+  out.summary = summaryFromItems(out.workItems, out.date||'');
+  return out;
 }
 function _snapshotReports(list){
   var m={}; (list||[]).forEach(function(r){ if(r&&r.id) m[r.id]=JSON.stringify(r); }); return m;
@@ -997,16 +1083,14 @@ async function pushCloud(data) {
       if (window._cdrGet) {
         try {
           var cloud = await window._cdrGet('reports/' + r.id);
-          if (cloud && Array.isArray(cloud.workItems)) {
-            var merged = mergeWorkItems(r.workItems || [], cloud.workItems, me);
-            toWrite = Object.assign({}, r, {
-              workItems: merged,
-              summary: summaryFromItems(merged, r.date || '')   // 摘要要含別人的列，否則只剩我自己那幾條
-            });
+          if (cloud) {
+            var base = _baselines[r.id] ? JSON.parse(_baselines[r.id]) : null;
+            toWrite = mergeReport(r, cloud, me, base);
           }
         } catch(e) { /* 讀不到雲端就照原樣寫，至少不會擋住存檔 */ }
       }
       jobs.push(window._cdrSet('reports/' + r.id, toWrite));
+      rememberBaseline(toWrite);   // 存完之後，基準就是「剛剛寫上去的那份」，下次才比得出我又改了什麼
     }
     dels.forEach(function(id){ jobs.push(window._cdrRemove('reports/'+id)); });
     jobs.push(window._cdrSet('cfg', data.cfg));
@@ -1125,6 +1209,51 @@ function applyAppLock(){
     .forEach(function(b){ b.style.display='none'; });
 }
 
+/* ── 設定維護權（2026-08-17）────────────────────────────────────────
+ * 入口的權限設定可以逐一角色勾「可維護設定」。沒勾的人進系統設定頁只能看：
+ * 清單照常顯示（要查「有沒有這家廠商」查得到），但「＋ 新增」「💾 儲存設定」不出現、欄位也改不動。
+ * 用途是避免同仁誤加共用清單（案場／施作位置／施工項目／廠商／材料）。
+ * 舊資料還沒有這個欄位時，比照入口的遷移規則（名稱含「主管」或看全公司）判斷，避免主管突然被擋。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanManageSettings(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    if(!r) return false;
+    if(typeof r.canManageSettings !== 'boolean') return /主管/.test(r.name||'') || r.level === 'all';
+    return !!r.canManageSettings;
+  }catch(e){ return false; }
+}
+function requireManageSettings(){
+  if(portalCanManageSettings()) return true;
+  toast('你的角色只能檢視設定，不能新增或修改。需要開通請找主管或系統管理員','e');
+  return false;
+}
+/* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function mngGuard(){ return !requireManageSettings(); }
+/* 設定頁唯讀提示條 + 切換 body.no-mng（收掉 data-mng 按鈕、鎖住欄位） */
+function applyMngSettingsUI(){
+  const can = portalCanManageSettings();
+  document.body.classList.toggle('no-mng', !can);
+  const host = document.getElementById('page-settings');
+  if(!host) return;
+  const body = host.querySelector('.card-body') || host;
+  let bar = document.getElementById('mng-notice');
+  if(can){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'mng-notice';
+    bar.className = 'no-print';
+    bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
+      + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
+    bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、廠商、材料，但不能新增或修改。'
+      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「權限設定」勾選「可維護設定」即可開通）。</span>';
+  }
+  if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
+}
+
 /* ── PERMISSION（權限執行層：依入口角色的檢視/編輯範圍過濾資料） ── */
 function inScope(report, level){
   const u = S.user||{};
@@ -1180,7 +1309,7 @@ function goPage(p) {
     if (b.getAttribute('onclick')?.includes(`'${p}'`)) b.classList.add('active');
   });
   if (p==='history')  { renderHistory(); populateHistFilters(); }
-  if (p==='settings') loadCfgForm();
+  if (p==='settings') { loadCfgForm(); applyMngSettingsUI(); }
   if (p==='mgmt')    { renderMgmt(); populateMgmtFilters(); }
   if (p==='export')  initExportPage();
   if (p==='report')  autoGrowAll();   // 切回報表頁重新撐高（摘要等 textarea 在隱藏時 scrollHeight 量不準，回來再算一次）
@@ -1192,7 +1321,7 @@ function onDateChange() {
   if (!v) return;
   $('f-dow').value = '星期'+DOW[new Date(v+'T00:00:00').getDay()];
   checkDeptDateDuplicate();
-  autoCarryFromPrev();
+  // 2026-08-16 起不再自動帶入舊資料（改由「＋ 新增」的帶入視窗讓使用者自己選）
   buildSummary();   // 摘要開頭帶日期（20231231.案場…），改日期要跟著重算
 }
 function navDay(d) {
@@ -1206,46 +1335,139 @@ function loadToday() {
   onDateChange();
 }
 
-/* ── COMPOSITE KEY CHECK ── */
+/* ── COMPOSITE KEY CHECK ──
+ * 2026-08-16 改：原本是 confirm 對話框「已有日報表，是否載入繼續編輯？」，
+ * 每次開 App／改日期都會跳出來擋路，使用者要先按掉才能做事 → 改成頁面上的提示條，
+ * 不擋操作，想加入就按「👥 加入一起填」。判斷邏輯完全沒變。
+ */
+var _dupReportId = '';
 function checkDeptDateDuplicate() {
+  const bar = $('dup-notice');
+  if (!bar) return;
+  _dupReportId = '';
+  bar.style.display = 'none';
   const dept = S.user.dept;
   const date = $('f-date').value;
   if (!dept||!date) return;
   const existing = S.reports.find(r=>r.dept===dept && r.date===date);
   if (existing && existing.id!==S.report.id) {
-    if (confirm(`⚠️ ${dept} 在 ${date} 已有日報表，是否載入繼續編輯？`)) {
-      loadReport(existing);
-    }
+    _dupReportId = existing.id;
+    $('dup-notice-text').textContent =
+      dept + ' 在 ' + date + ' 已經有一張日報表了'
+      + (existing.reporter ? '（' + existing.reporter + ' 建的）' : '')
+      + '。要接著填就按右邊，不用另外開一張。';
+    bar.style.display = 'flex';
   }
 }
+function joinDupReport(){
+  const r = S.reports.find(x=>x.id===_dupReportId);
+  if (!r) { toast('找不到那張日報表','e'); return; }
+  loadReport(r);
+  toast(`已載入 ${r.date} 的日報表，可以接著填了`,'s');
+}
 
-/* ── AUTO CARRY ── */
+/* ── 帶入舊資料（2026-08-16 從「自動塞」改成「自己選」）────────────────
+ * 舊行為：一改日期就自動把「同部門最近一張」的材料與注意事項塞進表單，
+ *         使用者不知道東西哪來的；多人共編之後更危險——每個人手上都握著一份材料清單，
+ *         誰後存誰的版本就蓋掉別人的（材料以前沒有逐列保護）。
+ * 新行為：按「＋ 新增」時跳視窗，自己挑要不要帶、帶哪一張、帶哪些東西。
+ *         材料數量一律歸零；帶進來的每一列都會重編 id 並掛上「我」當 owner。
+ */
 function getPrevReport() {
   const curDate = $('f-date').value || today();
   const same = S.reports.filter(r => r.dept === S.user.dept && r.date < curDate);
   if (!same.length) return null;
-  same.sort((a, b) => b.date.localeCompare(a.date));
+  same.sort((a, b) => String(b.date||'').localeCompare(String(a.date||'')));
   return same[0];
 }
-function autoCarryFromPrev() {
-  const prev = getPrevReport();
-  if (!prev) return;
-  // Carry notes only if currently empty
-  if (prev.notes?.contact && !$('n-contact').value) {
-    $('n-contact').value = prev.notes.contact;
-    autoGrow($('n-contact'));
+/* 同部門、可以拿來帶的舊報表（新到舊，最多 20 張） */
+function carryCandidates() {
+  return S.reports
+    .filter(r => r && r.dept === S.user.dept && r.id !== (S.report && S.report.id))
+    .sort((a, b) => String(b.date||'').localeCompare(String(a.date||'')))
+    .slice(0, 20);
+}
+function todaysReport() {
+  return S.reports.find(r => r && r.dept === S.user.dept && r.date === today()) || null;
+}
+function openCarryModal() {
+  const list = carryCandidates();
+  const host = $('carry-list');
+  host.innerHTML = list.length ? list.map((r, i) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px">
+      <input type="radio" name="carry-src" value="${escHtml(r.id)}"${i===0?' checked':''}>
+      <span style="font-weight:700;color:var(--primary);min-width:92px">${escHtml(r.date||'—')}</span>
+      <span style="flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere">${escHtml(r.reporter||'—')}</span>
+      <span style="color:var(--muted);font-size:12px;white-space:nowrap">工項 ${(r.workItems||[]).length} 筆・材料 ${(r.materials||[]).length} 筆</span>
+    </label>`).join('')
+    : `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">還沒有可以帶入的舊日報表</div>`;
+
+  const t = todaysReport(), note = $('carry-today-note');
+  if (t) {
+    $('carry-today-text').textContent =
+      '今天（' + t.date + '）' + t.dept + ' 已經有一張日報表了'
+      + (t.reporter ? '，是 ' + t.reporter + ' 建的' : '')
+      + '。要加入一起填，還是另外開一張？';
+    note.style.display = '';
+  } else { note.style.display = 'none'; }
+
+  $('carry-overlay').classList.add('show');
+}
+function closeCarryModal(){ $('carry-overlay').classList.remove('show'); }
+/* 出口①：加入今天已經存在的那張（共編） */
+function carryJoinToday(){
+  const t = todaysReport();
+  closeCarryModal();
+  if (!t) { toast('找不到今天的日報表','e'); return; }
+  loadReport(t);
+  toast(`已加入 ${t.date} 的日報表，可以開始填了`,'s');
+}
+/* 出口②：完全空白 */
+function carryBlank(){
+  closeCarryModal();
+  _startNewReport();
+  toast('已建立空白日報表','s');
+}
+/* 出口③：帶入選定那張的內容 */
+function carryApply(){
+  const sel = document.querySelector('input[name="carry-src"]:checked');
+  if (!sel) { toast('請先選一張要帶入的日報表，或按「不用，空白就好」','e'); return; }
+  const src = S.reports.find(r => r.id === sel.value);
+  if (!src) { toast('找不到那張日報表','e'); return; }
+  const wantMat   = $('carry-mat').checked;
+  const wantNotes = $('carry-notes').checked;
+  const wantWork  = $('carry-work').checked;
+  closeCarryModal();
+
+  _startNewReport();
+  const me = (S.user && S.user.name) || '';
+  const brought = [];
+
+  if (wantMat && (src.materials||[]).length) {
+    // 數量一律歸零、重編 id、owner 換成我 —— 否則會變成「別人的列」而被鎖住不能改
+    (src.materials||[]).forEach(m => addMatRow({ ...m, qty:0, id:uid(), owner:me }));
+    brought.push(`材料 ${src.materials.length} 筆（數量已歸零）`);
   }
-  if (prev.notes?.other && !$('n-other').value) {
-    $('n-other').value = prev.notes.other;
-    autoGrow($('n-other'));
+  if (wantWork && (src.workItems||[]).length) {
+    (src.workItems||[]).forEach(it => addRow({ ...it, id:uid(), owner:me }));
+    brought.push(`工項 ${src.workItems.length} 筆`);
   }
-  // Carry materials (qty=0) only if table is empty
-  if (prev.materials?.length && $('mat-tbody').children.length===0) {
-    prev.materials.forEach(m => addMatRow({...m, qty:0, id:uid()}));
-    const hint = $('mat-carry-hint');
-    hint.textContent = `✓ 已帶入昨日（${prev.date}）材料 ${prev.materials.length} 筆，數量已歸零，請填入今日實際用量`;
-    hint.style.display='block';
+  if (wantNotes) {
+    const n = src.notes || {};
+    if (n.contact) { $('n-contact').value = n.contact; autoGrow($('n-contact')); }
+    if (n.other)   { $('n-other').value   = n.other;   autoGrow($('n-other')); }
+    if (n.contact || n.other) brought.push('注意事項');
   }
+
+  const hint = $('mat-carry-hint');
+  if (hint) {
+    if (brought.length) {
+      hint.textContent = `✓ 已從 ${src.date}（${src.reporter||'—'}）帶入：${brought.join('、')}`;
+      hint.style.display = 'block';
+    } else { hint.style.display = 'none'; }
+  }
+  recalc(); buildSummary(); syncReport();
+  toast(brought.length ? '已帶入舊資料' : '那張沒有可帶入的內容，已建立空白日報表', brought.length?'s':'');
 }
 
 /* ── REPORT LOAD / SAVE ── */
@@ -1254,6 +1476,7 @@ function initReport() {
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
   S.report = newR;
+  rememberBaseline(S.report);
   renderReport();
   applyPermissions();
   loadToday();
@@ -1261,17 +1484,23 @@ function initReport() {
 function newReport() {
   if (appLockGuard()) return;
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
-    if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
+    if (!confirm('目前表單有內容，確定要離開它、開一張新的日報表？')) return;
   }
+  openCarryModal();
+}
+/* 真正建立空白報表（帶入視窗的三個出口都會走這裡） */
+function _startNewReport(){
   const newR = blankReport();
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
+  newR.date = today();
   S.report = newR;
+  rememberBaseline(S.report);
   renderReport();
   applyPermissions();
   $('f-date').value = today();
   onDateChange();
-  toast('已建立新日報表','s');
+  return newR;
 }
 function renderReport() {
   $('f-date').value = S.report.date||today();
@@ -1315,8 +1544,10 @@ function saveReport() {
 }
 function loadReport(r) {
   S.report = JSON.parse(JSON.stringify(r));
+  rememberBaseline(S.report);   // 記下「我打開它時長什麼樣」，存檔時才知道哪些欄位是我真的改過的
   renderReport();
   applyPermissions();
+  checkDeptDateDuplicate();     // 載進來之後就是同一張了 → 提示條要跟著收起來
 }
 /* 從歷史資料開啟報表 → 切到報表頁並顯示「‹ 返回歷史資料」返回列 */
 function openReportFromHistory(id){
@@ -1332,6 +1563,7 @@ function clearForm() {
   S.report = blankReport();
   S.report.dept = S.user.dept;
   S.report.reporter = S.user.name;
+  rememberBaseline(S.report);
   renderReport();
   applyPermissions();
 }
@@ -1521,12 +1753,21 @@ function addMatRow(m) {
   const tbody = $('mat-tbody'); const n=++matN;
   const tr = document.createElement('tr');
   tr.dataset.mid = m?.id||uid();
+  // 多人共編（2026-08-16）：材料也比照工項，每一列記住是誰加的。
+  // 別人的列鎖成唯讀並顯示 🔒 —— 不鎖的話你改了也會在存檔時被雲端版本蓋回去，看起來像「改了沒反應」。
+  // 舊資料沒有 owner → 視為無主，誰都能改（不讓歷史報表變成沒人碰得動）。
+  const owner = m ? (m.owner||'') : ((S.user&&S.user.name)||'');
+  const mine  = canEditRow(owner);
+  const dis   = mine ? '' : ' disabled';
+  tr.dataset.owner = owner;
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
-    <td><select class="cs" data-f="mname" onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
-    <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center" oninput="syncReport()"></td>
-    <td><select class="cs" data-f="munit">${matUnitOpts(m?.unit||'')}</select></td>
-    <td class="no-print"><button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button></td>`;
+    <td><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
+    <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
+    <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
+    <td class="no-print">${mine
+      ? `<button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button>`
+      : `<span class="owner-cell" title="${escHtml(owner)} 新增的，只有本人能改">🔒 ${escHtml(owner)}</span>`}</td>`;
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
@@ -1557,6 +1798,7 @@ function collectMatRows() {
   $('mat-tbody').querySelectorAll('tr').forEach(tr=>{
     rows.push({
       id: tr.dataset.mid||uid(),
+      owner: tr.dataset.owner||'',   // 多人共編：這一列是誰加的（disabled 的欄位 .value 照樣讀得到，資料不會掉）
       name: tr.querySelector('[data-f="mname"]')?.value||'',
       qty: parseFloat(tr.querySelector('[data-f="mq"]')?.value)||0,
       unit: tr.querySelector('[data-f="munit"]')?.value||''
@@ -1625,6 +1867,7 @@ function uploadPhotos(e) {
     rd.onload=ev=>{
       S.report.photos.push({
         id:uid(), data:ev.target.result, name:f.name, ts:Date.now(),
+        owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
         projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
       });
       renderPhotos(); syncReport();
@@ -1675,6 +1918,11 @@ function openPh(i) {
 function closePh(e){if(e.target===$('ph-overlay'))$('ph-overlay').classList.remove('show');}
 function deletePhoto(){
   if(viewPhIdx<0)return;
+  // 多人共編：只能刪自己上傳的照片（舊照片沒 owner → 視為無主，誰都能刪）
+  const p=S.report.photos[viewPhIdx];
+  if(p && !canEditRow(p.owner||'')){
+    toast(`這張是 ${p.owner} 上傳的，只有本人能刪`,'e'); return;
+  }
   S.report.photos.splice(viewPhIdx,1);
   $('ph-overlay').classList.remove('show');
   renderPhotos(); syncReport();
@@ -2145,7 +2393,7 @@ function renderTwoLevel(kind){
         </div>
         <div class="tl-body">
           ${kidRows}
-          <button class="btn btn-a btn-sm" style="margin-top:6px" onclick="tlAddChild('${kind}',${pi})">＋ 新增${def.childName}</button>
+          <button class="btn btn-a btn-sm" data-mng style="margin-top:6px" onclick="tlAddChild('${kind}',${pi})">＋ 新增${def.childName}</button>
         </div>
       </div>`;
   }).join('');
@@ -2156,6 +2404,7 @@ function tlToggle(kind,pi){
   renderTwoLevel(kind);
 }
 function tlAddParent(kind){
+  if(mngGuard())return;
   const def=TL_DEFS[kind], arr=S.cfg[def.parentKey];
   let name='新'+def.parentName, n=2;
   while(arr.includes(name)) name='新'+def.parentName+(n++);
@@ -2169,6 +2418,7 @@ function tlAddParent(kind){
 function addLocGroup(){ tlAddParent('loc'); }
 function addVendorGroup(){ tlAddParent('vendor'); }
 function tlRenameParent(kind,pi,val){
+  if(mngGuard()){renderTwoLevel(kind);return;}
   const def=TL_DEFS[kind], arr=S.cfg[def.parentKey], map=S.cfg[def.childKey];
   const old=arr[pi], name=(val||'').trim();
   if(name===old) return;                 // 沒改就不重繪，否則會把後續的按鈕點擊吃掉
@@ -2181,6 +2431,7 @@ function tlRenameParent(kind,pi,val){
   renderTwoLevel(kind);
 }
 function tlDelParent(kind,pi){
+  if(mngGuard())return;
   if(!requireDelete()) return;
   const def=TL_DEFS[kind], arr=S.cfg[def.parentKey], map=S.cfg[def.childKey];
   const name=arr[pi], kids=(map[name]||[]).length;
@@ -2191,6 +2442,7 @@ function tlDelParent(kind,pi){
   renderTwoLevel(kind);
 }
 function tlAddChild(kind,pi){
+  if(mngGuard())return;
   const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
   const map=S.cfg[def.childKey];
   if(!Array.isArray(map[p])) map[p]=[];
@@ -2202,6 +2454,7 @@ function tlAddChild(kind,pi){
   if(inps.length) inps[inps.length-1].focus();
 }
 function tlRenameChild(kind,pi,ki,val){
+  if(mngGuard()){renderTwoLevel(kind);return;}
   const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
   const list=S.cfg[def.childKey][p]||[];
   const name=(val||'').trim();
@@ -2215,6 +2468,7 @@ function tlRenameChild(kind,pi,ki,val){
   renderTwoLevel(kind);
 }
 function tlDelChild(kind,pi,ki){
+  if(mngGuard())return;
   if(!requireDelete()) return;
   const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
   const list=S.cfg[def.childKey][p]||[];
@@ -2244,6 +2498,7 @@ function loadCfgForm(){
 }
 function saveSettings(){
   if(appLockGuard())return;
+  if(mngGuard())return;
   S.cfg.matNames = readListField('lf-matnames');
   S.cfg.matUnits = readListField('lf-matunits');
   tlCleanup();   // 兩層設定在編輯當下已寫進 S.cfg，這裡只清空白
@@ -2265,6 +2520,7 @@ function loadListField(id, arr){
   });
 }
 function addListRow(id){
+  if(mngGuard())return;
   const el=$(id); const n=el.children.length+1;
   const row=document.createElement('div');
   row.className='list-row';
@@ -2307,13 +2563,14 @@ function renderProjTable(){
       <td>${escHtml(p.name)}</td>
       <td style="color:var(--muted);font-size:12px">${escHtml(p.note||'')}</td>
       <td class="no-print">
-        <button class="btn btn-o btn-sm" onclick="openProjModal('${p.id}')">編輯</button>
+        <button class="btn btn-o btn-sm" data-mng onclick="openProjModal('${p.id}')">編輯</button>
         ${locked?'<span style="font-size:11px;color:var(--warning);margin-left:4px">🔒 使用中</span>':(portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`:'')}
       </td>`;
     tbody.appendChild(tr);
   });
 }
 function openProjModal(id){
+  if(mngGuard())return;
   editProjId=id||null;
   $('pm-title').textContent=id?'編輯專案':'新增專案/工地';
   const p=id?S.cfg.projects.find(x=>x.id===id):null;
@@ -2325,6 +2582,7 @@ function openProjModal(id){
 function closeProjModal(){$('proj-overlay').classList.remove('show');}
 function saveProj(){
   if(appLockGuard())return;
+  if(mngGuard())return;
   const name=$('pm-name').value.trim();
   if(!name){toast('請輸入專案名稱','e');return;}
   if(editProjId){
@@ -2358,13 +2616,14 @@ function renderUsersTable(){
       <td style="font-size:12px;color:var(--muted)">${u.role==='manager'?'管理主管':'填報人員'}</td>
       <td style="font-size:12px">${u.password?'✅ 已設定':'— 未設定'}</td>
       <td class="no-print">
-        <button class="btn btn-o btn-sm" onclick="openUserModal('${u.id}')">編輯</button>
+        <button class="btn btn-o btn-sm" data-mng onclick="openUserModal('${u.id}')">編輯</button>
         ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteUser('${u.id}')">刪除</button>`:''}
       </td>`;
     tbody.appendChild(tr);
   });
 }
 function openUserModal(id){
+  if(mngGuard())return;
   editUserId=id||null;
   $('um-title').textContent=id?'編輯人員':'新增人員';
   const u=id?S.cfg.users.find(x=>x.id===id):null;
@@ -2383,6 +2642,7 @@ function openUserModal(id){
 function closeUserModal(){$('user-overlay').classList.remove('show');}
 function saveUser(){
   if(appLockGuard())return;
+  if(mngGuard())return;
   const name=$('um-name').value.trim();
   const dept=$('um-dept').value;
   const role=$('um-role').value;
@@ -2596,6 +2856,7 @@ function init(){
     updateNavUser();
     initReport();
     applyAppLock();   // 部門範圍鎖：不在 APP_DEPTS 範圍內 → 掛唯讀提示條、收掉寫入按鈕
+    applyMngSettingsUI();   // 設定維護權：沒勾「可維護設定」→ 設定頁只能看
   } else {
     // 未從入口登入：蓋上閘門，不初始化任何內容
     $('login-overlay').style.display = 'flex';

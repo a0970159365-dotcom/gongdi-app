@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -174,6 +174,13 @@ input[type="file"]{display:none}
   .sig-lbl{font-size:11px;color:var(--muted);font-weight:700}
 }
 @media screen{.print-header{display:none}.pv{display:none}}
+/* ── 設定維護權（2026-08-17）──
+ * 角色沒勾「可維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
+ * 欄位也改不動。用 CSS 而非逐一 style.display 是因為清單會重繪，重繪後規則自動生效。*/
+body.no-mng #page-settings [data-mng]{display:none!important}
+body.no-mng #page-settings input,
+body.no-mng #page-settings textarea,
+body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#6b7280}
 </style>
 
 <!-- Firebase compat SDK（跨裝置同步） -->
@@ -620,7 +627,7 @@ input[type="file"]{display:none}
     <div class="card-header" style="flex-direction:column;align-items:stretch;gap:0;padding-bottom:0">
       <div class="flex-b" style="padding-bottom:10px;justify-content:flex-end">
         <div class="flex gap2">
-          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存設定</button>
+          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存設定</button>
           <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
         </div>
       </div>
@@ -641,8 +648,8 @@ input[type="file"]{display:none}
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組二：專案/工地維護</span>
         <div class="flex gap2">
           <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
-          <button class="btn btn-a btn-sm no-print" onclick="openProjModal()">＋ 新增</button>
-          <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+          <button class="btn btn-a btn-sm no-print" data-mng onclick="openProjModal()">＋ 新增</button>
+          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
         </div>
       </div>
       <div class="tbl-wrap">
@@ -666,15 +673,15 @@ input[type="file"]{display:none}
       <!-- 群組三：材料名稱與單位 -->
       <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組三：材料名稱與單位</span>
-        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
       </div>
       <div class="g g2" style="gap:16px;align-items:start">
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matnames')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matnames')">＋ 新增</button></div>
           <div class="list-field" id="lf-matnames"></div>
         </div>
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-matunits')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
           <div class="list-field" id="lf-matunits"></div>
         </div>
       </div>
@@ -684,26 +691,26 @@ input[type="file"]{display:none}
       <!-- 群組四：施工明細設定 -->
       <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組四：施工明細設定</span>
-        <button class="btn btn-p btn-sm" onclick="saveSettings()">💾 儲存</button>
+        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
       </div>
       <div class="g g3" style="gap:12px">
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">施作位置</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-locs')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">施作位置</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-locs')">＋ 新增</button></div>
           <div class="list-field" id="lf-locs"></div>
         </div>
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">施工項目</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-works')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">施工項目</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-works')">＋ 新增</button></div>
           <div class="list-field" id="lf-works"></div>
         </div>
         <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">班組/領班</label><button class="btn btn-a btn-sm" onclick="addListRow('lf-leads')">＋ 新增</button></div>
+          <div class="flex-b mb2"><label class="fl" style="margin:0">班組/領班</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-leads')">＋ 新增</button></div>
           <div class="list-field" id="lf-leads"></div>
         </div>
       </div>
 
       <!-- 底部按鈕 -->
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <button class="btn btn-p" onclick="saveSettings()">💾 儲存設定</button>
+        <button class="btn btn-p" data-mng onclick="saveSettings()">💾 儲存設定</button>
         <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回主系統</button>
       </div>
 
@@ -997,7 +1004,7 @@ function goPage(p) {
     if (b.getAttribute('onclick')?.includes(`'${p}'`)) b.classList.add('active');
   });
   if (p==='history')  { renderHistory(); populateHistFilters(); }
-  if (p==='settings') loadCfgForm();
+  if (p==='settings') { loadCfgForm(); applyMngSettingsUI(); }
   if (p==='mgmt')    { renderMgmt(); populateMgmtFilters(); }
   if (p==='export')  initExportPage();
   if (p==='report')  autoGrowAll();   // 切回報表頁重新撐高（摘要等 textarea 在隱藏時 scrollHeight 量不準，回來再算一次）
@@ -1733,6 +1740,7 @@ function loadCfgForm(){
   renderProjTable();
 }
 function saveSettings(){
+  if(mngGuard())return;
   S.cfg.locs = readListField('lf-locs');
   S.cfg.works = readListField('lf-works');
   S.cfg.leads = readListField('lf-leads');
@@ -1756,6 +1764,7 @@ function loadListField(id, arr){
   });
 }
 function addListRow(id){
+  if(mngGuard())return;
   const el=$(id); const n=el.children.length+1;
   const row=document.createElement('div');
   row.className='list-row';
@@ -1798,13 +1807,14 @@ function renderProjTable(){
       <td>${escHtml(p.name)}</td>
       <td style="color:var(--muted);font-size:12px">${escHtml(p.note||'')}</td>
       <td class="no-print">
-        <button class="btn btn-o btn-sm" onclick="openProjModal('${p.id}')">編輯</button>
+        <button class="btn btn-o btn-sm" data-mng onclick="openProjModal('${p.id}')">編輯</button>
         ${locked?'<span style="font-size:11px;color:var(--warning);margin-left:4px">🔒 使用中</span>':(portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`:'')}
       </td>`;
     tbody.appendChild(tr);
   });
 }
 function openProjModal(id){
+  if(mngGuard())return;
   editProjId=id||null;
   $('pm-title').textContent=id?'編輯專案':'新增專案/工地';
   const p=id?S.cfg.projects.find(x=>x.id===id):null;
@@ -1815,6 +1825,7 @@ function openProjModal(id){
 }
 function closeProjModal(){$('proj-overlay').classList.remove('show');}
 function saveProj(){
+  if(mngGuard())return;
   const name=$('pm-name').value.trim();
   if(!name){toast('請輸入專案名稱','e');return;}
   if(editProjId){
@@ -1847,13 +1858,14 @@ function renderUsersTable(){
       <td style="font-size:12px;color:var(--muted)">${u.role==='manager'?'管理主管':'填報人員'}</td>
       <td style="font-size:12px">${u.password?'✅ 已設定':'— 未設定'}</td>
       <td class="no-print">
-        <button class="btn btn-o btn-sm" onclick="openUserModal('${u.id}')">編輯</button>
+        <button class="btn btn-o btn-sm" data-mng onclick="openUserModal('${u.id}')">編輯</button>
         ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteUser('${u.id}')">刪除</button>`:''}
       </td>`;
     tbody.appendChild(tr);
   });
 }
 function openUserModal(id){
+  if(mngGuard())return;
   editUserId=id||null;
   $('um-title').textContent=id?'編輯人員':'新增人員';
   const u=id?S.cfg.users.find(x=>x.id===id):null;
@@ -1871,6 +1883,7 @@ function openUserModal(id){
 }
 function closeUserModal(){$('user-overlay').classList.remove('show');}
 function saveUser(){
+  if(mngGuard())return;
   const name=$('um-name').value.trim();
   const dept=$('um-dept').value;
   const role=$('um-role').value;
@@ -1920,6 +1933,51 @@ function requireDelete(){
   if(portalCanDelete()) return true;
   toast('只有具備刪除權的角色可以刪除，請聯絡系統管理員','e');
   return false;
+}
+
+/* ── 設定維護權（2026-08-17）────────────────────────────────────────
+ * 入口的權限設定可以逐一角色勾「可維護設定」。沒勾的人進系統設定頁只能看：
+ * 清單照常顯示（要查「有沒有這個班組」查得到），但「＋ 新增」「💾 儲存設定」不出現、欄位也改不動。
+ * 用途是避免同仁誤加共用清單（案場／施作位置／施工項目／班組領班／材料）。
+ * 舊資料還沒有這個欄位時，比照入口的遷移規則（名稱含「主管」或看全公司）判斷，避免主管突然被擋。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanManageSettings(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    if(!r) return false;
+    if(typeof r.canManageSettings !== 'boolean') return /主管/.test(r.name||'') || r.level === 'all';
+    return !!r.canManageSettings;
+  }catch(e){ return false; }
+}
+function requireManageSettings(){
+  if(portalCanManageSettings()) return true;
+  toast('你的角色只能檢視設定，不能新增或修改。需要開通請找主管或系統管理員','e');
+  return false;
+}
+/* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function mngGuard(){ return !requireManageSettings(); }
+/* 設定頁唯讀提示條 + 切換 body.no-mng（收掉 data-mng 按鈕、鎖住欄位） */
+function applyMngSettingsUI(){
+  const can = portalCanManageSettings();
+  document.body.classList.toggle('no-mng', !can);
+  const host = document.getElementById('page-settings');
+  if(!host) return;
+  const body = host.querySelector('.card-body') || host;
+  let bar = document.getElementById('mng-notice');
+  if(can){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'mng-notice';
+    bar.className = 'no-print';
+    bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
+      + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
+    bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、班組、材料，但不能新增或修改。'
+      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「權限設定」勾選「可維護設定」即可開通）。</span>';
+  }
+  if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
 }
 
 /* ── PORTAL IDENTITY ──
@@ -2082,6 +2140,7 @@ function init(){
     document.body.style.overflow = '';
     updateNavUser();
     initReport();
+    applyMngSettingsUI();   // 設定維護權：沒勾「可維護設定」→ 設定頁只能看
   } else {
     // 未從入口登入：蓋上閘門，不初始化任何內容
     $('login-overlay').style.display = 'flex';

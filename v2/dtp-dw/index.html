@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-16.1';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-08-17.1';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -240,6 +240,13 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   .log-dt{font-size:10px}
 }
 @media(max-width:767px){nav{padding:6px 10px}.nav-logo{font-size:13px}.nav-btn{padding:5px 7px;font-size:11px}.nav-spacer{display:none}.nav-user{padding:3px 8px;font-size:11px}}
+/* ── 設定維護權（2026-08-17）──
+ * 角色沒勾「可維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
+ * 欄位也改不動。用 CSS 而非逐一 style.display 是因為清單會重繪，重繪後規則自動生效。*/
+body.no-mng #page-settings [data-mng]{display:none!important}
+body.no-mng #page-settings input,
+body.no-mng #page-settings textarea,
+body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#6b7280}
 </style>
 </head>
 <body>
@@ -320,7 +327,7 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 <div id="page-settings" class="page">
   <div class="card">
     <div class="set-top-bar">
-      <button class="btn btn-p btn-sm" onclick="manualSave()">💾 儲存設定</button>
+      <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存設定</button>
       <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
     </div>
     <div class="card-body">
@@ -337,45 +344,45 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
       <!-- ===== 群組二：案場、施作位置／工作項目、狀態 ===== -->
       <div class="grp-hdr-bar">
         <span class="grp-title">群組二：案場、施作位置／工作項目、狀態</span>
-        <button class="btn btn-p btn-sm" onclick="manualSave()">💾 儲存</button>
+        <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存</button>
       </div>
       <div class="g g3" style="gap:16px;align-items:start">
         <div>
           <div class="set-grp-hdr">
             <span class="set-grp-title">📁 案場</span>
-            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('案場')">＋ 新增</button>
+            <button class="btn btn-a btn-sm" data-mng onclick="cfgAddFromBtn('案場')">＋ 新增</button>
           </div>
           <div class="cfg-list-wrap" id="lw-案場"></div>
           <div class="cfg-inp-row" id="ir-案場" style="display:none">
             <input type="text" id="cfg-inp-案場" class="fi" placeholder="輸入案場名稱後按 Enter"
               onkeydown="if(event.key==='Enter')cfgAdd('案場');if(event.key==='Escape')cfgHideInp('案場')">
-            <button class="btn btn-p btn-sm" onclick="cfgAdd('案場')">新增</button>
+            <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('案場')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('案場')">取消</button>
           </div>
         </div>
         <div>
           <div class="set-grp-hdr">
             <span class="set-grp-title">📍 施作位置／工作項目</span>
-            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('施作位置')">＋ 新增</button>
+            <button class="btn btn-a btn-sm" data-mng onclick="cfgAddFromBtn('施作位置')">＋ 新增</button>
           </div>
           <div class="cfg-list-wrap" id="lw-施作位置"></div>
           <div class="cfg-inp-row" id="ir-施作位置" style="display:none">
             <input type="text" id="cfg-inp-施作位置" class="fi" placeholder="施作位置或工作項目"
               onkeydown="if(event.key==='Enter')cfgAdd('施作位置');if(event.key==='Escape')cfgHideInp('施作位置')">
-            <button class="btn btn-p btn-sm" onclick="cfgAdd('施作位置')">新增</button>
+            <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('施作位置')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('施作位置')">取消</button>
           </div>
         </div>
         <div>
           <div class="set-grp-hdr">
             <span class="set-grp-title">🏷️ 狀態</span>
-            <button class="btn btn-a btn-sm" onclick="cfgAddFromBtn('狀態')">＋ 新增</button>
+            <button class="btn btn-a btn-sm" data-mng onclick="cfgAddFromBtn('狀態')">＋ 新增</button>
           </div>
           <div class="cfg-list-wrap" id="lw-狀態"></div>
           <div class="cfg-inp-row" id="ir-狀態" style="display:none">
             <input type="text" id="cfg-inp-狀態" class="fi" placeholder="狀態名稱"
               onkeydown="if(event.key==='Enter')cfgAdd('狀態');if(event.key==='Escape')cfgHideInp('狀態')">
-            <button class="btn btn-p btn-sm" onclick="cfgAdd('狀態')">新增</button>
+            <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('狀態')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('狀態')">取消</button>
           </div>
         </div>
@@ -383,7 +390,7 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 
       <!-- 底部按鈕（仿 v3） -->
       <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-p" onclick="manualSave()">💾 儲存設定</button>
+        <button class="btn btn-p" data-mng onclick="manualSave()">💾 儲存設定</button>
         <button class="btn btn-o" onclick="switchUser()">🔄 切換使用者</button>
       </div>
 
@@ -908,9 +915,10 @@ function loadCfg(){
   ensureStatusOptions();
 }
 function saveCfg(){localStorage.setItem('dtp_cfg',JSON.stringify(cfg));fbSave()}
-function manualSave(){saveCfg();toast('已儲存設定 ✓','s')}
+function manualSave(){if(mngGuard())return;saveCfg();toast('已儲存設定 ✓','s')}
 
 function cfgAdd(key){
+  if(mngGuard())return;
   const inp=document.getElementById('cfg-inp-'+key);
   const val=(inp&&inp.value||'').trim();
   if(!val)return;
@@ -921,12 +929,14 @@ function cfgAdd(key){
   if(inp)inp.value='';
 }
 function cfgDel(key,idx){
+  if(mngGuard())return;
   if(!requireDelete())return;
   cfg[key].splice(idx,1);
   markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
 function cfgAddFromBtn(key){
+  if(mngGuard())return;
   const ir=document.getElementById('ir-'+key);
   if(ir){ir.style.display='flex';const inp=document.getElementById('cfg-inp-'+key);if(inp)inp.focus()}
 }
@@ -1172,7 +1182,7 @@ function goPage(id){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>{if(b.getAttribute('onclick')===`goPage('${id}')`)b.classList.add('active')});
-  if(id==='settings'){renderCfgCards();updateDataLists();renderUsers();renderSettingsFbStatus()}
+  if(id==='settings'){renderCfgCards();updateDataLists();renderUsers();renderSettingsFbStatus();applyMngSettingsUI()}
   if(id==='worktime'){renderWorktime()}
 }
 
@@ -1724,6 +1734,7 @@ function exportJson(){
   a.download='進度表-圖面管理_備份_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.json';a.click();
 }
 function importJson(e){
+  if(mngGuard())return;
   const f=e.target.files[0];if(!f)return;
   const rdr=new FileReader();rdr.onload=ev=>{
     try{
@@ -1769,6 +1780,51 @@ function requireDelete(){
   if(portalCanDelete()) return true;
   toast('只有具備刪除權的角色可以刪除，請聯絡系統管理員','e');
   return false;
+}
+
+/* ── 設定維護權（2026-08-17）────────────────────────────────────────
+ * 入口的權限設定可以逐一角色勾「可維護設定」。沒勾的人進系統設定頁只能看：
+ * 清單照常顯示（要查「有沒有這個案場」查得到），但「＋ 新增」「💾 儲存設定」不出現、欄位也改不動。
+ * 用途是避免同仁誤加共用清單（案場／施作位置／工作項目／狀態）。
+ * 舊資料還沒有這個欄位時，比照入口的遷移規則（名稱含「主管」或看全公司）判斷，避免主管突然被擋。
+ * ⚠️ 這是畫面層防呆，擋不住直接對資料庫發請求的人；真正的鎖要等 F 版伺服器端驗證。
+ */
+function portalCanManageSettings(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    if(!r) return false;
+    if(typeof r.canManageSettings !== 'boolean') return /主管/.test(r.name||'') || r.level === 'all';
+    return !!r.canManageSettings;
+  }catch(e){ return false; }
+}
+function requireManageSettings(){
+  if(portalCanManageSettings()) return true;
+  toast('你的角色只能檢視設定，不能新增或修改。需要開通請找主管或系統管理員','e');
+  return false;
+}
+/* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function mngGuard(){ return !requireManageSettings(); }
+/* 設定頁唯讀提示條 + 切換 body.no-mng（收掉 data-mng 按鈕、鎖住欄位） */
+function applyMngSettingsUI(){
+  const can = portalCanManageSettings();
+  document.body.classList.toggle('no-mng', !can);
+  const host = document.getElementById('page-settings');
+  if(!host) return;
+  const body = host.querySelector('.card-body') || host;
+  let bar = document.getElementById('mng-notice');
+  if(can){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'mng-notice';
+    bar.className = 'no-print';
+    bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
+      + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
+    bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、施作位置、狀態，但不能新增或修改。'
+      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「權限設定」勾選「可維護設定」即可開通）。</span>';
+  }
+  if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
 }
 
 function portalLoggedIn(){
@@ -1870,6 +1926,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
   updateNavUser();
   updateDataLists();
+  applyMngSettingsUI();   // 設定維護權：沒勾「可維護設定」→ 設定頁只能看
   initFb().then(()=>{
     document.getElementById('login-overlay').style.display = 'none';
   });
