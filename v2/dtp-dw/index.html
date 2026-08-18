@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-18.3';window.APP_KEY='dtp';</script>
+<script>window.APP_VERSION='2026-08-18.4';window.APP_KEY='dtp';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1821,8 +1821,8 @@ function applyMngSettingsUI(){
     bar.className = 'no-print';
     bar.style.cssText = 'background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;color:#92400e;'
       + 'font-weight:700;font-size:13px;padding:10px 14px;margin-bottom:12px;line-height:1.7';
-    bar.innerHTML = '👁️ 設定唯讀 — 你可以查看目前有哪些案場、施作位置、狀態，但不能新增或修改。'
-      + '<br><span style="font-weight:500;font-size:12.5px">需要新增請找主管或系統管理員（在入口網頁的「⚙️ 設定 → 權限設定」把這個角色的「系統設定維護」打勾即可開通）。</span>';
+    bar.innerHTML = '👁️ 設定唯讀 — 您可以查看目前有哪些案場、施作位置、狀態，但無法變更或修改。'
+      + '<br><span style="font-weight:500;font-size:12.5px">需要變更請洽主管或系統管理員。</span>';
   }
   if(bar.parentNode !== body) body.insertBefore(bar, body.firstChild);
 }
