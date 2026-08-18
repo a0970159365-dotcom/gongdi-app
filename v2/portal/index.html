@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-18.2';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-18.3';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -487,12 +487,12 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
             <th style="width:50px">序號</th>
             <th style="width:90px">角色編號</th>
             <th>角色名稱</th>
-            <th style="width:104px">系統設定刪除</th>
             <th style="width:92px">人員權限</th>
+            <th style="width:104px">系統設定刪除</th>
+            <th style="width:112px">系統設定維護</th>
             <th style="width:100px">資料檢視</th>
-            <th style="width:100px">資料編輯</th>
-            <th style="width:92px">資料維護</th>
             <th>跨部門互看</th>
+            <th style="width:100px">資料編輯</th>
             <th style="text-align:right;width:140px">操作</th>
           </tr></thead>
           <tbody id="role-tbody"></tbody>
@@ -640,8 +640,16 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         <label>描述</label>
         <input class="fi" id="role-desc" placeholder="說明這個角色的用途" maxlength="100">
       </div>
-      <!-- 以下六項的上下順序＝權限角色表的欄位順序（2026-08-17 用戶要求兩邊一致）：
-           系統設定刪除｜人員權限｜資料檢視｜資料編輯｜資料維護｜跨部門互看 -->
+      <!-- 以下六項的上下順序＝權限角色表的欄位順序（2026-08-18 用戶指定，兩邊必須一致）：
+           人員權限｜系統設定刪除｜系統設定維護｜資料檢視｜跨部門互看｜資料編輯 -->
+      <div class="form-row">
+        <label>人員權限</label>
+        <label class="checkbox-item" style="font-weight:600">
+          <input type="checkbox" id="role-can-manage-roles">
+          可維護入口的部門、員工、權限角色
+        </label>
+        <div class="hint">不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「系統設定維護」分開，所以可以「能加廠商但不能改別人的權限」。</div>
+      </div>
       <div class="form-row">
         <label>系統設定刪除</label>
         <label class="checkbox-item" style="font-weight:600">
@@ -651,12 +659,12 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         <div class="hint">不勾選的角色，刪除按鈕直接不會出現，只能新增和修改。用來避免同仁誤刪共用設定與歷史資料。</div>
       </div>
       <div class="form-row">
-        <label>人員權限</label>
+        <label>系統設定維護</label>
         <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-manage-roles">
-          可維護入口的部門、員工、權限角色
+          <input type="checkbox" id="role-can-manage-settings">
+          可維護各 App 的案場、施作位置、施工項目、廠商、材料
         </label>
-        <div class="hint">不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「資料維護」分開，所以可以「能加廠商但不能改別人的權限」。</div>
+        <div class="hint">不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</div>
       </div>
       <div class="form-row">
         <label>資料檢視 <span style="color:var(--danger)">*</span></label>
@@ -667,6 +675,14 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <label class="level-radio"><input type="radio" name="role-level" value="all" onchange="onRoleLevelChange()"><span class="level-pill level-all">全部</span> 全公司</label>
         </div>
       </div>
+      <!-- 跨部門互看清單：只有「資料檢視」選了跨部門才顯示。
+           2026-08-18 起就排在「資料檢視」正下方（跟表格順序一致），選了跨部門就地展開，
+           不會再有「選了卻沒發現要勾部門」的問題。 -->
+      <div class="form-row" id="role-cross-box" style="display:none">
+        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
+        <div id="role-cross-list" class="checkbox-list"></div>
+        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
+      </div>
       <div class="form-row">
         <label>資料編輯 <span style="color:var(--danger)">*</span></label>
         <div class="level-radio-group">
@@ -676,23 +692,6 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <label class="level-radio"><input type="radio" name="role-edit-level" value="cross"><span class="level-pill level-cross">跨部門</span> 可改本部門 + 指定部門</label>
           <label class="level-radio"><input type="radio" name="role-edit-level" value="all"><span class="level-pill level-all">全部</span> 全公司</label>
         </div>
-      </div>
-      <div class="form-row">
-        <label>資料維護</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-manage-settings">
-          可維護各 App 的案場、施作位置、施工項目、廠商、材料
-        </label>
-        <div class="hint">不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</div>
-      </div>
-      <!-- 跨部門互看清單：只有「資料檢視」選了跨部門才顯示。
-           排在最後是為了跟表格順序一致；因為它離「資料檢視」變遠了，
-           顯示時多一條提示告訴使用者「往下看」，免得選了跨部門卻沒發現要勾部門。 -->
-      <div class="form-row" id="role-cross-box" style="display:none">
-        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
-        <div class="hint" style="margin-bottom:8px;color:var(--accent);font-weight:600">⬇️ 「資料檢視」選了跨部門，請在這裡勾要互看哪些部門。</div>
-        <div id="role-cross-list" class="checkbox-list"></div>
-        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1715,18 +1714,18 @@ function renderRoles() {
           <strong>${esc(r.name)}</strong>
           ${r.desc ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(r.desc)}</div>` : ''}
         </td>
-        <td>${r.canDelete
-              ? '<span class="level-pill level-all">可刪除</span>'
-              : '<span class="level-pill level-none">不可刪</span>'}</td>
         <td>${roleCanManageRoles(r)
               ? '<span class="level-pill level-all">可設定</span>'
               : '<span class="level-pill level-none">不可</span>'}</td>
-        <td><span class="level-pill level-${r.level}">${LEVEL_LABEL[r.level]||r.level}</span></td>
-        <td><span class="level-pill level-${editLv}">${EDIT_LEVEL_LABEL[editLv]||editLv}</span></td>
+        <td>${r.canDelete
+              ? '<span class="level-pill level-all">可刪除</span>'
+              : '<span class="level-pill level-none">不可刪</span>'}</td>
         <td>${r.canManageSettings
               ? '<span class="level-pill level-all">可維護</span>'
               : '<span class="level-pill level-none">唯讀</span>'}</td>
+        <td><span class="level-pill level-${r.level}">${LEVEL_LABEL[r.level]||r.level}</span></td>
         <td>${crossHtml}</td>
+        <td><span class="level-pill level-${editLv}">${EDIT_LEVEL_LABEL[editLv]||editLv}</span></td>
         <td><div class="row-actions">${actions}</div></td>
       </tr>`;
   }).join('');
