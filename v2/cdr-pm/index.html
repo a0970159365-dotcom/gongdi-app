@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-18.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-18.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1204,21 +1204,19 @@ function appOutOfScope(){
 /* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
 function appLockGuard(){
   if (!appOutOfScope()) return false;
-  toast('👁️ 這是「'+(window.APP_DEPTS||[]).join('、')+'」的系統，你只能檢視，不能新增或修改','e');
+  toast('👁️ 帳號只有唯讀權限','e');
   return true;
 }
 /* 唯讀提示條 + 收掉寫入類按鈕（只在被鎖時執行一次） */
 function applyAppLock(){
   if (!appOutOfScope()) return;
   if (document.getElementById('app-scope-bar')) return;
-  var depts = (window.APP_DEPTS||[]).join('、');
   var bar = document.createElement('div');
   bar.id = 'app-scope-bar';
   bar.className = 'no-print';
   bar.style.cssText = 'background:#fef3c7;border-bottom:2px solid #f59e0b;color:#92400e;'
     + 'font-weight:700;font-size:13.5px;padding:9px 14px;text-align:center;line-height:1.7';
-  bar.innerHTML = '👁️ 唯讀模式 — 這是「'+depts+'」的系統，你的權限只能檢視，不能新增或修改。'
-    + '<br><span style="font-weight:500;font-size:12.5px">要填自己部門的資料，請回入口網頁選對應的系統。</span>';
+  bar.innerHTML = '👁️ 帳號只有唯讀權限';
   document.body.insertBefore(bar, document.body.firstChild);
   document.querySelectorAll('[onclick*="saveReport"],[onclick*="newReport"],[onclick*="clearForm"]')
     .forEach(function(b){ b.style.display='none'; });
