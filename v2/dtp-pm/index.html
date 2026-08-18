@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-17.3';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-18.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -551,7 +551,9 @@ let records=[], cfg={}, currentUser=null;
  * 背景：App 使用權改成「全開給所有人」之後，跑錯 App 的人（例如瑪摩處的人點進「專案管理」）
  *       會看到空白列表，卻仍能新增自己的紀錄 → 資料填到錯的系統裡。
  * 做法：window.APP_DEPTS 宣告「這支 App 服務哪些部門」。
- *       使用者「看得到的部門」與 APP_DEPTS 沒有交集 → 整支 App 唯讀（看得到、填不了）。
+ *       使用者的「所屬部門」不在 APP_DEPTS 裡 → 整支 App 唯讀（看得到、填不了）。
+ *       2026-08-18 起判斷的是「你是哪個部門的人」，不是「你看得到哪些部門」——
+ *       跨部門互看只給檢視，不給在對方的系統裡新增或填寫（用戶原本訂的規則）。
  * 三個刻意放行的情況：① 沒宣告 APP_DEPTS ② 檢視範圍＝全公司（level='all'）③ 沒登入／查不到部門。 */
 function appOutOfScope(){
   try{
@@ -560,7 +562,7 @@ function appOutOfScope(){
     var u = currentUser || {};
     if (!u.name) return false;
     if ((u.viewLevel||'dept') === 'all') return false;
-    var mine = [u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    var mine = [u.dept].filter(Boolean);   // 只認所屬部門，互看不算（2026-08-18）
     if (!mine.length) return false;
     for (var i=0;i<want.length;i++) if (mine.indexOf(want[i]) >= 0) return false;
     return true;

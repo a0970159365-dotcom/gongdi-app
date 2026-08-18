@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-17.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-18.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -122,6 +122,9 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .tl-empty{font-size:12px;color:var(--muted);text-align:center;padding:14px 8px;border:1px dashed var(--border);border-radius:8px}
 /* ── 多人共編：別人建的那一列鎖住（2026-08-12）── */
 .row-locked{background:#fafbfc}
+.lock-btn{border:1px dashed #94a3b8;background:#fff;color:#475569;border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;font-family:inherit;line-height:1.5}
+.lock-btn:hover{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+.owner-cell.unlocked{color:#92400e;font-weight:700}
 .row-locked select,.row-locked input{background:#f1f5f9;color:var(--muted);cursor:not-allowed}
 .owner-cell{font-size:11.5px;color:var(--muted);white-space:nowrap}
 .owner-cell.mine{color:var(--primary);font-weight:700}
@@ -995,12 +998,22 @@ var _lastPushed = {};   // id -> 上次推上雲的 JSON 字串
  *   ③ 雲端有、我這台沒有的別人列 → 補進來（那是我載入之後他們才新增的）
  * 靠 workItem.id 對應，所以每一列的 id 必須穩定（addRow 會沿用既有 id）。
  */
-function mergeRows(localItems, cloudItems, me){
+function mergeRows(localItems, cloudItems, me, baseItems){
   var cloudById = new Map((cloudItems||[]).map(function(x){ return [x.id, x]; }));
   var localIds  = new Set((localItems||[]).map(function(x){ return x.id; }).filter(Boolean));
+  // 打開這張報表當下、別人那幾列長什麼樣（給下面的「主管解鎖修改」比對用）
+  var baseById  = new Map((baseItems||[]).filter(function(x){ return x && x.id; })
+                    .map(function(x){ return [x.id, JSON.stringify(x)]; }));
   // ①②：保持我這台的排列順序；別人的列換成雲端版本
+  // 例外（2026-08-18 主管解鎖）：別人的列若「跟我打開當下的樣子不一樣」＝我解鎖後真的改過 → 用我的。
+  // 不這樣做的話，主管改完存檔會被雲端版本蓋回去，畫面上看起來像「改了沒反應」。
+  // 我沒動過的列一律仍以雲端為準 → 主管掛著頁面不動，也不會把別人後來的修改洗掉。
   var kept = (localItems||[]).map(function(x){
-    return (x.owner && x.owner !== me && cloudById.has(x.id)) ? cloudById.get(x.id) : x;
+    if (!x.owner || x.owner === me) return x;
+    if (!cloudById.has(x.id)) return x;
+    var b = baseById.get(x.id);
+    if (b !== undefined && JSON.stringify(x) !== b) return x;
+    return cloudById.get(x.id);
   });
   // ③：雲端才有的別人的列，接在後面
   var extra = (cloudItems||[]).filter(function(x){
@@ -1031,9 +1044,9 @@ function _pickScalar(mine, theirs, base){
 function mergeReport(local, cloud, me, base){
   if (!cloud) return local;
   var out = Object.assign({}, local);
-  out.workItems = mergeRows(local.workItems, cloud.workItems, me);
-  out.materials = mergeRows(local.materials, cloud.materials, me);
-  out.photos    = mergeRows(local.photos,    cloud.photos,    me);
+  out.workItems = mergeRows(local.workItems, cloud.workItems, me, base ? base.workItems : null);
+  out.materials = mergeRows(local.materials, cloud.materials, me, base ? base.materials : null);
+  out.photos    = mergeRows(local.photos,    cloud.photos,    me, base ? base.photos    : null);
   ['date','dept','reporter','weather'].forEach(function(k){
     out[k] = _pickScalar(local[k], cloud[k], base ? base[k] : undefined);
   });
@@ -1167,7 +1180,9 @@ function updateNavUser() {
  * 背景：App 使用權改成「全開給所有人」之後，跑錯 App 的人（例如瑪摩處的人點進「專案管理」）
  *       會看到空白列表，卻仍能新增自己的日報 → 資料填到錯的系統裡。
  * 做法：window.APP_DEPTS 宣告「這支 App 服務哪些部門」。
- *       使用者「看得到的部門」與 APP_DEPTS 沒有交集 → 整支 App 唯讀（看得到、填不了）。
+ *       使用者的「所屬部門」不在 APP_DEPTS 裡 → 整支 App 唯讀（看得到、填不了）。
+ *       2026-08-18 起判斷的是「你是哪個部門的人」，不是「你看得到哪些部門」——
+ *       跨部門互看只給檢視，不給在對方的系統裡新增或填寫（用戶原本訂的規則）。
  * 三個刻意放行的情況（避免把人鎖在門外，與 portalAppAllowed() 的精神一致）：
  *   ① 沒宣告 APP_DEPTS 的 App → 行為完全不變
  *   ② 檢視範圍＝全公司（level='all'，副總／總經理室／系統管理員）→ 不受限
@@ -1180,7 +1195,7 @@ function appOutOfScope(){
     var u = S.user || {};
     if (!u.name) return false;                            // ③ 還沒登入 → 不判定
     if ((u.viewLevel||'dept') === 'all') return false;    // ② 看全公司 → 不受限
-    var mine = [u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    var mine = [u.dept].filter(Boolean);   // 只認所屬部門，互看不算（2026-08-18）
     if (!mine.length) return false;                       // ③ 沒部門資料 → 放行
     for (var i=0;i<want.length;i++) if (mine.indexOf(want[i]) >= 0) return false;
     return true;
@@ -1577,12 +1592,14 @@ function addRow(it) {
   const prog = it?Math.min(100,Math.max(0,parseFloat(it.progress)||0)):0;
   // 這一列是誰建的：舊資料沒有 owner → 視為無主，任何人都能改（不讓歷史資料變成沒人能碰）
   const owner = it ? (it.owner||'') : ((S.user&&S.user.name)||'');
-  const mine  = canEditRow(owner);
+  const rowId = (it&&it.id)||uid();
+  const mine  = canEditRow(owner) || rowUnlocked(rowId);   // 解鎖過的列在重繪之後仍然可改
+  const canUn = !mine && canUnlockRow(owner);              // 主管：鎖頭可以點
   const dis   = mine ? '' : ' disabled';
   const loc0  = v('loc'), vd0 = v('vendor'), vd1 = v('vendor2');
   const tr = document.createElement('tr');
   tr.dataset.rn = n;
-  tr.dataset.id = (it&&it.id)||uid();
+  tr.dataset.id = rowId;
   tr.dataset.owner = owner;
   if(!mine) tr.classList.add('row-locked');
   tr.innerHTML = `
@@ -1604,7 +1621,9 @@ function addRow(it) {
     </td>
     <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()"${dis}>${aOpts}</select></td>
     <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="說明..." oninput="syncReport()"${dis}></td>
-    <td data-label="填表人"><span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span></td>
+    <td data-label="填表人">${canUn
+      ? `<button type="button" class="lock-btn" onclick="unlockRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 填的內容">${escHtml(owner)} 🔒</button>`
+      : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}</td>
     <td class="col-del no-print">${mine?'<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button>':''}</td>`;
   tbody.appendChild(tr);
   renum(); recalc(); buildSummary();
@@ -1627,6 +1646,51 @@ function canEditOthers(){
 function canEditRow(owner){
   if(!owner) return true;
   return owner===((S.user&&S.user.name)||'') || canEditOthers();
+}
+/* ── 主管解鎖修改（2026-08-18）──────────────────────────────────
+ * 逐列鎖的用意是「不要手一滑就動到別人填的東西」，不是「主管永遠不能改」。
+ * 編輯範圍＝「自己部門」的角色（部門主管、互看主管）看到別人的列時，鎖頭是可以點的：
+ * 點下去跳確認 → 按確定「那一列」才解開，沒按就維持唯讀。
+ * 解鎖只存在這次瀏覽（重新整理就恢復鎖住），也只影響被點開的那一列。
+ * 一般同仁（編輯範圍＝只改自己）看到的還是不能點的 🔒，行為完全不變。 */
+var _unlockedRows = {};
+function rowUnlocked(id){ return !!(id && _unlockedRows[id]); }
+function canUnlockRow(owner){
+  if(!owner) return false;
+  if(canEditRow(owner)) return false;                    // 本來就改得動 → 不需要解鎖
+  return ((S.user&&S.user.editLevel)||'self') === 'dept';
+}
+function _unlockConfirm(owner){
+  return confirm('這一列是 '+owner+' 填的。\n\n確定要修改嗎？修改後會覆蓋他填的內容。');
+}
+function unlockRow(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  var owner = tr.dataset.owner||'', id = tr.dataset.id||'';
+  if(!_unlockConfirm(owner)) return;
+  _unlockedRows[id] = true;
+  tr.classList.remove('row-locked');
+  tr.querySelectorAll('select,input').forEach(function(el){ el.disabled = false; });
+  var cell = tr.querySelector('.lock-btn, .owner-cell');   // 主管看到的是 button，一般欄位是 span
+  if(cell){
+    var span = document.createElement('span');
+    span.className = 'owner-cell unlocked';
+    span.textContent = owner + ' 🔓';
+    span.title = '已解鎖：你正在修改 ' + owner + ' 填的內容';
+    cell.replaceWith(span);
+  }
+  var del = tr.querySelector('.col-del');
+  if(del) del.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button>';
+  toast('已解鎖，這一列現在可以修改');
+}
+function unlockMatRow(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  var owner = tr.dataset.owner||'', id = tr.dataset.mid||'';
+  if(!_unlockConfirm(owner)) return;
+  _unlockedRows[id] = true;
+  tr.querySelectorAll('select,input').forEach(function(el){ el.disabled = false; });
+  var last = tr.lastElementChild;
+  if(last) last.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>';
+  toast('已解鎖，這一列現在可以修改');
 }
 /* 第二層選項查表：沒選第一層時回空陣列，下拉就只剩提示文字 */
 function worksOf(loc){ return (S.cfg.worksByLoc&&S.cfg.worksByLoc[loc])||[]; }
@@ -1757,7 +1821,8 @@ function addMatRow(m) {
   // 別人的列鎖成唯讀並顯示 🔒 —— 不鎖的話你改了也會在存檔時被雲端版本蓋回去，看起來像「改了沒反應」。
   // 舊資料沒有 owner → 視為無主，誰都能改（不讓歷史報表變成沒人碰得動）。
   const owner = m ? (m.owner||'') : ((S.user&&S.user.name)||'');
-  const mine  = canEditRow(owner);
+  const mine  = canEditRow(owner) || rowUnlocked(tr.dataset.mid);
+  const canUn = !mine && canUnlockRow(owner);
   const dis   = mine ? '' : ' disabled';
   tr.dataset.owner = owner;
   tr.innerHTML = `
@@ -1767,7 +1832,9 @@ function addMatRow(m) {
     <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
     <td class="no-print">${mine
       ? `<button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button>`
-      : `<span class="owner-cell" title="${escHtml(owner)} 新增的，只有本人能改">🔒 ${escHtml(owner)}</span>`}</td>`;
+      : (canUn
+        ? `<button type="button" class="lock-btn" onclick="unlockMatRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 加的材料">🔒 ${escHtml(owner)}</button>`
+        : `<span class="owner-cell" title="${escHtml(owner)} 新增的，只有本人能改">🔒 ${escHtml(owner)}</span>`)}</td>`;
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
@@ -1921,7 +1988,10 @@ function deletePhoto(){
   // 多人共編：只能刪自己上傳的照片（舊照片沒 owner → 視為無主，誰都能刪）
   const p=S.report.photos[viewPhIdx];
   if(p && !canEditRow(p.owner||'')){
-    toast(`這張是 ${p.owner} 上傳的，只有本人能刪`,'e'); return;
+    // 主管（編輯範圍＝自己部門）可以刪，但一樣要先確認一次，避免誤觸（2026-08-18）
+    if(!(canUnlockRow(p.owner||'') && confirm('這張照片是 '+p.owner+' 上傳的。\n\n確定要刪除嗎？'))){
+      toast(`這張是 ${p.owner} 上傳的，只有本人能刪`,'e'); return;
+    }
   }
   S.report.photos.splice(viewPhIdx,1);
   $('ph-overlay').classList.remove('show');
