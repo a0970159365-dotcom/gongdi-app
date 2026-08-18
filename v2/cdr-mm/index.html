@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-18.5';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-18.6';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -834,16 +834,19 @@ function load() {
     if (d.projSort) S.projSort = d.projSort;
   } catch(e){}
 }
+/* 2026-08-18 改：先推雲端，再寫本機（與 cdr-pm 同步）。
+ * 舊版先寫 localStorage，手機空間不足時整個 try 直接跳走 → 雲端那行根本沒執行，
+ * 使用者看到「儲存失敗」卻同時看到「已儲存」，換裝置一看資料不在（會掉資料）。 */
 function save() {
-  try {
-    const data = {
-      reports: S.reports, cfg: S.cfg, user: S.user,
-      projSort: S.projSort, updatedAt: Date.now()
-    };
-    localStorage.setItem('cdr_v3', JSON.stringify(data));
-    // Firebase 整包同步（跨裝置，圖示持久顯示，仿圖面進度表）
-    if(window._cdrSet) pushCloud(data);
-  } catch(e) { toast('儲存失敗：'+e.message,'e'); }
+  const data = {
+    reports: S.reports, cfg: S.cfg, user: S.user,
+    projSort: S.projSort, updatedAt: Date.now()
+  };
+  let cloudOk = false, localOk = false;
+  try { if(window._cdrSet){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
+  try { localStorage.setItem('cdr_v3', JSON.stringify(data)); localOk = true; }
+  catch(e){ console.warn('本機儲存失敗（多半是空間不足）：', e && e.message); }
+  return { cloudOk, localOk };
 }
 /* ── per-record 同步（2026-07-29 治本改造）──
  * 舊版：每次存檔都把 {reports,cfg,user,projSort} 整包 set 到 cdr_v3/all，靠 updatedAt 誰新誰贏。
@@ -1131,8 +1134,10 @@ function saveReport() {
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
-  save();
-  toast('日報表已儲存','s');
+  const st = save();
+  if (st.localOk) toast('日報表已儲存','s');
+  else if (st.cloudOk) toast('已存到雲端 — 這台裝置本機空間不足，換裝置開一樣看得到','s');
+  else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
   S.report = JSON.parse(JSON.stringify(r));
@@ -1331,18 +1336,58 @@ function collectMatRows() {
 }
 
 /* ── PHOTOS ── */
+/* ── 照片壓縮（2026-08-18，與 cdr-pm 同一套）──────────────────────
+ * 起因：手機拍一張就 3~5MB，轉 base64 更大，直接超過瀏覽器本機儲存上限
+ *       → 存檔整個失敗，連雲端都沒寫進去（使用者以為存好了，其實資料掉了）。
+ * ⚠️ 本地化部署後若要改成「原檔上傳到檔案伺服器」，只要動這兩個常數與 uploadPhotos()。
+ *    每張照片保留 origName／origSize／origW／origH，將來補傳原檔對得起來。 */
+var PHOTO_MAX_EDGE = 2048;   // 長邊上限（px）
+var PHOTO_QUALITY  = 0.85;   // JPEG 品質
+function compressImage(file){
+  return new Promise(function(resolve){
+    var rd = new FileReader();
+    rd.onload = function(ev){
+      var raw = ev.target.result;
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w = img.width, h = img.height;
+          var scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          var out = cv.toDataURL('image/jpeg', PHOTO_QUALITY);
+          if (out.length >= raw.length) { resolve({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
+          resolve({ data: out, w: cw, h: ch, ow: w, oh: h });
+        }catch(err){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); }
+      };
+      img.onerror = function(){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); };
+      img.src = raw;
+    };
+    rd.onerror = function(){ resolve(null); };
+    rd.readAsDataURL(file);
+  });
+}
 function uploadPhotos(e) {
   const phase=$('ph-phase').value;
-  Array.from(e.target.files).forEach(f=>{
-    if (!f.type.startsWith('image/')) return;
-    const rd=new FileReader();
-    rd.onload=ev=>{
-      S.report.photos.push({id:uid(),data:ev.target.result,phase,name:f.name,ts:Date.now()});
-      renderPhotos();
-    };
-    rd.readAsDataURL(f);
-  });
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
   e.target.value='';
+  if(!files.length) return;
+  if(files.length > 1) toast('照片處理中…');
+  Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
+    let n = 0;
+    list.forEach(({ r, f }) => {
+      if(!r) return;
+      S.report.photos.push({
+        id:uid(), data:r.data, phase:phase, name:f.name, ts:Date.now(),
+        origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h
+      });
+      n++;
+    });
+    renderPhotos();
+    if(n) toast('已加入 ' + n + ' 張照片','s');
+  });
 }
 function renderPhotos() {
   const grid=$('ph-grid');

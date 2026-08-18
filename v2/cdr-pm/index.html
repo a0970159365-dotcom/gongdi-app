@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-18.5';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-18.6';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -278,17 +278,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <button class="btn btn-sm" onclick="backToHistory()" style="background:#f59e0b;color:#fff;font-weight:800;border:none;border-radius:20px;padding:7px 16px;box-shadow:0 2px 6px rgba(245,158,11,.45)">‹ 返回歷史資料</button>
   </div>
 
-  <div class="stat-grid" id="stat-grid" style="display:none">
-    <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日出工累計</div></div>
-    <div class="stat-card stat-green"><div class="stat-val" id="st-tmrw">0</div><div class="stat-lbl">明日預估出工</div></div>
-  </div>
-
-  <!-- 同日已有報表提示（2026-08-16 取代原本會跳出來擋路的 confirm 對話框） -->
-  <div id="dup-notice" class="no-print" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
-       border-radius:10px;padding:11px 14px;margin-bottom:14px;align-items:center;gap:10px;flex-wrap:wrap">
-    <span id="dup-notice-text" style="flex:1;min-width:200px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7"></span>
-    <button class="btn btn-p btn-sm" onclick="joinDupReport()">👥 加入一起填</button>
-  </div>
+  <!-- 2026-08-18 用戶要求移除頁面抬頭的「今日出工累計／明日預估出工」數字卡。
+       施工明細表尾的合計（tot-today／tot-tmrw）保留不動。 -->
 
   <!-- 基本資訊 -->
   <div class="card">
@@ -306,6 +297,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       </div>
     </div>
     <div class="card-body">
+      <!-- 同日已有報表提示（2026-08-18 從頁首移到這裡＝「＋ 新增／今日／儲存」那排的正下方） -->
+      <div id="dup-notice" class="no-print" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
+           border-radius:10px;padding:11px 14px;margin-bottom:14px;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="dup-notice-text" style="flex:1;min-width:200px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7"></span>
+        <button class="btn btn-p btn-sm" onclick="joinDupReport()">👥 加入一起填</button>
+      </div>
       <div class="g g5" style="gap:10px">
         <div class="fg" style="grid-column:span 2">
           <label class="fl">日期</label>
@@ -357,7 +354,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <div class="card">
     <div class="card-header">
       <span class="card-title">施工明細</span>
-      <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRow()">＋ 新增工項</button>
+      <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRowBtn()">＋ 新增工項</button>
     </div>
     <div class="tbl-wrap">
       <table class="wtbl">
@@ -397,7 +394,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <div class="card">
     <div class="card-header">
       <span class="card-title">材料明細</span>
-      <button id="add-mat-btn" class="btn btn-a btn-sm no-print" onclick="addMatRow()">＋ 新增材料</button>
+      <button id="add-mat-btn" class="btn btn-a btn-sm no-print" onclick="addMatRowBtn()">＋ 新增材料</button>
     </div>
     <div class="tbl-wrap">
       <table class="mtbl">
@@ -969,16 +966,20 @@ function migrateCfgTwoLevel(){
   Object.keys(c.staffByVendor).forEach(k => { if (!c.vendors.includes(k)) delete c.staffByVendor[k]; });
 }
 
+/* 2026-08-18 改：先推雲端，再寫本機。
+ * 舊版是先寫 localStorage，手機空間不足時整個 try 直接跳走 → 雲端那行根本沒執行，
+ * 使用者看到「儲存失敗」但同時也看到「已儲存」，換電腦一看資料根本不在（會掉資料）。
+ * 現在兩件事各自 try：雲端進得去就算存到了，本機只是快取。 */
 function save() {
-  try {
-    const data = {
-      reports: S.reports, cfg: S.cfg, user: S.user,
-      projSort: S.projSort, updatedAt: Date.now()
-    };
-    localStorage.setItem('cdr_pm', JSON.stringify(data));
-    // Firebase 整包同步（跨裝置，圖示持久顯示，仿圖面進度表）
-    if(window._cdrSet) pushCloud(data);
-  } catch(e) { toast('儲存失敗：'+e.message,'e'); }
+  const data = {
+    reports: S.reports, cfg: S.cfg, user: S.user,
+    projSort: S.projSort, updatedAt: Date.now()
+  };
+  let cloudOk = false, localOk = false;
+  try { if(window._cdrSet){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
+  try { localStorage.setItem('cdr_pm', JSON.stringify(data)); localOk = true; }
+  catch(e){ console.warn('本機儲存失敗（多半是空間不足）：', e && e.message); }
+  return { cloudOk, localOk };
 }
 /* ── per-record 同步（2026-07-29 治本改造）──
  * 舊版：每次存檔都把 {reports,cfg,user,projSort} 整包 set 到 cdr_pm/all，靠 updatedAt 誰新誰贏。
@@ -1354,6 +1355,9 @@ function loadToday() {
  * 不擋操作，想加入就按「👥 加入一起填」。判斷邏輯完全沒變。
  */
 var _dupReportId = '';
+/* 使用者已經在新增視窗做過決定的「部門|日期」，之後就不要再一直提醒（2026-08-18 用戶要求）。
+   換到別的日期會重新判斷；重新整理也會重來。 */
+var _dupHandledFor = '';
 function checkDeptDateDuplicate() {
   const bar = $('dup-notice');
   if (!bar) return;
@@ -1362,6 +1366,7 @@ function checkDeptDateDuplicate() {
   const dept = S.user.dept;
   const date = $('f-date').value;
   if (!dept||!date) return;
+  if (_dupHandledFor === dept + '|' + date) return;
   const existing = S.reports.find(r=>r.dept===dept && r.date===date);
   if (existing && existing.id!==S.report.id) {
     _dupReportId = existing.id;
@@ -1406,21 +1411,22 @@ function todaysReport() {
 function openCarryModal() {
   const list = carryCandidates();
   const host = $('carry-list');
+  const td = today();
   host.innerHTML = list.length ? list.map((r, i) => `
     <label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px">
       <input type="radio" name="carry-src" value="${escHtml(r.id)}"${i===0?' checked':''}>
       <span style="font-weight:700;color:var(--primary);min-width:92px">${escHtml(r.date||'—')}</span>
+      ${r.date===td ? '<span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:11px;border-radius:10px;padding:1px 7px;white-space:nowrap">今天</span>' : ''}
       <span style="flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere">${escHtml(r.reporter||'—')}</span>
       <span style="color:var(--muted);font-size:12px;white-space:nowrap">工項 ${(r.workItems||[]).length} 筆・材料 ${(r.materials||[]).length} 筆</span>
     </label>`).join('')
     : `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">還沒有可以帶入的舊日報表</div>`;
 
+  // 黃框只講「要不要加入」，日期／建立人／筆數都在下面那份清單裡，不重複講一次（2026-08-18）
   const t = todaysReport(), note = $('carry-today-note');
   if (t) {
     $('carry-today-text').textContent =
-      '今天（' + t.date + '）' + t.dept + ' 已經有一張日報表了'
-      + (t.reporter ? '，是 ' + t.reporter + ' 建的' : '')
-      + '。要加入一起填，還是另外開一張？';
+      '今天已經有一張日報表了' + (t.reporter ? '（' + t.reporter + ' 建的）' : '') + '，要一起填嗎？';
     note.style.display = '';
   } else { note.style.display = 'none'; }
 
@@ -1438,6 +1444,7 @@ function carryJoinToday(){
 /* 出口②：完全空白 */
 function carryBlank(){
   closeCarryModal();
+  _dupHandledFor = S.user.dept + '|' + today();   // 已經做過決定 → 不要再跳提示
   _startNewReport();
   toast('已建立空白日報表','s');
 }
@@ -1452,6 +1459,7 @@ function carryApply(){
   const wantWork  = $('carry-work').checked;
   closeCarryModal();
 
+  _dupHandledFor = S.user.dept + '|' + today();   // 已經做過決定 → 不要再跳提示
   _startNewReport();
   const me = (S.user && S.user.name) || '';
   const brought = [];
@@ -1494,6 +1502,20 @@ function initReport() {
   applyPermissions();
   loadToday();
 }
+/* ── 一定要先按上方「＋ 新增」（2026-08-18）──────────────────────
+ * 開 App 時背景本來就有一張空白報表，所以以前直接按下方「＋ 新增工項／新增材料」就能填，
+ * 完全不會經過「要帶入舊的一張，還是開空白」那一步 → 常常變成另外開一張，或漏了材料明細。
+ * 現在下方兩個新增鈕會先確認這張報表是不是走正規流程開的，不是就直接把新增視窗打開。
+ * 從歷史資料開啟、加入別人那張（loadReport）也算「已開始」。 */
+var _reportStarted = false;
+function requireStarted(){
+  if (_reportStarted) return true;
+  toast('請先按上方「＋ 新增」建立日報表','e');
+  openCarryModal();
+  return false;
+}
+function addRowBtn(){ if (appLockGuard()) return; if (!requireStarted()) return; addRow(); }
+function addMatRowBtn(){ if (appLockGuard()) return; if (!requireStarted()) return; addMatRow(); }
 function newReport() {
   if (appLockGuard()) return;
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
@@ -1503,6 +1525,7 @@ function newReport() {
 }
 /* 真正建立空白報表（帶入視窗的三個出口都會走這裡） */
 function _startNewReport(){
+  _reportStarted = true;
   const newR = blankReport();
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
@@ -1552,10 +1575,13 @@ function saveReport() {
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
-  save();
-  toast('日報表已儲存','s');
+  const st = save();
+  if (st.localOk) toast('日報表已儲存','s');
+  else if (st.cloudOk) toast('已存到雲端 — 這台裝置本機空間不足，換裝置開一樣看得到','s');
+  else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
+  _reportStarted = true;             // 開既有的一張（歷史資料／加入共編）也算走過流程
   S.report = JSON.parse(JSON.stringify(r));
   rememberBaseline(S.report);   // 記下「我打開它時長什麼樣」，存檔時才知道哪些欄位是我真的改過的
   renderReport();
@@ -1744,10 +1770,6 @@ function recalc() {
   });
   $('tot-today').textContent = t0%1===0?t0:t0.toFixed(1);
   $('tot-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
-  $('st-today').textContent = t0%1===0?t0:t0.toFixed(1);
-  $('st-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
-  const cnt = $('tbody').children.length;
-  $('stat-grid').style.display = cnt>0?'grid':'none';
 }
 function collectRows() {
   const rows=[];
@@ -1923,23 +1945,63 @@ function phTargetFromSelect(){
     work: tr.querySelector('[data-f="work"]')?.value||''
   };
 }
+/* ── 照片壓縮（2026-08-18）────────────────────────────────────────
+ * 起因：手機拍一張就 3~5MB，轉 base64 後更大，直接超過瀏覽器本機儲存上限
+ *       → 存檔整個失敗，連雲端都沒寫進去（使用者以為存好了，其實資料掉了）。
+ * 做法：上傳時用 canvas 縮到長邊 PHOTO_MAX_EDGE、轉 JPEG PHOTO_QUALITY，一張約 400~600KB。
+ * ⚠️ 本地化部署後如果要改成「原檔上傳到檔案伺服器」，只要動這兩個常數與 uploadPhotos()。
+ *    每張照片有保留 origName／origSize／origW／origH，將來要補傳原檔對得起來。 */
+var PHOTO_MAX_EDGE = 2048;   // 長邊上限（px）
+var PHOTO_QUALITY  = 0.85;   // JPEG 品質
+function compressImage(file){
+  return new Promise(function(resolve){
+    var rd = new FileReader();
+    rd.onload = function(ev){
+      var raw = ev.target.result;
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w = img.width, h = img.height;
+          var scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          var out = cv.toDataURL('image/jpeg', PHOTO_QUALITY);
+          // 壓完反而更大（例如本來就很小的圖）→ 用原檔
+          if (out.length >= raw.length) { resolve({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
+          resolve({ data: out, w: cw, h: ch, ow: w, oh: h });
+        }catch(err){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); }
+      };
+      img.onerror = function(){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); };
+      img.src = raw;
+    };
+    rd.onerror = function(){ resolve(null); };
+    rd.readAsDataURL(file);
+  });
+}
 function uploadPhotos(e) {
   const tgt=phTargetFromSelect();
   if(!tgt){ toast('請先在上方新增工項，再選要把照片掛在哪一項','e'); e.target.value=''; return; }
-  Array.from(e.target.files).forEach(f=>{
-    if (!f.type.startsWith('image/')) return;
-    const rd=new FileReader();
-    rd.onload=ev=>{
+  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  e.target.value='';
+  if(!files.length) return;
+  if(files.length > 1) toast('照片處理中…');
+  Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
+    let n = 0;
+    list.forEach(({ r, f }) => {
+      if(!r) return;
       S.report.photos.push({
-        id:uid(), data:ev.target.result, name:f.name, ts:Date.now(),
+        id:uid(), data:r.data, name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
+        origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
         projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
       });
-      renderPhotos(); syncReport();
-    };
-    rd.readAsDataURL(f);
+      n++;
+    });
+    renderPhotos(); syncReport();
+    if(n) toast('已加入 ' + n + ' 張照片','s');
   });
-  e.target.value='';
 }
 /* 依 案場 → 施作位置 → 施工項目 → 日期 分層列出 */
 function renderPhotos() {
