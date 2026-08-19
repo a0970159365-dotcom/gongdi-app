@@ -7,7 +7,9 @@
 <meta name="robots" content="noindex, nofollow">
 <title>進度表—圖面管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-18.6';window.APP_KEY='dtp';</script>
+<!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
+     只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
+<script>window.APP_VERSION='2026-08-19.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -594,6 +596,7 @@ function _execList(r){ return String((r&&r.執行者)||'').split(/[、,，\n]/).
 // 權限執行層：依入口角色的檢視/編輯範圍過濾（欄位＝部門 / 執行者）
 function canViewRecord(r){
   const u=currentUser||{}; const level=u.viewLevel||'dept';
+  if(window.APP_VIEW_ALL) return true;   // 這支 App 不分部門，全公司都看得到（編輯權不受影響）
   if(level==='all') return true;
   if(r && u.name && _execList(r).includes(u.name)) return true;  // 保險：執行者含本人的紀錄，不論部門一律可見
   if(!r||!r.部門) return true;                       // 沒標部門的舊資料一律可見
@@ -990,11 +993,28 @@ function addLogRow(date='',location='',status='',text=''){
   editor.appendChild(row);
 }
 
+
+/* ── 部門建議清單一律以入口網頁為準（2026-08-19）──────────────────────
+ * 舊做法：讀 App 自己的 cfg.部門。那份清單是「在使用者管理新增人員時順手加進去的」，
+ *         2026-05-29 有人把部門打成「規畫設計部」（少一個立刀旁）就永久掛在清單上，
+ *         而正確的「規劃設計部」反而不在裡面 → 照建議選的人全部存成錯的部門，
+ *         權限判斷是字串完全相符，那些紀錄等於掉進一個不存在的部門，同部門的人全看不到。
+ * 新做法：直接讀入口的官方部門資料，入口改名這裡就跟著變，不再各存一份。
+ *         讀不到入口資料（例如舊分頁）才退回 cfg.部門，不會讓欄位變空白。 */
+function portalDepts(){
+  try{
+    const p=JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const ds=(p.departments||[]).map(d=>d&&d.name).filter(Boolean);
+    if(ds.length)return ds;
+  }catch(e){}
+  return cfg['部門']||[];
+}
 function updateDataLists(){
   // datalists for text inputs
   ['案場','部門','執行者','施作位置'].forEach(k=>{
     const el=document.getElementById('dl-'+k);
-    if(el)el.innerHTML=(cfg[k]||[]).map(v=>`<option value="${esc(v)}">`).join('');
+    const src=(k==='部門')?portalDepts():(cfg[k]||[]);   // 部門走入口，其餘照 App 自己的設定
+    if(el)el.innerHTML=src.map(v=>`<option value="${esc(v)}">`).join('');
   });
   // 位置 datalist（從所有歷史紀錄自動收集）
   const locDl=document.getElementById('dl-位置');
@@ -1553,8 +1573,13 @@ function openEdit(id){
     else addLogRow();
   }else{
     ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).value='');
-    // 新增時自動帶入當前執行者
-    if(currentUser)document.getElementById('e-exec').value=currentUser.name;
+    // 新增時自動帶入當前執行者與所屬部門
+    // 部門原本是空白讓人自己填，打錯字就會變成一個不存在的部門、同事全看不到（2026-08-19 事故）。
+    // 這裡只是預設值，欄位仍可改 —— 要幫別部門代填時還是動得了。
+    if(currentUser){
+      document.getElementById('e-exec').value=currentUser.name;
+      document.getElementById('e-dept').value=currentUser.dept||'';
+    }
     addLogRow();
   }
   // 唯讀模式：所有 input 設為 disabled
