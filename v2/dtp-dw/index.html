@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-20.5';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.6';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -962,14 +962,18 @@ function logRowsToArray(){
     const status=row.querySelector('.log-status').value;
     const text=row.querySelector('.log-text').value.trim();
     if(!date&&!location&&!status&&!text)return null;
-    return{date,location,status,text};
+    // 每列配一個固定編號，合併時才認得出「這是同一列」（2026-08-20）
+    const rid=row.dataset.rid||newRid();
+    row.dataset.rid=rid;
+    return{rid,date,location,status,text};
   }).filter(Boolean);
 }
-function addLogRow(date='',location='',status='',text=''){
+function addLogRow(date='',location='',status='',text='',rid=''){
   const editor=document.getElementById('log-editor');
   if(!editor)return;
   const row=document.createElement('div');
   row.className='log-edit-row'+(status==='暫停/卡關'?' row-stuck':'');
+  if(rid)row.dataset.rid=rid;   // 既有列的編號要跟著回到畫面上，存檔才不會換一個新的
   const opts=['',...(cfg['狀態']||[])].map(v=>`<option value="${esc(v)}"${v===status?' selected':''}>${v||'— 狀態 —'}</option>`).join('');
   row.innerHTML=`
     <input type="date" class="fi log-date" value="${esc(date)}">
@@ -1062,6 +1066,63 @@ async function pushCfg(authoritative){
   await window._fbSetPath('cfg',cfg);
 }
 
+// ============================================================
+// 多人同時改同一筆的合併（2026-08-20 第 7 項）
+// ============================================================
+// 不同人填的「不同筆」本來就互不覆蓋（存檔是一筆一筆寫）。這裡處理的是剩下那個窄情況：
+// 兩個人同時打開「同一筆」，後存的整筆蓋掉先存的。改成逐格比對後，各自改的都留得住。
+const LOG_FIELDS=['date','location','status','text'];
+function _logCore(l){const o={};LOG_FIELDS.forEach(k=>o[k]=(l&&l[k])||'');return JSON.stringify(o)}
+function newRid(){return 'lg_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6)}
+// 一列的身分：有編號用編號；沒有的（舊資料、或被舊版 App 存過）用內容 ——
+// 內容算出來的 key 各台裝置一致，不會像亂數編號那樣各編各的、合併時變成兩列。
+function logKey(l){ return l&&l.rid ? 'rid:'+l.rid : 'c:'+_logCore(l); }
+function _logMap(list){
+  const m=new Map();
+  (list||[]).forEach(l=>{const k=logKey(l);if(!m.has(k))m.set(k,l)});
+  return m;
+}
+function mergeLogs(mine,cloud,base){
+  if(!Array.isArray(cloud))return Array.isArray(mine)?mine:[];
+  if(!Array.isArray(mine))return cloud;
+  if(!Array.isArray(base)){
+    // 沒有基準（這筆不是我打開編輯的）→ 不猜誰改了什麼。保留我的，再把雲端多出來的補進來，
+    // 寧可多一列也不要弄丟別人剛填的。
+    const out=mine.slice(), have=_logMap(out);
+    cloud.forEach(c=>{if(!have.has(logKey(c)))out.push(c)});
+    return out;
+  }
+  const bM=_logMap(base), cM=_logMap(cloud), used=new Set(), out=[];
+  mine.forEach(l=>{
+    const k=logKey(l); used.add(k);
+    const b=bM.get(k), c=cM.get(k);
+    if(b===undefined){out.push(l);return}                    // 我新增的 → 留著
+    if(_logCore(l)!==_logCore(b)){out.push(l);return}        // 我改過這列 → 用我的
+    if(c!==undefined){out.push(c);return}                    // 我沒動、雲端還在 → 用雲端（別人可能剛改）
+    // 我沒動、雲端已經被刪掉 → 跟著刪（不 push）
+  });
+  cM.forEach((c,k)=>{ if(!used.has(k)&&!bM.has(k))out.push(c) });   // 別人新增的 → 補進來
+  return out;
+}
+// 整格文字的欄位沒辦法逐列比，改用基準值判斷：我沒碰過的格子永遠不覆蓋別人剛改的。
+function _pickScalar(mine,theirs,base){
+  if(base===undefined)return mine;                       // 沒基準 → 照舊用我的
+  if(JSON.stringify(mine)!==JSON.stringify(base))return mine;   // 我改過 → 用我的
+  return theirs!==undefined?theirs:mine;                 // 我沒改 → 保留雲端
+}
+const REC_SCALARS=['案場','部門','執行者','施作位置','工作項目','備註','狀態'];
+function mergeRecord(local,cloud,base){
+  if(!cloud)return local;
+  const out={...local};
+  REC_SCALARS.forEach(k=>{ out[k]=_pickScalar(local[k],cloud[k],base?base[k]:undefined) });
+  out.進度記錄=sortLogs(mergeLogs(local.進度記錄,cloud.進度記錄,base?base.進度記錄:null));
+  return out;
+}
+// 基準＝「我打開這筆的時候它長什麼樣」。存完之後基準換成剛寫上去的那份，下次才比得出我又改了什麼。
+const _recBaselines={};
+function rememberBaseline(r){ try{ if(r&&r.id)_recBaselines[r.id]=JSON.stringify(r) }catch(e){} }
+function baselineOf(id){ try{ return _recBaselines[id]?JSON.parse(_recBaselines[id]):null }catch(e){ return null } }
+
 async function fbSave(){
   saveLocal();saveCfgLocal();
   if(!window._fbSetPath){setSyncIcon('err');return}
@@ -1086,12 +1147,30 @@ async function fbSave(){
       return;
     }
     const jobs=[];
-    records.forEach(r=>{ if(r&&r.id&&_lastPushed[r.id]!==cur[r.id]) jobs.push(window._fbSetPath('records/'+r.id,r)); });
+    // 多人共編（2026-08-20）：推上去之前先讀雲端那一筆，跟「我打開當下的基準」三方比對，
+    // 只把我真的動過的格子寫上去 —— 我沒碰的欄位與別人剛新增的進度列都不會被蓋掉。
+    const changed=records.filter(r=>r&&r.id&&_lastPushed[r.id]!==cur[r.id]);
+    let mergedAny=false;
+    for(const r of changed){
+      let toWrite=r;
+      if(window._fbGetPath){
+        try{
+          const cloud=await window._fbGetPath('records/'+r.id);
+          if(cloud)toWrite=mergeRecord(r,normalizeRecord(cloud),baselineOf(r.id));
+        }catch(e){ /* 讀不到雲端就照原樣寫，至少不要擋住存檔 */ }
+      }
+      jobs.push(window._fbSetPath('records/'+r.id,toWrite));
+      rememberBaseline(toWrite);
+      const i=records.findIndex(x=>x.id===r.id);
+      if(i>=0&&JSON.stringify(records[i])!==JSON.stringify(toWrite)){records[i]=toWrite;mergedAny=true}
+    }
     dels.forEach(id=>jobs.push(window._fbSetPath('records/'+id,null)));
     jobs.push(pushCfg(_cfgAuthoritative));
     _cfgAuthoritative=false;
     await Promise.all(jobs);
-    _lastPushed=cur;
+    // 合併結果要回到畫面上，不然使用者看到的還是自己那份，跟雲端不一致
+    if(mergedAny){saveLocal();renderMain();renderHistory();updateFilters()}
+    _lastPushed=_snapshot(records);
     setSyncIcon('ok');
   }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err')}
 }
@@ -1652,8 +1731,9 @@ function openEdit(id){
     document.getElementById('e-loc').value=r.施作位置||'';
     document.getElementById('e-note').value=r.備註||'';
     const rows=r.進度記錄||[];
-    if(rows.length)rows.forEach(row=>addLogRow(row.date,row.location,row.status,row.text));
+    if(rows.length)rows.forEach(row=>addLogRow(row.date,row.location,row.status,row.text,row.rid));
     else addLogRow();
+    rememberBaseline(r);   // 記下「我打開它時長什麼樣」，存檔時才知道哪幾格是我真的改過的
   }else{
     ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).value='');
     // 新增時自動帶入當前執行者與所屬部門
