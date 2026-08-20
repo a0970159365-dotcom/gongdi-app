@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-20.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -73,7 +73,7 @@ textarea.fi{resize:vertical;min-height:60px}
 .ms-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;font-size:13px;cursor:pointer;white-space:nowrap}
 .ms-item:hover{background:#f1f5f9}
 .ms-item input{cursor:pointer;width:14px;height:14px;accent-color:var(--primary-l);flex:none}
-.ms-clear{display:block;width:100%;text-align:center;border:none;background:transparent;color:var(--muted);font-size:12px;font-family:inherit;padding:5px 0 3px;cursor:pointer;border-top:1px solid var(--border);margin-top:4px}
+.ms-clear{display:block;width:100%;text-align:center;border:none;background:transparent;color:var(--muted);font-size:12px;font-family:inherit;padding:3px 0 6px;cursor:pointer;border-bottom:1px solid var(--border);margin-bottom:4px;position:sticky;top:-6px;z-index:1;background:#fff}
 .ms-clear:hover{color:var(--danger)}
 .ms-empty{padding:8px;font-size:12px;color:var(--muted)}
 
@@ -1302,10 +1302,12 @@ function msPanel(key,opts){
   _msOpts[key]=opts||[];
   const p=document.getElementById('msp-'+key);if(!p)return;
   if(!_msOpts[key].length){p.innerHTML='<div class="ms-empty">沒有可選項目</div>';return}
-  p.innerHTML=_msOpts[key].map(o=>
-    '<label class="ms-item"><input type="checkbox" value="'+esc(o)+'"'+(msSel[key].has(o)?' checked':'')+
-    ' onchange="msPick(\''+key+'\',this.value,this.checked)">'+esc(o)+'</label>'
-  ).join('')+'<button type="button" class="ms-clear" onclick="msClear(\''+key+'\')">清除選取</button>';
+  // 「清除選取」放在最上面（2026-08-20 用戶指定）——選項多的時候不必捲到底才找得到
+  p.innerHTML='<button type="button" class="ms-clear" onclick="msClear(\''+key+'\')">清除選取</button>'
+    +_msOpts[key].map(o=>
+      '<label class="ms-item"><input type="checkbox" value="'+esc(o)+'"'+(msSel[key].has(o)?' checked':'')+
+      ' onchange="msPick(\''+key+'\',this.value,this.checked)">'+esc(o)+'</label>'
+    ).join('');
 }
 function hasActiveFilter(){
   const q=(document.getElementById('q')||{value:''}).value.trim();
