@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-20.7';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-20.8';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -379,7 +379,23 @@ function today(){ return new Date().toISOString().slice(0,10); }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function loadLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ return null; } }
-function saveLS(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({config:S.config, reports:S.reports})); }catch(e){} }
+/* 本機快取只留縮圖：原圖動輒兩三百 KB，全塞進 localStorage（上限約 5MB）
+ * 十幾張就滿了，滿了之後整包存不進去、離線連清單都看不到。
+ * 拿掉的項目標 photoOnCloud，存檔時會先把原圖補回來再寫雲端（見 persistReport）。*/
+function _lightReports(){
+  return (S.reports||[]).map(function(r){
+    if(!r||!r.items) return r;
+    var c=Object.assign({},r);
+    c.items=r.items.map(function(it){
+      if(!it||!it.photo) return it;
+      var ci=Object.assign({},it);
+      delete ci.photo; ci.photoOnCloud=true;
+      return ci;
+    });
+    return c;
+  });
+}
+function saveLS(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({config:S.config, reports:_lightReports()})); }catch(e){} }
 
 function showToast(msg){
   var w=$('toast-wrap'), m=$('toast-msg');
@@ -691,7 +707,7 @@ function renderChecklist(){
       +'</label>'
       +(item.photoThumb?'<button onclick="removePhoto('+idx+')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">🗑️</button>':'')
       +'</div>'
-      +(item.photoThumb?'<img src="'+item.photoThumb+'" class="w-full object-cover rounded-xl border border-gray-200" style="max-height:9rem">':'')
+      +(item.photoThumb?'<img src="'+item.photoThumb+'" onclick="openPhotoAt(\'checklist\','+idx+')" class="w-full object-cover rounded-xl border border-gray-200 cursor-zoom-in" style="max-height:9rem" title="點擊放大">':'')
       +'</div>'
       +'</div></div>';
   });
@@ -758,34 +774,89 @@ function updateCompleteBtn(){
   }
 }
 
+/* ── 照片：縮圖給列表、原圖給放大看（2026-08-20 把做到一半的設計補完）──
+ * 舊版：resizeImg(file,600) 產生一份 600px，photo 與 photoThumb 都指向它 →
+ *       同一張存兩次，而且 600px 對查驗證據來說看不清細節（縫隙寬度、標籤文字）。
+ * 新版：一次產生兩份 —— photoThumb 小、photo 大。保留原檔資訊，將來照片改放
+ *       檔案伺服器時（本地化），只要把值從 base64 換成網址，畫面程式不用動。*/
+var PHOTO_THUMB_EDGE=320, PHOTO_THUMB_Q=0.7;    // 列表／列印用
+var PHOTO_FULL_EDGE=1600, PHOTO_FULL_Q=0.85;    // 點開放大用
+function _scaleTo(img,maxEdge,q){
+  var s=Math.min(1,maxEdge/Math.max(img.width,img.height));
+  var w=Math.max(1,Math.round(img.width*s)), h=Math.max(1,Math.round(img.height*s));
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h);
+  return {data:c.toDataURL('image/jpeg',q), w:w, h:h};
+}
+function makePhoto(file,cb){
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    var raw=ev.target.result;
+    var img=new Image();
+    var fallback=function(){ cb({photo:raw,photoThumb:raw,origName:(file&&file.name)||'',origSize:(file&&file.size)||0,origW:0,origH:0}); };
+    img.onload=function(){
+      try{
+        var full=_scaleTo(img,PHOTO_FULL_EDGE,PHOTO_FULL_Q);
+        var th=_scaleTo(img,PHOTO_THUMB_EDGE,PHOTO_THUMB_Q);
+        // 本來就很小的圖壓完反而更大 → 原檔直接當原圖
+        cb({
+          photo: full.data.length>=raw.length ? raw : full.data,
+          photoThumb: th.data,
+          origName:(file&&file.name)||'', origSize:(file&&file.size)||0,
+          origW:img.width, origH:img.height
+        });
+      }catch(err){ fallback(); }
+    };
+    img.onerror=fallback;
+    img.src=raw;
+  };
+  rd.readAsDataURL(file);
+}
 function handlePhoto(e,idx){
   var file=e.target.files[0]; if(!file) return;
-  resizeImg(file,600,function(dataUrl){
-    S.report.items[idx].photo=dataUrl;
-    S.report.items[idx].photoThumb=dataUrl;
+  makePhoto(file,function(p){
+    var it=S.report.items[idx];
+    it.photo=p.photo; it.photoThumb=p.photoThumb;
+    it.origName=p.origName; it.origSize=p.origSize; it.origW=p.origW; it.origH=p.origH;
+    delete it.photoOnCloud;
     renderChecklist();
   });
 }
 function removePhoto(idx){
-  S.report.items[idx].photo=null;
-  S.report.items[idx].photoThumb=null;
+  var it=S.report.items[idx];
+  it.photo=null; it.photoThumb=null;
+  delete it.origName; delete it.origSize; delete it.origW; delete it.origH; delete it.photoOnCloud;
   renderChecklist();
 }
-function resizeImg(file,maxW,cb){
-  var reader=new FileReader();
-  reader.onload=function(ev){
-    var img=new Image();
-    img.onload=function(){
-      var r=Math.min(1,maxW/img.width);
-      var c=document.createElement('canvas');
-      c.width=img.width*r; c.height=img.height*r;
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-      cb(c.toDataURL('image/jpeg',0.72));
-    };
-    img.src=ev.target.result;
-  };
-  reader.readAsDataURL(file);
+/* ── 放大檢視 ── */
+function _itemAt(where,idx){
+  if(where==='detail'){
+    var r=S.reports.find(function(x){return x.id===S.selectedReportId;});
+    return r && (r.items||[])[idx];
+  }
+  return S.report && (S.report.items||[])[idx];
 }
+function openPhotoAt(where,idx){
+  var it=_itemAt(where,idx); if(!it) return;
+  var src=it.photo||it.photoThumb; if(!src) return;
+  var ov=$('photo-view');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='photo-view';
+    ov.className='fixed inset-0 z-50 flex items-center justify-center p-4';
+    ov.style.background='rgba(0,0,0,.88)';
+    document.body.appendChild(ov);
+  }
+  var cap='';
+  if(it.origW&&it.origH) cap='原檔 '+it.origW+'×'+it.origH+(it.origSize?(' · '+Math.round(it.origSize/1024)+' KB'):'');
+  if(!it.photo&&it.photoOnCloud) cap=(cap?cap+'　':'')+'（離線中，顯示的是縮圖）';
+  ov.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:82vh;object-fit:contain" class="rounded-lg">'
+    +'<button onclick="closePhotoView()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/15 text-white rounded-full text-lg">&#10005;</button>'
+    +(cap?'<div class="absolute bottom-4 left-0 right-0 text-center text-white/70 text-xs px-4">'+esc(cap)+'</div>':'');
+  ov.classList.remove('hidden');
+  ov.onclick=function(e){ if(e.target===ov) closePhotoView(); };
+}
+function closePhotoView(){ var ov=$('photo-view'); if(ov){ ov.classList.add('hidden'); ov.innerHTML=''; } }
 
 // criterion modal
 function showCriterion(idx){
@@ -835,6 +906,23 @@ function completeReport(){
   persistReport();
   goTo('complete');
 }
+/* 本機快取沒有原圖（photoOnCloud）→ 推雲端前先把雲端那份補回來。
+ * 不這樣做的話：離線開啟舊報表 → 編輯 → 存檔，會把雲端的原圖整個洗掉。
+ * 補不回來（離線／讀取失敗）就只存本機、不寫雲端 —— 寧可晚一點同步，也不要弄丟原圖。*/
+function restoreCloudPhotos(data){
+  var need=(data.items||[]).filter(function(it){ return it && it.photoOnCloud && !it.photo; });
+  if(!need.length) return Promise.resolve(true);
+  if(!window._sopGet) return Promise.resolve(false);
+  return window._sopGet('reports/'+data.id).then(function(cloud){
+    if(!cloud) return true;                       // 雲端本來就沒有 → 沒東西可弄丟
+    var m={}; (cloud.items||[]).forEach(function(it){ if(it&&it.id) m[it.id]=it; });
+    need.forEach(function(it){
+      var c=m[it.id];
+      if(c&&c.photo){ it.photo=c.photo; delete it.photoOnCloud; }
+    });
+    return true;
+  }).catch(function(){ return false; });
+}
 function persistReport(){
   var data=JSON.parse(JSON.stringify(S.report));
   data.createdAt=Date.now();
@@ -843,7 +931,14 @@ function persistReport(){
   saveLS();
   if(window._sopSet){
     setSyncStatus('saving');
-    window._sopSet('reports/'+data.id, data).then(function(){ setSyncStatus('saved'); }).catch(function(){ setSyncStatus('error'); });
+    restoreCloudPhotos(data).then(function(okPhotos){
+      if(!okPhotos){
+        setSyncStatus('error');
+        showToast('目前無法取得原圖，已存本機，稍後連線再存一次');
+        return;
+      }
+      window._sopSet('reports/'+data.id, data).then(function(){ setSyncStatus('saved'); }).catch(function(){ setSyncStatus('error'); });
+    });
   }
 }
 
@@ -980,7 +1075,7 @@ function renderDetail(){
         +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+esc(item.name)+'</div>'
         +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
         +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1">&#128221; '+esc(item.description)+'</div>':'')
-        +(item.photoThumb?'<img src="'+item.photoThumb+'" class="mt-2 w-full object-cover rounded-lg" style="max-height:7rem">':'')
+        +(item.photoThumb?'<img src="'+item.photoThumb+'" onclick="openPhotoAt(\'detail\','+idx+')" class="mt-2 w-full object-cover rounded-lg cursor-zoom-in" style="max-height:7rem" title="點擊放大">':'')
         +'</div>'
         +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
         +'</div></div>';
