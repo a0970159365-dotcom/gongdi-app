@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-20.4';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-20.5';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -554,8 +554,7 @@ function buildDefaultCfg(){
     部門:[],
     執行者:[],
     施作位置:['1F&BF公設','1F景觀','2F公設','33F公設','34F景觀','停車場側入口石柱','公設','地壁','基座','外牆','室內','標準層內裝','標準層外牆','標準層梯廳','標準層浴室','門檻+淋浴柱+馬背+檯面'],
-    狀態:['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動'],
-    users:[]
+    狀態:['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動']
   };
 }
 
@@ -563,7 +562,9 @@ function buildDefaultCfg(){
 function ensureStatusOptions(){
   if(!cfg.狀態)cfg.狀態=[];
   ['暫停/卡關','恢復啟動'].forEach(s=>{if(!cfg.狀態.includes(s))cfg.狀態.push(s)});
-  if(!cfg.users)cfg.users=[];
+  // cfg.users 已停用：使用者由入口統一管理，App 這份沒人維護也沒人讀（2026-08-20）。
+  // 這裡主動刪掉，舊裝置本機快取裡的殘留才不會在下次存檔又被推回雲端。
+  if(cfg.users)delete cfg.users;
   if(!cfg.部門)cfg.部門=[];
 }
 

@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-20.4';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.5';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -600,8 +600,7 @@ function buildDefaultCfg(){
     部門:[],
     執行者:[...execSet].sort(),
     施作位置:[...locSet].filter(Boolean).sort(),
-    狀態:['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動'],
-    users:[]
+    狀態:['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動']
   };
 }
 
@@ -609,7 +608,9 @@ function buildDefaultCfg(){
 function ensureStatusOptions(){
   if(!cfg.狀態)cfg.狀態=[];
   ['暫停/卡關','恢復啟動'].forEach(s=>{if(!cfg.狀態.includes(s))cfg.狀態.push(s)});
-  if(!cfg.users)cfg.users=[];
+  // cfg.users 已停用：使用者由入口統一管理，App 這份沒人維護也沒人讀（2026-08-20）。
+  // 這裡主動刪掉，舊裝置本機快取裡的殘留才不會在下次存檔又被推回雲端。
+  if(cfg.users)delete cfg.users;
   if(!cfg.部門)cfg.部門=[];
 }
 
