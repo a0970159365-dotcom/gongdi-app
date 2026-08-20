@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-19.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-20.7';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -1010,9 +1010,19 @@ function renderSettings(){
   secs.forEach(function(sec){
     var el=$('cfg-'+sec.key);
     var items=S.config[sec.key]||[];
+    var editing = (S.cfgEditing && S.cfgEditing.key===sec.key) ? S.cfgEditing.idx : -1;
     var listHtml=items.map(function(item,i){
+      if(i===editing){
+        return '<div class="flex items-center gap-2 mb-2">'
+          +'<input id="cfg-edit-'+sec.key+'" value="'+esc(item)+'" class="flex-1 border-2 border-blue-500 rounded-lg px-3 py-2 text-sm focus:outline-none" '
+          +'onkeyup="if(event.key===\'Enter\')saveCfgEdit(\''+sec.key+'\');if(event.key===\'Escape\')cancelCfgEdit()">'
+          +'<button onclick="saveCfgEdit(\''+sec.key+'\')" class="w-8 h-8 flex items-center justify-center text-green-600 hover:text-green-700 rounded-lg font-bold" title="儲存">&#10003;</button>'
+          +'<button onclick="cancelCfgEdit()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg" title="取消">&#10005;</button>'
+          +'</div>';
+      }
       return '<div class="flex items-center gap-2 mb-2">'
         +'<span class="flex-1 text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">'+esc(item)+'</span>'
+        +(portalCanManageSettings()?'<button onclick="startCfgEdit(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 rounded-lg" title="編輯">&#9998;</button>':'')
         +(portalCanDelete()?'<button onclick="removeCfgItem(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded-lg">&#10005;</button>':'')
         +'</div>';
     }).join('');
@@ -1226,6 +1236,86 @@ function removeTemplate(tplId){
   syncTemplatesToConfig();
   renderTemplatesSection();
 }
+/* ── 設定項目改名（2026-08-20）──────────────────────────────
+ * 編輯用「系統設定維護」權（跟新增同一組）；刪除仍是「系統設定刪除」權。
+ * 改名時若有查核紀錄正在用這個名稱，先問要不要一起更新。 */
+var CFG_FIELD={cases:'caseName',contractors:'contractor'};
+function startCfgEdit(key,idx){
+  if(mngGuard())return;
+  S.cfgEditing={key:key,idx:idx};
+  renderSettings();
+  var inp=$('cfg-edit-'+key);
+  if(inp){inp.focus();inp.select();}
+}
+function cancelCfgEdit(){ S.cfgEditing=null; renderSettings(); }
+function cfgUsage(key,val){
+  var f=CFG_FIELD[key]; if(!f)return 0;
+  return (S.reports||[]).filter(function(r){ return r && r[f]===val; }).length;
+}
+function saveCfgEdit(key){
+  if(mngGuard())return;
+  var inp=$('cfg-edit-'+key); if(!inp)return;
+  var idx=S.cfgEditing?S.cfgEditing.idx:-1;
+  var oldV=(S.config[key]||[])[idx];
+  var newV=inp.value.trim();
+  if(oldV===undefined)return;
+  if(!newV){ showToast('名稱不能空白'); inp.focus(); return; }
+  if(newV===oldV){ cancelCfgEdit(); return; }
+  if((S.config[key]||[]).indexOf(newV)>=0){ showToast('已存在同名項目'); inp.focus(); return; }
+  var used=cfgUsage(key,oldV);
+  if(!used){ commitCfgRename(key,idx,oldV,newV,false); return; }
+  askCfgRename(key,oldV,newV,used,function(choice){
+    if(choice==='cancel'){ cancelCfgEdit(); return; }
+    commitCfgRename(key,idx,oldV,newV,choice==='all');
+  });
+}
+function commitCfgRename(key,idx,oldV,newV,alsoReports){
+  S.config[key][idx]=newV;
+  var n=0;
+  if(alsoReports){
+    var f=CFG_FIELD[key];
+    (S.reports||[]).forEach(function(r){
+      if(r&&r[f]===oldV){
+        r[f]=newV; n++;
+        if(window._sopSet){ window._sopSet('reports/'+r.id, r).catch(function(){}); }
+      }
+    });
+  }
+  S.cfgEditing=null;
+  saveLS();
+  if(window._sopSet){ window._sopSet('config', S.config).catch(function(){}); }
+  renderSettings();
+  showToast(alsoReports ? ('已改名，連同 '+n+' 筆紀錄一起更新') : '已改名');
+}
+function askCfgRename(key,oldV,newV,used,cb){
+  var label=(key==='cases'?'案場':'施工廠商');
+  var ov=$('cfgren-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='cfgren-overlay';
+    ov.className='fixed inset-0 z-50 flex items-center justify-center p-4';
+    ov.style.background='rgba(15,23,42,.5)';
+    document.body.appendChild(ov);
+  }
+  function close(choice){ ov.classList.add('hidden'); ov.innerHTML=''; cb(choice); }
+  ov.classList.remove('hidden');
+  ov.innerHTML='<div class="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">'
+    +'<div class="text-base font-bold mb-3">&#9998; 這個名稱有紀錄正在使用</div>'
+    +'<div class="flex items-center gap-2 flex-wrap bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3">'
+    +'<span class="text-gray-400 line-through">'+esc(oldV)+'</span><span class="text-gray-400">&rarr;</span>'
+    +'<span class="text-blue-600 font-semibold">'+esc(newV)+'</span></div>'
+    +'<div class="text-sm mb-4"><strong>'+used+' 筆</strong>查核紀錄的「'+label+'」正在使用這個名稱。</div>'
+    +'<div class="flex gap-2 flex-wrap">'
+    +'<button id="cfgren-all" class="px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">一起更新（'+used+' 筆）</button>'
+    +'<button id="cfgren-only" class="px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">只改清單</button>'
+    +'<button id="cfgren-cancel" class="px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">取消</button>'
+    +'</div></div>';
+  $('cfgren-all').onclick=function(){close('all')};
+  $('cfgren-only').onclick=function(){close('only')};
+  $('cfgren-cancel').onclick=function(){close('cancel')};
+  ov.onclick=function(e){ if(e.target===ov) close('cancel'); };
+}
+
 function removeCfgItem(key,idx){
   if(mngGuard())return;
   if(!requireDelete()) return;

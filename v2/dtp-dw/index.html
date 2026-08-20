@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-20.6';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.7';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -172,6 +172,15 @@ textarea.fi{resize:vertical;min-height:60px}
 .cfg-row-lbl{flex:1;word-break:break-all;color:var(--text)}
 .cfg-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 4px;line-height:1;flex-shrink:0}
 .cfg-del:hover{color:var(--danger)}
+/* 設定項目改名（2026-08-20）*/
+.cfg-edit{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px;line-height:1;flex-shrink:0}
+.cfg-edit:hover{color:var(--primary-l)}
+.cfg-row.editing{background:#f5f3ff;border-radius:6px;border-bottom-color:transparent;padding:5px 6px}
+.cfg-edit-inp{flex:1;font-family:inherit;font-size:13px;padding:4px 8px;border-radius:5px;border:1.5px solid var(--primary-l);background:#fff;color:var(--text);min-width:0}
+.cfg-ok{background:none;border:none;color:var(--success);cursor:pointer;font-size:13px;font-weight:800;padding:0 4px;line-height:1;flex-shrink:0}
+.cfg-ren-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 11px;font-size:13px;margin:10px 0}
+.cfg-ren-old{color:var(--muted);text-decoration:line-through}
+.cfg-ren-new{color:var(--primary);font-weight:700}
 .cfg-inp-row{display:flex;gap:6px;margin-top:6px}
 .cfg-inp-row input{flex:1;min-width:0}
 .log-edit-wrap{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--border);border-radius:6px;padding:8px;min-height:52px;max-height:380px;overflow-y:auto;background:#fafafa}
@@ -935,6 +944,126 @@ function cfgHideInp(key){
   if(ir)ir.style.display='none';
 }
 
+/* ── 設定項目改名（2026-08-20）───────────────────────────────────
+ * 以前只能刪掉重加，重加會排到最後面，而且既有紀錄裡的舊名字還留著。
+ * 編輯用「系統設定維護」權（跟新增同一組）；刪除仍是「系統設定刪除」權，兩者分開。
+ * 改名時若有紀錄正在用這個名稱，先問要不要一起更新 —— 不更新的話清單會分岔
+ * （新名字 0 筆、舊名字 N 筆，篩選會漏抓，跟 2026-08-19 部門錯字同一類問題）。 */
+function cfgEditStart(key,idx){
+  if(mngGuard())return;
+  const row=document.getElementById('cfgrow-'+key+'-'+idx);
+  if(!row||row.classList.contains('editing'))return;
+  const val=(cfg[key]||[])[idx];
+  if(val===undefined)return;
+  row.classList.add('editing');
+  const lbl=row.querySelector('.cfg-row-lbl');
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='cfg-edit-inp';inp.value=val;
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault();cfgEditSave(key,idx)}
+    if(e.key==='Escape'){e.preventDefault();renderCfgLists()}
+  };
+  lbl.replaceWith(inp);
+  row.querySelectorAll('.cfg-edit,.cfg-del').forEach(b=>b.remove());
+  const ok=document.createElement('button');
+  ok.className='cfg-ok';ok.title='儲存';ok.textContent='✓';
+  ok.onclick=()=>cfgEditSave(key,idx);
+  const no=document.createElement('button');
+  no.className='cfg-del';no.title='取消';no.textContent='✕';
+  no.onclick=()=>renderCfgLists();
+  row.appendChild(ok);row.appendChild(no);
+  inp.focus();inp.select();
+}
+// 這個名稱目前有幾筆紀錄在用
+function cfgUsage(key,val){
+  let n=0;
+  (records||[]).forEach(r=>{
+    if(!r)return;
+    normalizeRecord(r);
+    let hit=false;
+    if(key==='案場')hit=(r.案場===val);
+    else if(key==='施作位置')hit=(r.施作位置===val||r.工作項目===val);
+    else if(key==='狀態'){
+      hit=(r.狀態===val);
+      (r.進度記錄||[]).forEach(l=>{if(l&&l.status===val)hit=true});
+    }
+    if(hit)n++;
+  });
+  return n;
+}
+function cfgApplyRename(key,oldV,newV){
+  let n=0;
+  (records||[]).forEach(r=>{
+    if(!r)return;
+    normalizeRecord(r);
+    let ch=false;
+    if(key==='案場'&&r.案場===oldV){r.案場=newV;ch=true}
+    if(key==='施作位置'){
+      if(r.施作位置===oldV){r.施作位置=newV;ch=true}
+      if(r.工作項目===oldV){r.工作項目=newV;ch=true}
+    }
+    if(key==='狀態'){
+      if(r.狀態===oldV){r.狀態=newV;ch=true}
+      (r.進度記錄||[]).forEach(l=>{if(l&&l.status===oldV){l.status=newV;ch=true}});
+    }
+    if(ch){r.updatedAt=new Date().toISOString();n++}
+  });
+  return n;
+}
+function cfgEditSave(key,idx){
+  if(mngGuard())return;
+  const row=document.getElementById('cfgrow-'+key+'-'+idx);
+  const inp=row&&row.querySelector('.cfg-edit-inp');
+  if(!inp)return;
+  const newV=inp.value.trim();
+  const oldV=(cfg[key]||[])[idx];
+  if(!newV){toast('名稱不能空白','e');inp.focus();return}
+  if(newV===oldV){renderCfgLists();return}
+  if((cfg[key]||[]).includes(newV)){toast('已存在同名項目','e');inp.focus();return}
+  const used=cfgUsage(key,oldV);
+  if(!used){cfgCommitRename(key,idx,oldV,newV,false);return}
+  cfgRenameAsk(key,oldV,newV,used,choice=>{
+    if(choice==='cancel'){renderCfgLists();return}
+    cfgCommitRename(key,idx,oldV,newV,choice==='all');
+  });
+}
+function cfgCommitRename(key,idx,oldV,newV,alsoRecords){
+  cfg[key][idx]=newV;
+  // 改名＝明確意圖，這次用本機版本覆蓋雲端，否則舊名字會被聯集補回來
+  markCfgAuthoritative();
+  let n=0;
+  if(alsoRecords)n=cfgApplyRename(key,oldV,newV);
+  saveCfg();renderCfgLists();updateDataLists();
+  if(alsoRecords){renderMain();renderHistory();updateFilters()}
+  toast(alsoRecords?('已改名，連同 '+n+' 筆紀錄一起更新 ✓'):'已改名 ✓','s');
+}
+/* 改名確認視窗：用 JS 建，兩支 App 的設定頁 HTML 都不用動 */
+function cfgRenameAsk(key,oldV,newV,used,cb){
+  let ov=document.getElementById('cfgren-overlay');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='cfgren-overlay';ov.className='overlay';
+    ov.style.alignItems='center';
+    document.body.appendChild(ov);
+  }
+  const close=choice=>{ov.classList.remove('show');ov.innerHTML='';cb(choice)};
+  ov.innerHTML=
+    '<div class="modal-box" style="max-width:460px">'
+    +'<div style="font-size:16px;font-weight:800;margin-bottom:12px">✏️ 這個名稱有紀錄正在使用</div>'
+    +'<div class="cfg-ren-row"><span class="cfg-ren-old">'+esc(oldV)+'</span><span style="color:var(--muted)">→</span><span class="cfg-ren-new">'+esc(newV)+'</span></div>'
+    +'<div style="font-size:14px;line-height:1.7;margin-bottom:16px"><strong>'+used+' 筆</strong>紀錄的「'+esc(key)+'」正在使用這個名稱。</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="btn btn-p btn-sm" id="cfgren-all">一起更新（'+used+' 筆）</button>'
+    +'<button class="btn btn-g btn-sm" id="cfgren-only">只改清單</button>'
+    +'<button class="btn btn-g btn-sm" id="cfgren-cancel">取消</button>'
+    +'</div></div>';
+  ov.classList.add('show');
+  ov.querySelector('#cfgren-all').onclick=()=>close('all');
+  ov.querySelector('#cfgren-only').onclick=()=>close('only');
+  ov.querySelector('#cfgren-cancel').onclick=()=>close('cancel');
+  ov.onclick=e=>{if(e.target===ov)close('cancel')};
+}
+
 function renderCfgLists(){
   CFG_KEYS.forEach(({key})=>{
     const wrap=document.getElementById('lw-'+key);
@@ -942,9 +1071,10 @@ function renderCfgLists(){
     const arr=cfg[key]||[];
     wrap.innerHTML=arr.length===0
       ?`<div class="cfg-empty-txt">尚無選項，點右側「＋ 新增」加入</div>`
-      :arr.map((v,i)=>`<div class="cfg-row">
+      :arr.map((v,i)=>`<div class="cfg-row" id="cfgrow-${key}-${i}">
           <span class="cfg-row-num">${i+1}</span>
           <span class="cfg-row-lbl">${esc(v)}</span>
+          ${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}
           ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
   });
