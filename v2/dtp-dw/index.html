@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-19.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -62,6 +62,20 @@ textarea.fi{resize:vertical;min-height:60px}
 .d-none{display:none!important}
 
 .filter-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+/* ── 複選篩選器（2026-08-20 新增）── */
+.ms{position:relative}
+.ms-btn{width:100%;cursor:pointer;text-align:left;white-space:nowrap;display:flex;align-items:center;gap:6px;justify-content:space-between;overflow:hidden}
+.ms-btn>span:first-child{overflow:hidden;text-overflow:ellipsis}
+.ms-btn.on{border-color:var(--primary-l);background:#f5f3ff;font-weight:700;color:var(--primary)}
+.ms-panel{display:none;position:absolute;z-index:60;top:calc(100% + 4px);left:0;min-width:100%;max-height:280px;overflow-y:auto;background:#fff;border:1.5px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.18);padding:6px}
+.ms.open .ms-panel{display:block}
+.ms-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;font-size:13px;cursor:pointer;white-space:nowrap}
+.ms-item:hover{background:#f1f5f9}
+.ms-item input{cursor:pointer;width:14px;height:14px;accent-color:var(--primary-l);flex:none}
+.ms-clear{display:block;width:100%;text-align:center;border:none;background:transparent;color:var(--muted);font-size:12px;font-family:inherit;padding:5px 0 3px;cursor:pointer;border-top:1px solid var(--border);margin-top:4px}
+.ms-clear:hover{color:var(--danger)}
+.ms-empty{padding:8px;font-size:12px;color:var(--muted)}
 
 /* STATUS BADGES */
 .st-badge{display:inline-block;border-radius:4px;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;background:#e2e8f0;color:#475569}
@@ -266,7 +280,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <nav>
   <span class="nav-logo">進度表 <span>圖面管理</span></span>
   <button class="nav-btn active" onclick="goPage('main')">📋 進度總表</button>
+  <!-- 2026-08-20 用戶要求隱藏工時計算頁（連帶收起該頁的「匯出本頁結果」工時 Excel）。
+       程式碼與 page-worktime 整頁都保留，要開回來把下面這行還原即可。
   <button class="nav-btn" onclick="goPage('worktime')">⏱️ 工時計算</button>
+  -->
   <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史資料</button>
   <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
   <span class="nav-spacer"></span>
@@ -287,9 +304,20 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <div id="page-main" class="page active">
   <div class="filter-bar">
     <input type="text" id="q" class="fi" placeholder="搜尋案場、執行者、工作內容..." style="max-width:220px" oninput="renderMain()">
-    <select id="f-proj" class="fi" style="max-width:170px" onchange="renderMain()"><option value="">全部案場</option></select>
-    <select id="f-exec" class="fi" style="max-width:130px" onchange="renderMain()"><option value="">全部執行者</option></select>
-    <select id="f-status" class="fi" style="max-width:120px" onchange="renderMain()"><option value="">全部狀態</option></select>
+    <div class="ms" id="ms-proj" style="max-width:190px;flex:0 1 190px">
+      <button type="button" class="fi ms-btn" onclick="msToggle(event,'proj')"><span id="mslb-proj">全部案場</span><span style="opacity:.5;font-size:11px">▾</span></button>
+      <div class="ms-panel" id="msp-proj"></div>
+    </div>
+    <div class="ms" id="ms-exec" style="max-width:150px;flex:0 1 150px">
+      <button type="button" class="fi ms-btn" onclick="msToggle(event,'exec')"><span id="mslb-exec">全部執行者</span><span style="opacity:.5;font-size:11px">▾</span></button>
+      <div class="ms-panel" id="msp-exec"></div>
+    </div>
+    <div class="ms" id="ms-status" style="max-width:140px;flex:0 1 140px">
+      <button type="button" class="fi ms-btn" onclick="msToggle(event,'status')"><span id="mslb-status">全部狀態</span><span style="opacity:.5;font-size:11px">▾</span></button>
+      <div class="ms-panel" id="msp-status"></div>
+    </div>
+    <button type="button" class="btn btn-g btn-sm" onclick="expandAll(true)">全部展開</button>
+    <button type="button" class="btn btn-g btn-sm" onclick="expandAll(false)">全部隱藏</button>
     <span id="result-count" style="font-size:12px;color:var(--muted)"></span>
     <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openEdit(null)">＋ 新增紀錄</button>
   </div>
@@ -667,6 +695,7 @@ function normalizeRecord(r){
     r.進度記錄=arr;
   }
   if(!Array.isArray(r.進度記錄))r.進度記錄=[];
+  r.進度記錄=sortLogs(r.進度記錄);   // 3-1（2026-08-20）：一律依日期排好，沒日期的排最後
   return r;
 }
 function getMainStatus(r){
@@ -1209,15 +1238,91 @@ function goPage(id){
 // ============================================================
 // 篩選
 // ============================================================
+// ============================================================
+// 2026-08-20：進度紀錄排序 / 展開狀態 / 複選篩選
+// ============================================================
+// 3-1 進度紀錄依日期由舊到新排序；沒填日期的一律排最後面（用戶 2026-08-20 指定）。
+// 日期相同時保持原本的輸入順序（穩定排序），才不會每次重繪都跳動。
+function _logTime(l){
+  const d=(l&&l.date)||'';
+  if(!d)return Infinity;
+  const t=new Date(d).getTime();
+  return isNaN(t)?Infinity:t;
+}
+function sortLogs(logs){
+  if(!Array.isArray(logs)||logs.length<2)return Array.isArray(logs)?logs:[];
+  return logs.map((l,i)=>({l,i}))
+    .sort((a,b)=>{const ta=_logTime(a.l),tb=_logTime(b.l);return ta===tb?a.i-b.i:ta-tb})
+    .map(x=>x.l);
+}
+
+// 4／5 展開狀態：預設全部收合；使用者展開過的記在 _openSecs，
+// 重繪（存檔、雲端同步）之後照著還原 —— 這就是第 5 項「存檔後展開狀態被重置」的修法。
+// 只存在這次瀏覽，重新整理回到預設收合。
+let _openSecs=new Set();
+function secId(proj){return 's_'+String(proj||'').replace(/\W/g,'_')}
+function expandAll(open){
+  if(open){
+    const groups=[...new Set(getFiltered().map(r=>r.案場))];
+    _openSecs=new Set(groups.map(secId));
+  }else{
+    _openSecs=new Set();
+  }
+  renderMain();
+}
+
+// 4b 複選篩選：原本三個下拉一次只能選一項，改成可勾多項。
+const MS_LABEL={proj:'案場',exec:'執行者',status:'狀態'};
+const msSel={proj:new Set(),exec:new Set(),status:new Set()};
+let _msOpts={proj:[],exec:[],status:[]};
+function msToggle(ev,key){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const box=document.getElementById('ms-'+key);if(!box)return;
+  const wasOpen=box.classList.contains('open');
+  document.querySelectorAll('.ms.open').forEach(b=>b.classList.remove('open'));
+  if(!wasOpen)box.classList.add('open');
+}
+function msPick(key,val,checked){
+  if(checked)msSel[key].add(val);else msSel[key].delete(val);
+  msLabel(key);renderMain();
+}
+function msClear(key){
+  msSel[key].clear();msLabel(key);msPanel(key,_msOpts[key]);renderMain();
+}
+function msLabel(key){
+  const el=document.getElementById('mslb-'+key);if(!el)return;
+  const n=msSel[key].size;
+  el.textContent = n===0 ? '全部'+MS_LABEL[key]
+                 : n===1 ? [...msSel[key]][0]
+                 : MS_LABEL[key]+' '+n+' 項';
+  const btn=el.parentElement;
+  if(btn&&btn.classList.contains('ms-btn'))btn.classList.toggle('on',n>0);
+}
+function msPanel(key,opts){
+  _msOpts[key]=opts||[];
+  const p=document.getElementById('msp-'+key);if(!p)return;
+  if(!_msOpts[key].length){p.innerHTML='<div class="ms-empty">沒有可選項目</div>';return}
+  p.innerHTML=_msOpts[key].map(o=>
+    '<label class="ms-item"><input type="checkbox" value="'+esc(o)+'"'+(msSel[key].has(o)?' checked':'')+
+    ' onchange="msPick(\''+key+'\',this.value,this.checked)">'+esc(o)+'</label>'
+  ).join('')+'<button type="button" class="ms-clear" onclick="msClear(\''+key+'\')">清除選取</button>';
+}
+function hasActiveFilter(){
+  const q=(document.getElementById('q')||{value:''}).value.trim();
+  return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0;
+}
+document.addEventListener('click',function(e){
+  if(e.target&&e.target.closest&&e.target.closest('.ms'))return;
+  document.querySelectorAll('.ms.open').forEach(b=>b.classList.remove('open'));
+});
+
 function getFiltered(){
   const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
-  const fp=(document.getElementById('f-proj')||{value:''}).value;
-  const fe=(document.getElementById('f-exec')||{value:''}).value;
-  const fs=(document.getElementById('f-status')||{value:''}).value;
+  // 2026-08-20：三個篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
   return records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
-    if(fp&&r.案場!==fp)return false;
-    if(fe&&!(r.執行者||'').includes(fe))return false;
-    if(fs&&getMainStatus(r)!==fs)return false;
+    if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
+    if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
+    if(msSel.status.size&&!msSel.status.has(getMainStatus(r)))return false;
     if(q){
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
       if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
@@ -1229,18 +1334,22 @@ function getFiltered(){
 function updateFilters(){
   const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort();
   const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
-  const pSel=document.getElementById('f-proj'),eSel=document.getElementById('f-exec'),stSel=document.getElementById('f-status');
-  if(!pSel)return;
-  const pv=pSel.value,ev=eSel.value,sv=stSel.value;
-  pSel.innerHTML='<option value="">全部案場</option>'+ps.map(p=>`<option${p===pv?' selected':''}>${esc(p)}</option>`).join('');
-  eSel.innerHTML='<option value="">全部執行者</option>'+es.map(e=>`<option${e===ev?' selected':''}>${esc(e)}</option>`).join('');
-  stSel.innerHTML='<option value="">全部狀態</option>'+(cfg['狀態']||[]).map(s=>`<option${s===sv?' selected':''}>${esc(s)}</option>`).join('');
+  const ss=(cfg['狀態']||[]).slice();
+  if(!document.getElementById('msp-proj'))return;
+  // 已經不存在的選項要從勾選中移掉，否則會篩出 0 筆卻看不出原因
+  [['proj',ps],['exec',es],['status',ss]].forEach(function(pair){
+    const k=pair[0],list=pair[1],has=new Set(list);
+    [...msSel[k]].forEach(v=>{if(!has.has(v))msSel[k].delete(v)});
+    msPanel(k,list);msLabel(k);
+  });
 }
 
 // ============================================================
 // 渲染：進度總表
 // ============================================================
 function renderMain(){
+  // 有搜尋字或有勾選篩選時一律展開符合的群組，否則篩完只看到一排標題，會以為壞掉
+  const _forceOpen=hasActiveFilter();
   const filtered=getFiltered();
   document.getElementById('result-count').textContent='共 '+filtered.length+' 筆';
   const groups={};
@@ -1248,12 +1357,13 @@ function renderMain(){
   const el=document.getElementById('main-table');
   if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有符合的資料</div>';return}
   el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
-    const sid='s_'+proj.replace(/\W/g,'_');
+    const sid=secId(proj);
+    const open=_forceOpen||_openSecs.has(sid);
     return`<div class="proj-section">
-      <div class="proj-header" onclick="toggleSec('${sid}',this)">
+      <div class="proj-header${open?'':' sec-collapsed'}" onclick="toggleSec('${sid}',this)">
         <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
       </div>
-      <div id="${sid}" class="tbl-scroll">
+      <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
         <table class="ptbl">
           <thead><tr>
             <th style="width:10%">執行者</th>
@@ -1309,8 +1419,10 @@ function renderLog(logs){
 }
 
 function toggleSec(id,hdr){
-  document.getElementById(id).classList.toggle('d-none');
-  hdr.classList.toggle('sec-collapsed');
+  const el=document.getElementById(id);if(!el)return;
+  const nowHidden=el.classList.toggle('d-none');
+  hdr.classList.toggle('sec-collapsed',nowHidden);
+  if(nowHidden)_openSecs.delete(id);else _openSecs.add(id);
 }
 
 // ============================================================
