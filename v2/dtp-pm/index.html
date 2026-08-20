@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-20.2';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-20.3';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -60,7 +60,11 @@ textarea.fi{resize:vertical;min-height:60px}
 .tbl-act .btn{min-width:48px;justify-content:center}
 .d-none{display:none!important}
 
-.filter-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.filter-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;position:sticky;top:var(--navh,52px);z-index:40}
+/* 黏住時上下各補一塊同色底，免得捲過去的內容從圓角與間距的縫隙露出來（2026-08-20） */
+.filter-bar::before,.filter-bar::after{content:"";position:absolute;left:-16px;right:-16px;height:16px;background:var(--bg)}
+.filter-bar::before{top:-16px}
+.filter-bar::after{bottom:-15px;height:15px}
 
 /* ── 複選篩選器（2026-08-20 新增）── */
 .ms{position:relative}
@@ -1309,6 +1313,17 @@ function msPanel(key,opts){
       ' onchange="msPick(\''+key+'\',this.value,this.checked)">'+esc(o)+'</label>'
     ).join('');
 }
+// 篩選列黏在導覽列下方 —— 導覽列會換行，高度不是固定的，要實際量（2026-08-20）
+function syncNavHeight(){
+  const nav=document.querySelector('nav');
+  if(!nav)return;
+  document.documentElement.style.setProperty('--navh',nav.offsetHeight+'px');
+}
+window.addEventListener('resize',syncNavHeight);
+window.addEventListener('load',syncNavHeight);
+document.addEventListener('DOMContentLoaded',syncNavHeight);
+syncNavHeight();
+
 function hasActiveFilter(){
   const q=(document.getElementById('q')||{value:''}).value.trim();
   return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0;
