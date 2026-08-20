@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-20.3';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-20.4';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -425,7 +425,6 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <!-- 底部按鈕（仿 v3） -->
       <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-p" data-mng onclick="manualSave()">💾 儲存設定</button>
-        <button class="btn btn-o" onclick="switchUser()">🔄 切換使用者</button>
       </div>
 
       <!-- 資料備份 -->
@@ -781,64 +780,18 @@ function setSyncIcon(s){
 }
 
 // ============================================================
-// 登入 / 切換使用者
+// 登入擋板（使用者由入口統一管理）
 // ============================================================
-function populateLoginDepts(){
-  const depts=[...new Set([...(cfg.部門||[]),...(cfg.users||[]).map(u=>u.dept)])].filter(Boolean).sort();
-  document.getElementById('dl-login-dept').innerHTML=depts.map(d=>`<option value="${esc(d)}">`).join('');
-}
-function onLoginDeptChange(){
-  const dept=document.getElementById('login-dept').value.trim();
-  const names=(cfg.users||[]).filter(u=>u.dept===dept).map(u=>u.name);
-  document.getElementById('dl-login-name').innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
-  document.getElementById('login-name').value='';
-  setTimeout(()=>document.getElementById('login-name').focus(),50);
-}
+// 使用者由入口網頁統一管理（2026-08-20 清掉 App 自己的登入殘留）
+// 這支 App 曾經有自己的登入與人員管理，整合入口之後那些欄位與表格早就從畫面移除了，
+// 只剩函式還留著 → 設定頁那顆「切換使用者」按下去會找不到欄位而報錯，看起來就是「沒反應」。
+// 現在只留一個安全的 showLogin()：把「請從入口網頁登入」那面擋板叫出來。
+// 要換人請回入口（導覽列「🏠 返回主系統」），在那裡登出或切換身分。
 function showLogin(){
-  populateLoginDepts();
-  const rem=localStorage.getItem('dtp_remember');
-  if(rem){try{const r=JSON.parse(rem);document.getElementById('login-dept').value=r.dept||'';if(r.dept)onLoginDeptChange();setTimeout(()=>{document.getElementById('login-name').value=r.name||''},80)}catch{}}
-  document.getElementById('login-pw').value='';
-  document.getElementById('login-overlay').classList.add('show');
-  setTimeout(()=>document.getElementById((document.getElementById('login-dept').value?'login-name':'login-dept')).focus(),200);
-}
-function doLogin(){
-  const name=document.getElementById('login-name').value.trim();
-  const dept=document.getElementById('login-dept').value.trim();
-  const pw=document.getElementById('login-pw').value;
-  const remember=document.getElementById('login-remember').checked;
-  if(!dept){toast('請輸入部門','e');return}
-  if(!name){toast('請輸入姓名','e');return}
-  if(!cfg.users)cfg.users=[];
-  let user=cfg.users.find(u=>u.name===name&&u.dept===dept);
-  // 自動 bootstrap：第一位登入者自動成為 manager
-  const isFirst=cfg.users.length===0;
-  if(!user&&isFirst){
-    user={id:uid(),name,dept,role:'manager',password:pw||''};
-    cfg.users.push(user);
-    saveCfg();
-    toast(`歡迎 ${name}！您是第一位使用者，已自動設為管理主管 ✓`,'s');
-  }else if(user){
-    if(!user.password&&pw){toast('此帳號未設密碼，請留空登入','e');document.getElementById('login-pw').focus();return}
-    if(user.password&&user.password!==pw){toast('密碼錯誤','e');document.getElementById('login-pw').focus();return}
-    toast(`歡迎回來，${name}！`,'s');
-  }else{
-    // 不在清單中，視為 reporter 並提示
-    toast(`歡迎 ${name}！（未在人員清單中，請至設定頁新增以啟用密碼）`);
-  }
-  currentUser={name,dept,role:user?user.role:'reporter'};
-  localStorage.setItem('dtp_user',JSON.stringify(currentUser));
-  if(remember)localStorage.setItem('dtp_remember',JSON.stringify({name,dept}));
-  else localStorage.removeItem('dtp_remember');
-  document.getElementById('login-overlay').classList.remove('show');
-  updateNavUser();
-  renderMain();renderHistory();renderCfgCards();
-}
-function switchUser(){showLogin()}
-function logout(){
-  currentUser=null;
-  localStorage.removeItem('dtp_user');
-  showLogin();
+  const el=document.getElementById('login-overlay');
+  if(!el)return;
+  el.style.display='flex';
+  document.body.style.overflow='hidden';
 }
 function updateNavUser(){
   if(!currentUser){
