@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-20.7';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-21.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -777,7 +777,28 @@ function toast(msg,type=''){
   el.textContent=msg;w.appendChild(el);
   setTimeout(()=>el.remove(),2800);
 }
+// 存檔沒上雲端時，只有右上角一個小圖示變紅 —— 使用者不會發現，繼續打字全部白打
+// （2026-08-21 事故）。改成跳一條關不掉的紅色警示條，成功同步後才自己消失。
+function showSyncWarn(err){
+  let el=document.getElementById('sync-warn');
+  if(!el){
+    el=document.createElement('div');
+    el.id='sync-warn';
+    el.style.cssText='position:sticky;top:0;z-index:60;background:#dc2626;color:#fff;'
+      +'font:600 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:8px 14px;text-align:center';
+    document.body.insertBefore(el,document.body.firstChild);
+  }
+  el.textContent='⚠️ 這筆沒有存上雲端，目前只留在這台裝置 —— 請先不要重新整理或關掉頁面，'
+    +'把這行截圖回報。（原因：'+((err&&err.message)||'連線失敗')+'）';
+  el.style.display='';
+  try{toast('⚠️ 沒有存上雲端！只留在這台裝置','e')}catch(e){}
+}
+function hideSyncWarn(){
+  const el=document.getElementById('sync-warn');
+  if(el)el.style.display='none';
+}
 function setSyncIcon(s){
+  if(s==='ok')hideSyncWarn();
   const el=document.getElementById('sync-icon');
   el.textContent=s==='ok'?'☁️✅':s==='err'?'☁️❌':'☁️';
   el.title=s==='ok'?'已同步':s==='err'?'連線失敗':'本機模式';
@@ -1244,7 +1265,13 @@ const REC_SCALARS=['案場','部門','執行者','施作位置','工作項目','
 function mergeRecord(local,cloud,base){
   if(!cloud)return local;
   const out={...local};
-  REC_SCALARS.forEach(k=>{ out[k]=_pickScalar(local[k],cloud[k],base?base[k]:undefined) });
+  REC_SCALARS.forEach(k=>{
+    const v=_pickScalar(local[k],cloud[k],base?base[k]:undefined);
+    // 這筆本來就沒有的欄位（例如舊制的「狀態」，早就改成每一列各自有狀態）不要補一個 undefined
+    // 上去 —— Firebase 只要看到 undefined 就整筆退件，畫面卻顯示「已儲存」，資料只留在本機。
+    // 2026-08-21 事故就是這樣，兩支進度表整整一天的存檔全部沒進雲端。
+    if(v===undefined)delete out[k]; else out[k]=v;
+  });
   out.進度記錄=sortLogs(mergeLogs(local.進度記錄,cloud.進度記錄,base?base.進度記錄:null));
   return out;
 }
@@ -1302,7 +1329,27 @@ async function fbSave(){
     if(mergedAny){saveLocal();renderMain();renderHistory();updateFilters()}
     _lastPushed=_snapshot(records);
     setSyncIcon('ok');
-  }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err')}
+  }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err');showSyncWarn(e)}
+}
+// 開頁面時比對本機與雲端：本機比較新的那幾筆＝上次沒推成功，留著並補推，不要被雲端舊版蓋掉。
+// 雲端已經沒有、但本機有的：只在 7 天內動過才留（避免把別人早就刪掉的紀錄又復活）。
+function rescueLocalNewer(){
+  let localRecs=[];
+  try{const s=localStorage.getItem('dtp_pm_rec');localRecs=s?JSON.parse(s):[]}catch(e){return 0}
+  if(!Array.isArray(localRecs)||!localRecs.length)return 0;
+  const byId={};records.forEach(r=>{if(r&&r.id)byId[r.id]=r});
+  const week=Date.now()-7*24*3600*1000;
+  let n=0;
+  localRecs.map(normalizeRecord).forEach(lr=>{
+    if(!lr||!lr.id)return;
+    const cr=byId[lr.id];
+    const lt=Date.parse(lr.updatedAt||'')||0;
+    const ct=cr?(Date.parse(cr.updatedAt||'')||0):0;
+    if(!cr){ if(lt>week){byId[lr.id]=lr;n++} return }
+    if(lt>ct&&JSON.stringify(lr)!==JSON.stringify(cr)){byId[lr.id]=lr;n++}
+  });
+  if(n){records=Object.values(byId);saveLocal()}
+  return n;
 }
 async function initFb(){
   let t=0;
@@ -1315,6 +1362,11 @@ async function initFb(){
       // 記下「雲端目前有哪幾筆」當作 per-record 同步的比較基準；
       // 沒有這份基準就無法分辨「使用者刪了一筆」與「這台裝置本來就沒讀到」→ 一律不刪最安全
       _lastPushed=_snapshot(Object.values(data.records));
+      // 搶救本機還沒推上去的修改（2026-08-21 事故）：以前這裡直接用雲端整包覆蓋，
+      // 上一次存檔如果沒推成功，使用者打的字會在重新整理的瞬間無聲消失。
+      // 判斷方式：同一筆的 updatedAt 本機比雲端新 ＝ 這台改過但沒送出去。
+      const _rescued=rescueLocalNewer();
+      if(_rescued){setTimeout(()=>{toast('找回 '+_rescued+' 筆還沒上傳的資料，正在補傳…','s');fbSave()},300)}
       if(data.cfg&&Object.keys(data.cfg).length){cfg={...buildDefaultCfg(),...data.cfg};ensureStatusOptions();saveCfgLocal()}
       saveLocal();setSyncIcon('ok');
     }else{
@@ -2269,8 +2321,19 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-window._fbSet = async (data) => { await set(ref(db, 'dtp_pm'), data); };   // 整包寫（已不再用於一般存檔，保留備援）
-window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp_pm/' + path), val); };  // per-record 寫入（val=null 即刪除）
+// 寫入前把 undefined 清乾淨：Firebase 只要遇到一個 undefined 就退回整筆（2026-08-21 事故）。
+// null 要原樣保留 —— 那是「刪除這一筆」的意思。
+const _noUndef = (v) => {
+  if (Array.isArray(v)) return v.map(x => x === undefined ? null : _noUndef(x));   // 陣列裡的空位要補 null，undefined 一樣會被退件
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).forEach(k => { if (v[k] !== undefined) o[k] = _noUndef(v[k]); });
+    return o;
+  }
+  return v;
+};
+window._fbSet = async (data) => { await set(ref(db, 'dtp_pm'), _noUndef(data)); };
+window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp_pm/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { const s = await get(ref(db, 'dtp_pm')); return s.exists() ? s.val() : null; };
 window._fbGetPath = async (path) => { const s = await get(ref(db, 'dtp_pm/' + path)); return s.exists() ? s.val() : null; };
 // 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-06 新增）
