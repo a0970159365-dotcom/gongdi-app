@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-20.8';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-25.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -22,6 +22,18 @@
     .btn-status.s-improved{background:#ea580c!important;color:#fff!important;border-color:#c2410c!important}
     .btn-status.s-na      {background:#6b7280!important;color:#fff!important;border-color:#4b5563!important}
     .hidden{display:none!important}
+    /* ── 日曆（2026-08-25 B批）── */
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+    .cal-dow{text-align:center;font-size:11px;color:#9ca3af;font-weight:700;padding:2px 0}
+    .cal-cell{aspect-ratio:1;min-height:38px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-size:14px;font-weight:700;color:#374151}
+    .cal-cell.pad{background:transparent;border-color:transparent;color:#d1d5db;cursor:default;font-weight:400}
+    .cal-cell.full{background:#dbeafe;border-color:#3b82f6;color:#1d4ed8}
+    .cal-cell.part{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+    .cal-cell.today{box-shadow:inset 0 0 0 2px #ea580c}
+    .cal-cell.sel{outline:3px solid #3b82f6;outline-offset:1px}
+    .cal-dot{width:6px;height:6px;border-radius:50%;background:#3b82f6}
+    .cal-cell.part .cal-dot{background:#f59e0b}
+    .cal-n{font-size:10px;font-weight:800;color:#6b7280}
     .view{display:none}
     .view.active{display:block}
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
@@ -211,7 +223,30 @@
 
   <!-- ===== HISTORY ===== -->
   <div id="view-history" class="view p-4">
-    <div class="space-y-2 mb-4">
+    <!-- 月曆／清單切換（2026-08-25 B批） -->
+    <div class="flex gap-2 mb-3">
+      <button id="h-tab-cal"  onclick="setHistMode('cal')"  class="flex-1 py-2 text-sm rounded-xl border">📅 月曆</button>
+      <button id="h-tab-list" onclick="setHistMode('list')" class="flex-1 py-2 text-sm rounded-xl border">📋 清單</button>
+    </div>
+
+    <!-- 月曆 -->
+    <div id="hist-cal-wrap" class="hidden">
+      <div class="flex items-center justify-center gap-3 mb-3">
+        <button onclick="calShift(-1)" class="px-3 py-1 text-sm rounded-lg border border-gray-300 bg-white">‹</button>
+        <span id="cal-title" class="font-bold text-gray-700 text-sm" style="min-width:110px;text-align:center">—</span>
+        <button onclick="calShift(1)" class="px-3 py-1 text-sm rounded-lg border border-gray-300 bg-white">›</button>
+        <button onclick="calGoToday()" class="px-3 py-1 text-xs rounded-lg border border-gray-300 bg-white text-gray-500">本月</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="flex gap-3 flex-wrap text-xs text-gray-500 mt-3 pt-2 border-t border-dashed border-gray-200">
+        <span><i class="inline-block w-3 h-3 rounded align-middle mr-1" style="background:#dbeafe;border:1px solid #3b82f6"></i>已完成</span>
+        <span><i class="inline-block w-3 h-3 rounded align-middle mr-1" style="background:#fef3c7;border:1px solid #f59e0b"></i>草稿（填一半）</span>
+        <span><i class="inline-block w-3 h-3 rounded align-middle mr-1" style="background:#fff;border:1px solid #e5e7eb"></i>沒有紀錄</span>
+      </div>
+      <div id="cal-day" class="mt-4"></div>
+    </div>
+
+    <div id="hist-filters" class="space-y-2 mb-4">
       <!-- 案場篩選（2026-08-13 新增） -->
       <select id="h-filter-case" onchange="renderHistory()" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         <option value="">全部案場</option>
@@ -502,7 +537,7 @@ function showView(v){
 
   // render views
   if(v==='home') renderHome();
-  if(v==='history') renderHistory();
+  if(v==='history') setHistMode(CAL.mode || 'cal');
   if(v==='settings') { renderSettings(); applyMngSettingsUI(); }
   if(v==='detail') renderDetail();
   if(v==='checklist') renderChecklist();
@@ -517,7 +552,6 @@ function renderHome(){
   liveTemplates().forEach(function(t){
     html+='<button onclick="selectTemplate(\''+t.id+'\')" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
       +'<div class="flex items-center gap-4">'
-      +'<div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style="'+tplBg(t.id)+'">'+t.icon+'</div>'
       +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(t.name)+'</div>'
       +'<div class="text-xs text-gray-500 mt-1">'+t.items.length+' 個查檢項目</div></div>'
       +'<span class="text-gray-400 text-xl">&#8250;</span>'
@@ -560,7 +594,6 @@ function renderHome(){
     list.className='space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2';
     list.innerHTML=all.slice(0,5).map(function(r){
       return '<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">'
-        +'<div class="w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
         +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800 truncate">'+esc(r.caseName)+'</div>'
         +'<div class="text-xs text-gray-500 truncate">'+esc(r.templateName)+' · '+esc(r.personnel)+'</div></div>'
         +'<div class="text-right flex-shrink-0"><div class="text-xs text-gray-400">'+esc(r.date)+'</div>'
@@ -572,7 +605,6 @@ function renderHome(){
 // 依案場分組時，組內每一列（案場名已在標題，這裡不重複顯示）
 function recentRow(r){
   return '<div onclick="viewReport(\''+r.id+'\')" class="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b border-gray-50 last:border-0">'
-    +'<div class="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
     +'<div class="flex-1 min-w-0"><div class="text-sm text-gray-800 truncate">'+esc(r.templateName)+'</div>'
     +'<div class="text-xs text-gray-500 truncate">'+esc(r.date)+' · '+esc(r.personnel)+'</div></div>'
     +'<div class="text-xs flex-shrink-0 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓':'草稿')+'</div>'
@@ -982,6 +1014,112 @@ function itemsHTML(items, pfx){
 }
 
 // ====== HISTORY ======
+/* ══════════ 日曆（2026-08-25 B批）══════════
+ * 這支本來就有 status（completed／draft）→ 直接拿來標色，不用像日報表那樣推算「填一半」。
+ *   藍＝那天的查檢表都已完成；黃＝有草稿；空白＝那天沒有紀錄。
+ * 點日期先列出那天的紀錄再點進去（用戶 2026-08-25 選方案 2）。 */
+var CAL = { ym:'', sel:'', mode:'cal' };
+
+function setHistMode(m){
+  CAL.mode = m;
+  var calOn = (m === 'cal');
+  $('hist-cal-wrap').classList.toggle('hidden', !calOn);
+  $('hist-filters').classList.toggle('hidden', calOn);
+  $('history-list').classList.toggle('hidden', calOn);
+  var on  = 'flex-1 py-2 text-sm rounded-xl border bg-blue-600 text-white border-blue-600 font-semibold';
+  var off = 'flex-1 py-2 text-sm rounded-xl border bg-white text-gray-500 border-gray-300';
+  $('h-tab-cal').className  = calOn ? on : off;
+  $('h-tab-list').className = calOn ? off : on;
+  if (calOn) renderCal(); else renderHistory();
+}
+function calFill(r){ return r.status === 'completed' ? 'full' : 'part'; }
+function calMap(){
+  var m = {};
+  visibleReports().forEach(function(r){ if(r.date){ (m[r.date] = m[r.date] || []).push(r); } });
+  return m;
+}
+function calShift(n){
+  var p = CAL.ym.split('-');
+  var d = new Date(Number(p[0]), Number(p[1]) - 1 + n, 1);
+  CAL.ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  renderCal();
+}
+function calToday(){ return new Date().toISOString().slice(0, 10); }
+function calGoToday(){ CAL.ym = calToday().slice(0, 7); CAL.sel = calToday(); renderCal(); }
+function calPick(ds){ CAL.sel = ds; renderCal(); }
+
+function renderCal(){
+  if (!CAL.ym){
+    var all = visibleReports().map(function(r){ return r.date; }).filter(Boolean).sort();
+    CAL.ym = (all.length ? all[all.length - 1] : calToday()).slice(0, 7);
+  }
+  var p = CAL.ym.split('-'), Y = Number(p[0]), M = Number(p[1]);
+  $('cal-title').textContent = Y + ' 年 ' + M + ' 月';
+
+  var map  = calMap();
+  var lead = new Date(Y, M - 1, 1).getDay();
+  var days = new Date(Y, M, 0).getDate();
+  var prev = new Date(Y, M - 1, 0).getDate();
+  var T    = calToday();
+  var h    = '';
+
+  ['日','一','二','三','四','五','六'].forEach(function(d){ h += '<div class="cal-dow">' + d + '</div>'; });
+  for (var i = lead - 1; i >= 0; i--) h += '<div class="cal-cell pad">' + (prev - i) + '</div>';
+
+  for (var d = 1; d <= days; d++){
+    var ds = Y + '-' + String(M).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var rs = map[ds] || [];
+    var cls = 'cal-cell';
+    if (rs.length) cls += rs.some(function(r){ return calFill(r) === 'part'; }) ? ' part' : ' full';
+    if (ds === T)       cls += ' today';
+    if (ds === CAL.sel) cls += ' sel';
+    var mark = rs.length > 1 ? '<span class="cal-n">' + rs.length + ' 張</span>'
+             : rs.length     ? '<span class="cal-dot"></span>' : '';
+    h += '<div class="' + cls + '" data-d="' + ds + '" onclick="calPick(\'' + ds + '\')">' + d + mark + '</div>';
+  }
+  var tail = (7 - ((lead + days) % 7)) % 7;
+  for (var j = 1; j <= tail; j++) h += '<div class="cal-cell pad">' + j + '</div>';
+
+  $('cal-grid').innerHTML = h;
+  renderCalDay();
+}
+
+function renderCalDay(){
+  var box = $('cal-day');
+  if (!box) return;
+  if (!CAL.sel){
+    box.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">點上面的日期，看那天的查檢表</div>';
+    return;
+  }
+  var rs = calMap()[CAL.sel] || [];
+  var h  = '<div class="text-sm font-bold text-gray-700 mb-2">' + esc(CAL.sel)
+         + ' <span class="font-normal text-xs text-gray-400">共 ' + rs.length + ' 張</span></div>';
+
+  if (!rs.length){
+    h += '<div class="text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-2xl">這天還沒有查檢表</div>';
+  } else {
+    /* 卡片樣式沿用清單那一套，讓兩種檢視看起來是同一個東西 */
+    h += rs.map(function(r){
+      return '<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3">'
+        + '<div class="flex items-start gap-3">'
+        +   '<div onclick="openReportForEdit(\'' + r.id + '\')" class="flex-1 min-w-0 cursor-pointer">'
+        +     '<div class="flex items-center justify-between">'
+        +       '<span class="font-semibold text-gray-800 text-sm truncate">' + esc(r.caseName) + '</span>'
+        +       '<span class="text-xs flex-shrink-0 ml-2 ' + (r.status === 'completed' ? 'text-green-600' : 'text-amber-600') + '">'
+        +         (r.status === 'completed' ? '✓ 完成' : '草稿') + '</span>'
+        +     '</div>'
+        +     '<div class="text-xs text-gray-500 mt-1 truncate">' + esc(r.templateName) + '</div>'
+        +     '<div class="text-xs text-gray-400 mt-1">' + esc(r.date) + ' · ' + esc(r.personnel) + '</div>'
+        +   '</div>'
+        +   '<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
+        +     '<button onclick="openReportForEdit(\'' + r.id + '\')" class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">📂 開啟</button>'
+        +   '</div>'
+        + '</div></div>';
+    }).join('');
+  }
+  box.innerHTML = h;
+}
+
 function renderHistory(){
   // fill filter template select
   var sel=$('h-filter-tpl');
@@ -1011,7 +1149,6 @@ function renderHistory(){
   $('history-list').innerHTML=list.map(function(r){
     return '<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all">'
       +'<div class="flex items-start gap-3">'
-      +'<div onclick="openReportForEdit(\''+r.id+'\')" class="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 cursor-pointer" style="'+tplBg(r.templateId)+'">'+tplIcon(r.templateId)+'</div>'
       +'<div onclick="openReportForEdit(\''+r.id+'\')" class="flex-1 min-w-0 cursor-pointer">'
       +'<div class="flex items-center justify-between">'
       +'<span class="font-semibold text-gray-800 text-sm truncate">'+esc(r.caseName)+'</span>'
@@ -1157,7 +1294,7 @@ function renderTemplatesSection(){
   var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || TEMPLATES[0];
   var selOpts = TEMPLATES.map(function(t){
     return '<option value="'+esc(t.id)+'"'+(tpl && t.id === tpl.id ? ' selected' : '')+'>'
-      +esc(t.icon||'')+' '+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
+      +esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
   }).join('');
   var itemsHtml = '';
   if(tpl && tpl.items && tpl.items.length){
@@ -1167,7 +1304,7 @@ function renderTemplatesSection(){
         +'<span class="text-xs text-gray-400 mt-2 w-6 text-center font-medium">'+(i+1)+'.</span>'
         +'<input type="text" value="'+esc(it.name)+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" '
         +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'name\',this.value)" placeholder="查驗項目名稱">'
-        +(portalCanDelete()?'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>':'')
+        +'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" data-mng title="刪除這個查驗項目" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>'
         +'</div>'
         +'<textarea class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 resize-y" rows="3" '
         +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'criterion\',this.value)" placeholder="查驗準則（可多行）...">'+esc(it.criterion||'')+'</textarea>'
@@ -1175,6 +1312,21 @@ function renderTemplatesSection(){
     }).join('');
   } else {
     itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此工法尚無查驗項目，點下方新增</div>';
+  }
+  // 按下「複製工法」才展開：列出已建立的工法，選一個複製（含所有查驗項目）
+  var copyPickerHtml = '';
+  if(S.showCopyPicker){
+    var pick = TEMPLATES.filter(function(t){ return !t.void; });
+    copyPickerHtml = '<div class="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-3" data-mng>'
+      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個工法？（查驗項目會一起複製）</div>'
+      +(pick.length ? pick.map(function(t){
+          return '<button onclick="duplicateTemplate(\''+t.id+'\')" class="w-full text-left bg-white border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-indigo-400">'
+            +'<span class="text-sm font-medium text-gray-800">'+esc(t.name)+'</span>'
+            +'<span class="text-xs text-gray-500 ml-2">'+((t.items||[]).length)+' 個查驗項目</span>'
+            +'</button>';
+        }).join('') : '<div class="text-xs text-gray-500">尚無工法可複製</div>')
+      +'<button onclick="toggleCopyPicker()" class="w-full text-xs text-gray-500 mt-1 py-1 hover:underline">取消</button>'
+      +'</div>';
   }
   var tplInfoHtml = '';
   if(tpl){
@@ -1190,12 +1342,6 @@ function renderTemplatesSection(){
       +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
       +'<input type="text" value="'+esc(tpl.materialLabel||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
       +'onblur="updateTemplate(\''+tpl.id+'\',\'materialLabel\',this.value)" placeholder="例：材質名稱 / 石材種類">'
-      +'</div>'
-      +'<div class="flex items-center gap-2">'
-      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">圖示</label>'
-      +'<input type="text" value="'+esc(tpl.icon||'')+'" class="w-20 border border-gray-300 rounded px-2 py-1 text-sm text-center" '
-      +'onblur="updateTemplate(\''+tpl.id+'\',\'icon\',this.value)" placeholder="📋" maxlength="2">'
-      +'<span class="text-xs text-gray-400">（單一 emoji）</span>'
       +'</div>'
       +'</div>'
       // 作廢／恢復（2026-08-13 新增）：作廢後首頁選不到、不能再新建，歷史報表完全不受影響
@@ -1216,10 +1362,13 @@ function renderTemplatesSection(){
     +'<label class="block text-xs text-gray-500 mb-1">選擇工法</label>'
     +'<div class="flex gap-2">'
     +'<select onchange="switchTplEditor(this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+selOpts+'</select>'
-    +'<button onclick="addTemplate()" data-mng class="px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 flex-shrink-0">+ 新增工法</button>'
     +'</div>'
-    // 複製工法（2026-08-13 新增）：整份複製，含所有查驗項目與準則
-    +(tpl?'<button onclick="duplicateTemplate(\''+tpl.id+'\')" data-mng class="mt-2 w-full border-2 border-dashed border-indigo-300 text-indigo-600 font-medium py-2 rounded-xl text-sm hover:bg-indigo-50">⧉ 複製目前這個工法（含所有查驗項目）</button>':'')
+    // 兩顆按鈕並排等寬（2026-08-21）：原本「新增」擠在下拉旁邊、「複製」是下面一整條虛線框，看起來零散
+    +'<div class="flex gap-2 mt-2" data-mng>'
+    +'<button onclick="addTemplate()" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">＋ 新增工法</button>'
+    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製工法</button>'
+    +'</div>'
+    + copyPickerHtml
     +'</div>'
     +tplInfoHtml
     +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗項目（共 '+(tpl.items||[]).length+' 項）</div>'
@@ -1228,6 +1377,7 @@ function renderTemplatesSection(){
     +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
 }
 function switchTplEditor(tplId){ S.editingTplId = tplId; renderTemplatesSection(); }
+function toggleCopyPicker(){ S.showCopyPicker = !S.showCopyPicker; renderTemplatesSection(); }
 function addTplItem(tplId){
   if(mngGuard())return;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
@@ -1239,7 +1389,8 @@ function addTplItem(tplId){
 }
 function removeTplItem(tplId, itemId){
   if(mngGuard())return;
-  if(!requireDelete()) return;
+  // 2026-08-21：改成「能維護設定的人就能刪」。原本綁「系統設定刪除」權限＝只有系統管理員看得到 ✕，
+  // 變成可以新增卻不能刪，不合理；刪錯也可以再加回來，所以只保留確認視窗。
   if(!confirm('確定刪除此查驗項目？\n（既有歷史報表為快照儲存，不會受影響）')) return;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl || !tpl.items) return;
@@ -1257,7 +1408,7 @@ function updateTplItem(tplId, itemId, field, value){
 }
 function addTemplate(){
   if(mngGuard())return;
-  var newTpl = { id: uid(), name: '新工法', materialLabel: '材質', icon: '📋', items: [] };
+  var newTpl = { id: uid(), name: '新工法', materialLabel: '材質', items: [] };
   TEMPLATES.push(newTpl);
   S.editingTplId = newTpl.id;
   syncTemplatesToConfig();
@@ -1268,6 +1419,7 @@ function addTemplate(){
  * 每個項目都給新 id，否則兩個工法共用同一個項目 id，改一邊會動到另一邊。 */
 function duplicateTemplate(tplId){
   if(mngGuard())return;
+  S.showCopyPicker = false;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
   if(!confirm('要複製工法「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
@@ -1275,7 +1427,6 @@ function duplicateTemplate(tplId){
     id: uid(),
     name: tpl.name + '（複本）',
     materialLabel: tpl.materialLabel,
-    icon: tpl.icon,
     items: (tpl.items||[]).map(function(it){
       return { id: uid(), name: it.name, criterion: it.criterion || '' };
     })

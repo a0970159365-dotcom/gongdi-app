@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-19.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-25.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -90,6 +90,44 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .ritem-date .mon{font-size:11px;color:var(--muted)}
 .ritem-info{flex:1}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
 .ritem-actions{display:flex;gap:5px}
+/* ── 日曆（2026-08-25 B批）── */
+.cal-wrap{max-width:780px}
+.cal-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}
+.cal-title{font-weight:800;font-size:16px;color:var(--primary);min-width:140px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-dow{text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:3px 0}
+.cal-cell{aspect-ratio:1;min-height:40px;border:1px solid var(--border);border-radius:8px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-size:14px;font-weight:700;color:var(--text);transition:transform .12s,border-color .12s}
+.cal-cell:hover{border-color:var(--primary-l);transform:translateY(-1px)}
+.cal-cell.pad{background:transparent;border-color:transparent;color:#cbd5e1;cursor:default;font-weight:400}
+.cal-cell.pad:hover{transform:none;border-color:transparent}
+.cal-cell.full{background:#e8f0fa;border-color:var(--primary-l);color:var(--primary)}
+.cal-cell.part{background:#fdf6e3;border-color:var(--warning);color:#8a6a04}
+.cal-cell.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal-cell.sel{outline:3px solid var(--primary-l);outline-offset:1px}
+.cal-dot{width:6px;height:6px;border-radius:50%;background:var(--primary-l)}
+.cal-cell.part .cal-dot{background:var(--warning)}
+.cal-n{font-size:10px;font-weight:800;color:var(--muted)}
+.cal-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)}
+.cal-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid var(--border)}
+.cal-lg-full{background:#e8f0fa;border-color:var(--primary-l)}
+.cal-lg-part{background:#fdf6e3;border-color:var(--warning)}
+.cal-lg-none{background:#fff}
+.cal-day-head{font-weight:800;color:var(--primary);margin:16px 0 8px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* ── 帶入視窗的「月曆／列表」切換（2026-08-25）──
+   月曆沿用上面那套 .cal-* 樣式，只是格子縮小一點塞進視窗裡。與 cdr-pm 同一份。 */
+.cv-tabs{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
+.cv-tab{background:#fff;border:none;padding:5px 12px;font-size:12px;font-family:inherit;cursor:pointer;color:var(--muted);font-weight:700;white-space:nowrap}
+.cv-tab:hover{background:var(--bg)}
+.cv-tab.active{background:var(--primary);color:#fff}
+.carry-cal .cal-grid{gap:3px}
+.carry-cal .cal-cell{min-height:30px;font-size:12px;border-radius:6px;gap:2px}
+.carry-cal .cal-title{font-size:14px;min-width:110px}
+.carry-cal .cal-bar{margin-bottom:8px}
+.carry-cal .cal-legend{margin-top:10px;padding-top:8px;gap:12px;font-size:11px}
+.carry-cal .cal-day-head{margin:12px 0 6px;font-size:13px}
+.carry-cal .cal-empty{padding:14px;font-size:12px}
+.cal-empty{padding:20px;text-align:center;color:var(--muted);background:var(--bg);border-radius:8px;font-size:13px}
+@media(max-width:560px){.cal-cell{min-height:34px;font-size:13px}.cal-n{font-size:9px}}
 .master-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .master-tbl th{background:var(--primary);color:#fff;padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap}
 .master-tbl td{border-bottom:1px solid var(--border);padding:10px 12px;vertical-align:middle}
@@ -223,9 +261,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <!-- NAV -->
 <nav class="no-print">
   <span class="nav-logo">日報表 <span>瑪摩工程</span><span class="nav-v">v3</span></span>
+  <!-- 順序：填寫 → 三種看法（歷史／日曆／總表）→ 匯出 → 設定
+       兩支日報表刻意排一樣，並排用的時候才不會點錯（2026-08-25 用戶指定） -->
   <button class="nav-btn active" onclick="goPage('report')">📋 日報填寫</button>
-  <button class="nav-btn" onclick="goPage('mgmt')">📊 動態看板</button>
   <button class="nav-btn" onclick="goPage('history')">🗂️ 歷史資料</button>
+  <button class="nav-btn" onclick="goPage('cal')">📅 日曆檢視</button>
+  <button class="nav-btn" onclick="goPage('mgmt')">📊 管理總表</button>
   <button class="nav-btn" onclick="goPage('export')">📤 報表下載</button>
   <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
   <span class="nav-spacer"></span>
@@ -274,6 +315,15 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       </div>
     </div>
     <div class="card-body">
+      <!-- 案場（2026-08-25 C批「一報表一案場」）──────────────────────────
+           以前案場掛在每一列施工明細，一張日報可以混好幾個案場；現在升到報表層，
+           整張報表只有一個案場，施工明細那欄已移除。必填，沒選不給存檔。 -->
+      <div class="fg" style="margin-bottom:12px">
+        <label class="fl">案場 <span style="color:var(--danger)">*</span></label>
+        <select id="f-proj" class="fi" style="max-width:340px" onchange="onProjChange()"></select>
+      </div>
+      <div id="legacy-proj-note" class="no-print" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
+           border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:13px;line-height:1.7;color:#92400e"></div>
       <div class="g g5" style="gap:10px">
         <div class="fg" style="grid-column:span 2">
           <label class="fl">日期</label>
@@ -332,7 +382,6 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <thead>
           <tr>
             <th style="width:28px">#</th>
-            <th style="min-width:120px">專案/工地名稱</th>
             <th style="min-width:90px">施作位置</th>
             <th style="min-width:100px">施工項目</th>
             <th style="min-width:78px">今日班組</th>
@@ -348,7 +397,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <tbody id="tbody"></tbody>
         <tfoot>
           <tr class="tfoot-row">
-            <td colspan="4" style="text-align:right;padding-right:10px">合計</td>
+            <td colspan="3" style="text-align:right;padding-right:10px">合計</td>
             <td></td><td id="tot-today">0</td>
             <td></td><td id="tot-tmrw">0</td>
             <td colspan="4"></td>
@@ -494,6 +543,30 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 </div>
 
 <!-- ===== HISTORY PAGE ===== -->
+<!-- ===== 日曆頁（2026-08-25 B批）===== -->
+<div id="page-cal" class="page">
+  <div class="card cal-wrap">
+    <div class="card-header">
+      <span class="card-title">日曆檢視</span>
+      <button class="btn btn-o btn-sm" onclick="calGoToday()">回到本月</button>
+    </div>
+    <div class="card-body">
+      <div class="cal-bar">
+        <button class="btn btn-o btn-sm" onclick="calShift(-1)">‹ 上個月</button>
+        <span class="cal-title" id="cal-title">—</span>
+        <button class="btn btn-o btn-sm" onclick="calShift(1)">下個月 ›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-legend">
+        <span><i class="cal-lg-full"></i>已填寫</span>
+        <span><i class="cal-lg-part"></i>填一半（沒有明細／天氣沒選／出工 0）</span>
+        <span><i class="cal-lg-none"></i>沒有日報</span>
+      </div>
+      <div id="cal-day"></div>
+    </div>
+  </div>
+</div>
+
 <div id="page-history" class="page">
   <div class="card">
     <div class="card-header">
@@ -720,6 +793,54 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 </div><!-- /container -->
 
 <!-- PROJ MODAL -->
+<!-- ══════ 新增日報表的「帶入」視窗（2026-08-25 從 cdr-pm 移植過來）══════
+     以前是一按「＋ 新增」就開空白，再由 autoCarryFromPrev() 偷偷把昨天的材料塞進來，
+     使用者不知道東西哪來的。改成先選案場、再自己挑要不要帶、帶哪一張、帶哪些東西。 -->
+<div id="carry-overlay" class="overlay">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-title">新增日報表</div>
+
+    <!-- 案場先選：選了才知道「這個案場今天是不是已經有一張」，下面的月曆也只畫這個案場 -->
+    <div class="fg" style="margin-bottom:14px">
+      <label class="fl">案場 <span style="color:var(--danger)">*</span></label>
+      <select id="carry-proj" class="fi" onchange="onCarryProjChange()"></select>
+    </div>
+
+    <!-- 今天已經有人建過 → 提醒先加入共編，不要又開一張 -->
+    <div id="carry-today-note" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
+         border-radius:8px;padding:11px 13px;margin-bottom:14px;font-size:13px;line-height:1.7">
+      <div id="carry-today-text" style="font-weight:700;color:#92400e;margin-bottom:8px"></div>
+      <button class="btn btn-p btn-sm" onclick="carryJoinToday()">👥 加入一起填</button>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+      <div class="fl" style="margin:0">要帶入哪一張的內容？</div>
+      <div class="cv-tabs">
+        <button type="button" id="cv-tab-cal"  class="cv-tab" onclick="carrySetView('cal')">📅 月曆</button>
+        <button type="button" id="cv-tab-list" class="cv-tab" onclick="carrySetView('list')">📋 列表</button>
+      </div>
+    </div>
+    <div id="carry-list" style="max-height:340px;overflow-y:auto;border:1.5px solid var(--border);
+         border-radius:8px;padding:8px;margin-bottom:14px"></div>
+
+    <div class="fl" style="margin-bottom:6px">要帶什麼過來？</div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;font-size:13px">
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-mat" checked> 材料明細<span style="color:var(--muted)">（數量歸零）</span></label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-notes" checked> 注意事項</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-work" checked> 班組</label>
+    </div>
+
+    <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-o" onclick="closeCarryModal()">取消</button>
+      <button class="btn btn-o" onclick="carryBlank()">不用，空白就好</button>
+      <button class="btn btn-a" onclick="carryApply()">帶入</button>
+    </div>
+  </div>
+</div>
+
 <div id="proj-overlay" class="overlay">
   <div class="modal">
     <div class="modal-title" id="pm-title">新增專案/工地</div>
@@ -809,6 +930,7 @@ const S = {
 function blankReport() {
   return {
     id: uid(), date: today(), dept:'', reporter:'', weather:'',
+    projId:'', projName:'',                       // C 批：案場升到報表層
     workItems: [], materials: [],
     notes: { contact:'', other:'' },
     photos: [], createdAt: new Date().toISOString()
@@ -1007,10 +1129,13 @@ function goPage(p) {
     if (b.getAttribute('onclick')?.includes(`'${p}'`)) b.classList.add('active');
   });
   if (p==='history')  { renderHistory(); populateHistFilters(); }
+  if (p==='cal')      renderCal();
   if (p==='settings') { loadCfgForm(); applyMngSettingsUI(); }
   if (p==='mgmt')    { renderMgmt(); populateMgmtFilters(); }
   if (p==='export')  initExportPage();
-  if (p==='report')  autoGrowAll();   // 切回報表頁重新撐高（摘要等 textarea 在隱藏時 scrollHeight 量不準，回來再算一次）
+  // 切回報表頁：案場下拉重填一次（在設定頁新增／改名案場、或雲端同步拉到新清單，才不會停在舊選項）；
+  // 再重新撐高（摘要等 textarea 在隱藏時 scrollHeight 量不準，回來再算一次）
+  if (p==='report')  { fillProjSelect(); autoGrowAll(); }
 }
 
 /* ── DATE ── */
@@ -1019,7 +1144,10 @@ function onDateChange() {
   if (!v) return;
   $('f-dow').value = '星期'+DOW[new Date(v+'T00:00:00').getDay()];
   checkDeptDateDuplicate();
-  autoCarryFromPrev();
+  /* 2026-08-25 起不再自動帶入舊資料（跟 cdr-pm 2026-08-16 一致）——
+     改由「＋ 新增」的帶入視窗讓使用者自己選要不要帶、帶哪一張、帶哪些東西。
+     autoCarryFromPrev() 本身留著沒刪，要恢復自動帶入把下面這行還原即可。
+  autoCarryFromPrev(); */
 }
 function navDay(d) {
   const cur = new Date($('f-date').value+'T00:00:00');
@@ -1032,14 +1160,103 @@ function loadToday() {
   onDateChange();
 }
 
+/* ══════════ 案場（C 批：一報表一案場，2026-08-25）══════════
+ * 拆分腳本跑完之前，雲端還留著「案場掛在每一列工項」的舊報表，
+ * 所以底下每個讀案場的地方都要能同時吃新舊兩種格式。 */
+
+/* 這張報表的工項用到哪些案場 id（舊格式可能不只一個） */
+function legacyProjIds(r){
+  return [...new Set(((r&&r.workItems)||[]).map(wi=>wi.projId).filter(Boolean))];
+}
+/* 報表的案場 id：新格式直接讀報表層；舊格式只有在「整張都同一個案場」時才推得出來 */
+function reportProjId(r){
+  if(!r) return '';
+  if(r.projId) return r.projId;
+  const ids = legacyProjIds(r);
+  return ids.length===1 ? ids[0] : '';
+}
+/* 報表的案場名稱（給畫面用）：舊格式混了多個案場就顯示「N 個案場」 */
+function reportProjName(r){
+  if(!r) return '';
+  if(r.projName) return r.projName;
+  const names = [...new Set(((r.workItems)||[]).map(wi=>wi.projName).filter(Boolean))];
+  if(names.length===1) return names[0];
+  return names.length>1 ? (names.length+' 個案場') : '';
+}
+/* 目前表單上選的案場名稱 */
+function curProjName(){
+  const sel = $('f-proj');
+  if(sel && sel.value) return sel.selectedOptions[0]?.text || '';
+  return (S.report && S.report.projName) || '';
+}
+/* 舊的單案場報表打開時直接補上報表層案場 */
+function migrateReportProj(r){
+  if(!r || r.projId) return r;
+  const ids = legacyProjIds(r);
+  if(ids.length===1){
+    r.projId = ids[0];
+    const wi = (r.workItems||[]).find(w=>w.projId===ids[0]);
+    r.projName = (wi && wi.projName) || '';
+  }
+  return r;
+}
+/* 舊的多案場報表：可看可列印，但不能存檔 —— 一存就會把其他案場的工項一起歸到同一個案場 */
+var _legacyMultiProj = false;
+function checkLegacyProj(){
+  const bar = $('legacy-proj-note');
+  const ids = legacyProjIds(S.report);
+  _legacyMultiProj = ids.length > 1;
+  if(!bar) return;
+  if(_legacyMultiProj){
+    const names = [...new Set((S.report.workItems||[]).map(wi=>wi.projName).filter(Boolean))];
+    bar.innerHTML = '⚠️ <b>這張是舊格式報表</b>，裡面混了 '+ids.length+' 個案場（'+escHtml(names.join('、'))+'）。<br>'
+      + '拆分成「一報表一案場」之前，這張只能查看與列印，<b>不能存檔</b>。';
+    bar.style.display = 'block';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+/* 換案場：同部門＋同一天＋同案場才算同一張，所以案場一改就要重新判斷 */
+function onProjChange(){
+  const sel = $('f-proj');
+  if(S.report){
+    S.report.projId = sel ? (sel.value||'') : '';
+    S.report.projName = (sel && sel.value) ? (sel.selectedOptions[0]?.text || '') : '';
+  }
+  // 不清「已問過」記號：記號本身已含案場，換案場就是新的一組，換回來代表已經答過了
+  checkDeptDateDuplicate();
+  buildSummary();
+}
+/* 把報表層案場填進下拉；設定頁把該案場刪掉的舊報表會自己補一個選項，不讓案場變空白 */
+function fillProjSelect(){
+  const sel = $('f-proj'); if(!sel) return;
+  const cur = (S.report && S.report.projId) || '';
+  sel.innerHTML = projOpts(cur, '— 請選擇案場 —');
+  sel.value = cur;
+  if(cur && sel.value !== cur){
+    const o = document.createElement('option');
+    o.value = cur;
+    o.textContent = (S.report.projName || '（已刪除的案場）');
+    sel.appendChild(o);
+    sel.value = cur;
+  }
+}
+
 /* ── COMPOSITE KEY CHECK ── */
+/* C 批：共填鍵從「同部門＋同一天」改成「同部門＋同一天＋同案場」。
+   這支還是舊的 confirm 問法，只是多帶案場；同一組條件問過一次就不再問。 */
+var _dupAskedFor = '';
 function checkDeptDateDuplicate() {
   const dept = S.user.dept;
   const date = $('f-date').value;
-  if (!dept||!date) return;
-  const existing = S.reports.find(r=>r.dept===dept && r.date===date);
+  const projId = $('f-proj') ? ($('f-proj').value||'') : '';
+  if (!dept||!date||!projId) return;        // 案場沒選就無從判斷
+  const key = dept+'|'+date+'|'+projId;
+  if (_dupAskedFor === key) return;
+  const existing = S.reports.find(r=>r.dept===dept && r.date===date && reportProjId(r)===projId);
   if (existing && existing.id!==S.report.id) {
-    if (confirm(`⚠️ ${dept} 在 ${date} 已有日報表，是否載入繼續編輯？`)) {
+    _dupAskedFor = key;
+    if (confirm(`⚠️ ${dept} 在 ${date} 的「${curProjName()}」已有日報表，是否載入繼續編輯？`)) {
       loadReport(existing);
     }
   }
@@ -1048,7 +1265,10 @@ function checkDeptDateDuplicate() {
 /* ── AUTO CARRY ── */
 function getPrevReport() {
   const curDate = $('f-date').value || today();
-  const same = S.reports.filter(r => r.dept === S.user.dept && r.date < curDate);
+  const pid = (S.report && S.report.projId) || '';
+  // C 批：只帶同案場的舊報表，跨案場帶過來只會製造錯資料
+  const same = S.reports.filter(r => r.dept === S.user.dept && r.date < curDate
+                                     && (!pid || reportProjId(r) === pid));
   if (!same.length) return null;
   same.sort((a, b) => b.date.localeCompare(a.date));
   return same[0];
@@ -1074,6 +1294,254 @@ function autoCarryFromPrev() {
   }
 }
 
+/* ══════════ 新增日報表的「帶入」視窗（2026-08-25 從 cdr-pm 移植）══════════
+ * 流程：按「＋ 新增」→ 先選案場 → 月曆／列表挑一張舊日報 → 決定帶哪些東西 → 帶入。
+ * 三個出口：加入今天那張（共編）／完全空白／帶入選定那張。
+ * 月曆沿用日曆檢視頁那套 calFill()／.cal-* 樣式，標色規則完全一致。 */
+var _carryProjId = '';
+var _carryView = 'cal';
+var CARRY_CAL = { ym:'', sel:'' };
+try { const _v = localStorage.getItem('cdr_v3_carry_view'); if (_v === 'list' || _v === 'cal') _carryView = _v; } catch(e){}
+
+/* 同部門＋同案場、可以拿來帶的舊報表（新到舊）
+   —— 一報表一案場之後，帶跨案場的班組過來只會製造錯資料 */
+function carryCandidates(pid, all) {
+  const p = (pid !== undefined) ? pid : _carryProjId;
+  const list = S.reports
+    .filter(r => r && r.dept === S.user.dept && r.id !== (S.report && S.report.id)
+                 && (!p || reportProjId(r) === p))
+    .sort((a, b) => String(b.date||'').localeCompare(String(a.date||'')));
+  /* 列表只給最近 20 張（再多也捲不完）；月曆要全部，否則翻到舊月份會是空的 */
+  return all ? list : list.slice(0, 20);
+}
+function todaysReport(pid) {
+  const p = (pid !== undefined) ? pid : _carryProjId;
+  return S.reports.find(r => r && r.dept === S.user.dept && r.date === today()
+                             && (!p || reportProjId(r) === p)) || null;
+}
+
+function openCarryModal() {
+  const sel = $('carry-proj');
+  if (sel) {
+    sel.innerHTML = projOpts(_carryProjId, '— 請先選擇案場 —');
+    sel.value = _carryProjId;
+    if (sel.value !== _carryProjId) _carryProjId = sel.value || '';
+  }
+  renderCarryBody();
+  $('carry-overlay').classList.add('show');
+}
+function closeCarryModal(){ $('carry-overlay').classList.remove('show'); }
+function onCarryProjChange() {
+  _carryProjId = $('carry-proj') ? ($('carry-proj').value||'') : '';
+  CARRY_CAL = { ym:'', sel:'' };     // 換案場 → 月曆回到該案場最後一筆那個月
+  renderCarryBody();
+}
+function carrySetView(v){
+  _carryView = (v === 'list') ? 'list' : 'cal';
+  try { localStorage.setItem('cdr_v3_carry_view', _carryView); } catch(e){}
+  renderCarryBody();
+}
+function carryCalShift(n){
+  const [Y, M] = CARRY_CAL.ym.split('-').map(Number);
+  const d = new Date(Y, M - 1 + n, 1);
+  CARRY_CAL.ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  renderCarryBody();
+}
+function carryCalPick(ds){ CARRY_CAL.sel = ds; renderCarryBody(); }
+
+/* 一張候選報表 → 一列可勾選的單選項（月曆與列表共用，carryApply 才不用分兩套讀） */
+function carryRow(r, checked){
+  const td = today();
+  return `<label style="display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:13px">
+      <input type="radio" name="carry-src" value="${escHtml(r.id)}"${checked ? ' checked' : ''}>
+      <span style="font-weight:700;color:var(--primary);min-width:92px">${escHtml(r.date||'—')}</span>
+      ${r.date === td ? '<span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:11px;border-radius:10px;padding:1px 7px;white-space:nowrap">今天</span>' : ''}
+      <span style="flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere">${escHtml(r.reporter||'—')}</span>
+      <span style="color:var(--muted);font-size:12px;white-space:nowrap">班組 ${(r.workItems||[]).length} 筆・材料 ${(r.materials||[]).length} 筆</span>
+    </label>`;
+}
+
+function renderCarryCal(host){
+  const all = carryCandidates(undefined, true);
+  const map = {};
+  all.forEach(r => { if (r.date) (map[r.date] = map[r.date] || []).push(r); });
+
+  if (!CARRY_CAL.ym){
+    /* 一打開就停在「這個案場最後一張日報」那個月，不是空空的本月 */
+    const ds = all.map(r => r.date).filter(Boolean).sort();
+    CARRY_CAL.ym = (ds.length ? ds[ds.length - 1] : today()).slice(0, 7);
+  }
+  const [Y, M] = CARRY_CAL.ym.split('-').map(Number);
+  const lead = new Date(Y, M - 1, 1).getDay();
+  const days = new Date(Y, M, 0).getDate();
+  const prev = new Date(Y, M - 1, 0).getDate();
+  const T = today();
+
+  let h = '<div class="carry-cal">'
+    + '<div class="cal-bar">'
+    +   '<button type="button" class="btn btn-o btn-sm" onclick="carryCalShift(-1)">‹ 上個月</button>'
+    +   '<span class="cal-title">' + Y + ' 年 ' + M + ' 月</span>'
+    +   '<button type="button" class="btn btn-o btn-sm" onclick="carryCalShift(1)">下個月 ›</button>'
+    + '</div><div class="cal-grid">';
+  ['日','一','二','三','四','五','六'].forEach(d => { h += '<div class="cal-dow">' + d + '</div>'; });
+  for (let i = lead - 1; i >= 0; i--) h += '<div class="cal-cell pad">' + (prev - i) + '</div>';
+  for (let d = 1; d <= days; d++){
+    const ds = Y + '-' + String(M).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const rs = map[ds] || [];
+    let cls = 'cal-cell';
+    if (rs.length) cls += rs.some(r => calFill(r) === 'part') ? ' part' : ' full';
+    if (ds === T) cls += ' today';
+    if (ds === CARRY_CAL.sel) cls += ' sel';
+    const mark = rs.length > 1 ? '<span class="cal-n">' + rs.length + ' 張</span>'
+               : rs.length     ? '<span class="cal-dot"></span>' : '';
+    h += '<div class="' + cls + '" data-d="' + ds + '" onclick="carryCalPick(\'' + ds + '\')">' + d + mark + '</div>';
+  }
+  const tail = (7 - ((lead + days) % 7)) % 7;
+  for (let i = 1; i <= tail; i++) h += '<div class="cal-cell pad">' + i + '</div>';
+  h += '</div><div class="cal-legend">'
+    +   '<span><i class="cal-lg-full"></i>已填寫</span>'
+    +   '<span><i class="cal-lg-part"></i>填一半</span>'
+    +   '<span><i class="cal-lg-none"></i>沒有日報</span>'
+    + '</div>';
+
+  if (!CARRY_CAL.sel){
+    h += '<div class="cal-empty">點上面有顏色的日期，挑一張帶入</div>';
+  } else {
+    const d = new Date(CARRY_CAL.sel + 'T00:00:00');
+    const rs = map[CARRY_CAL.sel] || [];
+    h += '<div class="cal-day-head">' + CARRY_CAL.sel + '（星期' + DOW[d.getDay()] + '）'
+       + '<span style="font-weight:400;color:var(--muted);font-size:12px">共 ' + rs.length + ' 張</span></div>';
+    if (!rs.length){
+      /* 空白日：直接建那天的日報，補填前幾天不用先改日期 */
+      h += '<div class="cal-empty">這天沒有日報可以帶'
+         + '<br><button type="button" class="btn btn-a btn-sm" style="margin-top:10px" onclick="carryBlankOn(\'' + CARRY_CAL.sel + '\')">'
+         + '＋ 建立 ' + CARRY_CAL.sel + ' 的空白日報</button></div>';
+    } else {
+      h += rs.map((r, i) => carryRow(r, i === 0)).join('');
+    }
+  }
+  host.innerHTML = h + '</div>';
+}
+
+/* 案場一換，帶入內容與「今天已經有一張」黃框都要跟著重畫 */
+function renderCarryBody() {
+  const host = $('carry-list');
+  const tc = $('cv-tab-cal'), tl = $('cv-tab-list');
+  if (tc) tc.classList.toggle('active', _carryView === 'cal');
+  if (tl) tl.classList.toggle('active', _carryView === 'list');
+  if (!_carryProjId) {
+    host.innerHTML = `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">請先在上方選擇案場</div>`;
+    const n0 = $('carry-today-note'); if (n0) n0.style.display = 'none';
+    return;
+  }
+  if (_carryView === 'cal') {
+    renderCarryCal(host);
+    carryTodayNote();
+    return;
+  }
+  const list = carryCandidates();
+  host.innerHTML = list.length
+    ? list.map((r, i) => carryRow(r, i === 0)).join('')
+    : `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">這個案場還沒有可以帶入的舊日報表</div>`;
+  carryTodayNote();
+}
+/* 黃框只講「要不要加入」，日期／建立人／筆數都在下面那份清單裡，不重複講一次 */
+function carryTodayNote(){
+  const t = todaysReport(), note = $('carry-today-note');
+  if (!note) return;
+  if (t) {
+    $('carry-today-text').textContent =
+      '今天已經有一張日報表了' + (t.reporter ? '（' + t.reporter + ' 建的）' : '') + '，要一起填嗎？';
+    note.style.display = '';
+  } else { note.style.display = 'none'; }
+}
+
+/* 真正建立空白報表（帶入視窗的三個出口都會走這裡） */
+function _startNewReport(){
+  const newR = blankReport();
+  newR.dept = S.user.dept;
+  newR.reporter = S.user.name;
+  newR.date = today();
+  S.report = newR;
+  renderReport();
+  applyPermissions();
+  $('f-date').value = today();
+  onDateChange();
+  return newR;
+}
+/* 新報表建好之後把帶入視窗選的案場套上去。
+   _dupAskedFor 要搶在 onProjChange() 之前設好 —— 這支的重複檢查是跳 confirm 的，
+   慢一步就會在使用者剛按完「空白就好」時又問一次「是否載入繼續編輯？」 */
+function applyCarryProj(ds){
+  if (!_carryProjId) return;
+  _dupAskedFor = S.user.dept + '|' + (ds || today()) + '|' + _carryProjId;
+  const sel = $('f-proj');
+  if (sel) { sel.value = _carryProjId; }
+  onProjChange();
+}
+/* 出口①：加入今天已經存在的那張（共編） */
+function carryJoinToday(){
+  const t = todaysReport();
+  closeCarryModal();
+  if (!t) { toast('找不到今天的日報表','e'); return; }
+  loadReport(t);
+  toast(`已加入 ${t.date} 的日報表，可以開始填了`,'s');
+}
+/* 出口②：完全空白。
+   ds 有給就開那天的（從月曆的空白日按「＋建立這天的空白日報」進來），沒給就是今天。 */
+function carryBlankOn(ds){
+  if (!_carryProjId) { toast('請先選擇案場','e'); return; }
+  closeCarryModal();
+  _startNewReport();
+  if (ds) { S.report.date = ds; $('f-date').value = ds; }
+  applyCarryProj(ds);
+  if (ds) onDateChange();          // 星期要跟著算
+  toast('已建立 ' + (ds || today()) + ' 的空白日報表','s');
+}
+function carryBlank(){ carryBlankOn(''); }
+/* 出口③：帶入選定那張的內容 */
+function carryApply(){
+  if (!_carryProjId) { toast('請先選擇案場','e'); return; }
+  const sel = document.querySelector('input[name="carry-src"]:checked');
+  if (!sel) { toast('請先選一張要帶入的日報表，或按「不用，空白就好」','e'); return; }
+  const src = S.reports.find(r => r.id === sel.value);
+  if (!src) { toast('找不到那張日報表','e'); return; }
+  const wantMat   = $('carry-mat').checked;
+  const wantNotes = $('carry-notes').checked;
+  const wantWork  = $('carry-work').checked;
+  closeCarryModal();
+
+  _startNewReport();
+  applyCarryProj();
+  const brought = [];
+
+  if (wantMat && (src.materials||[]).length) {
+    // 數量一律歸零、重編 id，免得跟來源那張共用同一筆
+    (src.materials||[]).forEach(m => addMatRow({ ...m, qty:0, id:uid() }));
+    brought.push(`材料 ${src.materials.length} 筆（數量已歸零）`);
+  }
+  if (wantWork && (src.workItems||[]).length) {
+    (src.workItems||[]).forEach(it => addRow({ ...it, id:uid() }));
+    brought.push(`班組 ${src.workItems.length} 筆`);
+  }
+  if (wantNotes) {
+    const n = src.notes || {};
+    if (n.contact) { $('n-contact').value = n.contact; autoGrow($('n-contact')); }
+    if (n.other)   { $('n-other').value   = n.other;   autoGrow($('n-other')); }
+    if (n.contact || n.other) brought.push('注意事項');
+  }
+
+  const hint = $('mat-carry-hint');
+  if (hint) {
+    if (brought.length) {
+      hint.textContent = `✓ 已從 ${src.date}（${src.reporter||'—'}）帶入：${brought.join('、')}`;
+      hint.style.display = 'block';
+    } else { hint.style.display = 'none'; }
+  }
+  recalc(); buildSummary(); syncReport();
+  toast(brought.length ? '已帶入舊資料' : '那張沒有可帶入的內容，已建立空白日報表', brought.length?'s':'');
+}
+
 /* ── REPORT LOAD / SAVE ── */
 function initReport() {
   const newR = blankReport();
@@ -1086,19 +1554,13 @@ function initReport() {
 }
 function newReport() {
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
-    if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
+    if (!confirm('目前表單有內容，確定要離開它、開一張新的日報表？')) return;
   }
-  const newR = blankReport();
-  newR.dept = S.user.dept;
-  newR.reporter = S.user.name;
-  S.report = newR;
-  renderReport();
-  applyPermissions();
-  $('f-date').value = today();
-  onDateChange();
-  toast('已建立新日報表','s');
+  openCarryModal();
 }
 function renderReport() {
+  fillProjSelect();
+  checkLegacyProj();
   $('f-date').value = S.report.date||today();
   $('f-dow').value = S.report.date?'星期'+DOW[new Date(S.report.date+'T00:00:00').getDay()]:'';
   $('f-weather').value = S.report.weather||'';
@@ -1117,6 +1579,9 @@ function renderReport() {
 }
 function syncReport() {
   S.report.date = $('f-date').value;
+  const _p = $('f-proj');
+  S.report.projId = _p ? (_p.value||'') : '';
+  S.report.projName = (_p && _p.value) ? (_p.selectedOptions[0]?.text || '') : '';
   S.report.weather = $('f-weather').value;
   S.report.dept = $('f-dept').value||S.user.dept;
   S.report.reporter = $('f-reporter').value;
@@ -1129,8 +1594,11 @@ function syncReport() {
   buildSummary();
 }
 function saveReport() {
+  /* 舊格式（一張混多個案場）拆分前不給存 —— 存下去會把其他案場的工項一起歸到同一個案場 */
+  if (_legacyMultiProj) { toast('這張是舊格式報表（混了多個案場），拆分前不能存檔','e'); return; }
   syncReport();
   if (!S.report.dept) { toast('請確認部門（需先登入）','e'); return; }
+  if (!S.report.projId) { toast('請先選擇案場','e'); $('f-proj')?.focus(); return; }
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
@@ -1141,18 +1609,26 @@ function saveReport() {
 }
 function loadReport(r) {
   S.report = JSON.parse(JSON.stringify(r));
+  migrateReportProj(S.report);   // 舊的單案場報表就地補上報表層案場
   renderReport();
   applyPermissions();
 }
 /* 從歷史資料開啟報表 → 切到報表頁並顯示「‹ 返回歷史資料」返回列 */
-function openReportFromHistory(id){
+function openReportFromHistory(id, from){
   const r = S.reports.find(x=>x.id===id);
   if(!r){ toast('找不到這筆報表','e'); return; }
+  _backTo = (from==='cal') ? 'cal' : 'history';
   loadReport(r);
   goPage('report');
-  const bb=$('report-backbar'); if(bb) bb.style.display='';
+  const bb=$('report-backbar');
+  if(bb){
+    bb.style.display='';
+    const btn=bb.querySelector('button');
+    if(btn) btn.textContent = (_backTo==='cal') ? '‹ 返回日曆檢視' : '‹ 返回歷史資料';
+  }
 }
-function backToHistory(){ goPage('history'); }
+var _backTo = 'history';   /* 報表是從歷史資料還是從日曆點進來的 */
+function backToHistory(){ goPage(_backTo==='cal' ? 'cal' : 'history'); }
 function clearForm() {
   if (!confirm('確定清除目前表單？')) return;
   S.report = blankReport();
@@ -1173,7 +1649,6 @@ function addRow(it) {
   tr.dataset.rn = n;
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
-    <td data-label="專案/工地"><select class="cs" data-f="proj" onchange="onRowChange(this)">${projOpts(v('projId'))}</select></td>
     <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)">${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
     <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)">${selOpts(S.cfg.works,v('work'),'施工項目...')}</select></td>
     <td data-label="今日班組"><select class="cs" data-f="lead" onchange="syncReport()">${selOpts(S.cfg.leads,v('lead'),'班組/領班...')}</select></td>
@@ -1192,9 +1667,9 @@ function addRow(it) {
   tbody.appendChild(tr);
   renum(); recalc(); buildSummary();
 }
-function projOpts(curId) {
+function projOpts(curId, ph) {
   const sorted = getSortedProjects();
-  return `<option value="">— 選擇專案 —</option>` +
+  return `<option value="">${escHtml(ph||'— 選擇專案 —')}</option>` +
     sorted.map(p=>`<option value="${p.id}"${curId===p.id?' selected':''}>${escHtml(p.name)}</option>`).join('');
 }
 function selOpts(presets, cur, ph) {
@@ -1236,12 +1711,8 @@ function recalc() {
 function collectRows() {
   const rows=[];
   $('tbody').querySelectorAll('tr').forEach(tr=>{
-    const projSel = tr.querySelector('[data-f="proj"]');
-    const projId = projSel?.value||'';
-    const projName = projSel?.selectedOptions[0]?.text||'';
     rows.push({
       id: tr.dataset.id||uid(),
-      projId, projName: projId?projName:'',
       loc: tr.querySelector('[data-f="loc"]')?.value||'',
       work: tr.querySelector('[data-f="work"]')?.value||'',
       lead: tr.querySelector('[data-f="lead"]')?.value||'',
@@ -1259,9 +1730,8 @@ function collectRows() {
 /* ── SUMMARY ── */
 function buildSummary() {
   const lines=[];
+  const projName = curProjName();      // C 批：案場是整張報表的，每一行都用同一個
   $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
-    const projSel = tr.querySelector('[data-f="proj"]');
-    const projName = projSel?.value?(projSel.selectedOptions[0]?.text||''):'';
     const loc = tr.querySelector('[data-f="loc"]')?.value||'';
     const work = tr.querySelector('[data-f="work"]')?.value||'';
     if (projName||loc||work) {
@@ -1430,12 +1900,13 @@ document.addEventListener('input',e=>{if(e.target.matches('textarea.fi'))autoGro
 /* ── PRINT / PDF ── */
 function buildPrintTitle(){
   const parts=['日報表-瑪摩工程', S.report.date||today()];
+  const pn=reportProjName(S.report); if(pn) parts.push(pn);
   if(S.report.reporter) parts.push(S.report.reporter);
   return parts.join('_');
 }
 function printPDF(){
   syncReport();
-  const info=[S.report.dept, S.report.reporter, S.report.date].filter(Boolean).join(' | ');
+  const info=[reportProjName(S.report), S.report.dept, S.report.reporter, S.report.date].filter(Boolean).join(' | ');
   $('ph-info').textContent=info;
   document.title=buildPrintTitle();
   window.print();
@@ -1444,6 +1915,126 @@ window.addEventListener('beforeprint',()=>{document.title=buildPrintTitle();});
 window.addEventListener('afterprint',()=>{document.title='日報表—瑪摩工程';});
 
 /* ── HISTORY ── */
+/* ══════════ 日曆（2026-08-25 B批）══════════
+ * 判準與流程與「日報表—專案管理」完全一致：
+ *   藍＝那天的日報都填齊；黃＝有日報但沒填完（0 筆明細／天氣沒選／今日出工 0）；空白＝沒有日報。
+ *   點日期先列出那天的紀錄再點進去（用戶 2026-08-25 選方案 2），C 批一天多張時不用重寫。 */
+var CAL = { ym:'', sel:'' };
+
+function calFill(r){
+  const wi = r.workItems || [];
+  if (!wi.length) return 'part';
+  if (!r.weather)  return 'part';
+  if (!wi.reduce((s,w)=>s+(Number(w.w0)||0),0)) return 'part';
+  return 'full';
+}
+function calWhyPart(r){
+  const wi = r.workItems || [], why = [];
+  if (!wi.length) why.push('沒有施工明細');
+  if (!r.weather) why.push('天氣沒選');
+  if (wi.length && !wi.reduce((s,w)=>s+(Number(w.w0)||0),0)) why.push('今日出工 0');
+  return why.join('、');
+}
+function calMap(){
+  const m = {};
+  visibleReports().forEach(r=>{ if(r.date) (m[r.date] = m[r.date]||[]).push(r); });
+  return m;
+}
+function calShift(n){
+  const [Y,M] = CAL.ym.split('-').map(Number);
+  const d = new Date(Y, M-1+n, 1);
+  CAL.ym = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  renderCal();
+}
+function calGoToday(){ CAL.ym = today().slice(0,7); CAL.sel = today(); renderCal(); }
+function calPick(ds){ CAL.sel = ds; renderCal(); }
+
+function renderCal(){
+  if (!CAL.ym){
+    const ds = visibleReports().map(r=>r.date).filter(Boolean).sort();
+    CAL.ym = (ds.length ? ds[ds.length-1] : today()).slice(0,7);
+  }
+  const [Y,M] = CAL.ym.split('-').map(Number);
+  $('cal-title').textContent = Y+' 年 '+M+' 月';
+
+  const map  = calMap();
+  const lead = new Date(Y, M-1, 1).getDay();
+  const days = new Date(Y, M, 0).getDate();
+  const prev = new Date(Y, M-1, 0).getDate();
+  const T    = today();
+  let h = '';
+
+  ['日','一','二','三','四','五','六'].forEach(d=>{ h += '<div class="cal-dow">'+d+'</div>'; });
+  for (let i=lead-1; i>=0; i--) h += '<div class="cal-cell pad">'+(prev-i)+'</div>';
+
+  for (let d=1; d<=days; d++){
+    const ds = Y+'-'+String(M).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const rs = map[ds] || [];
+    let cls = 'cal-cell';
+    if (rs.length) cls += rs.some(r=>calFill(r)==='part') ? ' part' : ' full';
+    if (ds === T)       cls += ' today';
+    if (ds === CAL.sel) cls += ' sel';
+    const mark = rs.length > 1 ? '<span class="cal-n">'+rs.length+' 張</span>'
+               : rs.length     ? '<span class="cal-dot"></span>' : '';
+    h += '<div class="'+cls+'" data-d="'+ds+'" onclick="calPick(\''+ds+'\')">'+d+mark+'</div>';
+  }
+  const tail = (7 - ((lead+days) % 7)) % 7;
+  for (let i=1; i<=tail; i++) h += '<div class="cal-cell pad">'+i+'</div>';
+
+  $('cal-grid').innerHTML = h;
+  renderCalDay();
+}
+
+function renderCalDay(){
+  const box = $('cal-day');
+  if (!box) return;
+  if (!CAL.sel){ box.innerHTML = '<div class="cal-empty">點上面的日期，看那天的日報</div>'; return; }
+
+  const d  = new Date(CAL.sel+'T00:00:00');
+  const rs = calMap()[CAL.sel] || [];
+  let h = '<div class="cal-day-head">'+CAL.sel+'（星期'+DOW[d.getDay()]+'）'
+        + '<span style="font-weight:400;color:var(--muted);font-size:12px">共 '+rs.length+' 張</span></div>';
+
+  if (!rs.length){
+    h += '<div class="cal-empty">這天還沒有日報'
+       + '<br><button class="btn btn-a btn-sm" style="margin-top:10px" onclick="calNewOn(\''+CAL.sel+'\')">＋ 建立這天的日報</button>'
+       + '</div>';
+  } else {
+    rs.forEach(r=>{
+      const t0   = (r.workItems||[]).reduce((s,w)=>s+(Number(w.w0)||0),0);
+      const part = calFill(r)==='part';
+      h += '<div class="ritem"'+(part ? ' style="border-left-color:var(--warning)"' : '')+'>'
+         +   '<div class="ritem-date"><div class="day">'+d.getDate()+'</div><div class="mon">'+(d.getMonth()+1)+'月</div></div>'
+         +   '<div class="ritem-info"><h3>'+escHtml(reportProjName(r)||'（未指定案場）')+'</h3>'
+         +     '<p style="margin-bottom:2px">'+escHtml(r.dept||'—')+' — '+escHtml(r.reporter||'—')+'</p>'
+         +     '<p>出工 '+t0+' 人工 ／ '+((r.workItems||[]).length)+' 筆明細'
+         +       (part ? ' ／ <b style="color:var(--warning)">未填完：'+escHtml(calWhyPart(r))+'</b>' : '')
+         +     '</p></div>'
+         +   '<div class="ritem-actions"><button class="btn btn-o btn-sm" onclick="openReportFromHistory(\''+r.id+'\',\'cal\')">開啟</button></div>'
+         + '</div>';
+    });
+  }
+  box.innerHTML = h;
+}
+
+/* 從日曆的空白日建立那天的日報（照這支自己的 newReport 流程，只是日期換成點選那天） */
+function calNewOn(ds){
+  if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value){
+    if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
+  }
+  const newR = blankReport();
+  newR.dept = S.user.dept;
+  newR.reporter = S.user.name;
+  newR.date = ds;
+  S.report = newR;
+  renderReport();
+  applyPermissions();
+  $('f-date').value = ds;
+  onDateChange();
+  goPage('report');
+  toast('已建立 '+ds+' 的日報表','s');
+}
+
 function renderHistory() {
   const m=$('filter-month').value;
   const dept=$('filter-dept').value;
@@ -1463,7 +2054,8 @@ function renderHistory() {
     div.innerHTML=`
       <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
       <div class="ritem-info">
-        <h3>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</h3>
+        <h3>${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
+        <p>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</p>
         <p>${r.date} ／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
       </div>
       <div class="ritem-actions">
@@ -1518,7 +2110,7 @@ function renderMgmt(){
   let list=[...visibleReports()].filter(r=>{
     if(date&&r.date!==date)return false;
     if(dept&&r.dept!==dept)return false;
-    if(proj&&!(r.workItems||[]).some(wi=>wi.projId===proj))return false;
+    if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return false;
     return true;
   }).sort((a,b)=>b.date.localeCompare(a.date)||a.dept?.localeCompare(b.dept||'')||0);
   const tbody=$('master-tbody'); tbody.innerHTML='';
@@ -1552,12 +2144,13 @@ function toggleDetail(btn,id){
     const r=S.reports.find(x=>x.id===id); if(!r)return;
     const inner=$('det-inner-'+id);
     const rows=(r.workItems||[]).map((wi,i)=>`
-      <tr><td>${i+1}</td><td>${escHtml(wi.projName||'—')}</td><td>${escHtml(wi.loc||'—')}</td>
+      <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
       <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wi.lead||'—')}</td>
       <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td></tr>`).join('');
-    inner.innerHTML=`<table class="stbl" style="font-size:12px">
-      <thead><tr><th>#</th><th>專案/工地</th><th>施作位置</th><th>施工項目</th><th>班組</th><th>出工</th><th>進度</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
+    inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
+      <table class="stbl" style="font-size:12px">
+      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>班組</th><th>出工</th><th>進度</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
       ${r.notes?.contact?`<p style="margin-top:8px;font-size:12px"><strong>工聯絡：</strong>${escHtml(r.notes.contact)}</p>`:''}`;
   }
 }
@@ -1638,12 +2231,17 @@ function getExRows(){
     if(deptF&&r.dept!==deptF)return;
     if(from&&r.date<from)return;
     if(to&&r.date>to)return;
+    /* C 批：案場改由報表層提供；拆分前的舊報表報表層推不出案場，就沿用工項上的，
+       這樣「總表匯出」在拆分前後都不會漏資料 */
+    const rpid = reportProjId(r);
     (r.workItems||[]).forEach(wi=>{
-      if(selProjIds.size>0&&!selProjIds.has(wi.projId))return;
+      const pid = rpid || wi.projId || '';
+      const pnm = rpid ? (r.projName || reportProjName(r)) : (wi.projName || '');
+      if(selProjIds.size>0&&!selProjIds.has(pid))return;
       if(locF&&wi.loc!==locF)return;
       if(leadF&&wi.lead!==leadF)return;
       if(wi.w0<wMin||wi.w0>wMax)return;
-      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi});
+      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi,projId:pid,projName:pnm});
     });
     if(matF){
       (r.materials||[]).filter(m=>m.name===matF).forEach(m=>{
@@ -1733,16 +2331,19 @@ async function exportExcel(){
     ws.mergeCells('A1:M1');
     ws.getCell('A1').alignment={horizontal:'center'};
     ws.addRow([]);
+    const pinfo=ws.addRow(['案場',reportProjName(r)||'']);
+    {const c1=pinfo.getCell(1);c1.font={bold:true};c1.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};}
+    pinfo.getCell(2).font={bold:true};
     const info=ws.addRow(['日期',r.date||'','部門',r.dept||'','填報人',r.reporter||'','天氣',r.weather||'']);
     [1,3,5,7].forEach(c=>{const cell=info.getCell(c);cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};});
     ws.addRow([]);
     // 工項
     if(hasWork){
       const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','專案/工地','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成%','異常類型','異常說明'];
+      const headers=['#','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成%','異常類型','異常說明'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
-        const row=ws.addRow([i+1,wi.projName||'',wi.loc||'',wi.work||'',wi.lead||'',wi.w0||0,wi.lead2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
+        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wi.lead||'',wi.w0||0,wi.lead2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -1766,7 +2367,7 @@ async function exportExcel(){
       if(r.notes?.contact){const row=ws.addRow(['與工地聯絡事項',r.notes.contact]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
       if(r.notes?.other){const row=ws.addRow(['其他工程配合重點',r.notes.other]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
     }
-    ws.columns=[6,22,18,28,14,10,14,10,10,14,28].map(w=>({width:w}));
+    ws.columns=[6,18,28,14,10,14,10,10,14,28].map(w=>({width:w}));   // C 批：拿掉「專案/工地」欄，11 欄 → 10 欄
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -1840,7 +2441,10 @@ function toggleProjSort(){
   $('sort-lbl').textContent=S.projSort==='desc'?'新→舊':'舊→新';
   renderProjTable();
 }
-function isProjLocked(id){ return S.reports.some(r=>(r.workItems||[]).some(wi=>wi.projId===id)); }
+/* 案場「使用中」＝不能刪。C 批之後案場在報表層，舊格式還掛在工項上 → 兩邊都要看 */
+function isProjLocked(id){
+  return S.reports.some(r=>reportProjId(r)===id || (r.workItems||[]).some(wi=>wi.projId===id));
+}
 function renderProjTable(){
   const sorted=getSortedProjects();
   const tbody=$('proj-tbody'); tbody.innerHTML='';
@@ -1879,14 +2483,14 @@ function saveProj(){
   } else {
     S.cfg.projects.push({id:uid(),name,note:$('pm-note').value.trim()});
   }
-  save(); closeProjModal(); renderProjTable(); toast('專案已儲存','s');   // 先存檔，畫面出錯也不賠掉資料
+  save(); closeProjModal(); renderProjTable(); fillProjSelect(); toast('專案已儲存','s');   // 先存檔，畫面出錯也不賠掉資料
 }
 function deleteProj(id){
   if(!requireDelete())return;
   if(isProjLocked(id)){toast('此專案已在日報表中使用，無法刪除','e');return;}
   if(!confirm('確定刪除此專案？'))return;
   S.cfg.projects=S.cfg.projects.filter(p=>p.id!==id);
-  renderProjTable(); save();
+  renderProjTable(); fillProjSelect(); save();
 }
 
 /* ── USER TABLE ── */
