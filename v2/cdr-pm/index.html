@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-26.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-26.5';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -355,12 +355,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <span class="card-title">基本資訊</span>
         <span id="access-badge" class="rw-badge no-print">✏️ 可編輯</span>
       </div>
-      <div class="flex gap2 no-print">
-        <button class="btn btn-o btn-sm" onclick="navDay(-1)">◀</button>
-        <button class="btn btn-o btn-sm" onclick="loadToday()">📅 今日</button>
-        <button class="btn btn-o btn-sm" onclick="navDay(1)">▶</button>
-        <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存</button>
-      </div>
+      <!-- 2026-08-26 用戶指定：
+           「💾 儲存」搬到「＋ 新增日報表」旁邊（建立與存檔是同一組動作，放一起才好找）
+           「◀ 📅今日 ▶」搬到日期欄位旁邊 —— 它們本來就只是改日期欄位的捷徑，
+             放在頁首看起來像「切換報表」，實際不是；而且放頁首會繞過「還沒按新增」的鎖。 -->
     </div>
     <div class="card-body">
       <!-- 同日已有報表提示（2026-08-18 從頁首移到這裡＝「＋ 新增／今日／儲存」那排的正下方） -->
@@ -379,6 +377,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
            從歷史資料開啟／加入別人那張（loadReport）也算已開始，不會被鎖。 -->
       <div class="no-print" style="margin-bottom:12px">
         <button class="btn btn-a" onclick="newReport()" style="font-weight:800">＋ 新增日報表</button>
+        <button class="btn btn-p" id="btn-save" onclick="saveReport()" style="font-weight:800;margin-left:8px">💾 儲存</button>
         <span id="start-hint" style="display:none;margin-left:10px;font-size:12.5px;color:var(--warning);font-weight:700">
           ← 請先按這裡建立日報表
         </span>
@@ -392,7 +391,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <div class="g g5" style="gap:10px">
         <div class="fg" style="grid-column:span 2">
           <label class="fl">日期</label>
-          <input type="date" id="f-date" class="fi" onchange="onDateChange()">
+          <div style="display:flex;gap:5px;align-items:center">
+            <input type="date" id="f-date" class="fi" onchange="onDateChange()" style="flex:1;min-width:0">
+            <!-- 這三顆只是「改日期欄位」的捷徑：前一天／今天／後一天，
+                 不會切換到別張報表（2026-08-16 起就不自動帶入舊資料了）。 -->
+            <button class="btn btn-o btn-sm no-print" id="btn-day-prev" onclick="navDay(-1)" title="前一天">◀</button>
+            <button class="btn btn-o btn-sm no-print" id="btn-day-today" onclick="loadToday()" title="跳回今天">📅 今日</button>
+            <button class="btn btn-o btn-sm no-print" id="btn-day-next" onclick="navDay(1)" title="後一天">▶</button>
+          </div>
         </div>
         <div class="fg">
           <label class="fl">星期</label>
@@ -1538,13 +1544,17 @@ function onDateChange() {
   // 2026-08-16 起不再自動帶入舊資料（改由「＋ 新增」的帶入視窗讓使用者自己選）
   buildSummary();   // 摘要開頭帶日期（20231231.案場…），改日期要跟著重算
 }
+/* 這三顆是直接改 f-date 的值，disabled 擋不住程式改值 ——
+ * 沒有這道檢查的話，還沒按「＋ 新增日報表」就能用 ◀ ▶ 把背景那張空白報表的日期改掉。 */
 function navDay(d) {
+  if (!requireStarted()) return;
   const cur = new Date($('f-date').value+'T00:00:00');
   cur.setDate(cur.getDate()+d);
   $('f-date').value = ymd(cur);
   onDateChange();
 }
 function loadToday() {
+  if (!requireStarted()) return;
   $('f-date').value = today();
   onDateChange();
 }
@@ -1992,6 +2002,14 @@ function applyStartedLock(){
     el.disabled = lock;
     el.style.background = lock ? '#f1f5f9' : '';
     el.title = lock ? '請先按上方「＋ 新增日報表」' : '';
+  });
+  // 日期捷徑鈕跟著日期欄位一起鎖，不然畫面看起來可以按、按了又被擋
+  ['btn-day-prev','btn-day-today','btn-day-next'].forEach(function(id){
+    var el = $(id); if(!el) return;
+    el.disabled = lock;
+    el.style.opacity = lock ? '.45' : '';
+    el.style.cursor = lock ? 'not-allowed' : '';
+    el.title = lock ? '請先按上方「＋ 新增日報表」' : (el.id==='btn-day-prev'?'前一天':el.id==='btn-day-next'?'後一天':'跳回今天');
   });
 }
 function renderReport() {
