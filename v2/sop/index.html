@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-25.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -112,26 +112,28 @@
     <div class="text-center py-5 mb-4">
       <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-900 text-3xl mb-3 shadow-lg">&#128203;</div>
       <h2 class="text-xl font-bold text-gray-800">查檢表—標準作業</h2>
-      <p class="text-sm text-gray-500 mt-1">選擇工法開始現場查驗</p>
+      <p id="home-subtitle" class="text-sm text-gray-500 mt-1">選擇工程，開始填一張新的</p>
     </div>
     <div id="template-cards" class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 mb-6"></div>
     <div id="recent-section">
       <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-semibold text-gray-600">最近記錄</h3>
+        <h3 class="text-sm font-semibold text-gray-600">填過的紀錄</h3>
         <button onclick="goTo('history')" class="text-xs text-blue-600">查看全部 &#8250;</button>
       </div>
-      <!-- 兩種顯示方式（2026-08-13 新增）：依日期／依案場分類 -->
-      <div class="flex mb-3 bg-gray-100 rounded-xl p-1 text-sm max-w-xs">
-        <button id="rm-date" onclick="setRecentMode('date')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依日期</button>
+      <!-- 三種顯示方式（2026-08-13 兩種 → 2026-08-26 加「依技術」）：依案場／依日期／依技術 -->
+      <div class="flex mb-3 bg-gray-100 rounded-xl p-1 text-sm max-w-md">
         <button id="rm-case" onclick="setRecentMode('case')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依案場</button>
+        <button id="rm-date" onclick="setRecentMode('date')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依日期</button>
+        <button id="rm-tpl"  onclick="setRecentMode('tpl')"  class="flex-1 py-1.5 rounded-lg font-medium transition-all">依技術</button>
       </div>
       <div id="recent-list" class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2"></div>
     </div>
-    <div id="no-recent" class="hidden text-center py-8 text-gray-400 text-sm">尚無記錄，點選上方工法開始填寫</div>
+    <div id="no-recent" class="hidden text-center py-8 text-gray-400 text-sm">尚無記錄，點選上方分類開始填寫</div>
   </div>
 
   <!-- ===== HEADER FORM ===== -->
   <div id="view-new-header" class="view p-4 space-y-4">
+    <div id="path-new-header" class="text-xs text-gray-500 leading-relaxed px-1"></div>
     <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
       <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">案場資訊</h3>
       <div>
@@ -188,6 +190,9 @@
 
   <!-- ===== CHECKLIST ===== -->
   <div id="view-checklist" class="view p-4">
+    <div id="path-checklist" class="text-xs text-gray-500 leading-relaxed px-1 mb-3"></div>
+    <!-- 打開舊紀錄時說清楚它的狀態（2026-08-26）：已完成的不該再看到「完成查驗」那顆鈕 -->
+    <div id="cl-status-note" class="hidden rounded-2xl px-4 py-3 mb-3 text-sm leading-relaxed"></div>
     <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
       <div class="flex items-center justify-between text-sm mb-2">
         <span class="font-medium text-gray-700">查驗進度</span>
@@ -200,7 +205,7 @@
     </div>
     <div id="checklist-items" class="space-y-3"></div>
     <div class="mt-4 space-y-2">
-      <button onclick="saveAsDraft()" class="w-full border-2 border-blue-700 text-blue-700 font-semibold py-3 rounded-2xl text-sm hover:bg-blue-50">&#128190; 儲存草稿</button>
+      <button id="btn-draft" onclick="saveAsDraft()" class="w-full border-2 border-blue-700 text-blue-700 font-semibold py-3 rounded-2xl text-sm hover:bg-blue-50">&#128190; 儲存草稿</button>
       <button id="btn-complete" onclick="completeReport()" class="w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-2xl text-base">查驗中...</button>
     </div>
   </div>
@@ -216,7 +221,7 @@
     <div id="complete-stats" class="grid grid-cols-4 gap-2 mb-3"></div>
     <div id="complete-items" class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden"></div>
     <div class="space-y-2">
-      <button onclick="printCurrentReport()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 匯出 PDF</button>
+      <button onclick="printCurrentReport()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 另存 PDF</button>
       <button onclick="goTo('home')" class="w-full border-2 border-gray-300 text-gray-600 font-semibold py-3 rounded-2xl text-sm hover:bg-gray-50">返回首頁</button>
     </div>
   </div>
@@ -253,7 +258,7 @@
       </select>
       <div class="flex gap-2">
         <select id="h-filter-tpl" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">全部工法</option>
+          <option value="">全部技術</option>
         </select>
         <select id="h-filter-status" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">全部狀態</option>
@@ -270,7 +275,9 @@
     <div id="detail-info" class="bg-white rounded-2xl p-4 shadow-sm mb-3"></div>
     <div id="detail-items" class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden"></div>
     <div class="space-y-2">
-      <button id="btn-print-detail" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 匯出 PDF</button>
+      <!-- 只是看一看的人不該掉進表單裡（2026-08-26）：要改才按這顆 -->
+      <button id="btn-edit-detail" onclick="editFromDetail()" class="hidden w-full border-2 border-blue-700 text-blue-700 font-semibold py-3 rounded-2xl text-sm hover:bg-blue-50">&#9999;&#65039; 修改內容</button>
+      <button id="btn-print-detail" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128424;&#65039; 列印 / 另存 PDF</button>
       <button id="btn-delete-detail" class="w-full border-2 border-red-300 text-red-600 font-semibold py-3 rounded-2xl text-sm hover:bg-red-50">&#128465;&#65039; 刪除此記錄</button>
     </div>
   </div>
@@ -278,6 +285,7 @@
   <!-- ===== SETTINGS ===== -->
   <div id="view-settings" class="view p-4 space-y-4">
     <button onclick="backToPortal()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">🏠 返回主系統</button>
+    <div id="cfg-cats"        class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
     <div id="cfg-templates"   class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
     <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
     <!-- 部門管理 / 人員管理 已移除：改由入口網頁集中管理 -->
@@ -350,10 +358,21 @@
 <script>
 'use strict';
 
+/* ── 三階分類（2026-08-26 C批）──
+ * 1階＝工程（景觀／牆面／內裝）、2階＝管理（圖面／工法）、3階＝技術（具體查驗表 TEMPLATES）。
+ * 中類是所有大類共用的一份清單，不是每個大類各自一套 —— 之後要加「材料」之類，一次加、每個大類都有。
+ * 每張查驗表帶 cat1／cat2 兩個 id；沒填或指到已刪掉的分類 → 一律當「（未分類）」，不會憑空消失。
+ * 兩層都存進 config.cats，設定頁「📂 分類管理」可增刪改。 */
+var CATS = {
+  l1:[ {id:'c1',name:'景觀',icon:'🌿'}, {id:'c2',name:'牆面',icon:'🧱'}, {id:'c3',name:'內裝',icon:'🏠'} ],
+  l2:[ {id:'d1',name:'圖面',icon:'📐'}, {id:'d2',name:'工法',icon:'🔧'} ]
+};
+var UNCAT = '__uncat__';
+
 // ====== TEMPLATES ======
 var TEMPLATES = [
   {
-    id:'t1', name:'瑪摩石地坪硬底工法', materialLabel:'材質名稱', icon:'🪵',
+    id:'t1', name:'瑪摩石地坪硬底工法', materialLabel:'材質名稱', icon:'🪵', cat1:'c3', cat2:'d2',
     items:[
       {id:'i1',name:'施工前地坪檢查', criterion:'地坪水泥砂漿打底面應檢查不能嚴重起砂、大坑洞及龜裂情形\n如遇到該情形應立即向現場管理人員反應並改善後才可進場施工'},
       {id:'i2',name:'地坪清潔',        criterion:'全區域地坪粉塵清掃或用海綿清理'},
@@ -367,7 +386,7 @@ var TEMPLATES = [
     ]
   },
   {
-    id:'t2', name:'插銷式鐵件固定工法', materialLabel:'石材種類', icon:'🪨',
+    id:'t2', name:'插銷式鐵件固定工法', materialLabel:'石材種類', icon:'🪨', cat1:'c2', cat2:'d2',
     items:[
       {id:'j1', name:'內迫錨栓施作',     criterion:'內迫長度4cm、直徑12.75mm，鑽頭尺寸13mm，應鑽入結構深度4.5cm使其全埋入\n結構有防水層需使用防水材或矽利康，避免水沿著鑽孔處滲入造成鋼筋鏽蝕及牆壁滲水'},
       {id:'j2', name:'內迫錨栓鑽孔',     criterion:'鑽孔後粉塵需清理，鑽孔擊中鋼筋時應改位置，內迫應確實擊開\n擊中鋼筋時內迫無法全埋入'},
@@ -393,12 +412,28 @@ var TEMPLATES = [
 var S = {
   view: 'home',
   viewStack: ['home'],
+  // 首頁分類鑽取（2026-08-26）：null＝停在大類那一層；否則是大類 id（或 UNCAT）
+  homeCat: null,
+  catEditing: null,
+  // 設定頁三段連動（2026-08-26）：目前選到哪一個大類／中類、是否正在新增分類、是否展開搬家選單
+  cfgCat1: null,
+  cfgCat2: null,
+  catAdding: null,
+  showMovePicker: false,
   // 首頁「最近記錄」的顯示方式：'date'＝依日期／'case'＝依案場分類（2026-08-13 新增，記住上次選的）
-  recentMode: (function(){ try{ return localStorage.getItem('sop_recent_mode')==='case' ? 'case' : 'date'; }catch(e){ return 'date'; } })(),
+  // 記住上次選的檢視；認不得的值一律退回第一個頁籤「依案場」
+  recentMode: (function(){
+    try{ var v=localStorage.getItem('sop_recent_mode');
+      return (v==='date'||v==='tpl'||v==='case') ? v : 'case';
+    }catch(e){ return 'case'; }
+  })(),
   report: {},
+  // 這張查驗表是怎麼來的（2026-08-26）：'new'＝剛選技術新建／'draft'＝打開草稿／'done'＝打開已完成的
+  reportOrigin: 'new',
   reports: [],
   selectedReportId: null,
   config: {
+    cats:        null,   // 開機時由 syncCatsToConfig() 填入
     cases:       ['國泰Mega+5B2','雙橡園2925'],
     departments: ['瑪摩石工程事業處','專案管理部'],
     personnel:   ['曾宇鵬','廖學健'],
@@ -410,7 +445,9 @@ var S = {
 // ====== HELPERS ======
 var LS_KEY = 'sop_v1';
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
-function today(){ return new Date().toISOString().slice(0,10); }
+/* 本地日期（2026-08-26 修）：toISOString() 是 UTC，台灣早上 8 點前會少一天 —— 現場一早填查驗表會帶到昨天 */
+function ymd(d){ d=d||new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function today(){ return ymd(); }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function loadLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ return null; } }
@@ -453,6 +490,65 @@ function badgeClass(s){
 }
 function borderClass(s){
   return s==='正常'?'border-l-normal':s==='不正常'?'border-l-abnormal':s==='改善後合格'?'border-l-improved':s==='未列入'?'border-l-na':'';
+}
+function catL1(){ return (CATS&&CATS.l1)||[]; }
+function catL2(){ return (CATS&&CATS.l2)||[]; }
+function catFind(level,id){
+  return (level===1?catL1():catL2()).find(function(c){ return c.id===id; });
+}
+function catName(level,id){ var c=catFind(level,id); return c?c.name:'（未分類）'; }
+function catIcon(level,id){ var c=catFind(level,id); return (c&&c.icon)||'📁'; }
+/* 查驗表實際落在哪一格：空的、或指到已被刪掉的分類，一律歸 UNCAT。
+ * 這樣分類被刪或還沒設好時，查驗表只是搬到「（未分類）」，不會從首頁消失。 */
+function tplCat(t,level){
+  var v=(level===1?(t&&t.cat1):(t&&t.cat2))||'';
+  return (v && catFind(level,v)) ? v : UNCAT;
+}
+function tplsInCat(c1,c2){
+  return liveTemplates().filter(function(t){
+    if(tplCat(t,1)!==c1) return false;
+    if(c2===undefined) return true;
+    return tplCat(t,2)===c2;
+  });
+}
+/* 分類有沒有人在用：連「已作廢」的查驗表也算進去。
+ * 只算沒作廢的話，作廢的表會在分類被刪之後恢復成孤兒。 */
+function catInUse(level,id){
+  return TEMPLATES.some(function(t){ return (level===1?t.cat1:t.cat2)===id; });
+}
+function syncCatsToConfig(){ S.config.cats = CATS; }
+function syncCatsFromConfig(){
+  var c = S.config && S.config.cats;
+  if(c && (Array.isArray(c.l1) || Array.isArray(c.l2))){
+    CATS.l1 = Array.isArray(c.l1) ? c.l1 : [];
+    CATS.l2 = Array.isArray(c.l2) ? c.l2 : [];
+  }
+}
+/* ── 三階路徑（2026-08-26）──
+ * 「工程 › 管理」的文字，例：🏠 內裝 › 🔧 工法。沒分類的那一段直接跳過，不會出現空的 ›。
+ * 分類讀的是「現在的設定」不是報表存檔當下的快照 —— 分類改名後舊報表也跟著顯示新名字，這是刻意的。
+ * （8/25 照片踩過反例：存下上傳當時的案場名，改名後就對不回去。分類要的是永遠對得上現在的設定。） */
+/* plain=true → 不帶 emoji，只給文字（列印／PDF 用：emoji 在部分印表機會變成黑白方框） */
+function tplPath(tplId, plain){
+  var t=TEMPLATES.find(function(x){ return x.id===tplId; });
+  if(!t) return '';
+  var one=function(c){ return plain ? c.name : ((c.icon||'')+' '+c.name).trim(); };
+  var parts=[], c1=catFind(1,t.cat1), c2=catFind(2,t.cat2);
+  if(c1) parts.push(one(c1));
+  if(c2) parts.push(one(c2));
+  return parts.join(' › ');
+}
+/* 完整三階：大類 › 中類 › 查驗表名。
+ * 名稱一律用報表自己存的 templateName —— 查驗表被刪掉之後歷史報表才不會變無名氏。 */
+function reportPath(r){
+  var name=(r&&r.templateName)||'';
+  var p=tplPath(r&&r.templateId);
+  return p ? (p+' › '+name) : name;
+}
+/* 歷史／最近記錄的小字卡片用：完整三階太長，只掛大類 */
+function tplLabel(r){
+  var p=tplPath(r&&r.templateId).split(' › ')[0];
+  return (p ? p+' · ' : '')+((r&&r.templateName)||'');
 }
 function tplIcon(id){
   var t=TEMPLATES.find(function(x){return x.id===id;});
@@ -508,6 +604,10 @@ function showView(v){
   }
   $('page-title').textContent=title;
 
+  // 三階路徑列（2026-08-26）：填寫流程裡隨時看得到「大類 › 中類 › 查驗表」
+  var _pb = (v==='new-header') ? $('path-new-header') : (v==='checklist' ? $('path-checklist') : null);
+  if(_pb) _pb.textContent = reportPath(S.report);
+
   // back button
   var canBack = S.viewStack.length>1;
   $('btn-back').classList.toggle('hidden', !canBack);
@@ -547,17 +647,7 @@ function showView(v){
 
 // ====== HOME ======
 function renderHome(){
-  // template cards（已作廢的工法不出現，不能再新建）
-  var html='';
-  liveTemplates().forEach(function(t){
-    html+='<button onclick="selectTemplate(\''+t.id+'\')" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
-      +'<div class="flex items-center gap-4">'
-      +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(t.name)+'</div>'
-      +'<div class="text-xs text-gray-500 mt-1">'+t.items.length+' 個查檢項目</div></div>'
-      +'<span class="text-gray-400 text-xl">&#8250;</span>'
-      +'</div></button>';
-  });
-  $('template-cards').innerHTML=html;
+  renderHomeCats();
 
   // recent（2026-08-13：兩種顯示 — 依日期／依案場分類）
   var all=[].concat(visibleReports()).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
@@ -571,54 +661,68 @@ function renderHome(){
   paintRecentTabs();
 
   var list=$('recent-list');
-  if(S.recentMode==='case'){
-    // 依案場分組，組內仍是新到舊；案場依「該案場最新一筆」排序
-    list.className='space-y-3';
-    var groups={}, order=[];
-    all.forEach(function(r){
-      var k=r.caseName||'（未填案場）';
-      if(!groups[k]){ groups[k]=[]; order.push(k); }
-      groups[k].push(r);
-    });
-    list.innerHTML=order.map(function(k){
-      return '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">'
-        +'<div class="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">'
-        +'<span class="text-sm font-semibold text-gray-700 truncate">📍 '+esc(k)+'</span>'
-        +'<span class="text-xs text-gray-400 flex-shrink-0 ml-2">'+groups[k].length+' 筆</span>'
-        +'</div>'
-        +groups[k].slice(0,5).map(recentRow).join('')
-        +(groups[k].length>5?'<div class="px-3 py-2 text-xs text-gray-400 text-center">還有 '+(groups[k].length-5)+' 筆，請至「歷史資料」查看</div>':'')
-        +'</div>';
-    }).join('');
+  if(S.recentMode==='case' || S.recentMode==='tpl'){
+    renderRecentGrouped(all, list, S.recentMode);
   } else {
     list.className='space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2';
     list.innerHTML=all.slice(0,5).map(function(r){
       return '<div onclick="viewReport(\''+r.id+'\')" class="bg-white rounded-xl p-3 shadow-sm border border-gray-100 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all">'
         +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800 truncate">'+esc(r.caseName)+'</div>'
-        +'<div class="text-xs text-gray-500 truncate">'+esc(r.templateName)+' · '+esc(r.personnel)+'</div></div>'
+        +'<div class="text-xs text-gray-500 truncate">'+esc(tplLabel(r))+' · '+esc(r.personnel)+'</div></div>'
         +'<div class="text-right flex-shrink-0"><div class="text-xs text-gray-400">'+esc(r.date)+'</div>'
         +'<div class="text-xs mt-1 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</div></div>'
         +'</div>';
     }).join('');
   }
 }
-// 依案場分組時，組內每一列（案場名已在標題，這裡不重複顯示）
-function recentRow(r){
+/* ── 分組檢視（依案場／依工法共用一套，2026-08-26）──
+ * 只有「分組依據」和「標題怎麼寫」不一樣，其餘（每組最多 5 筆、超過導去歷史資料）完全相同。
+ * 依工法要用 templateId 分組不能用名字 —— 兩張表可能同名（例如複製出來的複本改到一半）。 */
+function renderRecentGrouped(all, list, mode){
+  var byTpl = (mode==='tpl');
+  var keyOf   = byTpl ? function(r){ return 't:'+(r.templateId||''); }
+                      : function(r){ return 'c:'+(r.caseName||'（未填案場）'); };
+  // 依工法時標題用 tplLabel（自己就帶大類圖示，不用再加一個），依案場時前面補 📍
+  var titleOf = byTpl ? function(r){ return tplLabel(r)||'（未填工法）'; }
+                      : function(r){ return '📍 '+(r.caseName||'（未填案場）'); };
+  list.className='space-y-3';
+  var groups={}, order=[];
+  all.forEach(function(r){
+    var k=keyOf(r);
+    if(!groups[k]){ groups[k]={ title:titleOf(r), rows:[] }; order.push(k); }
+    groups[k].rows.push(r);
+  });
+  list.innerHTML=order.map(function(k){
+    var g=groups[k];
+    return '<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" data-recent-group="'+esc(k)+'">'
+      +'<div class="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">'
+      +'<span class="text-sm font-semibold text-gray-700 truncate">'+esc(g.title)+'</span>'
+      +'<span class="text-xs text-gray-400 flex-shrink-0 ml-2">'+g.rows.length+' 筆</span>'
+      +'</div>'
+      +g.rows.slice(0,5).map(function(r){ return recentRow(r, mode); }).join('')
+      +(g.rows.length>5?'<div class="px-3 py-2 text-xs text-gray-400 text-center">還有 '+(g.rows.length-5)+' 筆，請至「歷史資料」查看</div>':'')
+      +'</div>';
+  }).join('');
+}
+/* 組內每一列：分組依據已經在標題了，這裡就換另一個欄位顯示，不重複 */
+function recentRow(r, mode){
+  var main = (mode==='tpl') ? (r.caseName||'（未填案場）') : tplLabel(r);
   return '<div onclick="viewReport(\''+r.id+'\')" class="px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-blue-50 border-b border-gray-50 last:border-0">'
-    +'<div class="flex-1 min-w-0"><div class="text-sm text-gray-800 truncate">'+esc(r.templateName)+'</div>'
+    +'<div class="flex-1 min-w-0"><div class="text-sm text-gray-800 truncate">'+esc(main)+'</div>'
     +'<div class="text-xs text-gray-500 truncate">'+esc(r.date)+' · '+esc(r.personnel)+'</div></div>'
     +'<div class="text-xs flex-shrink-0 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓':'草稿')+'</div>'
     +'</div>';
 }
+var RECENT_MODES = ['case','date','tpl'];
 function paintRecentTabs(){
-  ['date','case'].forEach(function(m){
+  RECENT_MODES.forEach(function(m){
     var b=$('rm-'+m); if(!b) return;
     b.className='flex-1 py-1.5 rounded-lg font-medium transition-all'
       + (S.recentMode===m ? ' bg-white text-blue-700 shadow-sm' : ' text-gray-500');
   });
 }
 function setRecentMode(m){
-  S.recentMode = (m==='case' ? 'case' : 'date');
+  S.recentMode = (RECENT_MODES.indexOf(m)>=0 ? m : 'case');
   try{ localStorage.setItem('sop_recent_mode', S.recentMode); }catch(e){}
   renderHome();
 }
@@ -644,6 +748,17 @@ function renderHeaderForm(){
   if(S.config.departments.length) $('f-dept').value=S.config.departments[0];
   if(S.config.personnel.length)   $('f-person').value=S.config.personnel[0];
   lockIdentityFields();
+  clearMissMarks();
+  // 補填之後紅框就撤掉，不用等再按一次才知道好了（只綁一次）
+  var hdr=$('view-new-header');
+  if(hdr && !hdr._missBound){
+    hdr._missBound=true;
+    ['input','change'].forEach(function(ev){
+      hdr.addEventListener(ev, function(e){
+        if(e.target && e.target.classList) e.target.classList.remove.apply(e.target.classList, MISS_MARK);
+      }, true);
+    });
+  }
 }
 
 /* ── 部門／填表人員：自動帶入登入身分並鎖住（2026-08-13 新增）──
@@ -683,15 +798,113 @@ function handleContractorSelect(){
   $('f-contractor-custom').classList.toggle('hidden', v!=='__custom__');
 }
 
+/* ── 首頁兩層分類（2026-08-26 C批）──
+ * 第一層：大類卡片（景觀／牆面／內裝…）。
+ * 第二層：該大類底下依中類（圖面／工法…）分區，一頁把查驗表全部列完 —— 點兩次就能開始填。
+ * 「最近記錄」兩層都留著，填完回首頁不用先返回才看得到剛存的那張。
+ * 已作廢的查驗表不出現（liveTemplates），跟改版前一致。 */
+function renderHomeCats(){
+  var box=$('template-cards');
+  if(!box) return;
+  var sub=$('home-subtitle');
+
+  if(S.homeCat===null){
+    box.className='space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 mb-6';
+    if(sub) sub.textContent='選擇工程，開始填一張新的';
+    var html='';
+    catL1().forEach(function(c){
+      html+=catCardHtml(c.id, c.icon||'📁', c.name, tplsInCat(c.id).length);
+    });
+    var un=tplsInCat(UNCAT).length;
+    if(un) html+=catCardHtml(UNCAT,'📦','（未分類）',un);
+    if(!html) html='<div class="text-xs text-gray-400 py-6 text-center">尚未建立工程，請到 ⚙️ 系統設定 → 📂 工程 / 管理 / 技術 新增</div>';
+    box.innerHTML=html;
+    return;
+  }
+
+  var isUn = (S.homeCat===UNCAT);
+  var c1name = isUn ? '（未分類）' : catName(1,S.homeCat);
+  var c1icon = isUn ? '📦' : catIcon(1,S.homeCat);
+  if(sub) sub.textContent=c1icon+' '+c1name;
+  box.className='space-y-4 mb-6';
+
+  var h='<button onclick="backToCats()" class="text-sm text-blue-600 hover:underline py-1">&#8249; 返回工程</button>';
+  var groups=catL2().map(function(d){ return {id:d.id, icon:d.icon||'📄', name:d.name}; });
+  groups.push({id:UNCAT, icon:'📦', name:'（未指定）'});
+  var any=false;
+  groups.forEach(function(g){
+    var list=tplsInCat(S.homeCat, g.id);
+    if(!list.length) return;
+    any=true;
+    // 標題寫成「🏠 內裝 › 🔧 工法」，讓三階看得出是同一條路徑，而不是三段各講各的
+    h+='<div><div class="flex items-center gap-2 mb-2 mt-1">'
+      +'<span class="text-sm font-semibold text-gray-600" data-crumb>'+esc(c1icon+' '+c1name+' › '+g.icon+' '+g.name)+'</span>'
+      +'<span class="flex-1 border-t border-gray-200"></span></div>'
+      +'<div class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3">'
+      +list.map(tplCardHtml).join('')
+      +'</div></div>';
+  });
+  if(!any) h+='<div class="text-xs text-gray-400 py-6 text-center">這個工程底下還沒有技術</div>';
+  box.innerHTML=h;
+}
+function catCardHtml(id, icon, name, n){
+  return '<button onclick="openCat(\''+id+'\')" data-cat="'+esc(id)+'" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
+    +'<div class="flex items-center gap-4">'
+    +'<span class="text-2xl">'+esc(icon)+'</span>'
+    +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(name)+'</div>'
+    +'<div class="text-xs text-gray-500 mt-1">'+n+' 項技術</div></div>'
+    +'<span class="text-gray-400 text-xl">&#8250;</span>'
+    +'</div></button>';
+}
+function tplCardHtml(t){
+  return '<button onclick="selectTemplate(\''+t.id+'\')" data-tpl="'+esc(t.id)+'" class="w-full text-left p-4 rounded-2xl shadow-sm border border-gray-200 bg-white hover:shadow-md hover:border-blue-300 transition-all">'
+    +'<div class="flex items-center gap-4">'
+    +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(t.name)+'</div>'
+    +'<div class="text-xs text-gray-500 mt-1">'+((t.items||[]).length)+' 個查檢項目</div></div>'
+    +'<span class="text-gray-400 text-xl">&#8250;</span>'
+    +'</div></button>';
+}
+function openCat(id){ S.homeCat=id; renderHome(); try{ window.scrollTo(0,0); }catch(e){} }
+function backToCats(){ S.homeCat=null; renderHome(); }
+
 function selectTemplate(id){
   S.report={id:uid(), templateId:id, templateName:TEMPLATES.find(function(t){return t.id===id;}).name, items:[]};
+  S.reportOrigin='new';
   goTo('new-header');
 }
 
+/* 表單很長，缺的那一格通常在畫面最上方，人卻在最底下按按鈕 ——
+ * 只丟一句「請填寫案場、施作範圍、人員」的話，看起來就像「按了沒反應」（2026-08-26 用戶回報）。
+ * 改成：講明缺哪一格、捲到那一格、標紅框。 */
+var MISS_MARK=['ring-2','ring-red-400','border-red-400'];
+function clearMissMarks(){
+  ['f-case','f-case-custom','f-area','f-person'].forEach(function(id){
+    var el=$(id); if(el) el.classList.remove.apply(el.classList, MISS_MARK);
+  });
+}
+function markMissing(miss){
+  clearMissMarks();
+  miss.forEach(function(m){
+    var el=$(m.id); if(el) el.classList.add.apply(el.classList, MISS_MARK);
+  });
+  var first=$(miss[0].id);
+  if(!first) return;
+  try{ first.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){ try{ first.scrollIntoView(); }catch(e2){} }
+  if(!first.disabled){ try{ first.focus({preventScroll:true}); }catch(e){} }
+}
 function startChecklist(){
   var cn=$('f-case').value==='__custom__' ? $('f-case-custom').value.trim() : $('f-case').value;
   var co=$('f-contractor').value==='__custom__' ? $('f-contractor-custom').value.trim() : $('f-contractor').value;
-  if(!cn||!$('f-area').value||!$('f-person').value){ showToast('請填寫案場、施作範圍、人員'); return; }
+  var miss=[];
+  if(!cn) miss.push({ id:($('f-case').value==='__custom__'?'f-case-custom':'f-case'), label:'案場' });
+  if(!($('f-area').value||'').trim()) miss.push({ id:'f-area', label:'施作範圍' });
+  if(!$('f-person').value) miss.push({ id:'f-person', label:'填表人員' });
+  if(miss.length){
+    showToast('還沒填：'+miss.map(function(m){return m.label;}).join('、'));
+    markMissing(miss);
+    return;
+  }
+  clearMissMarks();
 
   S.report.caseName=cn;
   S.report.area=$('f-area').value;
@@ -711,7 +924,30 @@ function startChecklist(){
 }
 
 // ====== CHECKLIST ======
+/* ── 打開舊紀錄的狀態提醒（2026-08-26）──
+ * 原本不管完成沒完成，從歷史點進來都是同一個查驗畫面，下面還掛著「儲存草稿／完成查驗」，
+ * 已經完成的那張看起來像沒填完。改成：最上面先講清楚這張的狀態，
+ * 已完成的不再出現那兩顆鈕，只留一顆「儲存修改」（存完仍是已完成，不會被降回草稿）。*/
+function renderStatusNote(){
+  var box=$('cl-status-note'); if(!box) return;
+  var o=S.reportOrigin, r=S.report||{};
+  if(o!=='done' && o!=='draft'){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.classList.remove('hidden');
+  if(o==='done'){
+    box.className='rounded-2xl px-4 py-3 mb-3 text-sm leading-relaxed bg-green-50 border border-green-200 text-green-800';
+    box.innerHTML='<span class="font-bold">✅ 這張已經完成查驗</span><br>'
+      +esc(r.date||'')+(r.personnel?(' · '+esc(r.personnel)):'')
+      +'<span class="block text-xs text-green-700 mt-1">往下修改會直接覆蓋原本的紀錄；不改的話直接返回就好。</span>';
+  } else {
+    var done=(r.items||[]).filter(function(i){return i.status;}).length;
+    box.className='rounded-2xl px-4 py-3 mb-3 text-sm leading-relaxed bg-amber-50 border border-amber-200 text-amber-800';
+    box.innerHTML='<span class="font-bold">📝 這張還是草稿，尚未送出</span><br>'
+      +'上次填到 '+done+' / '+((r.items||[]).length)+' 項'
+      +'<span class="block text-xs text-amber-700 mt-1">全部查驗項目都勾完之後，才能按下方「完成查驗」。</span>';
+  }
+}
 function renderChecklist(){
+  renderStatusNote();
   updateProgress();
   var html='';
   S.report.items.forEach(function(item,idx){
@@ -797,9 +1033,12 @@ function updateCompleteBtn(){
   var done=S.report.items.filter(function(i){return i.status;}).length;
   var total=S.report.items.length;
   var btn=$('btn-complete');
+  /* 已完成的紀錄不該再看到「儲存草稿」—— 按下去會把一張完成的表降回草稿 */
+  var draftBtn=$('btn-draft');
+  if(draftBtn) draftBtn.classList.toggle('hidden', S.reportOrigin==='done');
   if(done===total){
     btn.className='w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base';
-    btn.textContent='✓ 完成查驗';
+    btn.textContent=(S.reportOrigin==='done') ? '💾 儲存修改' : '✓ 完成查驗';
   } else {
     btn.className='w-full bg-gray-200 text-gray-400 font-bold py-3 rounded-2xl text-base';
     btn.textContent='還有 '+(total-done)+' 項未查驗';
@@ -934,8 +1173,11 @@ function completeReport(){
     scrollToItem(noDesc[0]-1);
     return;
   }
+  var wasDone=(S.reportOrigin==='done');
   S.report.status='completed';
   persistReport();
+  /* 改舊紀錄不要再跳「查驗完成！」那頁 —— 那是給新填完的人看的，改錯字的人只想回原本的清單 */
+  if(wasDone){ showToast('修改已儲存'); goBack(); return; }
   goTo('complete');
 }
 /* 本機快取沒有原圖（photoOnCloud）→ 推雲端前先把雲端那份補回來。
@@ -980,7 +1222,7 @@ function renderComplete(){
   $('complete-subtitle').textContent=(r.caseName||'')+(r.date?' · '+r.date:'');
 
   $('complete-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
-    +infoRow('工法',r.templateName)+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +infoRow('技術',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
     +infoRow(materialLabelOf(r),r.material)
     +infoRow('部門',r.department)+infoRow('填表人員',r.personnel)+infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
     +'</div>';
@@ -1044,7 +1286,7 @@ function calShift(n){
   CAL.ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
   renderCal();
 }
-function calToday(){ return new Date().toISOString().slice(0, 10); }
+function calToday(){ return ymd(); }
 function calGoToday(){ CAL.ym = calToday().slice(0, 7); CAL.sel = calToday(); renderCal(); }
 function calPick(ds){ CAL.sel = ds; renderCal(); }
 
@@ -1108,7 +1350,7 @@ function renderCalDay(){
         +       '<span class="text-xs flex-shrink-0 ml-2 ' + (r.status === 'completed' ? 'text-green-600' : 'text-amber-600') + '">'
         +         (r.status === 'completed' ? '✓ 完成' : '草稿') + '</span>'
         +     '</div>'
-        +     '<div class="text-xs text-gray-500 mt-1 truncate">' + esc(r.templateName) + '</div>'
+        +     '<div class="text-xs text-gray-500 mt-1 truncate">' + esc(tplLabel(r)) + '</div>'
         +     '<div class="text-xs text-gray-400 mt-1">' + esc(r.date) + ' · ' + esc(r.personnel) + '</div>'
         +   '</div>'
         +   '<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
@@ -1123,10 +1365,22 @@ function renderCalDay(){
 function renderHistory(){
   // fill filter template select
   var sel=$('h-filter-tpl');
-  if(sel.options.length<=1){
+  /* 2026-08-26：原本只在第一次填（options.length<=1），分類或工法改了不會更新。
+   * 改成每次重繪都重建，但保留使用者當下選的那一項（比照下面案場篩選的做法）。 */
+  var keepT=sel.value;
+  var thtml='<option value="">全部技術</option>';
+  var grp=catL1().map(function(c){ return {id:c.id, name:(c.icon||'')+' '+c.name}; });
+  grp.push({id:UNCAT, name:'📦 （未分類）'});
+  grp.forEach(function(g){
     // 已作廢的工法也要留在篩選清單裡，否則舊報表篩不到
-    TEMPLATES.forEach(function(t){ sel.innerHTML+='<option value="'+t.id+'">'+esc(t.name)+(t.void?'（已作廢）':'')+'</option>'; });
-  }
+    var list=TEMPLATES.filter(function(t){ return tplCat(t,1)===g.id; });
+    if(!list.length) return;
+    thtml+='<optgroup label="'+esc(g.name)+'">';
+    list.forEach(function(t){ thtml+='<option value="'+esc(t.id)+'">'+esc(t.name)+(t.void?'（已作廢）':'')+'</option>'; });
+    thtml+='</optgroup>';
+  });
+  sel.innerHTML=thtml;
+  sel.value=keepT;
   // 案場篩選（2026-08-13 新增）：選項直接從現有報表長出來，每次重繪都更新但保留使用者當下的選擇
   var csel=$('h-filter-case');
   var mine=[].concat(visibleReports());
@@ -1154,7 +1408,7 @@ function renderHistory(){
       +'<span class="font-semibold text-gray-800 text-sm truncate">'+esc(r.caseName)+'</span>'
       +'<span class="text-xs flex-shrink-0 ml-2 '+(r.status==='completed'?'text-green-600':'text-amber-600')+'">'+(r.status==='completed'?'✓ 完成':'草稿')+'</span>'
       +'</div>'
-      +'<div class="text-xs text-gray-500 mt-1 truncate">'+esc(r.templateName)+'</div>'
+      +'<div class="text-xs text-gray-500 mt-1 truncate">'+esc(tplLabel(r))+'</div>'
       +'<div class="text-xs text-gray-400 mt-1">'+esc(r.date)+' · '+esc(r.personnel)+'</div>'
       +'</div>'
       +'<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
@@ -1165,11 +1419,26 @@ function renderHistory(){
   }).join('');
 }
 
+/* ── 從歷史資料點一筆紀錄（2026-08-26 改）──
+ *   已完成 → 先進「查核詳情」唯讀看，要改再按「✏️ 修改內容」
+ *            （只是想看一看的人，不該掉進一整頁可以改的表單裡）
+ *   草稿   → 直接進查驗畫面接著填，那本來就是還沒做完的東西 */
 function openReportForEdit(id){
   var r=S.reports.find(function(x){return x.id===id;});
   if(!r) return;
   if(!canEditReport(r)){ viewReport(id); showToast('👁️ 唯讀 — 僅本人或權限範圍內可編輯'); return; }
+  if(r.status==='completed'){ viewReport(id); return; }
   S.report=JSON.parse(JSON.stringify(r));
+  S.reportOrigin='draft';
+  goTo('checklist');
+}
+/* 詳情頁按「✏️ 修改內容」才真的進編輯（查驗頁最上面會再提醒一次這張已完成） */
+function editFromDetail(){
+  var r=S.reports.find(function(x){return x.id===S.selectedReportId;});
+  if(!r) return;
+  if(!canEditReport(r)){ showToast('👁️ 唯讀 — 僅本人或權限範圍內可編輯'); return; }
+  S.report=JSON.parse(JSON.stringify(r));
+  S.reportOrigin=(r.status==='completed' ? 'done' : 'draft');
   goTo('checklist');
 }
 function deleteReportFromHistory(id){
@@ -1196,11 +1465,20 @@ function renderDetail(){
   var r=S.reports.find(function(x){return x.id===S.selectedReportId;});
   if(!r) return;
 
+  // 狀態擺在最前面：一打開就知道這張是完成的還是草稿，不用去猜
+  var stTxt=(r.status==='completed')
+    ? '<span class="text-green-700 font-semibold">✅ 已完成查驗</span>'
+    : '<span class="text-amber-700 font-semibold">📝 草稿（尚未送出）</span>';
   $('detail-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
-    +infoRow('工法',r.templateName)+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +'<div class="flex py-1"><span class="text-gray-500 w-24 flex-shrink-0">狀態</span><span class="flex-1">'+stTxt+'</span></div>'
+    +infoRow('技術',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
     +infoRow(materialLabelOf(r),r.material)+infoRow('部門',r.department)+infoRow('填表人員',r.personnel)
     +infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
     +'</div>';
+
+  // 沒有編輯權的人（別人部門的紀錄）不給看到修改鈕
+  var eb=$('btn-edit-detail');
+  if(eb) eb.classList.toggle('hidden', !canEditReport(r));
 
   $('detail-items').innerHTML='<div class="p-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">查驗明細</div>'
     +'<div class="divide-y divide-gray-50">'
@@ -1234,6 +1512,7 @@ function deleteReport(id){
 
 // ====== SETTINGS ======
 function renderSettings(){
+  renderCatsSection();
   renderTemplatesSection();
   var secs=[
     {key:'cases',label:'案場管理',icon:'📍'},
@@ -1279,6 +1558,220 @@ function addCfgItem(key){
   renderSettings();
 }
 
+// ====== CATEGORIES EDITOR ======
+/* ── 分類與工法：三段連動（2026-08-26）──
+ * 工程 → 管理 → 技術 三個下拉串成一條：選了工程，管理與技術就只列這個工程底下的東西，
+ * 「＋ 在這裡新增技術」直接建在目前選的那一格，不用建完再回頭挑分類。
+ * 舊寫法是「分類管理」與「工法管理」兩張互不相干的清單，選了大類下面也不會變 ——
+ * 用戶回報「散開的、沒有串連」，這一版就是在修這件事。
+ * 大類／中類刻意不在下面的工法資訊裡重複出現，要搬家才展開（🔀 搬到其他分類）。 */
+
+/* 目前選到哪一格。沒設、或指到已被刪掉的分類時：先用正在編輯的工法回推，再不行抓第一個。 */
+function cfgEnsureSel(){
+  /* 沒有正在編輯的工法時退而求其次抓第一張工法 —— 直接抓第一個大類的話，
+   * 一打開設定頁常常停在空格子（例如「景觀」底下還沒建任何工法），看起來像壞掉。 */
+  var tpl = TEMPLATES.find(function(t){ return t.id===S.editingTplId; }) || TEMPLATES[0];
+  if(!S.cfgCat1 || (S.cfgCat1!==UNCAT && !catFind(1,S.cfgCat1))){
+    S.cfgCat1 = tpl ? tplCat(tpl,1) : ((catL1()[0]&&catL1()[0].id) || UNCAT);
+  }
+  if(!S.cfgCat2 || (S.cfgCat2!==UNCAT && !catFind(2,S.cfgCat2))){
+    S.cfgCat2 = tpl ? tplCat(tpl,2) : ((catL2()[0]&&catL2()[0].id) || UNCAT);
+  }
+}
+/* 這個大類底下第一個「有工法」的中類；全都是空的就回 null */
+function cfgFirstNonEmptyCat2(){
+  var cands=catL2().map(function(c){ return c.id; }).concat([UNCAT]);
+  var keep=S.cfgCat2, found=null;
+  for(var i=0;i<cands.length;i++){
+    S.cfgCat2=cands[i];
+    if(cfgTplList().length){ found=cands[i]; break; }
+  }
+  S.cfgCat2=keep;
+  return found;
+}
+/* 目前這一格裡的工法。含已作廢的 —— 設定頁要能把作廢的叫出來恢復，首頁才是只給沒作廢的。 */
+function cfgTplList(){
+  cfgEnsureSel();
+  return TEMPLATES.filter(function(t){
+    return tplCat(t,1)===S.cfgCat1 && tplCat(t,2)===S.cfgCat2;
+  });
+}
+/* 換格子之後，正在編輯的工法要跟著換成這一格的第一張（換完格子卻還在編別格的表會很怪） */
+function cfgSyncEditing(){
+  var list=cfgTplList();
+  if(!list.some(function(t){ return t.id===S.editingTplId; })){
+    S.editingTplId = list.length ? list[0].id : null;
+  }
+}
+function setCfgCat(level, v){
+  if(level===1){
+    S.cfgCat1=v;
+    /* 換大類時，如果目前的中類在新大類底下是空的，自動跳到有工法的那個中類。
+     * 不這樣做的話，切到「牆面」還停在「圖面」，會以為牆面底下什麼都沒有。 */
+    if(!cfgTplList().length){
+      var f=cfgFirstNonEmptyCat2();
+      if(f) S.cfgCat2=f;
+    }
+  } else {
+    S.cfgCat2=v;
+  }
+  S.catEditing=null; S.catAdding=null; S.showMovePicker=false;
+  cfgSyncEditing();
+  renderCatsSection(); renderTemplatesSection();
+}
+
+function renderCatsSection(){
+  var el=$('cfg-cats');
+  if(!el) return;
+  cfgEnsureSel(); cfgSyncEditing();
+  el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-1">📂 工程 / 管理 / 技術</h3>'
+    +'<p class="text-xs text-gray-400 mb-3">由上往下選：工程 → 管理 → 技術。選好之後，下面那張卡就是在編輯這一張表。</p>'
+    +catRowHtml(1,'工程')
+    +catRowHtml(2,'管理')
+    +tplRowHtml();
+}
+
+/* 一層分類的一整列：下拉 ＋ 改名／刪除 ＋ 新增 */
+function catRowHtml(level,label){
+  var arr=(level===1?catL1():catL2());
+  var cur=(level===1?S.cfgCat1:S.cfgCat2);
+  /* 有工法落在「未分類」時才給這個選項 —— 平常不佔位置，但舊工法一定找得到 */
+  var hasUn = TEMPLATES.some(function(t){
+    return level===1 ? tplCat(t,1)===UNCAT : (tplCat(t,1)===S.cfgCat1 && tplCat(t,2)===UNCAT);
+  });
+  var opts=arr.map(function(c){
+    return '<option value="'+esc(c.id)+'"'+(c.id===cur?' selected':'')+'>'+esc(((c.icon||'')+' '+c.name).trim())+'</option>';
+  }).join('');
+  if(hasUn) opts+='<option value="'+UNCAT+'"'+(cur===UNCAT?' selected':'')+'>📦 '+(level===1?'（未分類）':'（未指定）')+'</option>';
+  if(!opts) opts='<option value="'+UNCAT+'" selected>（尚未建立'+esc(label)+'）</option>';
+
+  var isReal = (cur!==UNCAT && !!catFind(level,cur));
+  var used = isReal && catInUse(level,cur);
+  var h='<div class="mb-3" data-cat-level="'+level+'">'
+    +'<label class="block text-xs text-gray-500 mb-1">'+esc(label)+'</label>';
+
+  if(S.catEditing && S.catEditing.level===level){
+    var c=catFind(level,S.catEditing.id)||{};
+    h+='<div class="flex items-center gap-2">'
+      +'<input id="cat-edit-icon-'+level+'" value="'+esc(c.icon||'')+'" maxlength="4" class="w-12 border-2 border-blue-500 rounded-xl px-1 py-2 text-sm text-center" placeholder="圖">'
+      +'<input id="cat-edit-'+level+'" value="'+esc(c.name||'')+'" class="flex-1 border-2 border-blue-500 rounded-xl px-3 py-2 text-sm focus:outline-none" '
+      +'onkeyup="if(event.key===\'Enter\')saveCatEdit();if(event.key===\'Escape\')cancelCatEdit()">'
+      +'<button onclick="saveCatEdit()" class="w-9 h-9 flex items-center justify-center text-green-600 hover:text-green-700 font-bold" title="儲存">&#10003;</button>'
+      +'<button onclick="cancelCatEdit()" class="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-600" title="取消">&#10005;</button>'
+      +'</div>';
+  } else {
+    h+='<div class="flex items-center gap-2">'
+      +'<select data-cfg-cat="'+level+'" onchange="setCfgCat('+level+',this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+opts+'</select>'
+      +(isReal&&portalCanManageSettings()?'<button onclick="startCatEdit('+level+',\''+cur+'\')" class="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-blue-600" title="改名">&#9998;</button>':'')
+      +(isReal&&portalCanDelete()?'<button onclick="removeCat('+level+',\''+cur+'\')" class="w-9 h-9 flex items-center justify-center '+(used?'text-gray-300 cursor-not-allowed':'text-red-400 hover:text-red-600')+'" title="'+(used?'還有技術掛在這裡，不能刪':'刪除')+'">&#10005;</button>':'')
+      +'</div>';
+  }
+
+  if(S.catAdding===level){
+    h+='<div class="flex items-center gap-2 mt-2">'
+      +'<input id="cat-icon-'+level+'" maxlength="4" placeholder="圖" class="w-12 border-2 border-blue-500 rounded-xl px-1 py-2 text-sm text-center">'
+      +'<input id="cat-input-'+level+'" placeholder="新增'+esc(label)+'名稱" class="flex-1 border-2 border-blue-500 rounded-xl px-3 py-2 text-sm focus:outline-none" '
+      +'onkeyup="if(event.key===\'Enter\')addCat('+level+');if(event.key===\'Escape\')cancelCatAdd()">'
+      +'<button onclick="addCat('+level+')" class="w-9 h-9 flex items-center justify-center text-green-600 font-bold" title="新增">&#10003;</button>'
+      +'<button onclick="cancelCatAdd()" class="w-9 h-9 flex items-center justify-center text-gray-400" title="取消">&#10005;</button>'
+      +'</div>';
+  } else {
+    h+='<button onclick="startCatAdd('+level+')" data-mng class="mt-1 text-xs text-blue-600 hover:underline">＋ 新增'+esc(label)+'</button>';
+  }
+  return h+'</div>';
+}
+
+/* 第三段：這一格裡的工法 */
+function tplRowHtml(){
+  var list=cfgTplList();
+  var opts=list.map(function(t){
+    return '<option value="'+esc(t.id)+'"'+(t.id===S.editingTplId?' selected':'')+'>'+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
+  }).join('');
+  var h='<div class="border-t pt-3" data-tpl-row>'
+    +'<label class="block text-xs text-gray-500 mb-1">技術</label>';
+  if(list.length){
+    h+='<select data-tpl-sel onchange="switchTplEditor(this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">'+opts+'</select>';
+  } else {
+    h+='<div class="text-xs text-gray-400 border border-dashed border-gray-300 rounded-xl px-3 py-2">（這裡還沒有技術）</div>';
+  }
+  h+='<div class="flex gap-2 mt-2" data-mng>'
+    +'<button onclick="addTemplate()" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">＋ 在這裡新增技術</button>'
+    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製技術</button>'
+    +'</div>';
+  return h+'</div>';
+}
+
+function startCatAdd(level){
+  if(mngGuard())return;
+  S.catAdding=level; S.catEditing=null;
+  renderCatsSection();
+  setTimeout(function(){ var e=$('cat-input-'+level); if(e) e.focus(); },0);
+}
+function cancelCatAdd(){ S.catAdding=null; renderCatsSection(); }
+function addCat(level){
+  if(mngGuard())return;
+  var inp=$('cat-input-'+level), ic=$('cat-icon-'+level);
+  var v=((inp&&inp.value)||'').trim();
+  if(!v) return;
+  var arr=(level===1?catL1():catL2());
+  if(arr.some(function(c){ return c.name===v; })){ showToast('已經有同名的了'); return; }
+  var nid='k'+uid();
+  arr.push({ id:nid, name:v, icon:((ic&&ic.value)||'').trim()||'📁' });
+  S.catAdding=null;
+  // 新增完直接跳到那一格，接著就能在裡面建工法
+  if(level===1) S.cfgCat1=nid; else S.cfgCat2=nid;
+  cfgSyncEditing();
+  syncCatsToConfig(); renderCatsSection(); renderTemplatesSection(); renderHome();
+}
+function startCatEdit(level,id){
+  if(mngGuard())return;
+  S.catEditing={level:level,id:id}; S.catAdding=null;
+  renderCatsSection();
+  setTimeout(function(){ var e=$('cat-edit-'+level); if(e){ e.focus(); e.select(); } },0);
+}
+function cancelCatEdit(){ S.catEditing=null; renderCatsSection(); }
+function saveCatEdit(){
+  if(!S.catEditing) return;
+  var level=S.catEditing.level, id=S.catEditing.id;
+  var inp=$('cat-edit-'+level), ic=$('cat-edit-icon-'+level);
+  var v=((inp&&inp.value)||'').trim();
+  if(!v){ showToast('名稱不能空白'); return; }
+  var c=catFind(level,id);
+  if(c){ c.name=v; c.icon=((ic&&ic.value)||'').trim()||c.icon||'📁'; }
+  S.catEditing=null;
+  syncCatsToConfig(); renderCatsSection(); renderTemplatesSection(); renderHome();
+}
+function removeCat(level,id){
+  if(mngGuard())return;
+  if(catInUse(level,id)){ showToast('還有技術掛在這裡，不能刪'); return; }
+  if(!requireDelete()) return;
+  var arr=(level===1?catL1():catL2());
+  var i=arr.findIndex(function(c){ return c.id===id; });
+  if(i<0) return;
+  arr.splice(i,1);
+  if(S.homeCat===id) S.homeCat=null;
+  if(level===1 && S.cfgCat1===id) S.cfgCat1=null;
+  if(level===2 && S.cfgCat2===id) S.cfgCat2=null;
+  cfgEnsureSel(); cfgSyncEditing();
+  syncCatsToConfig(); renderCatsSection(); renderTemplatesSection(); renderHome();
+}
+
+/* 搬家：平常收起來，避免大類／中類在畫面上出現兩次（那就又「散開」了） */
+function toggleMovePicker(){ S.showMovePicker=!S.showMovePicker; renderTemplatesSection(); }
+function moveTemplateTo(tplId){
+  if(mngGuard())return;
+  var tpl=TEMPLATES.find(function(t){ return t.id===tplId; });
+  if(!tpl) return;
+  var c1=$('move-cat1'), c2=$('move-cat2');
+  tpl.cat1=(c1&&c1.value)||'';
+  tpl.cat2=(c2&&c2.value)||'';
+  S.showMovePicker=false;
+  // 上方三段跟著跳到新位置，否則會看到工法憑空消失
+  S.cfgCat1=tplCat(tpl,1); S.cfgCat2=tplCat(tpl,2); S.editingTplId=tpl.id;
+  syncTemplatesToConfig(); renderCatsSection(); renderTemplatesSection(); renderHome();
+  showToast('已搬到 '+(tplPath(tpl.id)||'（未分類）'));
+}
+
 // ====== TEMPLATES EDITOR ======
 function syncTemplatesToConfig(){ S.config.templates = TEMPLATES; }
 function syncTemplatesFromConfig(){
@@ -1290,12 +1783,9 @@ function syncTemplatesFromConfig(){
 function renderTemplatesSection(){
   var el = $('cfg-templates');
   if(!el) return;
-  if(!S.editingTplId && TEMPLATES.length) S.editingTplId = TEMPLATES[0].id;
-  var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || TEMPLATES[0];
-  var selOpts = TEMPLATES.map(function(t){
-    return '<option value="'+esc(t.id)+'"'+(tpl && t.id === tpl.id ? ' selected' : '')+'>'
-      +esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
-  }).join('');
+  /* 編哪一張由上面那張卡的三段連動決定；那一格是空的就沒有 tpl，整張卡收成一句提示 */
+  cfgEnsureSel();
+  var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || null;
   var itemsHtml = '';
   if(tpl && tpl.items && tpl.items.length){
     itemsHtml = tpl.items.map(function(it, i){
@@ -1311,32 +1801,46 @@ function renderTemplatesSection(){
         +'</div>';
     }).join('');
   } else {
-    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此工法尚無查驗項目，點下方新增</div>';
+    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此技術尚無查驗項目，點下方新增</div>';
   }
   // 按下「複製工法」才展開：列出已建立的工法，選一個複製（含所有查驗項目）
   var copyPickerHtml = '';
   if(S.showCopyPicker){
     var pick = TEMPLATES.filter(function(t){ return !t.void; });
     copyPickerHtml = '<div class="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-3" data-mng>'
-      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個工法？（查驗項目會一起複製）</div>'
+      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個技術？（查驗項目會一起複製）</div>'
       +(pick.length ? pick.map(function(t){
           return '<button onclick="duplicateTemplate(\''+t.id+'\')" class="w-full text-left bg-white border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-indigo-400">'
             +'<span class="text-sm font-medium text-gray-800">'+esc(t.name)+'</span>'
             +'<span class="text-xs text-gray-500 ml-2">'+((t.items||[]).length)+' 個查驗項目</span>'
             +'</button>';
-        }).join('') : '<div class="text-xs text-gray-500">尚無工法可複製</div>')
+        }).join('') : '<div class="text-xs text-gray-500">尚無技術可複製</div>')
       +'<button onclick="toggleCopyPicker()" class="w-full text-xs text-gray-500 mt-1 py-1 hover:underline">取消</button>'
       +'</div>';
+  }
+  /* 搬家選單：按了「🔀 搬到其他分類」才展開，平常收著，避免大類／中類在畫面上出現兩次 */
+  var movePickerHtml = '';
+  if(tpl && S.showMovePicker){
+    movePickerHtml = '<div class="mt-2 border border-blue-300 bg-blue-50 rounded-xl p-3" data-mng data-move-picker>'
+      +'<div class="text-xs font-semibold text-blue-700 mb-2">把「'+esc(tpl.name)+'」搬到：</div>'
+      +'<div class="flex items-center gap-2 mb-2"><label class="text-xs text-gray-600 w-10 flex-shrink-0">大類</label>'
+      +catSelectHtml(tpl,1,'move-cat1')+'</div>'
+      +'<div class="flex items-center gap-2 mb-2"><label class="text-xs text-gray-600 w-10 flex-shrink-0">中類</label>'
+      +catSelectHtml(tpl,2,'move-cat2')+'</div>'
+      +'<div class="flex gap-2">'
+      +'<button onclick="moveTemplateTo(\''+tpl.id+'\')" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">確定搬過去</button>'
+      +'<button onclick="toggleMovePicker()" class="px-3 py-2 text-xs text-gray-500 hover:underline">取消</button>'
+      +'</div></div>';
   }
   var tplInfoHtml = '';
   if(tpl){
     tplInfoHtml = '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">'
-      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ 工法資訊</div>'
+      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ 技術資訊</div>'
       +'<div class="space-y-2">'
       +'<div class="flex items-center gap-2">'
       +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">名稱</label>'
       +'<input type="text" value="'+esc(tpl.name||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
-      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="工法名稱">'
+      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="技術名稱">'
       +'</div>'
       +'<div class="flex items-center gap-2">'
       +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
@@ -1346,37 +1850,47 @@ function renderTemplatesSection(){
       +'</div>'
       // 作廢／恢復（2026-08-13 新增）：作廢後首頁選不到、不能再新建，歷史報表完全不受影響
       +'<div class="mt-3 flex items-center gap-3 flex-wrap">'
+      +'<button onclick="toggleMovePicker()" data-mng class="text-xs text-blue-700 hover:underline font-medium">🔀 搬到其他分類</button>'
       +(tpl.void
         ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
-        : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此工法</button>')
-      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此工法</button>':'')
+        : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此技術</button>')
+      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此技術</button>':'')
       +'</div>'
       +'<div class="text-xs text-gray-500 mt-2">'
       +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
                  : '作廢＝停用但不刪除，歷史報表不受影響，隨時可恢復。')
       +'</div>'
+      +movePickerHtml
       +'</div>';
   }
-  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-3">🔧 工法管理</h3>'
-    +'<div class="mb-3">'
-    +'<label class="block text-xs text-gray-500 mb-1">選擇工法</label>'
-    +'<div class="flex gap-2">'
-    +'<select onchange="switchTplEditor(this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+selOpts+'</select>'
-    +'</div>'
-    // 兩顆按鈕並排等寬（2026-08-21）：原本「新增」擠在下拉旁邊、「複製」是下面一整條虛線框，看起來零散
-    +'<div class="flex gap-2 mt-2" data-mng>'
-    +'<button onclick="addTemplate()" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">＋ 新增工法</button>'
-    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製工法</button>'
-    +'</div>'
+  /* 標題直接寫「正在編輯哪一張」＋它的三階路徑，跟上面那張卡的選擇對得起來 */
+  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">'+(tpl?('✏️ '+esc(tpl.name)):'✏️ 技術設定')+'</h3>'
+    +(tpl?'<p class="text-xs text-gray-400 mb-3" data-tpl-path>'+esc(tplPath(tpl.id)||'📦 （未分類）')+'</p>':'')
     + copyPickerHtml
-    +'</div>'
     +tplInfoHtml
     +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗項目（共 '+(tpl.items||[]).length+' 項）</div>'
       +itemsHtml
-      +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗項目</button>') : '<div class="text-xs text-gray-400 py-3 text-center">尚無工法，點上方「+ 新增工法」</div>')
+      +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗項目</button>')
+      : '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有技術 —— 點上面那張卡的「＋ 在這裡新增技術」</div>')
     +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
 }
-function switchTplEditor(tplId){ S.editingTplId = tplId; renderTemplatesSection(); }
+/* 搬家選單裡的分類下拉。選了先不生效，按「確定搬過去」才寫進去 —— 避免選到一半工法就從清單消失 */
+function catSelectHtml(tpl, level, id){
+  var arr=(level===1?catL1():catL2());
+  var field=(level===1?'cat1':'cat2');
+  var cur=(tpl&&tpl[field])||'';
+  var opts='<option value="">（未分類）</option>';
+  arr.forEach(function(c){
+    opts+='<option value="'+esc(c.id)+'"'+(c.id===cur?' selected':'')+'>'+esc(((c.icon||'')+' '+c.name).trim())+'</option>';
+  });
+  return '<select id="'+esc(id||'')+'" data-cat-sel="'+field+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">'+opts+'</select>';
+}
+/* 改分類要順手重畫首頁，否則設定頁改完切回首頁還是舊的分佈（8/25 f-proj 那個坑的同型問題） */
+function setTemplateCat(tplId, field, value){
+  updateTemplate(tplId, field, value);
+  renderHome();
+}
+function switchTplEditor(tplId){ S.editingTplId = tplId; S.showMovePicker = false; renderTemplatesSection(); }
 function toggleCopyPicker(){ S.showCopyPicker = !S.showCopyPicker; renderTemplatesSection(); }
 function addTplItem(tplId){
   if(mngGuard())return;
@@ -1406,13 +1920,19 @@ function updateTplItem(tplId, itemId, field, value){
   item[field] = value;
   syncTemplatesToConfig();
 }
+/* 新工法直接歸在上面三段選到的那一格 —— 建完就在原地，不用再回頭挑分類 */
 function addTemplate(){
   if(mngGuard())return;
-  var newTpl = { id: uid(), name: '新工法', materialLabel: '材質', items: [] };
+  cfgEnsureSel();
+  var newTpl = { id: uid(), name: '新技術', materialLabel: '材質',
+    cat1: (S.cfgCat1===UNCAT ? '' : S.cfgCat1),
+    cat2: (S.cfgCat2===UNCAT ? '' : S.cfgCat2),
+    items: [] };
   TEMPLATES.push(newTpl);
   S.editingTplId = newTpl.id;
+  S.showMovePicker = false;
   syncTemplatesToConfig();
-  renderTemplatesSection();
+  renderCatsSection(); renderTemplatesSection(); renderHome();
 }
 /* ── 複製工法（2026-08-13 新增）──
  * 整份複製：名稱、材質標籤、圖示、所有查驗項目與準則都帶過去。
@@ -1422,19 +1942,23 @@ function duplicateTemplate(tplId){
   S.showCopyPicker = false;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
-  if(!confirm('要複製工法「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
+  if(!confirm('要複製技術「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
   var copy = {
     id: uid(),
     name: tpl.name + '（複本）',
     materialLabel: tpl.materialLabel,
+    icon: tpl.icon,
+    cat1: tpl.cat1 || '',
+    cat2: tpl.cat2 || '',
     items: (tpl.items||[]).map(function(it){
       return { id: uid(), name: it.name, criterion: it.criterion || '' };
     })
   };
   TEMPLATES.push(copy);
   S.editingTplId = copy.id;
+  S.cfgCat1 = tplCat(copy,1); S.cfgCat2 = tplCat(copy,2);
   syncTemplatesToConfig();
-  renderTemplatesSection();
+  renderCatsSection(); renderTemplatesSection(); renderHome();
   showToast('已複製 — 請改名後儲存設定');
 }
 /* ── 作廢／恢復（2026-08-13 新增）──
@@ -1445,7 +1969,7 @@ function voidTemplate(tplId){
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
   var live = TEMPLATES.filter(function(t){ return !t.void; });
-  if(live.length <= 1){ alert('至少要保留一個可用的工法，無法全部作廢。'); return; }
+  if(live.length <= 1){ alert('至少要保留一個可用的技術，無法全部作廢。'); return; }
   if(!confirm('確定把工法「'+tpl.name+'」設為作廢？\n\n・首頁不會再出現，無法新建這個工法的報表\n・既有歷史報表照常顯示、可列印\n・之後隨時可以在這裡按「恢復使用」')) return;
   tpl.void = true;
   syncTemplatesToConfig();
@@ -1602,7 +2126,10 @@ function buildPrintHTML(r){
     +'<thead><tr><td>'
     +'<div style="text-align:center;margin-bottom:14px;border-bottom:2px solid #1e3a5f;padding-bottom:10px">'
     +'<h1 style="font-size:17pt;color:#1e3a5f;margin:0 0 5px">查檢表—標準作業</h1>'
-    +'<p style="font-size:15pt;color:#1e3a5f;font-weight:600;margin:0">'+esc(r.templateName)+'</p></div>'
+    +'<p style="font-size:15pt;color:#1e3a5f;font-weight:600;margin:0">'+esc(r.templateName)+'</p>'
+    /* 分類路徑（2026-08-26）：純文字不帶 emoji（印表機／PDF 對 emoji 支援不一）；沒分類的表就整行不印 */
+    +(tplPath(r.templateId,true) ? '<p style="font-size:10pt;color:#5b6b7f;margin:4px 0 0;letter-spacing:.5px">'+esc(tplPath(r.templateId,true))+'</p>' : '')
+    +'</div>'
     +'<table style="width:100%;border-collapse:collapse;margin-bottom:10px;font-size:10pt">'
     +'<tr><td style="color:#666;width:15%;padding:2px 0">案場</td><td style="font-weight:600;padding:2px 8px;width:35%">'+esc(r.caseName)+'</td><td style="color:#666;width:12%">日期</td><td style="font-weight:600;padding:2px 8px">'+esc(r.date)+'</td></tr>'
     +'<tr><td style="color:#666;padding:2px 0">施作範圍</td><td style="font-weight:600;padding:2px 8px">'+esc(r.area)+'</td><td style="color:#666">部門</td><td style="font-weight:600;padding:2px 8px">'+esc(r.department||'')+'</td></tr>'
@@ -1624,9 +2151,20 @@ function buildPrintHTML(r){
     +'</div>';
 }
 
-function openPrint(html){
+/* ── 列印視窗（2026-08-26 補兩件事）──
+ * ① 加一條工具列：按「取消」之後不會停在一個沒有任何按鈕的空白視窗，可以直接再列印或關掉。
+ *    工具列標了 no-print，印出來的紙上不會有。自動跳列印保留 —— 只想印的人操作次數不變。
+ * ② 視窗標題帶案場與日期：Chrome「另存為 PDF」的預設檔名就是視窗標題，
+ *    原本每一張都叫「查檢表—標準作業」，存多張會分不出來也容易互相覆蓋。 */
+/* 檔名規則（2026-08-26 五支 App 統一）：{系統}-{子系統}_{日期}_{識別…}
+ * 日期一律 YYYY-MM-DD 排在第二段 —— 同一支 App 的檔案在資料夾裡自然照日期排好。 */
+function printFileName(r){
+  var parts=['查檢表-標準作業', (r&&r.date)||'', (r&&r.caseName)||'', (r&&r.templateName)||''];
+  return parts.filter(Boolean).join('_').replace(/[\\\/:*?"<>|]/g,'_');
+}
+function openPrint(html, title){
   var w=window.open('','_blank');
-  var doc='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>查檢表—標準作業</title>'
+  var doc='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>'+esc(title||'查檢表—標準作業')+'</title>'
     +'<style>body{font-family:sans-serif;margin:0;padding:0}'
     +'.status-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:9pt;font-weight:600}'
     +'.s-n2{background:#dcfce7;color:#166534}.s-a2{background:#fee2e2;color:#991b1b}'
@@ -1634,15 +2172,33 @@ function openPrint(html){
     +'table td,table th{border:1px solid #ccc;padding:5px 7px;vertical-align:top}'
     +'.outer-wrap,.outer-wrap>thead>tr>td,.outer-wrap>tbody>tr>td{border:0!important;padding:0!important}'
     +'.outer-wrap thead{display:table-header-group}'
-    +'@media print{@page{margin:12mm 12mm 18mm 12mm;@bottom-right{content:"第 " counter(page) " 頁，共 " counter(pages) " 頁";font-size:9pt;color:#666}}}'
-    +'</style></head><body>'+html+'</body></html>';
+    +'.pv-bar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;flex-wrap:wrap;'
+    +'background:#1e3a8a;color:#fff;padding:10px 16px;font-size:14px}'
+    +'.pv-bar b{flex:1;min-width:140px;font-weight:600;font-size:13px;opacity:.9}'
+    +'.pv-bar button{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:8px;'
+    +'padding:7px 15px;cursor:pointer;background:#fff;color:#1e3a8a}'
+    +'.pv-bar button.g{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6)}'
+    +'@media print{.pv-bar{display:none!important}'
+    +'@page{margin:12mm 12mm 18mm 12mm;@bottom-right{content:"第 " counter(page) " 頁，共 " counter(pages) " 頁";font-size:9pt;color:#666}}}'
+    +'</style></head><body>'
+    +'<div class="pv-bar no-print"><b>列印預覽 —— 確認版面後再按列印（這一列不會印出來）</b>'
+    +'<button onclick="window.print()">🖨️ 列印 / 另存 PDF</button>'
+    +'<button class="g" onclick="window.close()">✕ 取消</button></div>'
+    +html+'</body></html>';
   w.document.write(doc);
   w.document.close();
-  setTimeout(function(){ w.print(); }, 600);
+  /* 2026-08-26 用戶指定：不要自動跳列印對話框，停在預覽頁，看過版面自己按「🖨️ 列印」才印。
+   * 要改回自動跳，把下面這行的註解拿掉即可：
+   * setTimeout(function(){ w.print(); }, 600);
+   */
+  try{ w.focus(); }catch(e){}
 }
 
-function printCurrentReport(){ openPrint(buildPrintHTML(JSON.parse(JSON.stringify(S.report)))); }
-function printReportData(r){ openPrint(buildPrintHTML(r)); }
+function printCurrentReport(){
+  var r=JSON.parse(JSON.stringify(S.report));
+  openPrint(buildPrintHTML(r), printFileName(r));
+}
+function printReportData(r){ openPrint(buildPrintHTML(r), printFileName(r)); }
 
 // ====== PORTAL INTEGRATION ======
 // 從入口網頁同步 部門/人員 清單（如有），並抓當前登入身分預填表單
@@ -1835,11 +2391,13 @@ function enforcePortalLogin(){
   // load local
   var local=loadLS();
   if(local){
-    if(local.config) { ['cases','departments','personnel','contractors','templates'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
+    if(local.config) { ['cases','departments','personnel','contractors','templates','cats'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
     if(local.reports) S.reports=local.reports;
   }
   syncFromPortal();  // 從入口拉最新部門/人員 + 帶入登入身分
   if (!enforcePortalLogin()) return;  // 未從入口登入 → 顯示閘門，不初始化任何內容
+  syncCatsFromConfig();
+  syncCatsToConfig();
   syncTemplatesFromConfig();
   syncTemplatesToConfig();
 
@@ -1848,7 +2406,8 @@ function enforcePortalLogin(){
     Promise.all([window._sopGet('config'), window._sopGet('reports')]).then(function(res){
       var fbCfg=res[0], fbRpts=res[1];
       if(fbCfg){
-        ['cases','departments','personnel','contractors','templates'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; });
+        ['cases','departments','personnel','contractors','templates','cats'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; });
+        syncCatsFromConfig();
         syncTemplatesFromConfig();
       }
       if(fbRpts){

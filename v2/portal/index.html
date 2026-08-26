@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-19.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -104,9 +104,21 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .app-card .ic.ic-accent{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-l) 100%)}
 .app-card .ic.ic-green{background:linear-gradient(135deg,#16a34a 0%,#22c55e 100%)}
 /* 部門色：墨綠＝瑪摩石工程事業處、深紫＝規劃設計部、亮深藍＝查檢表（工地手機用）。深藍＝專案管理部，直接用 .ic 預設值 */
-.app-card .ic.ic-mm{background:linear-gradient(135deg,#14532d 0%,#15803d 100%)}
-.app-card .ic.ic-dw{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 100%)}
-.app-card .ic.ic-sop{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%)}
+/* ── 圖示與顏色的分工（2026-08-26 用戶指定）──
+ *   圖示 = 這是哪一種表（兩支日報表同一個 📋、兩支進度表同一個 📊）
+ *   顏色 = 這是哪個部門在用（名稱破折號後面那四個字上色）
+ * 原本四支各用一個 emoji（📋📝📊📈），兩兩太像又看不出關聯。 */
+.app-card .ic.ic-cdr{background:linear-gradient(135deg,#14532d 0%,#15803d 100%)}   /* 日報表：綠 */
+.app-card .ic.ic-dtp{background:linear-gradient(135deg,#4c1d95 0%,#6d28d9 100%)}   /* 進度表：紫 */
+.app-card .ic.ic-sop{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%)}   /* 查檢表：藍 */
+/* 部門色：同一個部門在不同系統裡是同一個顏色 */
+.dept-mm{color:#15803d}   /* 瑪摩石工程事業處 */
+.dept-pm{color:#b45309}   /* 專案管理部 */
+.dept-dw{color:#6d28d9}   /* 規劃設計部 */
+.dept-all{color:#2563eb}  /* 全公司共用 */
+.app-card h3 .dept-mm,.app-card h3 .dept-pm,.app-card h3 .dept-dw,.app-card h3 .dept-all{font-weight:800}
+/* 人員清單的小圖示：圖示同款，一樣用部門色分 */
+.app-icon.dept-mm,.app-icon.dept-pm,.app-icon.dept-dw,.app-icon.dept-all{font-size:15px}
 .app-card h3{font-size:17px;font-weight:800;color:var(--primary);margin-bottom:6px}
 .app-card .desc{color:var(--muted);font-size:13px;line-height:1.6;margin-bottom:16px;flex:1}
 .app-card .meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-light);margin-bottom:14px;flex-wrap:wrap}
@@ -378,31 +390,31 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <div class="cards">
 
         <a class="app-card" data-app="cdr" data-base-url="../cdr-mm/index.html" href="../cdr-mm/index.html">
-          <div class="ic ic-mm">📋</div>
-          <h3>日報表—瑪摩工程</h3>
+          <div class="ic ic-cdr">📋</div>
+          <h3>日報表—<span class="dept-mm">瑪摩工程</span></h3>
           <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
           <div class="meta"><div class="dot"></div>已上線 v3<span>·</span>瑪摩石工程事業處主用</div>
           <div class="enter-btn">進入系統 →</div>
         </a>
 
         <a class="app-card" data-app="cdr_pm" data-base-url="../cdr-pm/index.html" href="../cdr-pm/index.html">
-          <div class="ic">📝</div>
-          <h3>日報表—專案管理</h3>
+          <div class="ic ic-cdr">📋</div>
+          <h3>日報表—<span class="dept-pm">專案管理</span></h3>
           <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部主用</div>
           <div class="enter-btn">進入系統 →</div>
         </a>
         <a class="app-card" data-app="dtp" data-base-url="../dtp-dw/index.html" href="../dtp-dw/index.html">
-          <div class="ic ic-dw">📊</div>
-          <h3>進度表—圖面管理</h3>
+          <div class="ic ic-dtp">📊</div>
+          <h3>進度表—<span class="dept-dw">圖面管理</span></h3>
           <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>規劃設計部主用</div>
           <div class="enter-btn">進入系統 →</div>
         </a>
 
         <a class="app-card" data-app="dtp_pm" data-base-url="../dtp-pm/index.html" href="../dtp-pm/index.html">
-          <div class="ic">📈</div>
-          <h3>進度表—專案管理</h3>
+          <div class="ic ic-dtp">📊</div>
+          <h3>進度表—<span class="dept-pm">專案管理</span></h3>
           <p class="desc">執行進度追蹤、狀態管理、工時計算；支援 Excel 匯出與歷史查詢</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部主用</div>
           <div class="enter-btn">進入系統 →</div>
@@ -594,10 +606,10 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <div class="form-row">
         <label>可用子系統 <span style="color:var(--muted);font-weight:400">（勾選此員工能進入哪些 App）</span></label>
         <div class="checkbox-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr" checked> 📋 日報表—瑪摩工程</label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr_pm" checked> 📝 日報表—專案管理</label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp" checked> 📊 進度表—圖面管理</label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp_pm" checked> 📈 進度表—專案管理</label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr" checked> 📋 日報表—<span class="dept-mm">瑪摩工程</span></label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr_pm" checked> 📋 日報表—<span class="dept-pm">專案管理</span></label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp" checked> 📊 進度表—<span class="dept-dw">圖面管理</span></label>
+          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp_pm" checked> 📊 進度表—<span class="dept-pm">專案管理</span></label>
           <label class="checkbox-item"><input type="checkbox" id="emp-app-sop" checked> 📐 查檢表—標準作業</label>
         </div>
       </div>
@@ -1562,10 +1574,10 @@ function renderEmps() {
       : '<span style="color:var(--text-light)">— 未指派</span>';
     const ac = e.appAccess || {};
     const appsHtml = `
-      <span class="app-icon ${ac.cdr?'on':'off'}" title="日報表—瑪摩工程">📋</span>
-      <span class="app-icon ${ac.cdr_pm?'on':'off'}" title="日報表—專案管理">📝</span>
-      <span class="app-icon ${ac.dtp?'on':'off'}" title="進度表—圖面管理">📊</span>
-      <span class="app-icon ${ac.dtp_pm?'on':'off'}" title="進度表—專案管理">📈</span>
+      <span class="app-icon dept-mm ${ac.cdr?'on':'off'}" title="日報表—瑪摩工程">📋</span>
+      <span class="app-icon dept-pm ${ac.cdr_pm?'on':'off'}" title="日報表—專案管理">📋</span>
+      <span class="app-icon dept-dw ${ac.dtp?'on':'off'}" title="進度表—圖面管理">📊</span>
+      <span class="app-icon dept-pm ${ac.dtp_pm?'on':'off'}" title="進度表—專案管理">📊</span>
       <span class="app-icon ${ac.sop?'on':'off'}" title="查檢表—標準作業">📐</span>`;
     return `
     <tr>

@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-25.2';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -211,6 +211,31 @@ input[type="file"]{display:none}
   .sig-line{border-bottom:1px solid #555;margin:32px 16px 5px}
   .sig-lbl{font-size:11px;color:var(--muted);font-weight:700}
 }
+/* ==PRINT-PREVIEW-BEGIN 自動由上面的 @media print 產生，請勿手改== */
+  body.print-preview .no-print{display:none!important}
+  body.print-preview nav{display:none}
+  body.print-preview .container{padding:0;max-width:none}
+  body.print-preview .card{box-shadow:none;border:1px solid #ccc;page-break-inside:avoid;margin-bottom:8px}
+  body.print-preview{background:#fff}
+  body.print-preview .wtbl th,body.print-preview .mtbl th,body.print-preview .stbl th,body.print-preview .master-tbl th{background:#14532d!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.print-preview .tfoot-row td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.print-preview textarea.fi{display:none!important}
+  body.print-preview .pv{display:block!important;white-space:pre-wrap;font-size:13px;line-height:1.6;padding:4px 0}
+  body.print-preview .print-header{display:block!important;text-align:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary)}
+  body.print-preview .print-header h1{font-size:20px;font-weight:800;color:var(--primary)}
+  body.print-preview .print-header p{font-size:12px;color:var(--muted)}
+  body.print-preview .sig-area{display:flex!important;gap:0;margin-top:30px;border-top:1.5px solid #aaa;padding-top:20px}
+  body.print-preview .sig-box{flex:1;text-align:center;padding:0 10px}
+  body.print-preview .sig-line{border-bottom:1px solid #555;margin:32px 16px 5px}
+  body.print-preview .sig-lbl{font-size:11px;color:var(--muted);font-weight:700}
+  /* 工具列本身：預覽時才出現，真的列印時不印出來 */
+  #pv-bar{display:none}
+  body.print-preview #pv-bar{display:flex;position:sticky;top:0;z-index:99;align-items:center;gap:10px;flex-wrap:wrap;background:var(--primary);color:#fff;padding:10px 16px;margin:0 0 12px;font-size:13px}
+  #pv-bar b{flex:1;min-width:150px;font-weight:600;opacity:.9}
+  #pv-bar button{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:8px;padding:7px 15px;cursor:pointer;background:#fff;color:var(--primary)}
+  #pv-bar button.g{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6)}
+  @media print{#pv-bar{display:none!important}}
+/* ==PRINT-PREVIEW-END== */
 @media screen{.print-header{display:none}.pv{display:none}}
 /* ── 設定維護權（2026-08-17）──
  * 角色沒勾「維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
@@ -259,6 +284,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 </div>
 
 <!-- NAV -->
+<div id="pv-bar"><b>列印預覽 —— 確認版面後再按列印（這一列不會印出來）</b><button onclick="doPrintNow()">🖨️ 列印 / 另存 PDF</button><button class="g" onclick="exitPrintPreview()">✕ 取消</button></div>
 <nav class="no-print">
   <span class="nav-logo">日報表 <span>瑪摩工程</span><span class="nav-v">v3</span></span>
   <!-- 順序：填寫 → 三種看法（歷史／日曆／總表）→ 匯出 → 設定
@@ -272,8 +298,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <span class="nav-spacer"></span>
   <div style="display:flex;gap:5px">
     <button class="btn btn-o btn-sm no-print" onclick="backToPortal()">🏠 返回主系統</button>
-    <button class="btn btn-xl btn-sm no-print" onclick="exportExcel()">📊 Excel</button>
-    <button class="btn btn-pdf btn-sm no-print" onclick="printPDF()">🖨️ PDF</button>
+    <button class="btn btn-xl btn-sm no-print" onclick="exportExcel()">📊 匯出 Excel</button>
+    <button class="btn btn-pdf btn-sm no-print" onclick="printPDF()">🖨️ 列印 PDF</button>
   </div>
   <div class="nav-user">
     <span id="nav-name" class="nav-badge"></span>
@@ -481,7 +507,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button class="btn btn-o btn-sm" onclick="clearForm()">🗑️ 清除表單</button>
       <div class="flex gap2">
         <button class="btn btn-xl btn-sm" onclick="exportExcel()">📊 匯出 Excel</button>
-        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 匯出 PDF</button>
+        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 列印 PDF</button>
         <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存報表</button>
       </div>
     </div>
@@ -496,7 +522,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <span class="card-title">管理總表</span>
       <div class="flex gap2 no-print">
         <button class="btn btn-xl btn-sm" onclick="exportMgmtExcel()">📊 匯出 Excel</button>
-        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ PDF</button>
+        <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 列印 PDF</button>
       </div>
     </div>
     <div class="card-body">
@@ -905,7 +931,18 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 'use strict';
 const $ = id => document.getElementById(id);
 const DOW = ['日','一','二','三','四','五','六'];
-const today = () => new Date().toISOString().slice(0,10);
+/* ── 日期一律用「本地時間」（2026-08-26 修）──
+ * 原本是 new Date().toISOString().slice(0,10) —— toISOString 給的是 UTC，
+ * 台灣是 UTC+8，所以早上 8 點前會整整少一天：
+ *   ① 早上 7 點開日報表，日期自動帶成「昨天」
+ *   ② 日期切換鈕 ◀ ▶ 會壞掉：本地午夜 00:00 轉成 UTC 就退回前一天，
+ *      按「下一天」等於原地不動、按「前一天」一次跳兩天（實測確認）
+ * 完整時間戳（createdAt / updatedAt）維持 toISOString()，那本來就該用 UTC。 */
+const ymd = (d) => {
+  d = d || new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+};
+const today = () => ymd();
 let rowN = 0, matN = 0;
 let editProjId = null, editUserId = null, viewPhIdx = -1;
 
@@ -1152,7 +1189,7 @@ function onDateChange() {
 function navDay(d) {
   const cur = new Date($('f-date').value+'T00:00:00');
   cur.setDate(cur.getDate()+d);
-  $('f-date').value = cur.toISOString().slice(0,10);
+  $('f-date').value = ymd(cur);
   onDateChange();
 }
 function loadToday() {
@@ -1898,6 +1935,8 @@ function autoGrowAll(){document.querySelectorAll('textarea.fi').forEach(autoGrow
 document.addEventListener('input',e=>{if(e.target.matches('textarea.fi'))autoGrow(e.target);});
 
 /* ── PRINT / PDF ── */
+/* 進站當下的頁面標題；列印時會被暫時改成檔名，離開預覽要還原回來 */
+var BASE_TITLE=document.title;
 function buildPrintTitle(){
   const parts=['日報表-瑪摩工程', S.report.date||today()];
   const pn=reportProjName(S.report); if(pn) parts.push(pn);
@@ -1911,6 +1950,21 @@ function printPDF(){
   document.title=buildPrintTitle();
   window.print();
 }
+/* ── 列印預覽已停用（2026-08-26 用戶實測後取消）──
+ * 停用原因：查檢表是「另開一個新視窗」，一看就知道換了畫面；
+ * 日報表這套是「在原地把頁面變成列印版面」—— 人若停在頁面下方，
+ * 看起來就像按了沒反應，反而更容易誤會。
+ * 程式與樣式都留著（body.print-preview 那組規則、#pv-bar 工具列），
+ * 要開回來：把上面那行 window.print(); 改回 enterPrintPreview(); 即可。 */
+function enterPrintPreview(){
+  document.body.classList.add('print-preview');
+  try{ window.scrollTo(0,0); }catch(e){}
+}
+function exitPrintPreview(){
+  document.body.classList.remove('print-preview');
+  document.title=BASE_TITLE;
+}
+function doPrintNow(){ window.print(); }
 window.addEventListener('beforeprint',()=>{document.title=buildPrintTitle();});
 window.addEventListener('afterprint',()=>{document.title='日報表—瑪摩工程';});
 
@@ -2212,7 +2266,7 @@ function initExportPage(){
 function setExDateRange(type){
   const now=new Date();
   let from,to;
-  const fmt=d=>d.toISOString().slice(0,10);
+  const fmt=d=>ymd(d);
   if(type==='week'){
     const day=now.getDay();
     from=new Date(now); from.setDate(now.getDate()-day);
@@ -2325,7 +2379,11 @@ async function doExportExcel(rows){
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
+/* 單張報表的欄寬。備註列要合併到最後一欄、還要依整張表寬算列高，所以先定義好再用。
+ * C 批：拿掉「專案/工地」欄，11 欄 → 10 欄。 */
+const MM_COLW = [6,18,28,14,10,14,10,10,14,28];
 async function exportExcel(){
+  const COLW = MM_COLW, LASTCOL = MM_COLW.length;   // 工項表共 10 欄（A~J），備註要合併到這一欄
   syncReport();
   const r=S.report;
   const hasWork=(r.workItems||[]).length>0;
@@ -2380,16 +2438,42 @@ async function exportExcel(){
     // 備註
     if(hasNote){
       const tr=ws.addRow(['【備註事項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      if(r.notes?.contact){const row=ws.addRow(['與工地聯絡事項',r.notes.contact]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
-      if(r.notes?.other){const row=ws.addRow(['其他工程配合重點',r.notes.other]);row.getCell(1).font={bold:true};row.getCell(2).alignment={wrapText:true,vertical:'top'};}
+      if(r.notes?.contact) addNoteRow(ws,'與工地聯絡事項',r.notes.contact,LASTCOL,COLW);
+      if(r.notes?.other)   addNoteRow(ws,'其他工程配合重點',r.notes.other,LASTCOL,COLW);
     }
-    ws.columns=[6,18,28,14,10,14,10,10,14,28].map(w=>({width:w}));   // C 批：拿掉「專案/工地」欄，11 欄 → 10 欄
+    ws.columns=COLW.map(w=>({width:w}));
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download=`日報表-瑪摩工程_${r.date||today()}.xlsx`; a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
+}
+
+/* ── Excel 備註列：橫向合併 + 自動撐高 ──
+ * 2026-08-12 已在「日報表—專案管理」修過，這支當時沒跟上（2026-08-26 補）。
+ * 問題：備註文字全塞在 B 欄（寬 18），十個字就跳行、整列被撐成一根長條，
+ *       而且 exceljs 不會 auto-fit，wrapText 的內容會被切掉看不到。
+ * 解法：把 B~最後一欄合併成一格（整張表寬），再依實際字數自己算列高。
+ * 字寬估法：半形 1、中文 2；換行符先切段各自算，再加總。
+ * ⚠️ 這份與 cdr-pm 的 addNoteRow 是同一套算法，改一邊要記得改另一邊（測試會比對）。
+ */
+function addNoteRow(ws, label, text, lastCol, colw){
+  const row = ws.addRow([label, String(text||'')]);
+  row.getCell(1).font = {bold:true};
+  row.getCell(1).alignment = {vertical:'top'};
+  const rn = row.number;
+  ws.mergeCells(rn, 2, rn, lastCol);
+  row.getCell(2).alignment = {wrapText:true, vertical:'top'};
+  let w = 0; for(let c=2;c<=lastCol;c++) w += (colw[c-1]||0);
+  const usable = Math.max(10, w - 2);          // 留一點內距，免得估太滿
+  const lines = String(text||'').split('\n').reduce((sum,seg)=>{
+    let units = 0;
+    for(const ch of seg) units += /[\x00-\xff]/.test(ch) ? 1 : 2;
+    return sum + Math.max(1, Math.ceil(units / usable));
+  }, 0);
+  row.height = Math.max(18, lines * 14);
+  return row;
 }
 
 /* ── SETTINGS ── */

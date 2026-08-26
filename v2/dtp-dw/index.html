@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-21.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -209,6 +209,16 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:0 4px}
 .modal-close:hover{color:var(--danger)}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--bg)}
+/* 匯出前挑案場（2026-08-26） */
+.xp-hint{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 11px;margin-bottom:12px;line-height:1.6}
+.xp-all{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:8px 10px;border:1px solid var(--line,#e2e8f0);border-radius:8px;cursor:pointer;margin-bottom:8px}
+.xp-list{max-height:44vh;overflow-y:auto;border:1px solid var(--line,#e2e8f0);border-radius:8px}
+.xp-row{display:flex;align-items:center;gap:9px;padding:8px 11px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--bg)}
+.xp-row:last-child{border-bottom:none}
+.xp-row:hover{background:var(--bg)}
+.xp-row .xp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xp-row .xp-c{font-size:11px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.xp-sum{font-size:12px;color:var(--muted);margin-right:auto;align-self:center}
 
 .toast-wrap{position:fixed;bottom:18px;right:18px;z-index:1000;display:flex;flex-direction:column;gap:5px}
 .toast{background:#0f172a;color:#fff;padding:9px 15px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:ti .25s ease}
@@ -301,7 +311,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <button class="nav-btn" onclick="goPage('settings')">⚙️ 系統設定</button>
   <span class="nav-spacer"></span>
   <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
-  <button class="nav-xbtn" onclick="exportExcel()">📊 匯出 Excel</button>
+  <button class="nav-xbtn" onclick="openExportPicker()">📊 匯出 Excel</button>
   <div class="nav-user" id="nav-user" onclick="backToPortal()" title="點此返回主系統">
     <span class="nav-user-role r-reporter" id="nav-user-role">—</span>
     <span class="nav-user-name" id="nav-user-name">未登入</span>
@@ -505,6 +515,24 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button id="del-btn" class="btn btn-d btn-sm" onclick="delRecord()" style="margin-right:auto;display:none">🗑️ 刪除</button>
       <button class="btn btn-o btn-sm" onclick="closeEdit()">取消</button>
       <button id="save-btn" class="btn btn-p btn-sm" onclick="saveRecord()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 匯出挑案場（2026-08-26）===== -->
+<div id="xp-overlay" class="overlay" onclick="if(event.target===event.currentTarget)closeExportPicker()">
+  <div class="modal-box" style="max-width:460px">
+    <div class="modal-title">
+      <span>📊 匯出 Excel</span>
+      <button class="modal-close" onclick="closeExportPicker()">✕</button>
+    </div>
+    <div id="xp-hint" class="xp-hint"></div>
+    <label class="xp-all"><input type="checkbox" id="xp-all" onchange="xpToggleAll(this.checked)"><span id="xp-all-label">全選</span></label>
+    <div id="xp-list" class="xp-list"></div>
+    <div class="modal-footer">
+      <span id="xp-sum" class="xp-sum"></span>
+      <button class="btn btn-o" onclick="closeExportPicker()">取消</button>
+      <button class="btn btn-p" id="xp-go" onclick="runExport()">📊 匯出</button>
     </div>
   </div>
 </div>
@@ -730,7 +758,7 @@ function calcWorkDays(logs){
   let lastStatus='';
   for(let i=dated.length-1;i>=0;i--){if(dated[i].status){lastStatus=dated[i].status;break;}}
   const isClosed=['已完成','已定案'].includes(lastStatus);
-  const today=new Date(new Date().toISOString().slice(0,10));
+  const today=new Date(fnDate());   // 本地日期（2026-08-26 修：toISOString 是 UTC，台灣早上 8 點前會少一天）
   const end=isClosed?dated[dated.length-1]._d:today;
   const totalDays=Math.max(1,Math.round((end-start)/86400000)+1);
   // 暫停區間累積
@@ -746,6 +774,8 @@ function calcWorkDays(logs){
   const isStuckNow=!!pauseStart;
   if(pauseStart)pausedDays+=Math.max(1,Math.round((end-pauseStart)/86400000)+1);
   const workDays=Math.max(0,totalDays-pausedDays);
+  /* 這裡的 toISOString 是對的、不要改成本地日期：start/end 都是 new Date("YYYY-MM-DD") 建的，
+     那樣建出來是 UTC 午夜，用 toISOString 取回來剛好還原成同一天。改成本地日期反而會錯位。 */
   const iso=d=>d.toISOString().slice(0,10);
   return{total:totalDays,paused:pausedDays,work:workDays,isStuck:isStuckNow,isClosed,startDate:iso(start),endDate:iso(end)};
 }
@@ -762,7 +792,7 @@ function getCurrentStuckInfo(logs){
     }else if(log.status){stuckStart=null;stuckReason='';stuckLocation='';}
   }
   if(!stuckStart)return null;
-  const today=new Date(new Date().toISOString().slice(0,10));
+  const today=new Date(fnDate());   // 本地日期（2026-08-26 修：toISOString 是 UTC，台灣早上 8 點前會少一天）
   const days=Math.max(1,Math.round((today-stuckStart._d)/86400000)+1);
   return{startDate:stuckStart.date,days,reason:stuckReason,location:stuckLocation};
 }
@@ -1548,6 +1578,58 @@ document.addEventListener('click',function(e){
   document.querySelectorAll('.ms.open').forEach(b=>b.classList.remove('open'));
 });
 
+/* ── 匯出前先挑案場（2026-08-26）──
+ * 原本按下去就把目前篩選結果整包倒出來，不能只挑幾個案場。
+ * 案場清單從「目前頁面篩選後的資料」長出來 —— 既有的執行者／狀態／關鍵字篩選仍然有效，
+ * 這裡只是在那個基礎上再挑案場，不會出現「畫面篩過了、匯出卻多出別的東西」。
+ * 預設全選＝跟改版前一模一樣的結果，不勾也不會少東西。*/
+var xpSel=new Set(), xpGroups=new Map();
+function openExportPicker(){
+  const data=getFiltered();
+  if(!data.length){toast('沒有資料可匯出','e');return}
+  xpGroups=new Map();
+  data.forEach(r=>{const k=r.案場||'（未填案場）'; xpGroups.set(k,(xpGroups.get(k)||0)+1)});
+  xpSel=new Set(xpGroups.keys());
+  const other=(msSel.exec.size||msSel.status.size||((document.getElementById('q')||{value:''}).value.trim()))
+    ? '（畫面上其他篩選也還在生效）' : '';
+  document.getElementById('xp-hint').textContent=
+    '目前畫面上共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
+  renderExportPicker();
+  document.getElementById('xp-overlay').classList.add('show');
+}
+function renderExportPicker(){
+  const names=[...xpGroups.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
+  document.getElementById('xp-list').innerHTML=names.map(n=>
+    '<label class="xp-row"><input type="checkbox" data-xp="'+esc(n)+'"'+(xpSel.has(n)?' checked':'')
+    +' onchange="xpToggle(this.getAttribute(\'data-xp\'),this.checked)">'
+    +'<span class="xp-n">'+esc(n)+'</span><span class="xp-c">'+xpGroups.get(n)+' 項</span></label>').join('');
+  const all=document.getElementById('xp-all');
+  all.checked=(xpSel.size===xpGroups.size&&xpGroups.size>0);
+  all.indeterminate=(xpSel.size>0&&xpSel.size<xpGroups.size);
+  document.getElementById('xp-all-label').textContent='全選（'+xpGroups.size+' 個案場）';
+  let items=0; xpSel.forEach(n=>{items+=xpGroups.get(n)||0});
+  document.getElementById('xp-sum').textContent='已選 '+xpSel.size+' 個案場 · '+items+' 個項目';
+  document.getElementById('xp-go').disabled=(xpSel.size===0);
+}
+function xpToggle(name,on){ if(on)xpSel.add(name); else xpSel.delete(name); renderExportPicker(); }
+function xpToggleAll(on){ xpSel = on ? new Set(xpGroups.keys()) : new Set(); renderExportPicker(); }
+function closeExportPicker(){ document.getElementById('xp-overlay').classList.remove('show'); }
+function runExport(){
+  if(!xpSel.size){toast('請至少選一個案場','e');return}
+  const picked=[...xpSel];
+  closeExportPicker();
+  exportExcel(picked);
+}
+/* 檔名用的日期（2026-08-26 統一）：本地時間、月日補零，例 2026-08-06。
+ * 原本用 toLocaleDateString('zh-TW') 會得到「2026-8-6」—— 月日沒補零，
+ * 檔案在資料夾裡照名稱排序會亂掉（2026-8-6 會排到 2026-12-1 後面）。
+ * 也刻意不用 toISOString()：那是 UTC，台灣早上 8 點前會變成前一天。 */
+function fnDate(d){
+  d=d||new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+/* 檔名裡不能出現的字元（Windows 不接受） */
+function fnSafe(s){ return String(s||'').replace(/[\\\/:*?"<>|]/g,'_'); }
 function getFiltered(){
   const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
   // 2026-08-20：三個篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
@@ -1843,7 +1925,7 @@ async function exportWorktimeExcel(){
   });
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  const a=document.createElement('a');a.href=url;a.download='工時計算_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.xlsx';a.click();
+  const a=document.createElement('a');a.href=url;a.download='工時計算_'+fnDate()+'.xlsx';a.click();
   URL.revokeObjectURL(url);toast('已匯出 ✓','s');
 }
 
@@ -1978,8 +2060,11 @@ function logsToExcelText(logs){
     return[dt,loc,st,p.text].filter(Boolean).join(' ');
   }).join('\n');
 }
-async function exportExcel(){
-  const data=getFiltered();
+/* projs：要匯出的案場名清單。不給＝全部（直接呼叫仍是舊行為，不會壞） */
+async function exportExcel(projs){
+  let data=getFiltered();
+  if(projs&&projs.length) data=data.filter(r=>projs.indexOf(r.案場||'（未填案場）')>=0);
+  if(!data.length){toast('沒有資料可匯出','e');return}
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('進度表-圖面管理');
   // 中文≈2.4、英數≈1 的視覺寬度（Excel CJK 實際渲染偏寬）
@@ -2093,7 +2178,7 @@ async function exportExcel(){
 
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  const a=document.createElement('a');a.href=url;a.download='進度表-圖面管理_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.xlsx';a.click();
+  const a=document.createElement('a');a.href=url;a.download='進度表-圖面管理_'+fnDate()+(projs&&projs.length===1?'_'+fnSafe(projs[0]):'')+'.xlsx';a.click();
   URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（含卡關明細 ${stuckRows.length} 筆）`,'s');
 }
 
@@ -2101,7 +2186,7 @@ async function exportExcel(){
 function exportJson(){
   const b=new Blob([JSON.stringify({records,cfg},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download='進度表-圖面管理_備份_'+new Date().toLocaleDateString('zh-TW').replace(/\//g,'-')+'.json';a.click();
+  a.download='進度表-圖面管理_備份_'+fnDate()+'.json';a.click();
 }
 function importJson(e){
   if(mngGuard())return;
