@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-26.3';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-26.4';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -321,10 +321,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <button class="btn btn-sm" onclick="backToHistory()" style="background:#f59e0b;color:#fff;font-weight:800;border:none;border-radius:20px;padding:7px 16px;box-shadow:0 2px 6px rgba(245,158,11,.45)">‹ 返回歷史資料</button>
   </div>
 
-  <div class="stat-grid" id="stat-grid" style="display:none">
-    <div class="stat-card stat-blue"><div class="stat-val" id="st-today">0</div><div class="stat-lbl">今日出工累計</div></div>
-    <div class="stat-card stat-green"><div class="stat-val" id="st-tmrw">0</div><div class="stat-lbl">明日預估出工</div></div>
-  </div>
+  <!-- 2026-08-26 用戶要求移除頁面抬頭的「今日出工累計／明日預估出工」數字卡。
+       日報表—專案管理 2026-08-18 就移掉了，這支當時沒跟上。
+       施工明細表尾的合計（tot-today／tot-tmrw）保留不動。 -->
 
   <!-- 基本資訊 -->
   <div class="card">
@@ -1841,12 +1840,9 @@ function recalc() {
       tr.querySelector('[data-f="atype"]')?.classList.remove('atype-warn');
     }
   });
+  // 表尾合計保留；置頂的數字卡已於 2026-08-26 移除，所以不再更新 st-today／st-tmrw／stat-grid
   $('tot-today').textContent = t0%1===0?t0:t0.toFixed(1);
   $('tot-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
-  $('st-today').textContent = t0%1===0?t0:t0.toFixed(1);
-  $('st-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
-  const cnt = $('tbody').children.length;
-  $('stat-grid').style.display = cnt>0?'grid':'none';
 }
 function collectRows() {
   const rows=[];
