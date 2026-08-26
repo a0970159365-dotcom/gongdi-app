@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-26.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -691,10 +691,14 @@ function canEditRecord(r){
   return _execList(r).includes(u.name);              // self：執行者含本人
 }
 
+/* 設定頁要畫哪幾張清單。
+ * ⚠️ 沒有「部門」「執行者」是刻意的 —— 那兩個 2026-08 起改由入口網頁集中管理，
+ *    設定頁已經沒有對應的容器（只有 lw-案場 / lw-施作位置 / lw-狀態），
+ *    列在這裡也只會被 renderCfgLists 的 if(!wrap)return 跳過。要加回來請先補 DOM。
+ * ⚠️ cfg.部門 / cfg.執行者 這兩份「資料」仍在使用（編輯視窗的 dl-部門 / dl-執行者 下拉、
+ *    以及 portalDepts() 讀不到入口資料時的退路），不要順手一起刪掉。 */
 const CFG_KEYS=[
   {key:'案場',icon:'📁'},
-  {key:'部門',icon:'🏢'},
-  {key:'執行者',icon:'👤'},
   {key:'施作位置',icon:'📍'},
   {key:'狀態',icon:'🏷️'}
 ];

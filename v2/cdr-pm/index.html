@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-26.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-26.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -287,7 +287,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       appId:"1:228712770866:web:07634a3df74781419cfb2b"
     });
     var _db = firebase.database();
-    window._cdrSet    = function(p,d){ return _db.ref('cdr_pm/'+p).set(d); };
+    // 最後一道網：不管誰呼叫、傳什麼進來，寫進 Firebase 前一律再清一次 undefined
+    window._cdrSet    = function(p,d){ return _db.ref('cdr_pm/'+p).set(d === null ? null : _noUndef(d)); };
     window._cdrGet    = function(p){ return _db.ref('cdr_pm/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
     window._cdrRemove = function(p){ return _db.ref('cdr_pm/'+p).remove(); };
     // 一次讀回整個 cdr_pm 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
@@ -1026,7 +1027,40 @@ function blankReport() {
   };
 }
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+/* 遞迴把 undefined 清掉：Firebase 只要遇到一個 undefined 就退回整筆，
+ * 而且畫面還是會顯示「已儲存」（2026-08-21 進度表就是這樣連續 27 小時沒存進去）。
+ * null 要原樣保留 —— 那是「刪除這個節點」的意思（projSort 就會傳 null）。
+ * 放全域是刻意的：Firebase 初始化那段在沒網路／測試環境會整個 throw，
+ * 藏在它的閉包裡就等於沒有防護，也測不到。 */
+function _noUndef(v){
+  if (Array.isArray(v)) return v.map(function(x){ return x === undefined ? null : _noUndef(x); });
+  if (v && typeof v === 'object') {
+    var o = {};
+    Object.keys(v).forEach(function(k){ if (v[k] !== undefined) o[k] = _noUndef(v[k]); });
+    return o;
+  }
+  return v === undefined ? null : v;
+}
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── 救回「本機有、雲端沒有」的報表（2026-08-26 補，比照進度表 2026-08-21）──
+ * 情境：我存了檔但雲端寫入失敗（畫面顯示成功），接著別人存了檔 → 雲端 updatedAt 變新 →
+ *       我這台開頁時 takeCloud=true，整包被雲端蓋掉，我那幾張就消失了。
+ * 只補「雲端完全沒有這個 id」的報表，兩邊都有但內容不同的**不碰** ——
+ * 那種情況交給 pushCloud 裡的 mergeReport 逐列合併，這裡硬蓋反而會把別人的改動洗掉。
+ * 補完會標記，讓呼叫端接著推一次雲端。 */
+var _rescuedCount = 0;
+function rescueLocalNewer(localReports){
+  _rescuedCount = 0;
+  if(!Array.isArray(localReports) || !localReports.length) return 0;
+  var cloudIds = new Set((S.reports||[]).map(function(r){ return r && r.id; }).filter(Boolean));
+  localReports.forEach(function(lr){
+    if(!lr || !lr.id || cloudIds.has(lr.id)) return;
+    S.reports.push(lr);
+    _rescuedCount++;
+  });
+  return _rescuedCount;
+}
 
 /* ── STORAGE ── */
 function load() {
@@ -1160,10 +1194,15 @@ var mergeWorkItems = mergeRows;   // 舊名稱保留
  */
 var _baselines = {};   // 報表 id -> 打開當下的 JSON 快照
 function rememberBaseline(r){ try{ if(r&&r.id) _baselines[r.id]=JSON.stringify(r); }catch(e){} }
+/* ⚠️ 這支的每個 return 都不能吐出 undefined —— Firebase 只要收到一個 undefined 就退回整筆，
+ *    而且畫面還是會顯示「已儲存」（2026-08-21 進度表就是這樣連續 27 小時沒存進去）。
+ *    舊報表沒有 projId／projName 這些欄位時，mine 本來就會是 undefined，所以一律用 '' 兜底。
+ *    最外層還有 _noUndef 當第二道網，但這裡先擋住比較好追。 */
+function _noUndefVal(v){ return v === undefined ? '' : v; }
 function _pickScalar(mine, theirs, base){
-  if (base === undefined) return mine;                                  // 沒基準 → 照舊
-  if (JSON.stringify(mine) !== JSON.stringify(base)) return mine;       // 我改過 → 用我的
-  return theirs !== undefined ? theirs : mine;                          // 我沒改 → 保留雲端
+  if (base === undefined) return _noUndefVal(mine);                                  // 沒基準 → 照舊
+  if (JSON.stringify(mine) !== JSON.stringify(base)) return _noUndefVal(mine);       // 我改過 → 用我的
+  return _noUndefVal(theirs !== undefined ? theirs : mine);                          // 我沒改 → 保留雲端
 }
 function mergeReport(local, cloud, me, base){
   if (!cloud) return local;
@@ -1209,6 +1248,7 @@ async function pushCloud(data) {
     if(dels.length > 1){
       console.warn('[防呆] 這次同步會刪掉 '+dels.length+' 筆雲端報表（正常應為 0~1 筆）→ 放棄本次同步');
       setSyncIcon('☁️❌');
+      showSyncWarn(new Error('一次要刪 '+dels.length+' 筆雲端報表，已放棄本次同步'));
       return;
     }
     var jobs = [];
@@ -1226,7 +1266,7 @@ async function pushCloud(data) {
           }
         } catch(e) { /* 讀不到雲端就照原樣寫，至少不會擋住存檔 */ }
       }
-      jobs.push(window._cdrSet('reports/' + r.id, toWrite));
+      jobs.push(window._cdrSet('reports/' + r.id, _noUndef(toWrite)));   // 合併後可能生出 undefined，送出前先清
       rememberBaseline(toWrite);   // 存完之後，基準就是「剛剛寫上去的那份」，下次才比得出我又改了什麼
     }
     dels.forEach(function(id){ jobs.push(window._cdrRemove('reports/'+id)); });
@@ -1236,9 +1276,33 @@ async function pushCloud(data) {
     await Promise.all(jobs);
     _lastPushed = cur;
     setSyncIcon('☁️✅');
-  } catch(e) { setSyncIcon('☁️❌'); }
+  } catch(e) { setSyncIcon('☁️❌'); showSyncWarn(e); }
 }
-function setSyncIcon(s) { const el=$('sync-icon'); if(el) el.textContent=s; }
+/* 存檔沒上雲端時，原本只有右上角一個小圖示變紅 —— 使用者不會發現，繼續打字全部白打
+ * （2026-08-21 進度表事故就是這樣燒了 27 小時）。改成跳一條關不掉的紅色警示條，成功同步後才自己消失。 */
+function showSyncWarn(err) {
+  var el = document.getElementById('sync-warn');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sync-warn';
+    el.className = 'no-print';
+    el.style.cssText = 'position:sticky;top:0;z-index:60;background:#dc2626;color:#fff;'
+      + 'font:600 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:8px 14px;text-align:center';
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  el.textContent = '⚠️ 這筆沒有存上雲端，目前只留在這台裝置 —— 請先不要重新整理或關掉頁面，'
+    + '把這行截圖回報。（原因：' + ((err && err.message) || '連線失敗') + '）';
+  el.style.display = '';
+  try { toast('⚠️ 沒有存上雲端！只留在這台裝置','e'); } catch(e){}
+}
+function hideSyncWarn() {
+  var el = document.getElementById('sync-warn');
+  if (el) el.style.display = 'none';
+}
+function setSyncIcon(s) {
+  if (s === '☁️✅') hideSyncWarn();          // 只有真的同步成功才把警示條收起來
+  const el=$('sync-icon'); if(el) el.textContent=s;
+}
 
 /* ── LOGIN ── */
 function populateLoginDepts() {
@@ -3502,7 +3566,9 @@ function init(){
       var localEmptyCloudHas = (localData.reports||[]).length === 0 && (cloud.reports||[]).length > 0;
       var takeCloud = cloudTime > localTime || localEmptyCloudHas;
       if(takeCloud){
+        var _localReports = localData.reports || [];
         S.reports = cloud.reports || [];
+        rescueLocalNewer(_localReports);   // 拉雲端會整包蓋掉本機 → 先把本機獨有的報表撈回來
         if(cloud.cfg) S.cfg = {...S.cfg, ...cloud.cfg};
         // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
         // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
@@ -3511,7 +3577,16 @@ function init(){
           reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime
         }));
         if(S.page) goPage(S.page);
-        toast('已從雲端同步最新資料 ☁️','s');
+        if(_rescuedCount){
+          // 撈回來的還沒進雲端 → 立刻補推一次，並且本機快照要含它們（上面那行 setItem 寫的是雲端版）
+          localStorage.setItem('cdr_pm', JSON.stringify({
+            reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now()
+          }));
+          toast('找回 '+_rescuedCount+' 筆還沒上傳的日報表，正在補傳…','s');
+          setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
+        } else {
+          toast('已從雲端同步最新資料 ☁️','s');
+        }
       }
       // per-record 同步基準＝雲端目前有哪幾筆。舊格式時留空 → 只會新增不會刪，最安全。
       _lastPushed = fromLegacy ? {} : _snapshotReports(cloud.reports);
