@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-26.5';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-26.6';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -119,7 +119,7 @@
          第二層（點進某個工程）時，括號會換成該工程名，由 renderHomeCats 改 #home-subtitle。 -->
     <div class="flex items-baseline gap-1 mb-2 px-1">
       <h3 class="text-lg font-bold text-gray-800">新增</h3>
-      <span id="home-subtitle" class="text-sm text-gray-500">（選擇工程，開始填一張新的）</span>
+      <span id="home-subtitle" class="text-sm text-gray-500">（選擇範圍，開始填一張新的）</span>
     </div>
     <div id="template-cards" class="space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 mb-6"></div>
     <div id="recent-section">
@@ -130,11 +130,11 @@
         </div>
         <button onclick="goTo('history')" class="text-xs text-blue-600">查看全部 &#8250;</button>
       </div>
-      <!-- 三種顯示方式（2026-08-13 兩種 → 2026-08-26 加「依技術」）：依案場／依日期／依技術 -->
+      <!-- 三種顯示方式（2026-08-13 兩種 → 2026-08-26 加「依 SOP」）：依案場／依日期／依 SOP -->
       <div class="flex mb-3 bg-gray-100 rounded-xl p-1 text-sm max-w-md">
         <button id="rm-case" onclick="setRecentMode('case')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依案場</button>
         <button id="rm-date" onclick="setRecentMode('date')" class="flex-1 py-1.5 rounded-lg font-medium transition-all">依日期</button>
-        <button id="rm-tpl"  onclick="setRecentMode('tpl')"  class="flex-1 py-1.5 rounded-lg font-medium transition-all">依技術</button>
+        <button id="rm-tpl"  onclick="setRecentMode('tpl')"  class="flex-1 py-1.5 rounded-lg font-medium transition-all">依 SOP</button>
       </div>
       <div id="recent-list" class="space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2"></div>
     </div>
@@ -268,7 +268,7 @@
       </select>
       <div class="flex gap-2">
         <select id="h-filter-tpl" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="">全部技術</option>
+          <option value="">全部 SOP</option>
         </select>
         <select id="h-filter-status" onchange="renderHistory()" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">全部狀態</option>
@@ -369,7 +369,7 @@
 'use strict';
 
 /* ── 三階分類（2026-08-26 C批）──
- * 1階＝工程（景觀／牆面／內裝）、2階＝管理（圖面／工法）、3階＝技術（具體查驗表 TEMPLATES）。
+ * 1階＝範圍（景觀／牆面／內裝）、2階＝準則（圖面／工法）、3階＝SOP（具體查驗表 TEMPLATES）。
  * 中類是所有大類共用的一份清單，不是每個大類各自一套 —— 之後要加「材料」之類，一次加、每個大類都有。
  * 每張查驗表帶 cat1／cat2 兩個 id；沒填或指到已刪掉的分類 → 一律當「（未分類）」，不會憑空消失。
  * 兩層都存進 config.cats，設定頁「📂 分類管理」可增刪改。 */
@@ -429,6 +429,7 @@ var S = {
   cfgCat1: null,
   cfgCat2: null,
   catAdding: null,
+  addMenu: false,        // 設定頁上方那顆「＋ 新增」的選單有沒有展開
   showMovePicker: false,
   // 首頁「最近記錄」的顯示方式：'date'＝依日期／'case'＝依案場分類（2026-08-13 新增，記住上次選的）
   // 記住上次選的檢視；認不得的值一律退回第一個頁籤「依案場」
@@ -535,7 +536,7 @@ function syncCatsFromConfig(){
   }
 }
 /* ── 三階路徑（2026-08-26）──
- * 「工程 › 管理」的文字，例：🏠 內裝 › 🔧 工法。沒分類的那一段直接跳過，不會出現空的 ›。
+ * 「範圍 › 準則」的文字，例：🏠 內裝 › 🔧 工法。沒分類的那一段直接跳過，不會出現空的 ›。
  * 分類讀的是「現在的設定」不是報表存檔當下的快照 —— 分類改名後舊報表也跟著顯示新名字，這是刻意的。
  * （8/25 照片踩過反例：存下上傳當時的案場名，改名後就對不回去。分類要的是永遠對得上現在的設定。） */
 /* plain=true → 不帶 emoji，只給文字（列印／PDF 用：emoji 在部分印表機會變成黑白方框） */
@@ -820,14 +821,14 @@ function renderHomeCats(){
 
   if(S.homeCat===null){
     box.className='space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-3 mb-6';
-    if(sub) sub.textContent='（選擇工程，開始填一張新的）';
+    if(sub) sub.textContent='（選擇範圍，開始填一張新的）';
     var html='';
     catL1().forEach(function(c){
       html+=catCardHtml(c.id, c.icon||'📁', c.name, tplsInCat(c.id).length);
     });
     var un=tplsInCat(UNCAT).length;
     if(un) html+=catCardHtml(UNCAT,'📦','（未分類）',un);
-    if(!html) html='<div class="text-xs text-gray-400 py-6 text-center">尚未建立工程，請到 ⚙️ 系統設定 → 📂 工程 / 管理 / 技術 新增</div>';
+    if(!html) html='<div class="text-xs text-gray-400 py-6 text-center">尚未建立範圍，請到 ⚙️ 系統設定 → 📂 範圍 / 準則 / SOP 新增</div>';
     box.innerHTML=html;
     return;
   }
@@ -839,7 +840,7 @@ function renderHomeCats(){
   if(sub) sub.textContent='（'+c1icon+' '+c1name.replace(/^（|）$/g,'')+'）';
   box.className='space-y-4 mb-6';
 
-  var h='<button onclick="backToCats()" class="text-sm text-blue-600 hover:underline py-1">&#8249; 返回工程</button>';
+  var h='<button onclick="backToCats()" class="text-sm text-blue-600 hover:underline py-1">&#8249; 返回範圍</button>';
   var groups=catL2().map(function(d){ return {id:d.id, icon:d.icon||'📄', name:d.name}; });
   groups.push({id:UNCAT, icon:'📦', name:'（未指定）'});
   var any=false;
@@ -855,7 +856,7 @@ function renderHomeCats(){
       +list.map(tplCardHtml).join('')
       +'</div></div>';
   });
-  if(!any) h+='<div class="text-xs text-gray-400 py-6 text-center">這個工程底下還沒有技術</div>';
+  if(!any) h+='<div class="text-xs text-gray-400 py-6 text-center">這個範圍底下還沒有 SOP</div>';
   box.innerHTML=h;
 }
 function catCardHtml(id, icon, name, n){
@@ -863,7 +864,7 @@ function catCardHtml(id, icon, name, n){
     +'<div class="flex items-center gap-4">'
     +'<span class="text-2xl">'+esc(icon)+'</span>'
     +'<div class="flex-1"><div class="font-semibold text-gray-800">'+esc(name)+'</div>'
-    +'<div class="text-xs text-gray-500 mt-1">'+n+' 項技術</div></div>'
+    +'<div class="text-xs text-gray-500 mt-1">'+n+' 個 SOP</div></div>'
     +'<span class="text-gray-400 text-xl">&#8250;</span>'
     +'</div></button>';
 }
@@ -1233,7 +1234,7 @@ function renderComplete(){
   $('complete-subtitle').textContent=(r.caseName||'')+(r.date?' · '+r.date:'');
 
   $('complete-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
-    +infoRow('技術',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +infoRow('SOP',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
     +infoRow(materialLabelOf(r),r.material)
     +infoRow('部門',r.department)+infoRow('填表人員',r.personnel)+infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
     +'</div>';
@@ -1379,7 +1380,7 @@ function renderHistory(){
   /* 2026-08-26：原本只在第一次填（options.length<=1），分類或工法改了不會更新。
    * 改成每次重繪都重建，但保留使用者當下選的那一項（比照下面案場篩選的做法）。 */
   var keepT=sel.value;
-  var thtml='<option value="">全部技術</option>';
+  var thtml='<option value="">全部 SOP</option>';
   var grp=catL1().map(function(c){ return {id:c.id, name:(c.icon||'')+' '+c.name}; });
   grp.push({id:UNCAT, name:'📦 （未分類）'});
   grp.forEach(function(g){
@@ -1482,7 +1483,7 @@ function renderDetail(){
     : '<span class="text-amber-700 font-semibold">📝 草稿（尚未送出）</span>';
   $('detail-info').innerHTML='<h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">查核表資訊</h3><div class="text-sm">'
     +'<div class="flex py-1"><span class="text-gray-500 w-24 flex-shrink-0">狀態</span><span class="flex-1">'+stTxt+'</span></div>'
-    +infoRow('技術',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
+    +infoRow('SOP',reportPath(r))+infoRow('案場',r.caseName)+infoRow('施作範圍',r.area)
     +infoRow(materialLabelOf(r),r.material)+infoRow('部門',r.department)+infoRow('填表人員',r.personnel)
     +infoRow('施工廠商',r.contractor)+infoRow('施工人員',r.workers)+infoRow('日期',r.date)
     +'</div>';
@@ -1571,8 +1572,8 @@ function addCfgItem(key){
 
 // ====== CATEGORIES EDITOR ======
 /* ── 分類與工法：三段連動（2026-08-26）──
- * 工程 → 管理 → 技術 三個下拉串成一條：選了工程，管理與技術就只列這個工程底下的東西，
- * 「＋ 在這裡新增技術」直接建在目前選的那一格，不用建完再回頭挑分類。
+ * 範圍 → 準則 → SOP 三個下拉串成一條：選了範圍，準則與 SOP 就只列這個範圍底下的東西，
+ * 「＋ 新增」按鈕建在目前選的那一格，不用建完再回頭挑分類。
  * 舊寫法是「分類管理」與「工法管理」兩張互不相干的清單，選了大類下面也不會變 ——
  * 用戶回報「散開的、沒有串連」，這一版就是在修這件事。
  * 大類／中類刻意不在下面的工法資訊裡重複出現，要搬家才展開（🔀 搬到其他分類）。 */
@@ -1635,11 +1636,42 @@ function renderCatsSection(){
   var el=$('cfg-cats');
   if(!el) return;
   cfgEnsureSel(); cfgSyncEditing();
-  el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-1">📂 工程 / 管理 / 技術</h3>'
-    +'<p class="text-xs text-gray-400 mb-3">由上往下選：工程 → 管理 → 技術。選好之後，下面那張卡就是在編輯這一張表。</p>'
-    +catRowHtml(1,'工程')
-    +catRowHtml(2,'管理')
+  el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-1">📂 範圍 / 準則 / SOP</h3>'
+    +'<p class="text-xs text-gray-400 mb-3">由上往下選：範圍 → 準則 → SOP。選好之後，下面那張卡就是在編輯這一張表。</p>'
+    +addMenuHtml()
+    +catRowHtml(1,'範圍')
+    +catRowHtml(2,'準則')
     +tplRowHtml();
+}
+
+/* ── 一顆「＋ 新增」統一入口（2026-08-26 用戶指定）──────────────────
+ * 原本三個層級各有各的新增鈕（範圍／準則各一條小連結、SOP 一顆大按鈕），
+ * 散在三個地方。改成上方一顆「＋ 新增」，按了問要新增哪一層。
+ * 新增 SOP 一律建在「目前選到的那一格」（範圍＋準則），跟原本的行為一樣。 */
+function toggleAddMenu(){ S.addMenu=!S.addMenu; S.catAdding=null; renderCatsSection(); }
+function addMenuPick(kind){
+  S.addMenu=false;
+  if(kind==='tpl'){ addTemplate(); return; }     // addTemplate 自己會重繪
+  startCatAdd(kind==='l1'?1:2);
+}
+function addMenuHtml(){
+  if(!S.addMenu){
+    return '<div class="mb-3" data-mng>'
+      +'<button onclick="toggleAddMenu()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700">＋ 新增</button>'
+      +'</div>';
+  }
+  return '<div class="mb-3 border-2 border-blue-500 rounded-xl p-3" data-mng>'
+    +'<div class="text-xs font-semibold text-blue-700 mb-2">要新增什麼？</div>'
+    +'<div class="grid grid-cols-3 gap-2">'
+    +'<button onclick="addMenuPick(\'l1\')" class="px-2 py-2 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50">範圍</button>'
+    +'<button onclick="addMenuPick(\'l2\')" class="px-2 py-2 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50">準則</button>'
+    +'<button onclick="addMenuPick(\'tpl\')" class="px-2 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700">SOP</button>'
+    +'</div>'
+    +'<div class="text-xs text-gray-500 mt-2">新增 SOP 會建在目前選的「'
+    + esc((S.cfgCat1===UNCAT?'（未分類）':catName(1,S.cfgCat1))) + ' › '
+    + esc((S.cfgCat2===UNCAT?'（未指定）':catName(2,S.cfgCat2))) + '」底下</div>'
+    +'<button onclick="toggleAddMenu()" class="w-full text-xs text-gray-500 mt-2 py-1 hover:underline">取消</button>'
+    +'</div>';
 }
 
 /* 一層分類的一整列：下拉 ＋ 改名／刪除 ＋ 新增 */
@@ -1674,7 +1706,7 @@ function catRowHtml(level,label){
     h+='<div class="flex items-center gap-2">'
       +'<select data-cfg-cat="'+level+'" onchange="setCfgCat('+level+',this.value)" class="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm">'+opts+'</select>'
       +(isReal&&portalCanManageSettings()?'<button onclick="startCatEdit('+level+',\''+cur+'\')" class="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-blue-600" title="改名">&#9998;</button>':'')
-      +(isReal&&portalCanDelete()?'<button onclick="removeCat('+level+',\''+cur+'\')" class="w-9 h-9 flex items-center justify-center '+(used?'text-gray-300 cursor-not-allowed':'text-red-400 hover:text-red-600')+'" title="'+(used?'還有技術掛在這裡，不能刪':'刪除')+'">&#10005;</button>':'')
+      +(isReal&&portalCanDelete()?'<button onclick="removeCat('+level+',\''+cur+'\')" class="w-9 h-9 flex items-center justify-center '+(used?'text-gray-300 cursor-not-allowed':'text-red-400 hover:text-red-600')+'" title="'+(used?'還有 SOP 掛在這裡，不能刪':'刪除')+'">&#10005;</button>':'')
       +'</div>';
   }
 
@@ -1686,9 +1718,8 @@ function catRowHtml(level,label){
       +'<button onclick="addCat('+level+')" class="w-9 h-9 flex items-center justify-center text-green-600 font-bold" title="新增">&#10003;</button>'
       +'<button onclick="cancelCatAdd()" class="w-9 h-9 flex items-center justify-center text-gray-400" title="取消">&#10005;</button>'
       +'</div>';
-  } else {
-    h+='<button onclick="startCatAdd('+level+')" data-mng class="mt-1 text-xs text-blue-600 hover:underline">＋ 新增'+esc(label)+'</button>';
   }
+  // 新增入口統一收到上方那顆「＋ 新增」，這裡不再各自掛一條連結（2026-08-26）
   return h+'</div>';
 }
 
@@ -1699,15 +1730,14 @@ function tplRowHtml(){
     return '<option value="'+esc(t.id)+'"'+(t.id===S.editingTplId?' selected':'')+'>'+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
   }).join('');
   var h='<div class="border-t pt-3" data-tpl-row>'
-    +'<label class="block text-xs text-gray-500 mb-1">技術</label>';
+    +'<label class="block text-xs text-gray-500 mb-1">SOP</label>';
   if(list.length){
     h+='<select data-tpl-sel onchange="switchTplEditor(this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">'+opts+'</select>';
   } else {
-    h+='<div class="text-xs text-gray-400 border border-dashed border-gray-300 rounded-xl px-3 py-2">（這裡還沒有技術）</div>';
+    h+='<div class="text-xs text-gray-400 border border-dashed border-gray-300 rounded-xl px-3 py-2">（這裡還沒有 SOP）</div>';
   }
   h+='<div class="flex gap-2 mt-2" data-mng>'
-    +'<button onclick="addTemplate()" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700">＋ 在這裡新增技術</button>'
-    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製技術</button>'
+    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製 SOP</button>'
     +'</div>';
   return h+'</div>';
 }
@@ -1754,7 +1784,7 @@ function saveCatEdit(){
 }
 function removeCat(level,id){
   if(mngGuard())return;
-  if(catInUse(level,id)){ showToast('還有技術掛在這裡，不能刪'); return; }
+  if(catInUse(level,id)){ showToast('還有 SOP 掛在這裡，不能刪'); return; }
   if(!requireDelete()) return;
   var arr=(level===1?catL1():catL2());
   var i=arr.findIndex(function(c){ return c.id===id; });
@@ -1812,20 +1842,39 @@ function renderTemplatesSection(){
         +'</div>';
     }).join('');
   } else {
-    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此技術尚無查驗項目，點下方新增</div>';
+    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此 SOP 尚無查驗項目，點下方新增</div>';
   }
   // 按下「複製工法」才展開：列出已建立的工法，選一個複製（含所有查驗項目）
   var copyPickerHtml = '';
   if(S.showCopyPicker){
+    /* 2026-08-26：來源列出**全部** SOP（不限目前這一格），並且可以指定複製到哪個範圍／準則。
+     * 這樣「跨範圍複製」一步就到 —— 以前要先複製（複本落在原地）再按「🔀 搬到其他分類」，兩步。
+     * 目的地預設＝目前選到的那一格，所以「在原地複製一份」的舊行為完全沒變。 */
     var pick = TEMPLATES.filter(function(t){ return !t.void; });
-    copyPickerHtml = '<div class="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-3" data-mng>'
-      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個技術？（查驗項目會一起複製）</div>'
+    var dstOpts = function(level){
+      var arr=(level===1?catL1():catL2());
+      var cur=(level===1?S.cfgCat1:S.cfgCat2);
+      var o='<option value="">（未分類）</option>';
+      arr.forEach(function(c){
+        o+='<option value="'+esc(c.id)+'"'+(c.id===cur?' selected':'')+'>'+esc(((c.icon||'')+' '+c.name).trim())+'</option>';
+      });
+      return o;
+    };
+    copyPickerHtml = '<div class="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-3" data-mng data-copy-picker>'
+      +'<div class="text-xs font-semibold text-indigo-700 mb-2">複製到哪裡？</div>'
+      +'<div class="flex items-center gap-2 mb-1"><label class="text-xs text-gray-600 w-10 flex-shrink-0">範圍</label>'
+      +'<select id="copy-cat1" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">'+dstOpts(1)+'</select></div>'
+      +'<div class="flex items-center gap-2 mb-3"><label class="text-xs text-gray-600 w-10 flex-shrink-0">準則</label>'
+      +'<select id="copy-cat2" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">'+dstOpts(2)+'</select></div>'
+      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個 SOP？（查驗項目會一起複製）</div>'
       +(pick.length ? pick.map(function(t){
-          return '<button onclick="duplicateTemplate(\''+t.id+'\')" class="w-full text-left bg-white border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-indigo-400">'
+          var p=tplPath(t.id);
+          return '<button onclick="duplicateTemplate(\''+t.id+'\')" data-copy-src="'+esc(t.id)+'" class="w-full text-left bg-white border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-indigo-400">'
             +'<span class="text-sm font-medium text-gray-800">'+esc(t.name)+'</span>'
             +'<span class="text-xs text-gray-500 ml-2">'+((t.items||[]).length)+' 個查驗項目</span>'
+            +(p?'<span class="block text-xs text-gray-400 mt-0.5">'+esc(p)+'</span>':'')
             +'</button>';
-        }).join('') : '<div class="text-xs text-gray-500">尚無技術可複製</div>')
+        }).join('') : '<div class="text-xs text-gray-500">尚無 SOP 可複製</div>')
       +'<button onclick="toggleCopyPicker()" class="w-full text-xs text-gray-500 mt-1 py-1 hover:underline">取消</button>'
       +'</div>';
   }
@@ -1846,12 +1895,12 @@ function renderTemplatesSection(){
   var tplInfoHtml = '';
   if(tpl){
     tplInfoHtml = '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">'
-      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ 技術資訊</div>'
+      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ SOP 資訊</div>'
       +'<div class="space-y-2">'
       +'<div class="flex items-center gap-2">'
       +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">名稱</label>'
       +'<input type="text" value="'+esc(tpl.name||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
-      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="技術名稱">'
+      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="SOP 名稱">'
       +'</div>'
       +'<div class="flex items-center gap-2">'
       +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
@@ -1864,8 +1913,8 @@ function renderTemplatesSection(){
       +'<button onclick="toggleMovePicker()" data-mng class="text-xs text-blue-700 hover:underline font-medium">🔀 搬到其他分類</button>'
       +(tpl.void
         ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
-        : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此技術</button>')
-      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此技術</button>':'')
+        : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此 SOP</button>')
+      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此 SOP</button>':'')
       +'</div>'
       +'<div class="text-xs text-gray-500 mt-2">'
       +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
@@ -1875,14 +1924,14 @@ function renderTemplatesSection(){
       +'</div>';
   }
   /* 標題直接寫「正在編輯哪一張」＋它的三階路徑，跟上面那張卡的選擇對得起來 */
-  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">'+(tpl?('✏️ '+esc(tpl.name)):'✏️ 技術設定')+'</h3>'
+  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">'+(tpl?('✏️ '+esc(tpl.name)):'✏️ SOP 設定')+'</h3>'
     +(tpl?'<p class="text-xs text-gray-400 mb-3" data-tpl-path>'+esc(tplPath(tpl.id)||'📦 （未分類）')+'</p>':'')
     + copyPickerHtml
     +tplInfoHtml
     +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗項目（共 '+(tpl.items||[]).length+' 項）</div>'
       +itemsHtml
       +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗項目</button>')
-      : '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有技術 —— 點上面那張卡的「＋ 在這裡新增技術」</div>')
+      : '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有 SOP —— 點上面那張卡的「＋ 新增」→「SOP」</div>')
     +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
 }
 /* 搬家選單裡的分類下拉。選了先不生效，按「確定搬過去」才寫進去 —— 避免選到一半工法就從清單消失 */
@@ -1935,7 +1984,7 @@ function updateTplItem(tplId, itemId, field, value){
 function addTemplate(){
   if(mngGuard())return;
   cfgEnsureSel();
-  var newTpl = { id: uid(), name: '新技術', materialLabel: '材質',
+  var newTpl = { id: uid(), name: '新 SOP', materialLabel: '材質',
     cat1: (S.cfgCat1===UNCAT ? '' : S.cfgCat1),
     cat2: (S.cfgCat2===UNCAT ? '' : S.cfgCat2),
     items: [] };
@@ -1953,14 +2002,16 @@ function duplicateTemplate(tplId){
   S.showCopyPicker = false;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
-  if(!confirm('要複製技術「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
+  if(!confirm('要複製 SOP「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗項目會一起複製過去）')) return;
   var copy = {
     id: uid(),
     name: tpl.name + '（複本）',
     materialLabel: tpl.materialLabel,
     icon: tpl.icon,
-    cat1: tpl.cat1 || '',
-    cat2: tpl.cat2 || '',
+    /* 目的地由複製視窗上方那兩個下拉決定（預設＝目前選到的那一格）。
+     * 視窗沒開（例如直接呼叫）時退回沿用來源的分類，行為跟以前一樣。 */
+    cat1: (function(){ var e=$('copy-cat1'); return e ? e.value : (tpl.cat1 || ''); })(),
+    cat2: (function(){ var e=$('copy-cat2'); return e ? e.value : (tpl.cat2 || ''); })(),
     items: (tpl.items||[]).map(function(it){
       return { id: uid(), name: it.name, criterion: it.criterion || '' };
     })
@@ -1970,7 +2021,8 @@ function duplicateTemplate(tplId){
   S.cfgCat1 = tplCat(copy,1); S.cfgCat2 = tplCat(copy,2);
   syncTemplatesToConfig();
   renderCatsSection(); renderTemplatesSection(); renderHome();
-  showToast('已複製 — 請改名後儲存設定');
+  var where = tplPath(copy.id) || '（未分類）';
+  showToast('已複製到「'+where+'」— 請改名後儲存設定');
 }
 /* ── 作廢／恢復（2026-08-13 新增）──
  * 作廢＝停用不刪除：首頁選不到、不能新建；既有歷史報表為快照儲存，完全不受影響。
@@ -1980,7 +2032,7 @@ function voidTemplate(tplId){
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
   var live = TEMPLATES.filter(function(t){ return !t.void; });
-  if(live.length <= 1){ alert('至少要保留一個可用的技術，無法全部作廢。'); return; }
+  if(live.length <= 1){ alert('至少要保留一個可用的 SOP，無法全部作廢。'); return; }
   if(!confirm('確定把工法「'+tpl.name+'」設為作廢？\n\n・首頁不會再出現，無法新建這個工法的報表\n・既有歷史報表照常顯示、可列印\n・之後隨時可以在這裡按「恢復使用」')) return;
   tpl.void = true;
   syncTemplatesToConfig();
