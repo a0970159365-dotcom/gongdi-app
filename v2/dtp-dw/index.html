@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-08-26.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-08-26.3';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -326,6 +326,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <!-- ===== 進度總表 ===== -->
 <div id="page-main" class="page active">
   <div class="filter-bar">
+    <!-- 「＋ 新增紀錄」擺在最前面（2026-08-26 用戶指定）——
+         原本掛在整排篩選器的最右邊（margin-left:auto），視窗一窄就被擠到第二行找不到。 -->
+    <button class="btn btn-p btn-sm" onclick="openEdit(null)">＋ 新增紀錄</button>
     <input type="text" id="q" class="fi" placeholder="搜尋案場、執行者、工作內容..." style="max-width:220px" oninput="renderMain()">
     <div class="ms" id="ms-proj" style="max-width:190px;flex:0 1 190px">
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'proj')"><span id="mslb-proj">全部案場</span><span style="opacity:.5;font-size:11px">▾</span></button>
@@ -341,8 +344,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     </div>
     <button type="button" class="btn btn-g btn-sm" onclick="expandAll(true)">全部展開</button>
     <button type="button" class="btn btn-g btn-sm" onclick="expandAll(false)">全部隱藏</button>
-    <span id="result-count" style="font-size:12px;color:var(--muted)"></span>
-    <button class="btn btn-p btn-sm" style="margin-left:auto" onclick="openEdit(null)">＋ 新增紀錄</button>
+    <span id="result-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
   </div>
   <div id="main-table"></div>
 </div>

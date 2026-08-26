@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-26.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-26.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -356,7 +356,6 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <span id="access-badge" class="rw-badge no-print">✏️ 可編輯</span>
       </div>
       <div class="flex gap2 no-print">
-        <button class="btn btn-a btn-sm" onclick="newReport()">＋ 新增</button>
         <button class="btn btn-o btn-sm" onclick="navDay(-1)">◀</button>
         <button class="btn btn-o btn-sm" onclick="loadToday()">📅 今日</button>
         <button class="btn btn-o btn-sm" onclick="navDay(1)">▶</button>
@@ -373,6 +372,17 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <!-- 案場（2026-08-25 C批「一報表一案場」）──────────────────────────
            以前案場掛在每一列施工明細，一張日報可以混好幾個案場；現在升到報表層，
            整張報表只有一個案場，施工明細那欄已移除。必填，沒選不給存檔。 -->
+      <!-- 「＋ 新增日報表」移到案場正上方（2026-08-26 用戶指定）──────────────
+           以前這顆在右上角那排按鈕裡，而下面的案場下拉是可以直接選的 ——
+           等於「選案場」也能開始一張日報，繞過「要帶入舊的一張，還是開空白」那一步。
+           現在：沒按這顆之前案場是鎖住的，一定要走正規流程。
+           從歷史資料開啟／加入別人那張（loadReport）也算已開始，不會被鎖。 -->
+      <div class="no-print" style="margin-bottom:12px">
+        <button class="btn btn-a" onclick="newReport()" style="font-weight:800">＋ 新增日報表</button>
+        <span id="start-hint" style="display:none;margin-left:10px;font-size:12.5px;color:var(--warning);font-weight:700">
+          ← 請先按這裡建立日報表
+        </span>
+      </div>
       <div class="fg" style="margin-bottom:12px">
         <label class="fl">案場 <span style="color:var(--danger)">*</span></label>
         <select id="f-proj" class="fi" style="max-width:340px" onchange="onProjChange()"></select>
@@ -1604,6 +1614,8 @@ function checkLegacyProj(){
 /* 換案場：同部門＋同一天＋同案場才算同一張，所以案場一改就要重新判斷 */
 function onProjChange(){
   const sel = $('f-proj');
+  // 沒走正規流程就不給選案場 —— 選了等於直接開始一張新的日報表（2026-08-26 用戶指定）
+  if(!_reportStarted){ if(sel) sel.value=''; requireStarted(); return; }
   if(S.report){
     S.report.projId = sel ? (sel.value||'') : '';
     S.report.projName = (sel && sel.value) ? (sel.selectedOptions[0]?.text || '') : '';
@@ -1940,7 +1952,7 @@ function initReport() {
 var _reportStarted = false;
 function requireStarted(){
   if (_reportStarted) return true;
-  toast('請先按上方「＋ 新增」建立日報表','e');
+  toast('請先按上方「＋ 新增日報表」建立日報表','e');
   openCarryModal();
   return false;
 }
@@ -1968,8 +1980,23 @@ function _startNewReport(){
   onDateChange();
   return newR;
 }
+/* 還沒按「＋ 新增日報表」之前，基本資訊整區鎖住（2026-08-26 用戶指定）。
+ * 背景本來就掛著一張空白報表，不鎖的話直接選案場、打字就開始填了，
+ * 完全不會經過帶入視窗那一步 —— 這正是以前「另外開一張／漏了材料」的來源。 */
+function applyStartedLock(){
+  var lock = !_reportStarted;
+  var hint = $('start-hint');
+  if(hint) hint.style.display = lock ? '' : 'none';
+  ['f-proj','f-date','f-weather'].forEach(function(id){
+    var el = $(id); if(!el) return;
+    el.disabled = lock;
+    el.style.background = lock ? '#f1f5f9' : '';
+    el.title = lock ? '請先按上方「＋ 新增日報表」' : '';
+  });
+}
 function renderReport() {
   fillProjSelect();
+  applyStartedLock();
   checkLegacyProj();
   $('f-date').value = S.report.date||today();
   $('f-dow').value = S.report.date?'星期'+DOW[new Date(S.report.date+'T00:00:00').getDay()]:'';
