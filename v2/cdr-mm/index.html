@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-26.6';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-28.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -88,11 +88,22 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .ritem-date{min-width:56px;text-align:center;font-weight:800;color:var(--primary)}
 .ritem-date .day{font-size:20px;line-height:1}
 .ritem-date .mon{font-size:11px;color:var(--muted)}
-.ritem-info{flex:1}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
+.ritem-info{flex:1;min-width:0}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
+/* 歷史資料：案場名擺第一位（2026-08-28 用戶指定）。排序早就是「先案場、再日期」，
+   但左邊那塊大日期讓人第一眼還是看到日期，以為沒改 → 案場名放大、日期方塊縮小移到右側。 */
+.ritem-info h3.ritem-proj{font-size:16px;font-weight:800;color:var(--primary);letter-spacing:.3px;margin-bottom:2px}
+.ritem-date{min-width:48px;opacity:.75;padding-left:10px;border-left:1px solid var(--border)}
+.ritem-date .day{font-size:17px}
 .ritem-actions{display:flex;gap:5px}
 /* ── 日曆（2026-08-25 B批）── */
 .cal-wrap{max-width:780px}
 .cal-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}
+/* 日曆落地頁上方的兩條路（2026-08-28）：搜尋舊的／開新的 */
+.cal-entry{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.cal-entry-btn{font-weight:800;padding:9px 18px;font-size:14px}
+.cal-entry-hint{font-size:12px;color:var(--muted);transition:color .2s}
+.cal-entry-hint.on{color:var(--primary);font-weight:700}
+@media(max-width:600px){.cal-entry-btn{flex:1}.cal-entry-hint{width:100%}}
 .cal-title{font-weight:800;font-size:16px;color:var(--primary);min-width:140px;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .cal-dow{text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:3px 0}
@@ -141,6 +152,21 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .list-row input{flex:1;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit;background:#fff}
 .list-row input:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
 .list-num{font-size:11px;color:var(--muted);min-width:18px;text-align:center;font-weight:600}
+/* 兩層設定（2026-08-28 從 cdr-pm 移植）：施作位置→施工項目、廠商→施工人員 */
+.tl-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+.tl-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;overflow:hidden}
+.tl-head{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#f8fafc;border-bottom:1px solid var(--border)}
+.tl-group.collapsed .tl-head{border-bottom:none}
+.tl-head>input{flex:1;min-width:0;border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12.5px;font-weight:700;font-family:inherit;background:#fff}
+.tl-head>input:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
+.tl-toggle{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);padding:3px 5px;line-height:1}
+.tl-count{font-size:11px;color:var(--muted);white-space:nowrap;font-weight:600}
+.tl-body{padding:8px 9px 9px}
+.tl-group.collapsed .tl-body{display:none}
+.tl-body .list-row{margin-bottom:4px}
+.tl-sub-empty{font-size:11.5px;color:var(--muted);padding:2px 0 6px}
+.tl-add{display:flex;justify-content:flex-end;margin-top:6px}
+.tl-empty{font-size:12px;color:var(--muted);text-align:center;padding:14px 8px;border:1px dashed var(--border);border-radius:8px}
 .proj-checks{display:flex;flex-wrap:wrap;gap:6px}
 .proj-check{display:flex;align-items:center;gap:5px;font-size:12px;background:var(--bg);padding:4px 10px;border-radius:5px;cursor:pointer;user-select:none;border:1px solid var(--border)}
 .proj-check:hover{background:#e2e8f0}
@@ -393,7 +419,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <input type="text" id="f-dept" class="fi" readonly>
         </div>
         <div class="fg" style="grid-column:span 2">
-          <label class="fl">負責人</label>
+          <label class="fl">專案工務</label>
           <input type="text" id="f-reporter" class="fi" readonly>
         </div>
       </div>
@@ -407,7 +433,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button class="btn btn-o btn-sm no-print" onclick="copySummary()">📋 複製</button>
     </div>
     <div class="card-body">
-      <textarea id="f-summary" class="fi summary-box" rows="4" readonly placeholder="— 請先在下方施工明細新增班組，摘要將自動生成 —"></textarea>
+      <textarea id="f-summary" class="fi summary-box" rows="4" readonly placeholder="— 請先在下方施工明細新增工項，摘要將自動生成 —"></textarea>
       <p style="font-size:11px;color:var(--muted);margin-top:5px">* 自動從施工明細生成，點「複製」後可直接貼入電子郵件</p>
       <div class="pv" id="f-summary-pv"></div>
     </div>
@@ -417,7 +443,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <div class="card">
     <div class="card-header">
       <span class="card-title">施工明細</span>
-      <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRowBtn()">＋ 新增班組</button>
+      <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRowBtn()">＋ 新增工項</button>
     </div>
     <div class="tbl-wrap">
       <table class="wtbl">
@@ -426,9 +452,11 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th style="width:28px">#</th>
             <th style="min-width:90px">施作位置</th>
             <th style="min-width:100px">施工項目</th>
-            <th style="min-width:78px">今日班組</th>
+            <th style="min-width:88px">今日廠商</th>
+            <th style="min-width:88px">今日<br>施工人員</th>
             <th style="width:64px">今日<br>出工</th>
-            <th style="min-width:78px">明日班組</th>
+            <th style="min-width:88px">明日廠商</th>
+            <th style="min-width:88px">明日<br>施工人員</th>
             <th style="width:64px">明日<br>出工</th>
             <th style="width:76px">完成<br>進度%</th>
             <th style="min-width:90px">異常類型</th>
@@ -440,8 +468,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <tfoot>
           <tr class="tfoot-row">
             <td colspan="3" style="text-align:right;padding-right:10px">合計</td>
-            <td></td><td id="tot-today">0</td>
-            <td></td><td id="tot-tmrw">0</td>
+            <td></td><td></td><td id="tot-today">0</td>
+            <td></td><td></td><td id="tot-tmrw">0</td>
             <td colspan="4"></td>
           </tr>
         </tfoot>
@@ -566,9 +594,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <thead>
             <tr>
               <th style="width:36px"></th>
+              <th>案場</th>
               <th>日期</th>
               <th>部門</th>
-              <th>負責人</th>
+              <th>專案工務</th>
               <th>今日出工</th>
               <th>明日預估</th>
             </tr>
@@ -593,6 +622,13 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button class="btn btn-o btn-sm" onclick="calGoToday()">回到本月</button>
     </div>
     <div class="card-body">
+      <!-- 進 App 的落地頁（2026-08-28 用戶指定）：上方兩條路 —— 找舊的／開新的。
+           以前一進來停在「日報填寫」，還會自動彈出新增視窗。 -->
+      <div class="cal-entry">
+        <button id="cal-mode-search" class="btn btn-p cal-entry-btn" onclick="calModeSearch()">🔍 搜尋</button>
+        <button class="btn btn-a cal-entry-btn" onclick="calModeNew()">＋ 新增日報</button>
+        <span class="cal-entry-hint" id="cal-entry-hint">點下面的日期，看那天的日報</span>
+      </div>
       <div class="cal-bar">
         <button class="btn btn-o btn-sm" onclick="calShift(-1)">‹ 上個月</button>
         <span class="cal-title" id="cal-title">—</span>
@@ -685,7 +721,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <select id="ex-loc" class="fi"><option value="">全部</option></select>
         </div>
         <div class="fg">
-          <label class="fl">施工班組</label>
+          <label class="fl">施工廠商</label>
           <select id="ex-lead" class="fi"><option value="">全部</option></select>
         </div>
         <div class="fg">
@@ -724,9 +760,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <table class="stbl" id="ex-tbl">
         <thead>
           <tr>
-            <th>日期</th><th>部門</th><th>負責人</th><th>專案/工地</th>
-            <th>施作位置</th><th>施工項目</th><th>今日班組</th>
-            <th>今日出工</th><th>明日班組</th><th>明日出工</th>
+            <th>日期</th><th>部門</th><th>專案工務</th><th>專案/工地</th>
+            <th>施作位置</th><th>施工項目</th><th>今日廠商</th><th>今日施工人員</th>
+            <th>今日出工</th><th>明日廠商</th><th>明日施工人員</th><th>明日出工</th>
             <th>完成進度%</th><th>異常類型</th><th>異常說明</th>
           </tr>
         </thead>
@@ -808,19 +844,24 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <span style="font-size:13px;font-weight:700;color:var(--primary)">群組四：施工明細設定</span>
         <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
       </div>
-      <div class="g g3" style="gap:12px">
-        <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">施作位置</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-locs')">＋ 新增</button></div>
-          <div class="list-field" id="lf-locs"></div>
+      <!-- 4-1 施作位置 → 施工項目（兩層，2026-08-28 用戶指定，與 cdr-pm 同一套） -->
+      <div class="fg" style="margin-bottom:18px">
+        <div class="flex-b mb2">
+          <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
+          <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
         </div>
-        <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">施工項目</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-works')">＋ 新增</button></div>
-          <div class="list-field" id="lf-works"></div>
+        <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
+        <div id="loc-groups"></div>
+      </div>
+
+      <!-- 4-2 廠商 → 施工人員（兩層） -->
+      <div class="fg">
+        <div class="flex-b mb2">
+          <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
+          <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
         </div>
-        <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">班組/領班</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-leads')">＋ 新增</button></div>
-          <div class="list-field" id="lf-leads"></div>
-        </div>
+        <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
+        <div id="vendor-groups"></div>
       </div>
 
       <!-- 底部按鈕 -->
@@ -872,7 +913,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
         <input type="checkbox" id="carry-notes" checked> 注意事項</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-work" checked> 班組</label>
+        <input type="checkbox" id="carry-work" checked> 工項</label>
     </div>
 
     <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
@@ -969,9 +1010,14 @@ const S = {
   cfg: {
     projects: [],
     depts: ['專案管理部','工程部','景觀部','監造部'],
+    /* 兩層化（2026-08-28）：locs→worksByLoc、vendors→staffByVendor。
+       舊的 works／leads 兩張平清單留著不刪 —— 還沒搬過的雲端資料要靠它們才顯示得出來。 */
     leads: [],
     locs: [],
     works: [],
+    vendors: [],
+    worksByLoc: {},
+    staffByVendor: {},
     matNames: [],
     matUnits: [],
     users: []
@@ -1274,6 +1320,13 @@ function loadToday() {
   $('f-date').value = today();
   onDateChange();
 }
+/* 開機用：只把日期填成今天，不走 requireStarted 那道守門（2026-08-28）。
+   以前開機走 loadToday() → requireStarted() → 直接彈出「新增日報表」視窗＋右下紅字，
+   使用者還沒做任何事就被視窗擋住，這不是守門的用意。 */
+function initTodayDate() {
+  $('f-date').value = today();
+  onDateChange();
+}
 
 /* ══════════ 案場（C 批：一報表一案場，2026-08-25）══════════
  * 拆分腳本跑完之前，雲端還留著「案場掛在每一列工項」的舊報表，
@@ -1474,7 +1527,7 @@ function carryRow(r, checked){
       <span style="font-weight:700;color:var(--primary);min-width:92px">${escHtml(r.date||'—')}</span>
       ${r.date === td ? '<span style="background:#fef3c7;color:#92400e;font-weight:700;font-size:11px;border-radius:10px;padding:1px 7px;white-space:nowrap">今天</span>' : ''}
       <span style="flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere">${escHtml(r.reporter||'—')}</span>
-      <span style="color:var(--muted);font-size:12px;white-space:nowrap">班組 ${(r.workItems||[]).length} 筆・材料 ${(r.materials||[]).length} 筆</span>
+      <span style="color:var(--muted);font-size:12px;white-space:nowrap">工項 ${(r.workItems||[]).length} 筆・材料 ${(r.materials||[]).length} 筆</span>
     </label>`;
 }
 
@@ -1655,7 +1708,7 @@ function carryApply(){
   }
   if (wantWork && (src.workItems||[]).length) {
     (src.workItems||[]).forEach(it => addRow({ ...it, id:uid() }));
-    brought.push(`班組 ${src.workItems.length} 筆`);
+    brought.push(`工項 ${src.workItems.length} 筆`);
   }
   if (wantNotes) {
     const n = src.notes || {};
@@ -1683,7 +1736,11 @@ function initReport() {
   S.report = newR;
   renderReport();
   applyPermissions();
-  loadToday();
+  /* 落地頁＝日曆（2026-08-28 用戶指定）。
+     以前停在「日報填寫」，而且 loadToday() 會觸發守門式的新增視窗，
+     等於一進來就被彈窗擋住。現在改成先看日曆，要新增再按上方那顆。 */
+  initTodayDate();
+  goPage('cal');
 }
 function newReport() {
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
@@ -1805,10 +1862,12 @@ function addRow(it) {
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
     <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)">${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
-    <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)">${selOpts(S.cfg.works,v('work'),'施工項目...')}</select></td>
-    <td data-label="今日班組"><select class="cs" data-f="lead" onchange="syncReport()">${selOpts(S.cfg.leads,v('lead'),'班組/領班...')}</select></td>
+    <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)">${selOpts(worksOf(v('loc')),v('work'),'施工項目...')}</select></td>
+    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)">${selOpts(S.cfg.vendors,v('vendor'),'廠商...')}</select></td>
+    <td data-label="今日施工人員"><select class="cs" data-f="staff" onchange="syncReport()">${selOpts(staffOf(v('vendor')),v('staff')||v('lead'),'施工人員...')}</select></td>
     <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
-    <td data-label="明日班組"><select class="cs" data-f="lead2" onchange="syncReport()">${selOpts(S.cfg.leads,v('lead2'),'班組/領班...')}</select></td>
+    <td data-label="明日廠商"><select class="cs" data-f="vendor2" onchange="onRowChange(this)">${selOpts(S.cfg.vendors,v('vendor2'),'廠商...')}</select></td>
+    <td data-label="明日施工人員"><select class="cs" data-f="staff2" onchange="syncReport()">${selOpts(staffOf(v('vendor2')),v('staff2')||v('lead2'),'施工人員...')}</select></td>
     <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
     <td data-label="完成進度%">
       <div class="prog-wrap">
@@ -1833,7 +1892,31 @@ function selOpts(presets, cur, ph) {
   return `<option value="">${ph}</option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
-function onRowChange(el) { buildSummary(); syncReport(); }
+/* 兩層化（2026-08-28）之前，一列明細只有一個「班組/領班」＝ lead／lead2。
+ * 搬移腳本會把 lead 寫進 staff，但雲端可能還有沒搬到的舊報表（別台裝置離線存的等等），
+ * 所以顯示與匯出一律走這四個取值器，不要直接讀 wi.staff —— 否則舊報表會整欄空白。 */
+function wiVendor(wi){ return (wi&&wi.vendor)||''; }
+function wiStaff(wi){ return (wi&&(wi.staff||wi.lead))||''; }
+function wiVendor2(wi){ return (wi&&wi.vendor2)||''; }
+function wiStaff2(wi){ return (wi&&(wi.staff2||wi.lead2))||''; }
+function worksOf(loc){ return (S.cfg.worksByLoc&&S.cfg.worksByLoc[loc])||[]; }
+function staffOf(vendor){ return (S.cfg.staffByVendor&&S.cfg.staffByVendor[vendor])||[]; }
+/* 第一層改變時，重建它底下的第二層下拉（2026-08-28 兩層化，與 cdr-pm 同一套）。
+ * 舊值若還在新清單裡就保留，不在就清空（避免留下對不上的組合）。 */
+function onRowChange(el) {
+  const tr=el.closest('tr'), f=el.dataset&&el.dataset.f;
+  if(tr){
+    if(f==='loc'){
+      const list=worksOf(el.value), sel=tr.querySelector('[data-f="work"]');
+      if(sel) sel.innerHTML=selOpts(list, list.includes(sel.value)?sel.value:'', '施工項目...');
+    } else if(f==='vendor'||f==='vendor2'){
+      const list=staffOf(el.value);
+      const sel=tr.querySelector(f==='vendor'?'[data-f="staff"]':'[data-f="staff2"]');
+      if(sel) sel.innerHTML=selOpts(list, list.includes(sel.value)?sel.value:'', '施工人員...');
+    }
+  }
+  buildSummary(); syncReport();
+}
 function updProg(inp) {
   const v = Math.min(100,Math.max(0,parseFloat(inp.value)||0));
   const fill = inp.closest('.prog-wrap')?.querySelector('.prog-bar-fill');
@@ -1847,7 +1930,7 @@ function recalc() {
     const w0 = parseFloat(tr.querySelector('[data-f="w0"]')?.value)||0;
     const w1 = parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0;
     t0+=w0; t1+=w1;
-    if (w0===0 && tr.querySelector('[data-f="lead"]')?.value) {
+    if (w0===0 && tr.querySelector('[data-f="vendor"]')?.value) {
       tr.classList.add('row-zero');
       const at=tr.querySelector('[data-f="atype"]');
       if (at&&!at.value) at.classList.add('atype-warn');
@@ -1867,9 +1950,11 @@ function collectRows() {
       id: tr.dataset.id||uid(),
       loc: tr.querySelector('[data-f="loc"]')?.value||'',
       work: tr.querySelector('[data-f="work"]')?.value||'',
-      lead: tr.querySelector('[data-f="lead"]')?.value||'',
+      vendor: tr.querySelector('[data-f="vendor"]')?.value||'',
+      staff: tr.querySelector('[data-f="staff"]')?.value||'',
       w0: parseFloat(tr.querySelector('[data-f="w0"]')?.value)||0,
-      lead2: tr.querySelector('[data-f="lead2"]')?.value||'',
+      vendor2: tr.querySelector('[data-f="vendor2"]')?.value||'',
+      staff2: tr.querySelector('[data-f="staff2"]')?.value||'',
       w1: parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0,
       progress: parseFloat(tr.querySelector('[data-f="progress"]')?.value)||0,
       atype: tr.querySelector('[data-f="atype"]')?.value||'',
@@ -2118,6 +2203,17 @@ function calShift(n){
 function calGoToday(){ CAL.ym = today().slice(0,7); CAL.sel = today(); renderCal(); }
 function calPick(ds){ CAL.sel = ds; renderCal(); }
 
+/* 日曆落地頁的兩顆鈕（2026-08-28）。
+   「搜尋」＝維持日曆本身的行為（點日期→列出那天的日報），按了會回到本月並把提示打亮；
+   「新增日報」＝走原本的「＋ 新增」流程（帶入視窗），不繞過任何一步。 */
+function calModeSearch(){
+  const hint=$('cal-entry-hint');
+  if(hint){ hint.classList.add('on'); setTimeout(()=>hint.classList.remove('on'), 1200); }
+  calGoToday();
+}
+function calModeNew(){
+  newReport();
+}
 function renderCal(){
   if (!CAL.ym){
     const ds = visibleReports().map(r=>r.date).filter(Boolean).sort();
@@ -2237,12 +2333,12 @@ function renderHistory() {
     const div=document.createElement('div');
     div.className='ritem';
     div.innerHTML=`
-      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
       <div class="ritem-info">
-        <h3>${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
+        <h3 class="ritem-proj">${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
+        <p class="ritem-when">📅 ${r.date}（${DOW[d.getDay()]}）／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
         <p>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</p>
-        <p>${r.date} ／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
       </div>
+      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
       <div class="ritem-actions">
         <button class="btn btn-o btn-sm" onclick="openReportFromHistory('${r.id}')">開啟</button>
         ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>`:''}
@@ -2297,7 +2393,8 @@ function renderMgmt(){
     if(dept&&r.dept!==dept)return false;
     if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return false;
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)||a.dept?.localeCompare(b.dept||'')||0);
+  /* 管理總表也照「先案場、再日期」（2026-08-28 用戶指定，與歷史資料同一套 histSort）*/
+  }).sort((a,b)=>histSort(a,b)||(a.dept||'').localeCompare(b.dept||''));
   const tbody=$('master-tbody'); tbody.innerHTML='';
   $('mgmt-empty').style.display=list.length?'none':'block';
   list.forEach(r=>{
@@ -2307,6 +2404,7 @@ function renderMgmt(){
     tr.className='master-row';
     tr.innerHTML=`
       <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
+      <td style="font-weight:700">${escHtml(reportProjName(r)||'（未指定案場）')}</td>
       <td>${r.date}</td>
       <td>${escHtml(r.dept||'—')}</td>
       <td>${escHtml(r.reporter||'—')}</td>
@@ -2315,7 +2413,7 @@ function renderMgmt(){
     tbody.appendChild(tr);
     const det=document.createElement('tr');
     det.className='detail-row'; det.id='det-'+r.id; det.style.display='none';
-    det.innerHTML=`<td colspan="6"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
+    det.innerHTML=`<td colspan="7"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
     tbody.appendChild(det);
   });
 }
@@ -2330,11 +2428,11 @@ function toggleDetail(btn,id){
     const inner=$('det-inner-'+id);
     const rows=(r.workItems||[]).map((wi,i)=>`
       <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
-      <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wi.lead||'—')}</td>
+      <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wiVendor(wi)||'—')}</td><td>${escHtml(wiStaff(wi)||'—')}</td>
       <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td></tr>`).join('');
     inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
       <table class="stbl" style="font-size:12px">
-      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>班組</th><th>出工</th><th>進度</th></tr></thead>
+      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
       ${r.notes?.contact?`<p style="margin-top:8px;font-size:12px"><strong>工聯絡：</strong>${escHtml(r.notes.contact)}</p>`:''}`;
   }
@@ -2371,7 +2469,7 @@ function initExportPage(){
     sel.innerHTML='<option value="">全部</option>';
     let items=[];
     if(id==='ex-loc') items=[...new Set(visibleReports().flatMap(r=>r.workItems||[]).map(wi=>wi.loc).filter(Boolean))];
-    if(id==='ex-lead') items=[...new Set(visibleReports().flatMap(r=>r.workItems||[]).map(wi=>wi.lead).filter(Boolean))];
+    if(id==='ex-lead') items=[...new Set(visibleReports().flatMap(r=>r.workItems||[]).map(wi=>wiVendor(wi)||wiStaff(wi)).filter(Boolean))];
     if(id==='ex-mat') items=[...new Set(visibleReports().flatMap(r=>r.materials||[]).map(m=>m.name).filter(Boolean))];
     if(id==='ex-dept') items=[...new Set(visibleReports().map(r=>r.dept).filter(Boolean))];
     items.forEach(v=>sel.appendChild(Object.assign(document.createElement('option'),{value:v,textContent:v})));
@@ -2424,19 +2522,30 @@ function getExRows(){
       const pnm = rpid ? (r.projName || reportProjName(r)) : (wi.projName || '');
       if(selProjIds.size>0&&!selProjIds.has(pid))return;
       if(locF&&wi.loc!==locF)return;
-      if(leadF&&wi.lead!==leadF)return;
+      if(leadF&&wiVendor(wi)!==leadF&&wiStaff(wi)!==leadF)return;
       if(wi.w0<wMin||wi.w0>wMax)return;
       rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi,projId:pid,projName:pnm});
     });
     if(matF){
       (r.materials||[]).filter(m=>m.name===matF).forEach(m=>{
         rows.push({date:r.date,dept:r.dept,reporter:r.reporter,projId:'',projName:'',
-          loc:'',work:'',lead:'',w0:'',lead2:'',w1:'',progress:'',atype:'',anote:'',
+          loc:'',work:'',vendor:'',staff:'',w0:'',vendor2:'',staff2:'',w1:'',progress:'',atype:'',anote:'',
           _matRow:true,matName:m.name,matQty:m.qty,matUnit:m.unit});
       });
     }
   });
-  return rows.sort((a,b)=>b.date.localeCompare(a.date));
+  /* 報表下載也照「先案場、再日期」（2026-08-28 用戶指定）。
+     這裡的一列是「工項」不是「報表」，所以不能直接用 histSort，改比 row.projName；
+     沒案場的（材料列、舊資料）一律排最後，判準與 histSort 一致。 */
+  return rows.sort((a,b)=>{
+    const pa=a.projName||'', pb=b.projName||'';
+    if(pa!==pb){
+      if(!pa) return 1;
+      if(!pb) return -1;
+      return pa.localeCompare(pb,'zh-Hant',{numeric:true});
+    }
+    return String(b.date||'').localeCompare(String(a.date||''));
+  });
 }
 function previewExport(){
   const rows=getExRows();
@@ -2447,13 +2556,13 @@ function previewExport(){
   rows.slice(0,200).forEach(r=>{
     const tr=document.createElement('tr');
     tr.innerHTML=[r.date,r.dept,r.reporter,r._matRow?'(材料)':escHtml(r.projName||''),
-      escHtml(r.loc||''),escHtml(r.work||''),escHtml(r.lead||''),
-      r.w0!==''?r.w0:'',escHtml(r.lead2||''),r.w1!==''?r.w1:'',
+      escHtml(r.loc||''),escHtml(r.work||''),escHtml(wiVendor(r)),escHtml(wiStaff(r)),
+      r.w0!==''?r.w0:'',escHtml(wiVendor2(r)),escHtml(wiStaff2(r)),r.w1!==''?r.w1:'',
       r.progress!==''?r.progress+'%':'',escHtml(r.atype||''),escHtml(r.anote||'')]
       .map(v=>`<td>${v}</td>`).join('');
     tbody.appendChild(tr);
   });
-  if(rows.length>200) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="13" style="text-align:center;color:var(--muted)">... 僅顯示前 200 筆，匯出 Excel 將包含全部 ${rows.length} 筆</td></tr>`);
+  if(rows.length>200) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="15" style="text-align:center;color:var(--muted)">... 僅顯示前 200 筆，匯出 Excel 將包含全部 ${rows.length} 筆</td></tr>`);
 }
 function doExport(){
   const rows=getExRows();
@@ -2469,7 +2578,7 @@ async function doExportExcel(rows){
   try{
     const wb=new ExcelJS.Workbook();
     const ws=wb.addWorksheet('日報表-瑪摩工程');
-    const headers=['日期','部門','負責人','專案/工地','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成進度%','異常類型','異常說明'];
+    const headers=['日期','部門','專案工務','專案/工地','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','異常說明'];
     ws.addRow(headers);
     ws.getRow(1).eachCell(cell=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
@@ -2480,7 +2589,7 @@ async function doExportExcel(rows){
     ws.getRow(1).height=22;
     rows.forEach((r,i)=>{
       const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.loc||'',r.work||'',
-        r.lead||'',r.w0,r.lead2||'',r.w1,r.progress,r.atype||'',r.anote||'']);
+        wiVendor(r),wiStaff(r),r.w0,wiVendor2(r),wiStaff2(r),r.w1,r.progress,r.atype||'',r.anote||'']);
       if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
       row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
     });
@@ -2529,10 +2638,10 @@ async function exportExcel(){
     // 工項
     if(hasWork){
       const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','施作位置','施工項目','今日班組','今日出工','明日班組','明日出工','完成%','異常類型','異常說明'];
+      const headers=['#','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','異常說明'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
-        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wi.lead||'',wi.w0||0,wi.lead2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
+        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wiVendor(wi),wiStaff(wi),wi.w0||0,wiVendor2(wi),wiStaff2(wi),wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -2591,22 +2700,153 @@ function addNoteRow(ws, label, text, lastCol, colw){
   return row;
 }
 
+/* ── 兩層設定編輯器（2026-08-12）──
+ * 「施作位置→施工項目」與「廠商→施工人員」形狀完全一樣，共用同一支渲染器，差別只有 key 與文案。
+ * 編輯（改名／新增／刪除）當下就寫進 S.cfg，按「💾 儲存設定」才真的存檔＋推上雲 —— 與這頁其他區塊一致。
+ * ⚠️ 刪除鈕一律用 onmousedown + preventDefault：input 的 onblur 會先觸發並重繪，
+ *    用 onclick 的話按鈕在 click 送達前就被重繪掉了，等於按不動。
+ */
+const TL_DEFS = {
+  loc:    { host:'loc-groups',    parentKey:'locs',    childKey:'worksByLoc',    parentName:'施作位置', childName:'施工項目' },
+  vendor: { host:'vendor-groups', parentKey:'vendors', childKey:'staffByVendor', parentName:'廠商',     childName:'施工人員' },
+};
+const tlCollapsed = { loc:{}, vendor:{} };   // 記住哪些群組收合中，重繪後維持原狀
+
+function renderTwoLevel(kind){
+  const def=TL_DEFS[kind], host=$(def.host);
+  if(!host) return;
+  const parents=S.cfg[def.parentKey]||[], map=S.cfg[def.childKey]||{}, canDel=portalCanDelete();
+  if(!parents.length){
+    host.innerHTML=`<div class="tl-empty">尚無${def.parentName}，點右上「＋ 新增${def.parentName}」開始建立</div>`;
+    return;
+  }
+  host.innerHTML=parents.map((p,pi)=>{
+    const kids=map[p]||[];
+    const collapsed=tlCollapsed[kind][p]?' collapsed':'';
+    const kidRows=kids.length
+      ? kids.map((k,ki)=>`<div class="list-row">
+            <span class="list-num">${ki+1}</span>
+            <input type="text" value="${escHtml(k)}" placeholder="${def.childName}名稱" onblur="tlRenameChild('${kind}',${pi},${ki},this.value)">
+            ${canDel?`<button class="btn btn-g btn-icon btn-sm" onmousedown="event.preventDefault();tlDelChild('${kind}',${pi},${ki})" title="刪除">✕</button>`:''}
+          </div>`).join('')
+      : `<div class="tl-sub-empty">這個${def.parentName}底下還沒有${def.childName}</div>`;
+    return `<div class="tl-group${collapsed}">
+        <div class="tl-head">
+          <button class="tl-toggle" onmousedown="event.preventDefault();tlToggle('${kind}',${pi})" title="展開／收合">${collapsed?'▶':'▼'}</button>
+          <input type="text" value="${escHtml(p)}" placeholder="${def.parentName}名稱" onblur="tlRenameParent('${kind}',${pi},this.value)">
+          <span class="tl-count">${kids.length} 項</span>
+          ${canDel?`<button class="btn btn-g btn-icon btn-sm" onmousedown="event.preventDefault();tlDelParent('${kind}',${pi})" title="刪除整個${def.parentName}">✕</button>`:''}
+        </div>
+        <div class="tl-body">
+          ${kidRows}
+          <div class="tl-add"><button class="btn btn-a btn-sm" data-mng onclick="tlAddChild('${kind}',${pi})">＋ 新增${def.childName}</button></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+function tlToggle(kind,pi){
+  const p=S.cfg[TL_DEFS[kind].parentKey][pi];
+  tlCollapsed[kind][p]=!tlCollapsed[kind][p];
+  renderTwoLevel(kind);
+}
+function tlAddParent(kind){
+  if(mngGuard())return;
+  const def=TL_DEFS[kind], arr=S.cfg[def.parentKey];
+  let name='新'+def.parentName, n=2;
+  while(arr.includes(name)) name='新'+def.parentName+(n++);
+  arr.push(name);
+  S.cfg[def.childKey][name]=[];
+  tlCollapsed[kind][name]=false;
+  renderTwoLevel(kind);
+  const inp=$(def.host).querySelectorAll('.tl-head > input')[arr.length-1];
+  if(inp){ inp.focus(); inp.select(); }
+}
+function addLocGroup(){ tlAddParent('loc'); }
+function addVendorGroup(){ tlAddParent('vendor'); }
+function tlRenameParent(kind,pi,val){
+  if(mngGuard()){renderTwoLevel(kind);return;}
+  const def=TL_DEFS[kind], arr=S.cfg[def.parentKey], map=S.cfg[def.childKey];
+  const old=arr[pi], name=(val||'').trim();
+  if(name===old) return;                 // 沒改就不重繪，否則會把後續的按鈕點擊吃掉
+  if(!name){ toast(def.parentName+'名稱不可空白','e'); renderTwoLevel(kind); return; }
+  if(arr.includes(name)){ toast(`${def.parentName}「${name}」已存在`,'e'); renderTwoLevel(kind); return; }
+  arr[pi]=name;
+  map[name]=map[old]||[];
+  delete map[old];
+  if(tlCollapsed[kind][old]){ tlCollapsed[kind][name]=true; delete tlCollapsed[kind][old]; }
+  renderTwoLevel(kind);
+}
+function tlDelParent(kind,pi){
+  if(mngGuard())return;
+  if(!requireDelete()) return;
+  const def=TL_DEFS[kind], arr=S.cfg[def.parentKey], map=S.cfg[def.childKey];
+  const name=arr[pi], kids=(map[name]||[]).length;
+  if(!confirm(`確定刪除${def.parentName}「${name}」？`+(kids?`\n底下的 ${kids} 個${def.childName}會一併刪除。`:''))) return;
+  arr.splice(pi,1);
+  delete map[name];
+  delete tlCollapsed[kind][name];
+  renderTwoLevel(kind);
+}
+function tlAddChild(kind,pi){
+  if(mngGuard())return;
+  const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
+  const map=S.cfg[def.childKey];
+  if(!Array.isArray(map[p])) map[p]=[];
+  map[p].push('');                       // 先放空白列，使用者輸入後 onblur 才寫回；留空＝自動取消
+  tlCollapsed[kind][p]=false;
+  renderTwoLevel(kind);
+  const grp=$(def.host).querySelectorAll('.tl-group')[pi];
+  const inps=grp?grp.querySelectorAll('.tl-body input'):[];
+  if(inps.length) inps[inps.length-1].focus();
+}
+function tlRenameChild(kind,pi,ki,val){
+  if(mngGuard()){renderTwoLevel(kind);return;}
+  const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
+  const list=S.cfg[def.childKey][p]||[];
+  const name=(val||'').trim();
+  // 留白＝取消這一列。這個判斷一定要排在「沒改就不重繪」之前 ——
+  // tlAddChild 是先塞一個空字串再讓使用者輸入，若使用者直接離開，
+  // 新舊值都是空字串會被判定成「沒改」而留下一列空白。
+  if(!name){ list.splice(ki,1); renderTwoLevel(kind); return; }
+  if(name===list[ki]) return;             // 沒改就不重繪（避免吃掉下一次點擊）
+  if(list.some((x,i)=>i!==ki&&x===name)){ toast(`${def.childName}「${name}」已存在`,'e'); renderTwoLevel(kind); return; }
+  list[ki]=name;
+  renderTwoLevel(kind);
+}
+function tlDelChild(kind,pi,ki){
+  if(mngGuard())return;
+  if(!requireDelete()) return;
+  const def=TL_DEFS[kind], p=S.cfg[def.parentKey][pi];
+  const list=S.cfg[def.childKey][p]||[];
+  list.splice(ki,1);
+  renderTwoLevel(kind);
+}
+/* 存檔前把空白項掃掉（新增後沒填就切走會留下空字串） */
+function tlCleanup(){
+  ['loc','vendor'].forEach(kind=>{
+    const def=TL_DEFS[kind];
+    S.cfg[def.parentKey]=(S.cfg[def.parentKey]||[]).filter(Boolean);
+    const map=S.cfg[def.childKey]||{};
+    Object.keys(map).forEach(k=>{
+      if(!S.cfg[def.parentKey].includes(k)) { delete map[k]; return; }
+      map[k]=(map[k]||[]).filter(Boolean);
+    });
+  });
+}
+
 /* ── SETTINGS ── */
 function loadCfgForm(){
-  loadListField('lf-locs',S.cfg.locs);
-  loadListField('lf-works',S.cfg.works);
-  loadListField('lf-leads',S.cfg.leads);
   loadListField('lf-matnames',S.cfg.matNames);
   loadListField('lf-matunits',S.cfg.matUnits);
+  renderTwoLevel('loc');
+  renderTwoLevel('vendor');
   renderProjTable();
 }
 function saveSettings(){
   if(mngGuard())return;
-  S.cfg.locs = readListField('lf-locs');
-  S.cfg.works = readListField('lf-works');
-  S.cfg.leads = readListField('lf-leads');
   S.cfg.matNames = readListField('lf-matnames');
   S.cfg.matUnits = readListField('lf-matunits');
+  tlCleanup();   // 兩層設定在編輯當下已寫進 S.cfg，這裡只清空白
   save(); toast('設定已儲存','s');
   // Refresh form dropdowns
   if(S.page==='report') renderReport();

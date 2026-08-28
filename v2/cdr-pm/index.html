@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-26.7';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-28.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -91,11 +91,22 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .ritem-date{min-width:56px;text-align:center;font-weight:800;color:var(--primary)}
 .ritem-date .day{font-size:20px;line-height:1}
 .ritem-date .mon{font-size:11px;color:var(--muted)}
-.ritem-info{flex:1}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
+.ritem-info{flex:1;min-width:0}.ritem-info h3{font-size:14px;font-weight:700}.ritem-info p{font-size:12px;color:var(--muted)}
+/* 歷史資料：案場名擺第一位（2026-08-28 用戶指定）。排序早就是「先案場、再日期」，
+   但左邊那塊大日期讓人第一眼還是看到日期，以為沒改 → 案場名放大、日期方塊縮小移到右側。 */
+.ritem-info h3.ritem-proj{font-size:16px;font-weight:800;color:var(--primary);letter-spacing:.3px;margin-bottom:2px}
+.ritem-date{min-width:48px;opacity:.75;padding-left:10px;border-left:1px solid var(--border)}
+.ritem-date .day{font-size:17px}
 .ritem-actions{display:flex;gap:5px}
 /* ── 日曆（2026-08-25 B批）── */
 .cal-wrap{max-width:780px}
 .cal-bar{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}
+/* 日曆落地頁上方的兩條路（2026-08-28）：搜尋舊的／開新的 */
+.cal-entry{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--border)}
+.cal-entry-btn{font-weight:800;padding:9px 18px;font-size:14px}
+.cal-entry-hint{font-size:12px;color:var(--muted);transition:color .2s}
+.cal-entry-hint.on{color:var(--primary);font-weight:700}
+@media(max-width:600px){.cal-entry-btn{flex:1}.cal-entry-hint{width:100%}}
 .cal-title{font-weight:800;font-size:16px;color:var(--primary);min-width:140px;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .cal-dow{text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding:3px 0}
@@ -596,6 +607,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <thead>
             <tr>
               <th style="width:36px"></th>
+              <th>案場</th>
               <th>日期</th>
               <th>部門</th>
               <th>專案工務</th>
@@ -623,6 +635,13 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button class="btn btn-o btn-sm" onclick="calGoToday()">回到本月</button>
     </div>
     <div class="card-body">
+      <!-- 進 App 的落地頁（2026-08-28 用戶指定）：上方兩條路 —— 找舊的／開新的。
+           以前一進來停在「日報填寫」，還會自動彈出新增視窗。 -->
+      <div class="cal-entry">
+        <button id="cal-mode-search" class="btn btn-p cal-entry-btn" onclick="calModeSearch()">🔍 搜尋</button>
+        <button class="btn btn-a cal-entry-btn" onclick="calModeNew()">＋ 新增日報</button>
+        <span class="cal-entry-hint" id="cal-entry-hint">點下面的日期，看那天的日報</span>
+      </div>
       <div class="cal-bar">
         <button class="btn btn-o btn-sm" onclick="calShift(-1)">‹ 上個月</button>
         <span class="cal-title" id="cal-title">—</span>
@@ -1559,6 +1578,13 @@ function loadToday() {
   $('f-date').value = today();
   onDateChange();
 }
+/* 開機用：只把日期填成今天，不走 requireStarted 那道守門（2026-08-28）。
+   以前開機走 loadToday() → requireStarted() → 直接彈出「新增日報表」視窗＋右下紅字，
+   使用者還沒做任何事就被視窗擋住，這不是守門的用意。 */
+function initTodayDate() {
+  $('f-date').value = today();
+  onDateChange();
+}
 
 /* ── COMPOSITE KEY CHECK ──
  * 2026-08-16 改：原本是 confirm 對話框「已有日報表，是否載入繼續編輯？」，
@@ -1953,7 +1979,11 @@ function initReport() {
   rememberBaseline(S.report);
   renderReport();
   applyPermissions();
-  loadToday();
+  /* 落地頁＝日曆（2026-08-28 用戶指定）。
+     以前停在「日報填寫」，而且 loadToday() 會觸發守門式的新增視窗，
+     等於一進來就被彈窗擋住。現在改成先看日曆，要新增再按上方那顆。 */
+  initTodayDate();
+  goPage('cal');
 }
 /* ── 一定要先按上方「＋ 新增」（2026-08-18）──────────────────────
  * 開 App 時背景本來就有一張空白報表，所以以前直接按下方「＋ 新增工項／新增材料」就能填，
@@ -2649,6 +2679,17 @@ function calShift(n){
 function calGoToday(){ CAL.ym = today().slice(0,7); CAL.sel = today(); renderCal(); }
 function calPick(ds){ CAL.sel = ds; renderCal(); }
 
+/* 日曆落地頁的兩顆鈕（2026-08-28）。
+   「搜尋」＝維持日曆本身的行為（點日期→列出那天的日報），按了會回到本月並把提示打亮；
+   「新增日報」＝走原本的「＋ 新增」流程（帶入視窗），不繞過任何一步。 */
+function calModeSearch(){
+  const hint=$('cal-entry-hint');
+  if(hint){ hint.classList.add('on'); setTimeout(()=>hint.classList.remove('on'), 1200); }
+  calGoToday();
+}
+function calModeNew(){
+  newReport();
+}
 function renderCal(){
   if (!CAL.ym){
     /* 第一次進來停在「最後一筆日報」那個月，不是空空的本月 */
@@ -2772,12 +2813,12 @@ function renderHistory() {
     const div=document.createElement('div');
     div.className='ritem';
     div.innerHTML=`
-      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
       <div class="ritem-info">
-        <h3>${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
+        <h3 class="ritem-proj">${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
+        <p class="ritem-when">📅 ${r.date}（${DOW[d.getDay()]}）／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
         <p>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</p>
-        <p>${r.date} ／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
       </div>
+      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
       <div class="ritem-actions">
         <button class="btn btn-o btn-sm" onclick="openReportFromHistory('${r.id}')">開啟</button>
         ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>`:''}
@@ -2847,7 +2888,8 @@ function renderMgmt(){
     if(dept&&r.dept!==dept)return false;
     if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return false;
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)||a.dept?.localeCompare(b.dept||'')||0);
+  /* 管理總表也照「先案場、再日期」（2026-08-28 用戶指定，與歷史資料同一套 histSort）*/
+  }).sort((a,b)=>histSort(a,b)||(a.dept||'').localeCompare(b.dept||''));
   const tbody=$('master-tbody'); tbody.innerHTML='';
   $('mgmt-empty').style.display=list.length?'none':'block';
   list.forEach(r=>{
@@ -2857,6 +2899,7 @@ function renderMgmt(){
     tr.className='master-row';
     tr.innerHTML=`
       <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
+      <td style="font-weight:700">${escHtml(reportProjName(r)||'（未指定案場）')}</td>
       <td>${r.date}</td>
       <td>${escHtml(r.dept||'—')}</td>
       <td>${escHtml(r.reporter||'—')}</td>
@@ -2865,7 +2908,7 @@ function renderMgmt(){
     tbody.appendChild(tr);
     const det=document.createElement('tr');
     det.className='detail-row'; det.id='det-'+r.id; det.style.display='none';
-    det.innerHTML=`<td colspan="6"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
+    det.innerHTML=`<td colspan="7"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
     tbody.appendChild(det);
   });
 }
@@ -2986,7 +3029,18 @@ function getExRows(){
       });
     }
   });
-  return rows.sort((a,b)=>b.date.localeCompare(a.date));
+  /* 報表下載也照「先案場、再日期」（2026-08-28 用戶指定）。
+     這裡的一列是「工項」不是「報表」，所以不能直接用 histSort，改比 row.projName；
+     沒案場的（材料列、舊資料）一律排最後，判準與 histSort 一致。 */
+  return rows.sort((a,b)=>{
+    const pa=a.projName||'', pb=b.projName||'';
+    if(pa!==pb){
+      if(!pa) return 1;
+      if(!pb) return -1;
+      return pa.localeCompare(pb,'zh-Hant',{numeric:true});
+    }
+    return String(b.date||'').localeCompare(String(a.date||''));
+  });
 }
 function previewExport(){
   const rows=getExRows();
