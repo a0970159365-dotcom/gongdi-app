@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-28.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-28.2';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -119,6 +119,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .cal-cell.part .cal-dot{background:var(--warning)}
 .cal-n{font-size:10px;font-weight:800;color:var(--muted)}
 .cal-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px;padding-top:10px;border-top:1px dashed var(--border)}
+.cal-legend.cal-legend-top{margin-top:0;margin-bottom:10px;padding-top:0;padding-bottom:10px;border-top:none;border-bottom:1px dashed var(--border)}
 .cal-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid var(--border)}
 .cal-lg-full{background:#e8f0fa;border-color:var(--primary-l)}
 .cal-lg-part{background:#fdf6e3;border-color:var(--warning)}
@@ -572,6 +573,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="card-body">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
         <div class="fg" style="flex:0 0 auto">
+          <label class="fl">專案/工地</label>
+          <select id="mg-proj" class="fi" onchange="renderMgmt()" style="max-width:160px">
+            <option value="">全部專案</option>
+          </select>
+        </div>
+        <div class="fg" style="flex:0 0 auto">
           <label class="fl">日期</label>
           <input type="date" id="mg-date" class="fi" onchange="renderMgmt()">
         </div>
@@ -579,12 +586,6 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <label class="fl">部門</label>
           <select id="mg-dept" class="fi" onchange="renderMgmt()" style="max-width:150px">
             <option value="">全部部門</option>
-          </select>
-        </div>
-        <div class="fg" style="flex:0 0 auto">
-          <label class="fl">專案/工地</label>
-          <select id="mg-proj" class="fi" onchange="renderMgmt()" style="max-width:160px">
-            <option value="">全部專案</option>
           </select>
         </div>
         <button class="btn btn-o btn-sm" onclick="clearMgmtFilter()">清除</button>
@@ -626,19 +627,25 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
            以前一進來停在「日報填寫」，還會自動彈出新增視窗。 -->
       <div class="cal-entry">
         <button id="cal-mode-search" class="btn btn-p cal-entry-btn" onclick="calModeSearch()">🔍 搜尋</button>
+        <span class="cal-entry-hint" id="cal-entry-hint">點擊下方日期，查閱當天日報</span>
         <button class="btn btn-a cal-entry-btn" onclick="calModeNew()">＋ 新增日報</button>
-        <span class="cal-entry-hint" id="cal-entry-hint">點下面的日期，看那天的日報</span>
       </div>
       <div class="cal-bar">
         <button class="btn btn-o btn-sm" onclick="calShift(-1)">‹ 上個月</button>
         <span class="cal-title" id="cal-title">—</span>
         <button class="btn btn-o btn-sm" onclick="calShift(1)">下個月 ›</button>
       </div>
+      <!-- 圖例上下各一份（2026-08-28 用戶指定）：月曆一長，只放下面要捲動才看得到 -->
+      <div class="cal-legend cal-legend-top">
+        <span><i class="cal-lg-full"></i>已回報</span>
+        <span><i class="cal-lg-part"></i>填寫中（沒有明細／天氣沒選／出工 0）</span>
+        <span><i class="cal-lg-none"></i>未填寫</span>
+      </div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="cal-legend">
-        <span><i class="cal-lg-full"></i>已填寫</span>
-        <span><i class="cal-lg-part"></i>填一半（沒有明細／天氣沒選／出工 0）</span>
-        <span><i class="cal-lg-none"></i>沒有日報</span>
+        <span><i class="cal-lg-full"></i>已回報</span>
+        <span><i class="cal-lg-part"></i>填寫中（沒有明細／天氣沒選／出工 0）</span>
+        <span><i class="cal-lg-none"></i>未填寫</span>
       </div>
       <div id="cal-day"></div>
     </div>
@@ -657,12 +664,28 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="card-body">
       <div class="flex gap2" style="align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
         <div class="fg">
+          <label class="fl">案場名稱</label>
+          <select id="filter-proj" class="fi" style="max-width:170px" onchange="renderHistory()">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <div class="fg">
           <label class="fl">月份</label>
           <input type="month" id="filter-month" class="fi" style="max-width:160px" onchange="renderHistory()">
         </div>
         <div class="fg">
+          <label class="fl">日期</label>
+          <input type="date" id="filter-date" class="fi" style="max-width:160px" onchange="renderHistory()">
+        </div>
+        <div class="fg">
           <label class="fl">部門</label>
           <select id="filter-dept" class="fi" style="max-width:150px" onchange="renderHistory()">
+            <option value="">全部</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">填表人</label>
+          <select id="filter-reporter" class="fi" style="max-width:140px" onchange="renderHistory()">
             <option value="">全部</option>
           </select>
         </div>
@@ -1569,9 +1592,9 @@ function renderCarryCal(host){
   const tail = (7 - ((lead + days) % 7)) % 7;
   for (let i = 1; i <= tail; i++) h += '<div class="cal-cell pad">' + i + '</div>';
   h += '</div><div class="cal-legend">'
-    +   '<span><i class="cal-lg-full"></i>已填寫</span>'
-    +   '<span><i class="cal-lg-part"></i>填一半</span>'
-    +   '<span><i class="cal-lg-none"></i>沒有日報</span>'
+    +   '<span><i class="cal-lg-full"></i>已回報</span>'
+    +   '<span><i class="cal-lg-part"></i>填寫中</span>'
+    +   '<span><i class="cal-lg-none"></i>未填寫</span>'
     + '</div>';
 
   if (!CARRY_CAL.sel){
@@ -2319,9 +2342,16 @@ function histSort(a, b){
 function renderHistory() {
   const m=$('filter-month').value;
   const dept=$('filter-dept').value;
+  const day=$('filter-date')?.value||'';          // 指定某一天（比月份更細）
+  const proj=$('filter-proj')?.value||'';         // 案場名稱：該報表任一列工項用到就算命中
+  const rep=$('filter-reporter')?.value||'';      // 填表人：專案工務本人、或任一列工項的填表人
   let list=[...visibleReports()].filter(r=>{
     if (m && !r.date.startsWith(m)) return false;
+    if (day && r.date!==day) return false;
     if (dept && r.dept!==dept) return false;
+    // 新格式看報表層；拆分前的舊格式還是逐列比對，多案場那幾張在每個案場底下都找得到
+    if (proj && r.projName !== proj && !(r.workItems||[]).some(wi=>wi.projName===proj)) return false;
+    if (rep && r.reporter!==rep && !(r.workItems||[]).some(wi=>wi.owner===rep)) return false;
     return true;
   }).sort(histSort);
   const el=$('hist-list');
@@ -2347,15 +2377,28 @@ function renderHistory() {
   });
 }
 function populateHistFilters() {
-  const sel=$('filter-dept');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">全部</option>';
-  [...new Set(visibleReports().map(r=>r.dept).filter(Boolean))].forEach(d=>
-    sel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
-  );
-  if(cur) sel.value=cur;
+  const reports = visibleReports();
+  const fill = (id, items) => {
+    const sel=$(id); if(!sel) return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">全部</option>';
+    [...new Set(items.filter(Boolean))].sort().forEach(v=>
+      sel.appendChild(Object.assign(document.createElement('option'),{value:v,textContent:v}))
+    );
+    if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;   // 選項還在才保留，否則回「全部」
+  };
+  fill('filter-dept',     reports.map(r=>r.dept));
+  fill('filter-proj',     reports.flatMap(r=> r.projName ? [r.projName]
+                                              : (r.workItems||[]).map(wi=>wi.projName)));
+  // 填表人＝報表的專案工務 ∪ 各列工項的填表人（多人共編時兩者可能不同）
+  fill('filter-reporter', [...reports.map(r=>r.reporter),
+                           ...reports.flatMap(r=>(r.workItems||[]).map(wi=>wi.owner))]);
 }
-function clearHistFilter(){$('filter-month').value='';$('filter-dept').value='';renderHistory();}
+function clearHistFilter(){
+  ['filter-month','filter-date','filter-dept','filter-proj','filter-reporter']
+    .forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  renderHistory();
+}
 function deleteReport(id){
   if(!requireDelete())return;
   if(!confirm('確定刪除這筆報表？'))return;
