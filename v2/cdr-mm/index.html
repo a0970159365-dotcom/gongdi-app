@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.3';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.5';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2522,7 +2522,36 @@ function populateMgmtFilters(){
   if(cd) dSel.value=cd; if(cp) pSel.value=cp;
 }
 function clearMgmtFilter(){$('mg-date').value='';$('mg-dept').value='';$('mg-proj').value='';renderMgmt();}
-function exportMgmtExcel(){doExportExcel(getFilteredRows());}
+/* 管理總表的「📊 匯出 Excel」要用的資料列（2026-08-30 修：用戶回報畫面 3 列、Excel 卻是全部）。
+ * 原本這顆直接叫 getFilteredRows() → getExRows()，讀的是**報表下載頁**那組欄位
+ * （ex-proj-checks／ex-date-from／ex-loc…），完全沒讀管理總表自己的 mg-proj／mg-date／mg-dept
+ * → 篩了也沒用；先去過報表下載頁的話，匯出的還會是那邊的條件。
+ * 現在照管理總表自己的條件展開（一列＝一個工項，跟報表下載同一種列格式與排序）。
+ * 篩選判準與 renderMgmt() 逐條對齊，畫面看到幾張報表，匯出就是那幾張的工項。 */
+function getMgmtRows(){
+  const date=$('mg-date').value, dept=$('mg-dept').value, proj=$('mg-proj').value;
+  const rows=[];
+  visibleReports().forEach(r=>{
+    if(date&&r.date!==date)return;
+    if(dept&&r.dept!==dept)return;
+    if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return;
+    const rpid=reportProjId(r);
+    (r.workItems||[]).forEach(wi=>{
+      const pid=rpid||wi.projId||'';
+      /* 拆分前的舊報表一張可能混多個案場 —— 篩了案場就只留那個案場的工項，
+         否則會把同一張裡別的案場那幾列一起匯出去 */
+      if(proj && pid!==proj) return;
+      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi,
+        projId:pid, projName: rpid ? (r.projName||reportProjName(r)) : (wi.projName||'')});
+    });
+  });
+  return sortExRows(rows);
+}
+function exportMgmtExcel(){
+  const rows=getMgmtRows();
+  if(!rows.length){toast('無符合條件的資料','e');return;}
+  doExportExcel(rows);
+}
 
 /* ── EXPORT PAGE ── */
 function initExportPage(){
@@ -2605,9 +2634,13 @@ function getExRows(){
       });
     }
   });
-  /* 報表下載也照「先案場、再日期」（2026-08-28 用戶指定）。
-     這裡的一列是「工項」不是「報表」，所以不能直接用 histSort，改比 row.projName；
-     沒案場的（材料列、舊資料）一律排最後，判準與 histSort 一致。 */
+  return sortExRows(rows);
+}
+/* 「先案場、再日期」的列排序（2026-08-28 用戶指定）。
+   這裡的一列是「工項」不是「報表」，所以不能直接用 histSort，改比 row.projName；
+   沒案場的（材料列、舊資料）一律排最後，判準與 histSort 一致。
+   2026-08-30 抽成獨立函式 —— 管理總表匯出也要用同一套排序。 */
+function sortExRows(rows){
   return rows.sort((a,b)=>{
     const pa=a.projName||'', pb=b.projName||'';
     if(pa!==pb){
@@ -2640,7 +2673,6 @@ function doExport(){
   if(!rows.length){toast('無符合條件的資料','e');return;}
   doExportExcel(rows);
 }
-function getFilteredRows(){return getExRows();}
 
 /* ── EXCEL EXPORT ── */
 async function doExportExcel(rows){
