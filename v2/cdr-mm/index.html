@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-28.2';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1560,9 +1560,10 @@ function renderCarryCal(host){
   all.forEach(r => { if (r.date) (map[r.date] = map[r.date] || []).push(r); });
 
   if (!CARRY_CAL.ym){
-    /* 一打開就停在「這個案場最後一張日報」那個月，不是空空的本月 */
-    const ds = all.map(r => r.date).filter(Boolean).sort();
-    CARRY_CAL.ym = (ds.length ? ds[ds.length - 1] : today()).slice(0, 7);
+    /* 一打開就停在本月（2026-08-30 用戶指定）。
+       以前停在「這個案場最後一張日報」那個月 —— 那張可能是一年前的，
+       要建今天的就得往後翻十幾個月。要挑舊的改按「‹ 上個月」，或切「📋 列表」看最近 20 張。 */
+    CARRY_CAL.ym = today().slice(0, 7);
   }
   const [Y, M] = CARRY_CAL.ym.split('-').map(Number);
   const lead = new Date(Y, M - 1, 1).getDay();
@@ -1694,6 +1695,7 @@ function carryJoinToday(){
   closeCarryModal();
   if (!t) { toast('找不到今天的日報表','e'); return; }
   loadReport(t);
+  goPage('report');                // 落地頁＝日曆之後一定要自己切過去，否則畫面還停在日曆（2026-08-30）
   toast(`已加入 ${t.date} 的日報表，可以開始填了`,'s');
 }
 /* 出口②：完全空白。
@@ -1705,6 +1707,7 @@ function carryBlankOn(ds){
   if (ds) { S.report.date = ds; $('f-date').value = ds; }
   applyCarryProj(ds);
   if (ds) onDateChange();          // 星期要跟著算
+  goPage('report');                // 同上：報表建好了要切到報表頁才看得到（2026-08-30）
   toast('已建立 ' + (ds || today()) + ' 的空白日報表','s');
 }
 function carryBlank(){ carryBlankOn(''); }
@@ -1748,6 +1751,7 @@ function carryApply(){
     } else { hint.style.display = 'none'; }
   }
   recalc(); buildSummary(); syncReport();
+  goPage('report');                // 同上：帶入完要切到報表頁才看得到（2026-08-30）
   toast(brought.length ? '已帶入舊資料' : '那張沒有可帶入的內容，已建立空白日報表', brought.length?'s':'');
 }
 
@@ -2239,8 +2243,9 @@ function calModeNew(){
 }
 function renderCal(){
   if (!CAL.ym){
-    const ds = visibleReports().map(r=>r.date).filter(Boolean).sort();
-    CAL.ym = (ds.length ? ds[ds.length-1] : today()).slice(0,7);
+    /* 一進來停在本月（2026-08-30 用戶指定），與帶入視窗的月曆一致。
+       以前停在「最後一筆日報」那個月，兩個日曆各停各的月份，很容易看錯。 */
+    CAL.ym = today().slice(0,7);
   }
   const [Y,M] = CAL.ym.split('-').map(Number);
   $('cal-title').textContent = Y+' 年 '+M+' 月';
