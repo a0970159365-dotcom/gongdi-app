@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-30.4';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-30.9';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -306,23 +306,14 @@
   <div id="view-settings" class="view p-4 space-y-4">
     <button onclick="backToPortal()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">🏠 返回主系統</button>
 
-    <!-- 兩大部份（2026-08-30 用戶指定）：SOP 設定歸一邊、案場／廠商歸一邊，一次只看一邊 -->
+    <!-- 兩大部份（2026-08-30 用戶指定）：案場／廠商在左（預設），SOP 設定在右 -->
     <div class="flex gap-1 bg-gray-100 rounded-xl p-1" data-set-tabs>
-      <button id="set-tab-sop"  onclick="setCfgPart('sop')"  class="set-tab on">📋 查檢表 SOP 設定</button>
-      <button id="set-tab-base" onclick="setCfgPart('base')" class="set-tab">📍 案場管理與施工廠商</button>
+      <button id="set-tab-base" onclick="setCfgPart('base')" class="set-tab on">📍 案場管理與施工廠商</button>
+      <button id="set-tab-sop"  onclick="setCfgPart('sop')"  class="set-tab">📋 查檢表 SOP 設定</button>
     </div>
 
-    <!-- 第 1 部份：查檢表 SOP 設定 -->
-    <div id="set-part-sop" class="space-y-4">
-      <div id="cfg-tpl-all" class="bg-white rounded-2xl p-4 shadow-sm"></div>
-      <div class="set-2col sidebar">
-        <div id="cfg-cats"      class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
-        <div id="cfg-templates" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
-      </div>
-    </div>
-
-    <!-- 第 2 部份：案場管理與施工廠商 -->
-    <div id="set-part-base" class="space-y-4" style="display:none">
+    <!-- 第 1 部份：案場管理與施工廠商 -->
+    <div id="set-part-base" class="space-y-4">
       <div class="set-2col">
         <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
         <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
@@ -332,6 +323,15 @@
         ℹ️ <strong>部門管理 / 人員管理 已移至入口網頁集中管理</strong><br>
         如需新增/編輯部門、員工，請至
         <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+      </div>
+    </div>
+
+    <!-- 第 2 部份：查檢表 SOP 設定 -->
+    <div id="set-part-sop" class="space-y-4" style="display:none">
+      <div id="cfg-tpl-all" class="bg-white rounded-2xl p-4 shadow-sm"></div>
+      <div class="set-2col sidebar">
+        <div id="cfg-cats"      class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
+        <div id="cfg-templates" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
       </div>
     </div>
     <div class="bg-white rounded-2xl p-4 shadow-sm">
@@ -462,7 +462,9 @@ var S = {
   showMovePicker: false,
   // 設定頁停在哪一大部份（2026-08-30）：'sop'＝查檢表 SOP 設定／'base'＝案場管理與施工廠商
   cfgPart: (function(){
-    try{ var v=localStorage.getItem('sop_cfg_part'); return (v==='base')?'base':'sop'; }catch(e){ return 'sop'; }
+    /* 預設停在左邊那顆「案場管理與施工廠商」（2026-08-30 用戶指定的順序）；
+       使用者自己切過就記住他的選擇 */
+    try{ var v=localStorage.getItem('sop_cfg_part'); return (v==='sop')?'sop':'base'; }catch(e){ return 'base'; }
   })(),
   // 首頁「最近記錄」的顯示方式：'date'＝依日期／'case'＝依案場分類（2026-08-13 新增，記住上次選的）
   // 記住上次選的檢視；認不得的值一律退回第一個頁籤「依案場」
