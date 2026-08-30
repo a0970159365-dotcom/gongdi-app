@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-30.9';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-30.10';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -460,6 +460,9 @@ var S = {
   catAdding: null,
   addMenu: false,        // 設定頁上方那顆「＋ 新增」的選單有沒有展開
   showMovePicker: false,
+  /* 右邊的 SOP 明細要「選了才出現」（2026-08-30 用戶指定：不要一進去就全部出現）。
+     進設定頁時重設成 false；從一覽點一列、從下拉選一張、或新增／複製建好，才變 true。 */
+  tplOpened: false,
   // 設定頁停在哪一大部份（2026-08-30）：'sop'＝查檢表 SOP 設定／'base'＝案場管理與施工廠商
   cfgPart: (function(){
     /* 預設停在左邊那顆「案場管理與施工廠商」（2026-08-30 用戶指定的順序）；
@@ -684,7 +687,7 @@ function showView(v){
   // render views
   if(v==='home') renderHome();
   if(v==='history') setHistMode(CAL.mode || 'cal');
-  if(v==='settings') { renderSettings(); applyMngSettingsUI(); }
+  if(v==='settings') { S.tplOpened=false; renderSettings(); applyMngSettingsUI(); }
   if(v==='detail') renderDetail();
   if(v==='checklist') renderChecklist();
   if(v==='complete') renderComplete();
@@ -1588,7 +1591,7 @@ function renderTplAllSection(){
   });
   var voidN=all.filter(function(t){ return t.void; }).length;
   var rows=all.map(function(t){
-    var on=(t.id===S.editingTplId);
+    var on=(S.tplOpened && t.id===S.editingTplId);
     return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
       +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
       +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(tplPath(t.id)||'📦 （未分類）')+'</td>'
@@ -1618,7 +1621,7 @@ function jumpToTpl(id){
   var tpl=TEMPLATES.find(function(t){ return t.id===id; });
   if(!tpl) return;
   S.cfgCat1=tplCat(tpl,1); S.cfgCat2=tplCat(tpl,2); S.editingTplId=id;
-  S.showMovePicker=false;
+  S.showMovePicker=false; S.tplOpened=true;
   renderCatsSection(); renderTemplatesSection();
 }
 
@@ -1748,6 +1751,7 @@ function nfCreate(){
   S.editingTplId = tpl.id;
   S.cfgCat1 = tplCat(tpl,1); S.cfgCat2 = tplCat(tpl,2);
   S.showMovePicker = false;
+  S.tplOpened = true;          // 建好就直接進到它的明細，接著加查驗品項
   syncTemplatesToConfig();
   closeNewFlow();
   renderCatsSection(); renderTemplatesSection(); renderHome();
@@ -2051,9 +2055,11 @@ function catRowHtml(level,label){
 /* 第三段：這一格裡的工法 */
 function tplRowHtml(){
   var list=cfgTplList();
-  var opts=list.map(function(t){
-    return '<option value="'+esc(t.id)+'"'+(t.id===S.editingTplId?' selected':'')+'>'+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
-  }).join('');
+  /* 還沒選之前停在「— 請選擇 —」，右邊才會是留白的空狀態（2026-08-30） */
+  var opts='<option value=""'+(S.tplOpened?'':' selected')+'>— 請選擇 SOP —</option>'
+    + list.map(function(t){
+        return '<option value="'+esc(t.id)+'"'+((S.tplOpened&&t.id===S.editingTplId)?' selected':'')+'>'+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
+      }).join('');
   var h='<div class="border-t pt-3" data-tpl-row>'
     +'<label class="block text-xs text-gray-500 mb-1">SOP</label>';
   if(list.length){
@@ -2151,6 +2157,18 @@ function renderTemplatesSection(){
   if(!el) return;
   /* 編哪一張由上面那張卡的三段連動決定；那一格是空的就沒有 tpl，整張卡收成一句提示 */
   cfgEnsureSel();
+  /* 還沒選之前右邊留白（2026-08-30 用戶指定）：一進來就把明細整個攤開太吵，
+     而且會讓人以為「已經在編某一張了」。左邊選一張，或按「＋ 新增」建一張，才展開。 */
+  if(!S.tplOpened){
+    el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">✏️ SOP 明細</h3>'
+      + '<div data-tpl-empty class="text-center text-gray-400 py-10">'
+      +   '<div class="text-4xl mb-3">📋</div>'
+      +   '<div class="text-sm font-medium text-gray-500 mb-1">還沒有選擇 SOP</div>'
+      +   '<div class="text-xs leading-relaxed">從左邊選一張，或按左邊的「＋ 新增」<br>建立新的（也可以複製現有的）</div>'
+      + '</div>';
+    renderTplAllSection();   // 早退也要把上面那張一覽畫出來，否則整個空掉
+    return;
+  }
   var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || null;
   var itemsHtml = '';
   if(tpl && tpl.items && tpl.items.length){
@@ -2242,7 +2260,11 @@ function setTemplateCat(tplId, field, value){
   updateTemplate(tplId, field, value);
   renderHome();
 }
-function switchTplEditor(tplId){ S.editingTplId = tplId; S.showMovePicker = false; renderTemplatesSection(); }
+function switchTplEditor(tplId){
+  if(!tplId){ S.tplOpened=false; renderTemplatesSection(); renderTplAllSection(); return; }
+  S.editingTplId = tplId; S.showMovePicker = false; S.tplOpened = true;
+  renderTemplatesSection();
+}
 function addTplItem(tplId){
   if(mngGuard())return;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
@@ -2282,6 +2304,7 @@ function addTemplate(){
   TEMPLATES.push(newTpl);
   S.editingTplId = newTpl.id;
   S.showMovePicker = false;
+  S.tplOpened = true;          // 建好就直接進到它的明細（2026-08-30）
   syncTemplatesToConfig();
   renderCatsSection(); renderTemplatesSection(); renderHome();
 }
