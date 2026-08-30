@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.6';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.7';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -580,7 +580,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="card-body">
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
         <div class="fg" style="flex:0 0 auto">
-          <label class="fl">專案/工地</label>
+          <label class="fl">案場</label>
           <select id="mg-proj" class="fi" onchange="renderMgmt()" style="max-width:160px">
             <option value="">全部專案</option>
           </select>
@@ -716,7 +716,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <!-- 專案/工地 -->
       <div style="margin-bottom:12px">
         <div class="flex-b mb2">
-          <label class="fl" style="margin:0">專案/工地（可多選）</label>
+          <label class="fl" style="margin:0">案場（可多選）</label>
           <div class="flex gap2">
             <button class="btn btn-g btn-sm" onclick="exSelectAll(true)">全選</button>
             <button class="btn btn-g btn-sm" onclick="exSelectAll(false)">全不選</button>
@@ -790,7 +790,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <table class="stbl" id="ex-tbl">
         <thead>
           <tr>
-            <th>日期</th><th>部門</th><th>專案工務</th><th>專案/工地</th>
+            <th>日期</th><th>部門</th><th>專案工務</th><th>案場</th>
             <th>施作位置</th><th>施工項目</th><th>今日廠商</th><th>今日施工人員</th>
             <th>今日出工</th><th>明日廠商</th><th>明日施工人員</th><th>明日出工</th>
             <th>完成進度%</th><th>異常類型</th><th>異常說明</th>
@@ -819,7 +819,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
            每個群組原本各掛一顆「儲存」（連頂部底部共 6 顆）→ 收成頂部＋底部各一顆。 -->
       <div class="set-tabs" data-set-tabs>
         <button id="set-tab-work" class="set-tab on" onclick="setCfgPart('work')">🔧 施工明細設定</button>
-        <button id="set-tab-base" class="set-tab" onclick="setCfgPart('base')">🏗️ 專案／工地與材料</button>
+        <button id="set-tab-base" class="set-tab" onclick="setCfgPart('base')">🏗️ 案場與材料</button>
       </div>
 
       <!-- 第 1 部份：施工明細設定 —— 日報填寫時那兩組連動下拉的來源 -->
@@ -851,7 +851,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <div class="set-2col">
           <div class="fg">
             <div class="flex-b mb2">
-              <label class="fl" style="margin:0">專案／工地</label>
+              <label class="fl" style="margin:0">案場（專案／工地）</label>
               <div class="flex gap2">
                 <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
                 <button class="btn btn-a btn-sm no-print" data-mng onclick="openProjModal()">＋ 新增</button>
@@ -861,7 +861,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
               <table class="stbl">
                 <thead><tr>
                   <th style="width:36px;text-align:center">#</th>
-                  <th>專案/工地名稱</th>
+                  <th>案場名稱</th>
                   <th>說明</th>
                   <th class="no-print" style="width:90px">操作</th>
                 </tr></thead>
@@ -870,7 +870,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             </div>
             <div id="proj-empty" class="empty" style="display:none">
               <div class="empty-icon" style="font-size:28px">📋</div>
-              <h3 style="font-size:13px">尚無專案，點「＋ 新增」建立</h3>
+              <h3 style="font-size:13px">尚無案場，點「＋ 新增」建立</h3>
             </div>
           </div>
           <div class="fg">
@@ -956,9 +956,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 
 <div id="proj-overlay" class="overlay">
   <div class="modal">
-    <div class="modal-title" id="pm-title">新增專案/工地</div>
+    <div class="modal-title" id="pm-title">新增案場</div>
     <div class="g" style="gap:10px;margin-bottom:14px">
-      <div class="fg"><label class="fl">專案/工地名稱 *</label><input type="text" id="pm-name" class="fi" placeholder="例：260526.雙橡園3B1"></div>
+      <div class="fg"><label class="fl">案場名稱 *</label><input type="text" id="pm-name" class="fi" placeholder="例：260526.雙橡園3B1"></div>
       <div class="fg"><label class="fl">說明（選填）</label><input type="text" id="pm-note" class="fi" placeholder="備註說明"></div>
     </div>
     <div class="flex gap2" style="justify-content:flex-end">
@@ -2712,7 +2712,7 @@ async function doExportExcel(rows){
   try{
     const wb=new ExcelJS.Workbook();
     const ws=wb.addWorksheet('日報表-瑪摩工程');
-    const headers=['日期','部門','專案工務','專案/工地','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','異常說明'];
+    const headers=['日期','部門','專案工務','案場','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','異常說明'];
     ws.addRow(headers);
     ws.getRow(1).eachCell(cell=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
@@ -3054,7 +3054,7 @@ function renderProjTable(){
 function openProjModal(id){
   if(mngGuard())return;
   editProjId=id||null;
-  $('pm-title').textContent=id?'編輯專案':'新增專案/工地';
+  $('pm-title').textContent=id?'編輯案場':'新增案場';
   const p=id?S.cfg.projects.find(x=>x.id===id):null;
   $('pm-name').value=p?.name||'';
   $('pm-note').value=p?.note||'';
