@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.7';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.8';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -816,38 +816,15 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="card-body">
 
       <!-- 兩大部份（2026-08-30 用戶指定：原本四個群組一路往下堆太長，比照查檢表設定頁的作法）。
+           順序：案場與材料在左（預設），施工與廠商在右（2026-08-30 用戶第二次指定）。
            每個群組原本各掛一顆「儲存」（連頂部底部共 6 顆）→ 收成頂部＋底部各一顆。 -->
       <div class="set-tabs" data-set-tabs>
-        <button id="set-tab-work" class="set-tab on" onclick="setCfgPart('work')">🔧 施工明細設定</button>
-        <button id="set-tab-base" class="set-tab" onclick="setCfgPart('base')">🏗️ 案場與材料</button>
+        <button id="set-tab-base" class="set-tab on" onclick="setCfgPart('base')">🏗️ 案場與材料</button>
+        <button id="set-tab-work" class="set-tab" onclick="setCfgPart('work')">🔧 施工與廠商</button>
       </div>
 
-      <!-- 第 1 部份：施工明細設定 —— 日報填寫時那兩組連動下拉的來源 -->
-      <div id="set-part-work">
-        <div class="set-2col">
-          <!-- 施作位置 → 施工項目（兩層） -->
-          <div class="fg">
-            <div class="flex-b mb2">
-              <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
-              <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
-            </div>
-            <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
-            <div id="loc-groups"></div>
-          </div>
-          <!-- 廠商 → 施工人員（兩層） -->
-          <div class="fg">
-            <div class="flex-b mb2">
-              <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
-              <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
-            </div>
-            <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
-            <div id="vendor-groups"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 第 2 部份：專案／工地與材料 -->
-      <div id="set-part-base" style="display:none">
+      <!-- 第 1 部份：案場與材料 -->
+      <div id="set-part-base">
         <div class="set-2col">
           <div class="fg">
             <div class="flex-b mb2">
@@ -890,6 +867,30 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
               如需新增/編輯部門、員工、權限角色，請至
               <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第 2 部份：施工與廠商 —— 日報填寫時那兩組連動下拉的來源 -->
+      <div id="set-part-work" style="display:none">
+        <div class="set-2col">
+          <!-- 施作位置 → 施工項目（兩層） -->
+          <div class="fg">
+            <div class="flex-b mb2">
+              <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
+              <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
+            </div>
+            <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
+            <div id="loc-groups"></div>
+          </div>
+          <!-- 廠商 → 施工人員（兩層） -->
+          <div class="fg">
+            <div class="flex-b mb2">
+              <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
+              <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
+            </div>
+            <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
+            <div id="vendor-groups"></div>
           </div>
         </div>
       </div>
@@ -1330,8 +1331,10 @@ function goPage(p) {
  * （連頂部底部共 6 顆）。改成上方兩顆分頁，一次只看一邊；儲存收成頂部＋底部各一顆。
  * 停在哪一邊記在 localStorage，下次進來維持上次選的。 */
 var _cfgPart = (function(){
-  try{ var v=localStorage.getItem('cdr_mm_cfg_part'); return (v==='base')?'base':'work'; }
-  catch(e){ return 'work'; }
+  /* 預設停在左邊那顆「案場與材料」（2026-08-30 用戶指定的順序）；
+     使用者自己切過就記住他的選擇 */
+  try{ var v=localStorage.getItem('cdr_mm_cfg_part'); return (v==='work')?'work':'base'; }
+  catch(e){ return 'base'; }
 })();
 function setCfgPart(p){
   _cfgPart = (p==='base') ? 'base' : 'work';
