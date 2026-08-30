@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.5';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.6';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -24,6 +24,13 @@ nav{background:var(--primary);min-height:54px;display:flex;align-items:center;pa
 .nav-user{color:rgba(255,255,255,.85);font-size:12px;display:flex;align-items:center;gap:5px;margin-left:4px}
 .nav-badge{background:rgba(255,255,255,.18);padding:2px 8px;border-radius:10px;font-size:11px}
 .container{max-width:1440px;margin:0 auto;padding:16px}
+/* 設定頁兩大部份（2026-08-30 用戶指定：原本一路往下堆太長，比照查檢表設定頁的作法）。
+   窄視窗自動堆回單欄，手機看到的跟原本一樣。 */
+.set-tabs{display:flex;gap:4px;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:16px}
+.set-tab{flex:1;padding:9px 10px;border-radius:8px;border:0;cursor:pointer;font:inherit;font-size:13px;font-weight:700;color:var(--muted);background:transparent;white-space:nowrap}
+.set-tab.on{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.set-2col{display:grid;gap:18px}
+@media(min-width:900px){.set-2col{grid-template-columns:1fr 1fr;align-items:start}}
 .page{display:none}.page.active{display:block}
 .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
 .card-header{padding:12px 16px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -808,83 +815,83 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     </div>
     <div class="card-body">
 
-      <!-- 群組一已移除：部門與使用者改由入口網頁集中管理 -->
-      <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:14px;color:#1e40af;font-size:13px;line-height:1.6">
-        ℹ️ <strong>部門與使用者管理已移至入口網頁集中管理</strong><br>
-        如需新增/編輯部門、員工、權限角色，請至
-        <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+      <!-- 兩大部份（2026-08-30 用戶指定：原本四個群組一路往下堆太長，比照查檢表設定頁的作法）。
+           每個群組原本各掛一顆「儲存」（連頂部底部共 6 顆）→ 收成頂部＋底部各一顆。 -->
+      <div class="set-tabs" data-set-tabs>
+        <button id="set-tab-work" class="set-tab on" onclick="setCfgPart('work')">🔧 施工明細設定</button>
+        <button id="set-tab-base" class="set-tab" onclick="setCfgPart('base')">🏗️ 專案／工地與材料</button>
       </div>
 
-      <div class="divider"></div>
-
-      <!-- 群組二：專案/工地維護 -->
-      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
-        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組二：專案/工地維護</span>
-        <div class="flex gap2">
-          <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
-          <button class="btn btn-a btn-sm no-print" data-mng onclick="openProjModal()">＋ 新增</button>
-          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
-        </div>
-      </div>
-      <div class="tbl-wrap">
-        <table class="stbl">
-          <thead><tr>
-            <th style="width:36px;text-align:center">#</th>
-            <th>專案/工地名稱</th>
-            <th>說明</th>
-            <th class="no-print" style="width:90px">操作</th>
-          </tr></thead>
-          <tbody id="proj-tbody"></tbody>
-        </table>
-      </div>
-      <div id="proj-empty" class="empty" style="display:none">
-        <div class="empty-icon" style="font-size:28px">📋</div>
-        <h3 style="font-size:13px">尚無專案，點「＋ 新增專案」建立</h3>
-      </div>
-
-      <div class="divider"></div>
-
-      <!-- 群組三：材料名稱與單位 -->
-      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
-        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組三：材料名稱與單位</span>
-        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
-      </div>
-      <div class="g g2" style="gap:16px;align-items:start">
-        <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matnames')">＋ 新增</button></div>
-          <div class="list-field" id="lf-matnames"></div>
-        </div>
-        <div class="fg">
-          <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
-          <div class="list-field" id="lf-matunits"></div>
+      <!-- 第 1 部份：施工明細設定 —— 日報填寫時那兩組連動下拉的來源 -->
+      <div id="set-part-work">
+        <div class="set-2col">
+          <!-- 施作位置 → 施工項目（兩層） -->
+          <div class="fg">
+            <div class="flex-b mb2">
+              <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
+              <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
+            </div>
+            <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
+            <div id="loc-groups"></div>
+          </div>
+          <!-- 廠商 → 施工人員（兩層） -->
+          <div class="fg">
+            <div class="flex-b mb2">
+              <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
+              <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
+            </div>
+            <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
+            <div id="vendor-groups"></div>
+          </div>
         </div>
       </div>
 
-      <div class="divider"></div>
-
-      <!-- 群組四：施工明細設定 -->
-      <div class="flex-b" style="margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)">
-        <span style="font-size:13px;font-weight:700;color:var(--primary)">群組四：施工明細設定</span>
-        <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存</button>
-      </div>
-      <!-- 4-1 施作位置 → 施工項目（兩層，2026-08-28 用戶指定，與 cdr-pm 同一套） -->
-      <div class="fg" style="margin-bottom:18px">
-        <div class="flex-b mb2">
-          <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
-          <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
+      <!-- 第 2 部份：專案／工地與材料 -->
+      <div id="set-part-base" style="display:none">
+        <div class="set-2col">
+          <div class="fg">
+            <div class="flex-b mb2">
+              <label class="fl" style="margin:0">專案／工地</label>
+              <div class="flex gap2">
+                <button class="btn btn-o btn-sm" onclick="toggleProjSort()">🔃 <span id="sort-lbl">新→舊</span></button>
+                <button class="btn btn-a btn-sm no-print" data-mng onclick="openProjModal()">＋ 新增</button>
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table class="stbl">
+                <thead><tr>
+                  <th style="width:36px;text-align:center">#</th>
+                  <th>專案/工地名稱</th>
+                  <th>說明</th>
+                  <th class="no-print" style="width:90px">操作</th>
+                </tr></thead>
+                <tbody id="proj-tbody"></tbody>
+              </table>
+            </div>
+            <div id="proj-empty" class="empty" style="display:none">
+              <div class="empty-icon" style="font-size:28px">📋</div>
+              <h3 style="font-size:13px">尚無專案，點「＋ 新增」建立</h3>
+            </div>
+          </div>
+          <div class="fg">
+            <div class="g g2" style="gap:16px;align-items:start">
+              <div class="fg">
+                <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matnames')">＋ 新增</button></div>
+                <div class="list-field" id="lf-matnames"></div>
+              </div>
+              <div class="fg">
+                <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
+                <div class="list-field" id="lf-matunits"></div>
+              </div>
+            </div>
+            <!-- 部門與使用者改由入口網頁集中管理 -->
+            <div style="margin-top:18px;background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
+              ℹ️ <strong>部門與使用者管理已移至入口網頁集中管理</strong><br>
+              如需新增/編輯部門、員工、權限角色，請至
+              <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+            </div>
+          </div>
         </div>
-        <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
-        <div id="loc-groups"></div>
-      </div>
-
-      <!-- 4-2 廠商 → 施工人員（兩層） -->
-      <div class="fg">
-        <div class="flex-b mb2">
-          <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
-          <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
-        </div>
-        <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
-        <div id="vendor-groups"></div>
       </div>
 
       <!-- 底部按鈕 -->
@@ -1310,12 +1317,36 @@ function goPage(p) {
   });
   if (p==='history')  { renderHistory(); populateHistFilters(); }
   if (p==='cal')      renderCal();
-  if (p==='settings') { loadCfgForm(); applyMngSettingsUI(); }
+  if (p==='settings') { loadCfgForm(); applyMngSettingsUI(); applyCfgPart(); }
   if (p==='mgmt')    { renderMgmt(); populateMgmtFilters(); }
   if (p==='export')  initExportPage();
   // 切回報表頁：案場下拉重填一次（在設定頁新增／改名案場、或雲端同步拉到新清單，才不會停在舊選項）；
   // 再重新撐高（摘要等 textarea 在隱藏時 scrollHeight 量不準，回來再算一次）
   if (p==='report')  { fillProjSelect(); autoGrowAll(); }
+}
+
+/* ══════════ 設定頁的兩大部份（2026-08-30 用戶指定）══════════
+ * 原本四個群組一路往下堆，筆電上要捲很久才看得完，而且每個群組各掛一顆「儲存」
+ * （連頂部底部共 6 顆）。改成上方兩顆分頁，一次只看一邊；儲存收成頂部＋底部各一顆。
+ * 停在哪一邊記在 localStorage，下次進來維持上次選的。 */
+var _cfgPart = (function(){
+  try{ var v=localStorage.getItem('cdr_mm_cfg_part'); return (v==='base')?'base':'work'; }
+  catch(e){ return 'work'; }
+})();
+function setCfgPart(p){
+  _cfgPart = (p==='base') ? 'base' : 'work';
+  try{ localStorage.setItem('cdr_mm_cfg_part', _cfgPart); }catch(e){}
+  applyCfgPart();
+  window.scrollTo(0,0);
+}
+function applyCfgPart(){
+  var isWork = (_cfgPart!=='base');
+  var a=$('set-part-work'), b=$('set-part-base');
+  if(a) a.style.display = isWork ? '' : 'none';
+  if(b) b.style.display = isWork ? 'none' : '';
+  var ta=$('set-tab-work'), tb=$('set-tab-base');
+  if(ta) ta.className = 'set-tab' + (isWork ? ' on' : '');
+  if(tb) tb.className = 'set-tab' + (isWork ? '' : ' on');
 }
 
 /* ── DATE ── */
