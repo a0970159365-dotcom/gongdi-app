@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-08-30.2';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -941,8 +941,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 
     <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
       <button class="btn btn-o" onclick="closeCarryModal()">取消</button>
-      <button class="btn btn-o" onclick="carryBlank()">不用，空白就好</button>
-      <button class="btn btn-a" onclick="carryApply()">帶入</button>
+      <button class="btn btn-o" id="carry-blank-btn" onclick="carryBlank()">＋ 建立今天的空白日報</button>
+      <button class="btn btn-a" onclick="carryApply()">帶入這張 → 建今天的日報</button>
     </div>
   </div>
 </div>
@@ -1513,20 +1513,26 @@ function todaysReport(pid) {
                              && (!p || reportProjId(r) === p)) || null;
 }
 
-function openCarryModal() {
+/* seedDate：從落地日曆點了某一天再按「＋ 新增日報」時，把那天帶進來（2026-08-30）。
+   沒帶就回本月、沒有選定日期 —— 每次打開都重設，不留上一次打開的殘影。 */
+function openCarryModal(seedDate) {
   const sel = $('carry-proj');
   if (sel) {
     sel.innerHTML = projOpts(_carryProjId, '— 請先選擇案場 —');
     sel.value = _carryProjId;
     if (sel.value !== _carryProjId) _carryProjId = sel.value || '';
   }
+  const sd = seedDate || '';
+  CARRY_CAL = { ym: sd ? sd.slice(0, 7) : '', sel: sd };
   renderCarryBody();
   $('carry-overlay').classList.add('show');
 }
 function closeCarryModal(){ $('carry-overlay').classList.remove('show'); }
 function onCarryProjChange() {
   _carryProjId = $('carry-proj') ? ($('carry-proj').value||'') : '';
-  CARRY_CAL = { ym:'', sel:'' };     // 換案場 → 月曆回到該案場最後一筆那個月
+  /* 換案場不清掉已選的日期 —— 日期是「要做哪一天」，跟案場無關（2026-08-30 改）；
+     月曆跟著跳到那天所在的月份，沒選日期才回本月 */
+  CARRY_CAL = { ym: CARRY_CAL.sel ? CARRY_CAL.sel.slice(0, 7) : '', sel: CARRY_CAL.sel || '' };
   renderCarryBody();
 }
 function carrySetView(v){
@@ -1623,6 +1629,7 @@ function renderCarryBody() {
   const tc = $('cv-tab-cal'), tl = $('cv-tab-list');
   if (tc) tc.classList.toggle('active', _carryView === 'cal');
   if (tl) tl.classList.toggle('active', _carryView === 'list');
+  updateCarryBtns();
   if (!_carryProjId) {
     host.innerHTML = `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">請先在上方選擇案場</div>`;
     const n0 = $('carry-today-note'); if (n0) n0.style.display = 'none';
@@ -1710,7 +1717,17 @@ function carryBlankOn(ds){
   goPage('report');                // 同上：報表建好了要切到報表頁才看得到（2026-08-30）
   toast('已建立 ' + (ds || today()) + ' 的空白日報表','s');
 }
-function carryBlank(){ carryBlankOn(''); }
+/* 「空白就好」建的是月曆上選的那天，沒選才是今天（2026-08-30 用戶回報）。
+   以前寫死 carryBlankOn('') —— 在月曆點了 8/31 按這顆，建出來卻是今天，
+   只有那顆藏在「這天還沒有日報」提示裡的小鈕會帶日期。
+   列表檢視沒有「選到哪一天」的概念 → 一律今天。 */
+function carryPickedDate(){ return (_carryView === 'cal' && CARRY_CAL.sel) ? CARRY_CAL.sel : ''; }
+function carryBlank(){ carryBlankOn(carryPickedDate()); }
+/* 按鈕自己把「會建哪一天」寫出來 —— 按之前就看得到，不用猜（同 8/28「改了要看得出來」那條） */
+function updateCarryBtns(){
+  const d = carryPickedDate(), b = $('carry-blank-btn');
+  if (b) b.textContent = d ? ('＋ 建立 ' + d + ' 的空白日報') : '＋ 建立今天的空白日報';
+}
 /* 出口③：帶入選定那張的內容 */
 function carryApply(){
   if (!_carryProjId) { toast('請先選擇案場','e'); return; }
@@ -1769,11 +1786,11 @@ function initReport() {
   initTodayDate();
   goPage('cal');
 }
-function newReport() {
+function newReport(seedDate) {
   if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
     if (!confirm('目前表單有內容，確定要離開它、開一張新的日報表？')) return;
   }
-  openCarryModal();
+  openCarryModal(seedDate);
 }
 /* 還沒按「＋ 新增日報表」之前，基本資訊整區鎖住（2026-08-26 用戶指定）。
  * 背景本來就掛著一張空白報表，不鎖的話直接選案場、打字就開始填了，
@@ -2239,7 +2256,7 @@ function calModeSearch(){
   calGoToday();
 }
 function calModeNew(){
-  newReport();
+  newReport(CAL.sel || '');    // 日曆上點了哪天，就把那天帶進帶入視窗（2026-08-30）
 }
 function renderCal(){
   if (!CAL.ym){
