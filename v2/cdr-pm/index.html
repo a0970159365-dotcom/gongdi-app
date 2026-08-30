@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-30.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-08-30.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1738,8 +1738,14 @@ function getPrevReport() {
    —— 一報表一案場之後，帶跨案場的工項過來只會製造錯資料 */
 function carryCandidates(pid, all) {
   const p = (pid !== undefined) ? pid : _carryProjId;
-  const list = S.reports
-    .filter(r => r && r.dept === S.user.dept && r.id !== (S.report && S.report.id)
+  /* 可見範圍跟全站一致（visibleReports → canView → 角色的 viewLevel）。
+     2026-08-30 用戶回報「選了案場，月曆是空的、日期也沒顏色」：
+     這裡本來寫死 r.dept === S.user.dept，是全站唯一用「同部門」判斷可見範圍的地方 ——
+     看全公司的帳號（系統維護／總經理室／副總）自己部門沒有日報 → 候選永遠是空的；
+     跨部門互看的角色（r7～r11）也只看得到自己那半邊。
+     歷史資料、日曆檢視、管理總表、報表下載全都用 visibleReports()，這裡跟上。 */
+  const list = visibleReports()
+    .filter(r => r && r.id !== (S.report && S.report.id)
                  && (!p || reportProjId(r) === p))
     .sort((a, b) => String(b.date||'').localeCompare(String(a.date||'')));
   /* 列表只給最近 20 張（再多也捲不完）；月曆要全部，否則翻到舊月份會是空的 */
