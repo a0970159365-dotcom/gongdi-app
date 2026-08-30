@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-26.7';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-08-30.4';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -61,6 +61,16 @@
       body.wide #top-header,
       body.wide #bottom-nav{max-width:64rem!important}
     }
+    /* ── 設定頁：兩大部份 ＋ 筆電兩欄（2026-08-30 用戶指定）──────────────
+     * 手機／窄視窗一律單欄堆疊，跟原本完全一樣；768px 以上才並排。 */
+    .set-2col{display:grid;gap:16px}
+    @media (min-width:768px){
+      .set-2col{grid-template-columns:1fr 1fr;align-items:start}
+      .set-2col.sidebar{grid-template-columns:minmax(280px,22rem) 1fr}
+    }
+    .set-tab{flex:1;padding:9px 10px;border-radius:10px;font-weight:700;font-size:13px;
+             color:#6b7280;background:transparent;border:0;cursor:pointer;white-space:nowrap}
+    .set-tab.on{background:#fff;color:#1d4ed8;box-shadow:0 1px 3px rgba(0,0,0,.12)}
     /* ── 設定維護權（2026-08-17）──
      * 角色沒勾「維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
      * 欄位也改不動。用 CSS 而非逐一 style.display 是因為設定頁會整區重繪，重繪後規則自動生效。*/
@@ -295,16 +305,35 @@
   <!-- ===== SETTINGS ===== -->
   <div id="view-settings" class="view p-4 space-y-4">
     <button onclick="backToPortal()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">🏠 返回主系統</button>
-    <div id="cfg-cats"        class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
-    <div id="cfg-templates"   class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
-    <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
-    <!-- 部門管理 / 人員管理 已移除：改由入口網頁集中管理 -->
-    <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
-      ℹ️ <strong>部門管理 / 人員管理 已移至入口網頁集中管理</strong><br>
-      如需新增/編輯部門、員工，請至
-      <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+
+    <!-- 兩大部份（2026-08-30 用戶指定）：SOP 設定歸一邊、案場／廠商歸一邊，一次只看一邊 -->
+    <div class="flex gap-1 bg-gray-100 rounded-xl p-1" data-set-tabs>
+      <button id="set-tab-sop"  onclick="setCfgPart('sop')"  class="set-tab on">📋 查檢表 SOP 設定</button>
+      <button id="set-tab-base" onclick="setCfgPart('base')" class="set-tab">📍 案場管理與施工廠商</button>
     </div>
-    <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
+
+    <!-- 第 1 部份：查檢表 SOP 設定 -->
+    <div id="set-part-sop" class="space-y-4">
+      <div id="cfg-tpl-all" class="bg-white rounded-2xl p-4 shadow-sm"></div>
+      <div class="set-2col sidebar">
+        <div id="cfg-cats"      class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
+        <div id="cfg-templates" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
+      </div>
+    </div>
+
+    <!-- 第 2 部份：案場管理與施工廠商 -->
+    <div id="set-part-base" class="space-y-4" style="display:none">
+      <div class="set-2col">
+        <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
+        <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
+      </div>
+      <!-- 部門管理 / 人員管理 已移除：改由入口網頁集中管理 -->
+      <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
+        ℹ️ <strong>部門管理 / 人員管理 已移至入口網頁集中管理</strong><br>
+        如需新增/編輯部門、員工，請至
+        <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+      </div>
+    </div>
     <div class="bg-white rounded-2xl p-4 shadow-sm">
       <h3 class="text-sm font-semibold text-gray-700 mb-2">☁️ 雲端同步狀態</h3>
       <div id="sync-status-text" class="text-sm text-gray-400 mb-3">— 尚未同步</div>
@@ -431,6 +460,10 @@ var S = {
   catAdding: null,
   addMenu: false,        // 設定頁上方那顆「＋ 新增」的選單有沒有展開
   showMovePicker: false,
+  // 設定頁停在哪一大部份（2026-08-30）：'sop'＝查檢表 SOP 設定／'base'＝案場管理與施工廠商
+  cfgPart: (function(){
+    try{ var v=localStorage.getItem('sop_cfg_part'); return (v==='base')?'base':'sop'; }catch(e){ return 'sop'; }
+  })(),
   // 首頁「最近記錄」的顯示方式：'date'＝依日期／'case'＝依案場分類（2026-08-13 新增，記住上次選的）
   // 記住上次選的檢視；認不得的值一律退回第一個頁籤「依案場」
   recentMode: (function(){
@@ -637,8 +670,8 @@ function showView(v){
   var showNav = BOTTOM_NAV_VIEWS[v];
   $('bottom-nav').style.display = showNav ? '' : 'none';
 
-  // wide layout for list views (home/history)
-  document.body.classList.toggle('wide', v==='home' || v==='history');
+  // wide layout：清單類頁面＋設定頁（2026-08-30 用戶要求設定頁「適合筆電使用」）
+  document.body.classList.toggle('wide', v==='home' || v==='history' || v==='settings');
   ['home','history','settings'].forEach(function(n){
     var btn=$('nav-'+n);
     btn.className='flex-1 flex flex-col items-center py-2 text-xs transition-colors '+(v===n?'text-blue-700':'text-gray-400');
@@ -1523,9 +1556,74 @@ function deleteReport(id){
 }
 
 // ====== SETTINGS ======
+/* ══════════ 設定頁的兩大部份（2026-08-30 用戶指定）══════════
+ * 第 1 部份＝查檢表 SOP 設定，第 2 部份＝案場管理與施工廠商。
+ * 以前整頁由上往下五張卡，改 SOP 時下面的案場／廠商一直在干擾，筆電上更明顯。 */
+function setCfgPart(p){
+  S.cfgPart = (p==='base') ? 'base' : 'sop';
+  try{ localStorage.setItem('sop_cfg_part', S.cfgPart); }catch(e){}
+  applyCfgPart();
+  window.scrollTo(0,0);
+}
+function applyCfgPart(){
+  var isSop = (S.cfgPart!=='base');
+  var a=$('set-part-sop'), b=$('set-part-base');
+  if(a) a.style.display = isSop ? '' : 'none';
+  if(b) b.style.display = isSop ? 'none' : '';
+  var ta=$('set-tab-sop'), tb=$('set-tab-base');
+  if(ta) ta.className = 'set-tab' + (isSop ? ' on' : '');
+  if(tb) tb.className = 'set-tab' + (isSop ? '' : ' on');
+}
+
+/* ══════════ 所有 SOP 一覽（2026-08-30 用戶指定）══════════
+ * 以前只能靠三段下拉一格一格切，看不到全貌 —— 她問「要怎麼檢視現有所有的 SOP」，答案是做不到。
+ * 這張表列出全部（含已作廢的，設定頁本來就要能把作廢的叫出來恢復），點一列就跳去編它。 */
+function renderTplAllSection(){
+  var el=$('cfg-tpl-all'); if(!el) return;
+  var all=TEMPLATES.slice().sort(function(a,b){
+    var pa=tplPath(a.id)||'', pb=tplPath(b.id)||'';
+    return pa.localeCompare(pb) || String(a.name||'').localeCompare(String(b.name||''));
+  });
+  var voidN=all.filter(function(t){ return t.void; }).length;
+  var rows=all.map(function(t){
+    var on=(t.id===S.editingTplId);
+    return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
+      +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
+      +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(tplPath(t.id)||'📦 （未分類）')+'</td>'
+      +'<td class="px-2 py-1.5 text-sm '+(on?'font-bold text-blue-700':'font-medium text-gray-800')+'">'+esc(t.name||'')+'</td>'
+      +'<td class="px-2 py-1.5 text-xs text-gray-500 text-center whitespace-nowrap">'+((t.items||[]).length)+'</td>'
+      +'<td class="px-2 py-1.5 text-xs whitespace-nowrap">'
+      +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>':'<span class="text-green-700">使用中</span>')
+      +'</td></tr>';
+  }).join('');
+  el.innerHTML='<div class="flex items-baseline justify-between mb-2 flex-wrap gap-1">'
+    +'<h3 class="text-sm font-semibold text-gray-700">📋 所有 SOP 一覽</h3>'
+    +'<span class="text-xs text-gray-400" data-tpl-all-count>共 '+all.length+' 個'
+      +(voidN?'（含已作廢 '+voidN+' 個）':'')+'</span></div>'
+    +(all.length
+      ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse">'
+        +'<thead><tr class="border-b border-gray-200 text-xs text-gray-400">'
+        +'<th class="px-2 py-1 font-medium whitespace-nowrap">範圍 › 項目</th>'
+        +'<th class="px-2 py-1 font-medium">SOP 名稱</th>'
+        +'<th class="px-2 py-1 font-medium text-center whitespace-nowrap">品項</th>'
+        +'<th class="px-2 py-1 font-medium whitespace-nowrap">狀態</th>'
+        +'</tr></thead><tbody class="divide-y divide-gray-100">'+rows+'</tbody></table></div>'
+        +'<p class="text-xs text-gray-400 mt-2">點任一列 → 右邊就切成在編輯那一張。</p>'
+      : '<div class="text-xs text-gray-400 py-3 text-center">還沒有任何 SOP —— 點下面那張卡的「＋ 新增」</div>');
+}
+/* 從一覽點進去：三段跟著跳到它所在的格子，編輯區就是它 */
+function jumpToTpl(id){
+  var tpl=TEMPLATES.find(function(t){ return t.id===id; });
+  if(!tpl) return;
+  S.cfgCat1=tplCat(tpl,1); S.cfgCat2=tplCat(tpl,2); S.editingTplId=id;
+  S.showMovePicker=false;
+  renderCatsSection(); renderTemplatesSection();
+}
+
 function renderSettings(){
+  applyCfgPart();
   renderCatsSection();
-  renderTemplatesSection();
+  renderTemplatesSection();   // 內含 renderTplAllSection()
   var secs=[
     {key:'cases',label:'案場管理',icon:'📍'},
     {key:'contractors',label:'施工廠商',icon:'🔨'}
@@ -1596,6 +1694,13 @@ function closeNewFlow(){
 function nfSet(k,v){ NF[k]=v; renderNewFlow(); }
 /* 從第一頁的清單挑範本 → 進「要放哪裡」那一頁 */
 function nfPickSrc(id){ NF.src=id; NF.mode='place'; renderNewFlow(); }
+/* 下拉選了先記住就好，不要馬上翻頁 —— 使用者可能還想換一個看看 */
+function nfSrcChanged(){ var e=$('nf-src-sel'); NF.src=(e&&e.value)||''; }
+function nfPickSrcFromSel(){
+  var e=$('nf-src-sel'), v=(e&&e.value)||'';
+  if(!v){ showToast('請先選一個要複製的 SOP'); if(e) e.focus(); return; }
+  nfPickSrc(v);
+}
 function nfBlank(){ NF.mode='blank'; NF.step=1; renderNewFlow(); }
 function nfBackToPick(){ NF.mode='pick'; NF.src=''; NF.addingCat=0; renderNewFlow(); }
 /* 按「⧉ 複製現有 SOP」才列出清單 */
@@ -1729,20 +1834,25 @@ function renderNewFlow(){
       +'<div class="flex gap-2"><button onclick="closeNewFlow()" class="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">取消</button></div>';
 
   } else if(NF.mode==='list'){
-    /* 按了「複製現有 SOP」才列出清單 */
+    /* 按了「複製現有 SOP」才出現這一步。
+       2026-08-30 用戶指定改成**下拉式選單**（原本是一長條按鈕清單，SOP 一多就要捲）。 */
     var pick=TEMPLATES.filter(function(t){ return !t.void; });
     body='<div class="text-sm font-semibold mb-1">要複製哪一個 SOP？</div>'
-      +'<div class="text-xs text-gray-500 mb-3">它的查驗品項會整套複製過來</div>'
-      +'<div data-nf-list class="max-h-64 overflow-y-auto border border-gray-200 rounded-xl p-2 mb-3">'
-      +(pick.length ? pick.map(function(t){
-          var p=tplPath(t.id);
-          return '<button data-nf-src="'+esc(t.id)+'" onclick="nfPickSrc(\''+t.id+'\')" class="w-full text-left border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-blue-400 bg-white">'
-            +'<div class="text-sm font-bold text-gray-800">'+esc(t.name)+'</div>'
-            +'<div class="text-xs text-gray-500">'+(p?esc(p)+' · ':'')+((t.items||[]).length)+' 個查驗品項</div>'
-            +'</button>';
-        }).join('') : '<div class="text-xs text-gray-400 py-3 text-center">還沒有任何 SOP，回上一步選「空白表格」</div>')
-      +'</div>'
-      +'<div class="flex gap-2"><button onclick="nfBackToPick()" class="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">‹ 上一步</button></div>';
+      +'<div class="text-xs text-gray-500 mb-3">它的查驗品項會整套複製過來，建立後可以直接編修</div>'
+      +(pick.length
+        ? '<select id="nf-src-sel" data-nf-srcsel onchange="nfSrcChanged()" class="w-full border-2 border-blue-500 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none">'
+          +'<option value="">— 請選擇 —</option>'
+          +pick.map(function(t){
+             var p=tplPath(t.id);
+             return '<option value="'+esc(t.id)+'"'+(NF.src===t.id?' selected':'')+'>'
+               +esc(t.name)+'（'+((t.items||[]).length)+' 個查驗品項'+(p?' · '+esc(p):'')+'）</option>';
+           }).join('')
+          +'</select>'
+        : '<div data-nf-empty class="text-xs text-gray-400 py-3 text-center border border-dashed border-gray-300 rounded-xl mb-3">還沒有任何 SOP，回上一步選「空白表格」</div>')
+      +'<div class="flex gap-2">'
+      +'<button onclick="nfBackToPick()" class="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">‹ 上一步</button>'
+      +(pick.length?'<button data-nf-next onclick="nfPickSrcFromSel()" class="flex-1 px-3 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700">下一步 ›</button>':'')
+      +'</div>';
 
   } else if(NF.mode==='place'){
     /* 路線 A 第二頁：選了範本，再決定放哪一格＋叫什麼 */
@@ -1785,8 +1895,9 @@ function renderNewFlow(){
         +'<label class="block text-xs text-gray-500 mb-1">SOP 名稱 <span class="text-red-500">*</span></label>'
         +'<input id="nf-name" value="'+esc(NF.name||'')+'" placeholder="例：瑪摩石地坪硬底工法" class="w-full border-2 border-blue-500 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none" '
         +'onkeyup="if(event.key===\'Enter\')nfCreate()">'
-        +'<label class="block text-xs text-gray-500 mb-1">材質欄位要叫什麼</label>'
-        +'<input id="nf-mat" value="'+esc(NF.mat||'材質')+'" placeholder="例：材質名稱 / 石材種類" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3">'
+        /* 2026-08-30 用戶指定拿掉「材質欄位要叫什麼」：新增時問這個太細，而且線上資料顯示
+           它常被誤填成「值」（例：2CM大理石、A1B2）。一律先給預設值「材質」，
+           真要改的人到 ✏️ SOP 設定 卡片裡改 —— 那裡本來就有這個欄位。 */
         +'<div class="flex gap-2 flex-wrap">'
         +'<button onclick="nfGoStep(2)" class="flex-1 px-3 py-2 border border-gray-300 text-sm rounded-xl hover:bg-gray-50">‹ 上一步</button>'
         +'<button data-nf-create onclick="nfCreate()" class="flex-1 px-3 py-2 bg-blue-600 text-white font-bold text-sm rounded-xl hover:bg-blue-700">建立</button>'
@@ -1948,9 +2059,9 @@ function tplRowHtml(){
   } else {
     h+='<div class="text-xs text-gray-400 border border-dashed border-gray-300 rounded-xl px-3 py-2">（這裡還沒有 SOP）</div>';
   }
-  h+='<div class="flex gap-2 mt-2" data-mng>'
-    +'<button onclick="toggleCopyPicker()" class="flex-1 px-3 py-2 border-2 border-indigo-300 text-indigo-600 font-medium rounded-xl text-sm hover:bg-indigo-50">⧉ 複製 SOP</button>'
-    +'</div>';
+  /* 2026-08-30 用戶指定：新增 SOP 只留上方那顆「＋ 新增」一個入口。
+     這裡原本還有一顆「⧉ 複製 SOP」，跟「＋ 新增 →⧉ 複製現有 SOP」是兩套做同一件事，
+     而且功能比較弱（不能自己命名、不能選要不要帶查驗品項）→ 整個拿掉。 */
   return h+'</div>';
 }
 
@@ -2056,40 +2167,6 @@ function renderTemplatesSection(){
   } else {
     itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此 SOP 尚無查驗品項，點下方新增</div>';
   }
-  // 按下「複製工法」才展開：列出已建立的工法，選一個複製（含所有查驗品項）
-  var copyPickerHtml = '';
-  if(S.showCopyPicker){
-    /* 2026-08-26：來源列出**全部** SOP（不限目前這一格），並且可以指定複製到哪個範圍／項目。
-     * 這樣「跨範圍複製」一步就到 —— 以前要先複製（複本落在原地）再按「🔀 搬到其他分類」，兩步。
-     * 目的地預設＝目前選到的那一格，所以「在原地複製一份」的舊行為完全沒變。 */
-    var pick = TEMPLATES.filter(function(t){ return !t.void; });
-    var dstOpts = function(level){
-      var arr=(level===1?catL1():catL2());
-      var cur=(level===1?S.cfgCat1:S.cfgCat2);
-      var o='<option value="">（未分類）</option>';
-      arr.forEach(function(c){
-        o+='<option value="'+esc(c.id)+'"'+(c.id===cur?' selected':'')+'>'+esc(((c.icon||'')+' '+c.name).trim())+'</option>';
-      });
-      return o;
-    };
-    copyPickerHtml = '<div class="mt-2 border border-indigo-200 bg-indigo-50 rounded-xl p-3" data-mng data-copy-picker>'
-      +'<div class="text-xs font-semibold text-indigo-700 mb-2">複製到哪裡？</div>'
-      +'<div class="flex items-center gap-2 mb-1"><label class="text-xs text-gray-600 w-10 flex-shrink-0">範圍</label>'
-      +'<select id="copy-cat1" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">'+dstOpts(1)+'</select></div>'
-      +'<div class="flex items-center gap-2 mb-3"><label class="text-xs text-gray-600 w-10 flex-shrink-0">項目</label>'
-      +'<select id="copy-cat2" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm">'+dstOpts(2)+'</select></div>'
-      +'<div class="text-xs font-semibold text-indigo-700 mb-2">要複製哪一個 SOP？（查驗品項會一起複製）</div>'
-      +(pick.length ? pick.map(function(t){
-          var p=tplPath(t.id);
-          return '<button onclick="duplicateTemplate(\''+t.id+'\')" data-copy-src="'+esc(t.id)+'" class="w-full text-left bg-white border border-gray-200 rounded-lg px-3 py-2 mb-1 hover:border-indigo-400">'
-            +'<span class="text-sm font-medium text-gray-800">'+esc(t.name)+'</span>'
-            +'<span class="text-xs text-gray-500 ml-2">'+((t.items||[]).length)+' 個查驗品項</span>'
-            +(p?'<span class="block text-xs text-gray-400 mt-0.5">'+esc(p)+'</span>':'')
-            +'</button>';
-        }).join('') : '<div class="text-xs text-gray-500">尚無 SOP 可複製</div>')
-      +'<button onclick="toggleCopyPicker()" class="w-full text-xs text-gray-500 mt-1 py-1 hover:underline">取消</button>'
-      +'</div>';
-  }
   /* 搬家選單：按了「🔀 搬到其他分類」才展開，平常收著，避免大類／中類在畫面上出現兩次 */
   var movePickerHtml = '';
   if(tpl && S.showMovePicker){
@@ -2138,13 +2215,14 @@ function renderTemplatesSection(){
   /* 標題直接寫「正在編輯哪一張」＋它的三階路徑，跟上面那張卡的選擇對得起來 */
   el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">'+(tpl?('✏️ '+esc(tpl.name)):'✏️ SOP 設定')+'</h3>'
     +(tpl?'<p class="text-xs text-gray-400 mb-3" data-tpl-path>'+esc(tplPath(tpl.id)||'📦 （未分類）')+'</p>':'')
-    + copyPickerHtml
     +tplInfoHtml
     +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗品項（共 '+(tpl.items||[]).length+' 項）</div>'
       +itemsHtml
       +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗品項</button>')
       : '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有 SOP —— 點上面那張卡的「＋ 新增」→「SOP」</div>')
     +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
+  /* 編輯區一動，上面那張一覽的名稱／品項數／狀態／反白就要跟著更新 */
+  renderTplAllSection();
 }
 /* 搬家選單裡的分類下拉。選了先不生效，按「確定搬過去」才寫進去 —— 避免選到一半工法就從清單消失 */
 function catSelectHtml(tpl, level, id){
@@ -2163,7 +2241,6 @@ function setTemplateCat(tplId, field, value){
   renderHome();
 }
 function switchTplEditor(tplId){ S.editingTplId = tplId; S.showMovePicker = false; renderTemplatesSection(); }
-function toggleCopyPicker(){ S.showCopyPicker = !S.showCopyPicker; renderTemplatesSection(); }
 function addTplItem(tplId){
   if(mngGuard())return;
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
@@ -2209,33 +2286,6 @@ function addTemplate(){
 /* ── 複製工法（2026-08-13 新增）──
  * 整份複製：名稱、材質標籤、圖示、所有查驗品項與準則都帶過去。
  * 每個項目都給新 id，否則兩個工法共用同一個項目 id，改一邊會動到另一邊。 */
-function duplicateTemplate(tplId){
-  if(mngGuard())return;
-  S.showCopyPicker = false;
-  var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
-  if(!tpl) return;
-  if(!confirm('要複製 SOP「'+tpl.name+'」嗎？\n（'+(tpl.items||[]).length+' 個查驗品項會一起複製過去）')) return;
-  var copy = {
-    id: uid(),
-    name: tpl.name + '（複本）',
-    materialLabel: tpl.materialLabel,
-    icon: tpl.icon,
-    /* 目的地由複製視窗上方那兩個下拉決定（預設＝目前選到的那一格）。
-     * 視窗沒開（例如直接呼叫）時退回沿用來源的分類，行為跟以前一樣。 */
-    cat1: (function(){ var e=$('copy-cat1'); return e ? e.value : (tpl.cat1 || ''); })(),
-    cat2: (function(){ var e=$('copy-cat2'); return e ? e.value : (tpl.cat2 || ''); })(),
-    items: (tpl.items||[]).map(function(it){
-      return { id: uid(), name: it.name, criterion: it.criterion || '' };
-    })
-  };
-  TEMPLATES.push(copy);
-  S.editingTplId = copy.id;
-  S.cfgCat1 = tplCat(copy,1); S.cfgCat2 = tplCat(copy,2);
-  syncTemplatesToConfig();
-  renderCatsSection(); renderTemplatesSection(); renderHome();
-  var where = tplPath(copy.id) || '（未分類）';
-  showToast('已複製到「'+where+'」— 請改名後儲存設定');
-}
 /* ── 作廢／恢復（2026-08-13 新增）──
  * 作廢＝停用不刪除：首頁選不到、不能新建；既有歷史報表為快照儲存，完全不受影響。
  * 用 void 旗標而不是真的刪掉，隨時可恢復，也不會讓歷史報表的工法名稱變成孤兒。 */
@@ -2267,6 +2317,10 @@ function updateTemplate(tplId, field, value){
   if(!tpl) return;
   tpl[field] = value;
   syncTemplatesToConfig();
+  /* 改名要讓「所有 SOP 一覽」、上面那段 SOP 下拉、首頁跟著換名字（2026-08-30）——
+     這三處都顯示 SOP 名稱，不更新就會停在舊名字，看起來像沒改到。
+     刻意不重畫編輯卡本身：這是 onblur 觸發的，重畫會把游標與其他還沒存的輸入洗掉。 */
+  if(field === 'name'){ renderTplAllSection(); renderCatsSection(); renderHome(); }
 }
 function removeTemplate(tplId){
   if(mngGuard())return;
