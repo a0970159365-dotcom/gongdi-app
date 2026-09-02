@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-02.8';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-02.9';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -201,6 +201,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .lock-btn:hover{border-color:#f59e0b;background:#fffbeb;color:#92400e}
 .owner-cell.unlocked{color:#92400e;font-weight:700}
 .row-locked select,.row-locked input{background:#f1f5f9;color:var(--muted);cursor:not-allowed}
+.sub-time{font-size:10.5px;color:var(--muted);line-height:1.4;margin-top:2px;white-space:nowrap}
 .owner-cell{font-size:11.5px;color:var(--muted);white-space:nowrap}
 .owner-cell.mine{color:var(--primary);font-weight:700}
 .proj-checks{display:flex;flex-wrap:wrap;gap:6px}
@@ -402,7 +403,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <div id="dup-notice" class="no-print" style="display:none;background:#fef3c7;border:1.5px solid var(--warning);
            border-radius:10px;padding:11px 14px;margin-bottom:14px;align-items:center;gap:10px;flex-wrap:wrap">
         <span id="dup-notice-text" style="flex:1;min-width:200px;font-size:13px;font-weight:700;color:#92400e;line-height:1.7"></span>
-        <button class="btn btn-p btn-sm" onclick="joinDupReport()">👥 加入一起填</button>
+        <button id="dup-join" class="btn btn-p btn-sm" onclick="joinDupReport()">👥 加入一起填</button>
+        <button id="dup-merge" class="btn btn-a btn-sm" style="display:none" onclick="mergeDupHere()">🧩 合併成一張</button>
       </div>
       <!-- 案場（2026-08-25 C批「一報表一案場」）──────────────────────────
            以前案場掛在每一列施工明細，一張日報可以混好幾個案場；現在升到報表層，
@@ -1162,6 +1164,14 @@ function reportDepts(r){
   return out;
 }
 function reportDeptText(r){ const l = reportDepts(r); return l.length ? l.join('、') : '—'; }
+/* 提交時間顯示成「09-02 16:52」——2026-09-02 用戶要看得到誰在什麼時候填的 */
+function subTimeText(v){
+  if(!v) return '';
+  const d = new Date(v);
+  if(isNaN(d)) return '';
+  const p = x => String(x).padStart(2,'0');
+  return p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
 function reportHasDept(r, dept){ return !dept || reportDepts(r).indexOf(dept) >= 0; }
 /* 把我這張草稿併進既有的那一張（存檔時用）。
  * 我的列直接接在後面；列 id 萬一撞號就換一個。報表層的欄位只補「對方是空的」那些，
@@ -1866,8 +1876,26 @@ function checkDeptDateDuplicate() {
   const date = $('f-date').value;
   const projId = $('f-proj') ? ($('f-proj').value||'') : '';
   if (!date||!projId) return;
-  const existing = S.reports.find(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  const dups = S.reports.filter(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  const existing = dups[0];
+  const _joinBtn = $('dup-join'), _mergeBtn = $('dup-merge');
+  if (_joinBtn) _joinBtn.style.display = '';
+  if (_mergeBtn) _mergeBtn.style.display = 'none';
   if (!existing) return;
+  /* 我現在編的這張本身就是既有的一張（不是新草稿）→ 這一天有多張＝改版前留下的重複。
+     再跳「加入一起填」只會在兩張之間跳來跳去（2026-09-02 她手機上就是這樣），
+     所以這裡改成給一顆「合併成一張」。 */
+  const _iAmSaved = S.reports.some(r => r && r.id === S.report.id);
+  if (_iAmSaved) {
+    _dupReportId = existing.id;
+    $('dup-notice-text').textContent =
+      date + ' 的「' + curProjName() + '」有 ' + (dups.length + 1) + ' 張日報表（多半是舊版留下來的）'
+      + '。按「合併成一張」會把另外 ' + dups.length + ' 張的明細併進你正在看的這一張。';
+    if (_joinBtn) _joinBtn.style.display = 'none';
+    if (_mergeBtn) _mergeBtn.style.display = '';
+    bar.style.display = 'flex';
+    return;
+  }
   /* ⚠️ 不能只看 S.report：畫面上剛填的列要等 syncReport() 才進得去資料裡。
      只看資料的話，「先填兩列、再選案場」會被當成空草稿 → 自動載入別張，剛填的就不見了。
      所以連畫面上的列與欄位一起看。 */
@@ -1892,6 +1920,30 @@ function checkDeptDateDuplicate() {
     + (existing.reporter ? '（' + existing.reporter + ' 建的）' : '')
     + '。要接著填就按右邊；直接存檔的話，你填的明細也會自動併進那一張。';
   bar.style.display = 'flex';
+}
+/* 把同案場同日的其他張，全部併進「我正在看的這一張」，然後把它們刪掉。
+ * 刪除刻意一筆一筆做：雲端同步有一道「一次刪超過 1 筆就放棄」的防呆（2026-07-21 事故後加的），
+ * 一次刪多筆會整個放棄同步。 */
+function mergeDupHere(){
+  const date = $('f-date').value;
+  const projId = $('f-proj') ? ($('f-proj').value||'') : '';
+  const dups = S.reports.filter(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  if (!dups.length) { toast('沒有需要合併的','' ); return; }
+  if (!confirm('要把另外 ' + dups.length + ' 張的明細併進這一張嗎？\n（併完那幾張會刪掉，明細都會保留在這一張裡）')) return;
+  let rows = 0;
+  dups.forEach(function(d){
+    rows += ((d.workItems||[]).length) + ((d.materials||[]).length);
+    S.report = mergeIntoKeyed(S.report, d);
+  });
+  const idx = S.reports.findIndex(r=>r.id===S.report.id);
+  if (idx>=0) S.reports[idx] = S.report;
+  save();                                    // 先把合併後的內容存起來
+  dups.forEach(function(d){                  // 再一筆一筆刪掉那幾張
+    S.reports = S.reports.filter(r=>r.id!==d.id);
+    save();
+  });
+  renderReport(); applyPermissions(); checkDeptDateDuplicate();
+  toast('已合併 ' + dups.length + ' 張、' + rows + ' 列明細到這一張','s');
 }
 function joinDupReport(){
   const r = S.reports.find(x=>x.id===_dupReportId);
@@ -2418,7 +2470,8 @@ function addRow(it) {
     <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="說明..." oninput="syncReport()"${dis}></td>
     <td data-label="填表人">${canUn
       ? `<button type="button" class="lock-btn" onclick="unlockRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 填的內容">${escHtml(owner)} 🔒</button>`
-      : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}</td>
+      : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}${
+      it&&it.subAt?`<div class="sub-time" title="這一列送出的時間">${subTimeText(it.subAt)}</div>`:''}</td>
     <td class="col-del no-print">${mine?'<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button>':''}</td>`;
   tbody.appendChild(tr);
   renum(); recalc(); buildSummary();
@@ -3533,11 +3586,11 @@ function toggleDetail(btn,id){
     const rows=(r.workItems||[]).map((wi,i)=>`
       <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
       <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wi.vendor||'—')}</td><td>${escHtml(wi.staff||'—')}</td>
-      <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td><td>${escHtml(wi.owner||'—')}</td></tr>`).join('');
+      <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td><td>${escHtml(wi.owner||'—')}</td><td>${subTimeText(wi.subAt)||'—'}</td></tr>`).join('');
     inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
       <table class="stbl" style="font-size:12px">
-      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="8" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
+      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
       ${r.notes?.contact?`<p style="margin-top:8px;font-size:12px"><strong>工聯絡：</strong>${escHtml(r.notes.contact)}</p>`:''}`;
   }
 }

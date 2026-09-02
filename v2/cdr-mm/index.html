@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-02.8';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-02.9';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1151,6 +1151,14 @@ function reportDepts(r){
   return out;
 }
 function reportDeptText(r){ const l = reportDepts(r); return l.length ? l.join('、') : '—'; }
+/* 提交時間顯示成「09-02 16:52」——2026-09-02 用戶要看得到誰在什麼時候填的 */
+function subTimeText(v){
+  if(!v) return '';
+  const d = new Date(v);
+  if(isNaN(d)) return '';
+  const p = x => String(x).padStart(2,'0');
+  return p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
 function reportHasDept(r, dept){ return !dept || reportDepts(r).indexOf(dept) >= 0; }
 /* 把我這張草稿併進既有的那一張（存檔時用）。
  * 我的列直接接在後面；列 id 萬一撞號就換一個。報表層的欄位只補「對方是空的」那些，
@@ -1610,6 +1618,28 @@ var _dupAskedFor = '';
 /* 2026-09-02 改：判斷鍵拿掉「部門」（跨部門也算同一張，用戶拍板）。
  * 草稿還沒填東西 → 直接載入既有那張，不再問；已經填了才問要不要接著填，
  * 就算選「不要」，存檔時也會自動併進那一張（saveReport 那段），不會再多一張。 */
+/* 把同案場同日的其他張，全部併進「我正在看的這一張」，然後把它們刪掉。
+ * 刪除刻意一筆一筆做：雲端同步有一道「一次刪超過 1 筆就放棄」的防呆（2026-07-21 事故後加的）。 */
+function mergeDupHere(){
+  const date = $('f-date').value;
+  const projId = $('f-proj') ? ($('f-proj').value||'') : '';
+  const dups = S.reports.filter(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  if (!dups.length) { toast('沒有需要合併的',''); return; }
+  let rows = 0;
+  dups.forEach(function(d){
+    rows += ((d.workItems||[]).length) + ((d.materials||[]).length);
+    S.report = mergeIntoKeyed(S.report, d);
+  });
+  const idx = S.reports.findIndex(r=>r.id===S.report.id);
+  if (idx>=0) S.reports[idx] = S.report;
+  save();
+  dups.forEach(function(d){
+    S.reports = S.reports.filter(r=>r.id!==d.id);
+    save();
+  });
+  renderReport(); applyPermissions();
+  toast('已合併 ' + dups.length + ' 張、' + rows + ' 列明細到這一張','s');
+}
 function checkDeptDateDuplicate() {
   /* 帶入流程進行中就整個跳過 —— 瑪摩這支除了自動載入，還有一條 confirm 的路，
      不擋的話帶入時會先把今天那張讀進來，帶入的工項就疊在別人的列上面。 */
@@ -1617,8 +1647,23 @@ function checkDeptDateDuplicate() {
   const date = $('f-date').value;
   const projId = $('f-proj') ? ($('f-proj').value||'') : '';
   if (!date||!projId) return;               // 案場沒選就無從判斷
-  const existing = S.reports.find(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  const dups = S.reports.filter(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  const existing = dups[0];
   if (!existing) return;
+  /* 我現在編的這張本身就是既有的一張（不是新草稿）→ 這一天有多張＝改版前留下的重複。
+     再問「要不要載入」只會在兩張之間跳來跳去（2026-09-02 用戶在手機上就踩到）→ 改問要不要合併。
+     同一組條件只問一次。 */
+  const _iAmSaved = S.reports.some(r => r && r.id === S.report.id);
+  if (_iAmSaved) {
+    const mk = 'merge|' + date + '|' + projId;
+    if (_dupAskedFor === mk) return;
+    _dupAskedFor = mk;
+    if (confirm(date + ' 的「' + curProjName() + '」有 ' + (dups.length + 1) + ' 張日報表（多半是舊版留下來的），'
+        + '要合併成一張嗎？\n（另外 ' + dups.length + ' 張的明細會併進你正在看的這一張）')) {
+      mergeDupHere();
+    }
+    return;
+  }
   /* ⚠️ 不能只看 S.report：畫面上剛填的列要等 syncReport() 才進得去資料裡。
      只看資料的話，「先填兩列、再選案場」會被當成空草稿 → 自動載入別張，剛填的就不見了。
      所以連畫面上的列與欄位一起看。 */
@@ -3087,11 +3132,12 @@ function toggleDetail(btn,id){
     const rows=(r.workItems||[]).map((wi,i)=>`
       <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
       <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wiVendor(wi)||'—')}</td><td>${escHtml(wiStaff(wi)||'—')}</td>
-      <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td></tr>`).join('');
+      <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td>
+      <td>${escHtml(wi.owner||'—')}</td><td>${subTimeText(wi.subAt)||'—'}</td></tr>`).join('');
     inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
       <table class="stbl" style="font-size:12px">
-      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
+      <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
       ${r.notes?.contact?`<p style="margin-top:8px;font-size:12px"><strong>工聯絡：</strong>${escHtml(r.notes.contact)}</p>`:''}`;
   }
 }
