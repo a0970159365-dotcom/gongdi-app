@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-02.2';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-02.3';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -158,6 +158,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .ghead .gchev{display:inline-block;transition:transform .15s}
 .ghead.closed .gchev{transform:rotate(-90deg)}
 .grp-row td{padding:0!important;border:none!important}
+.sgrp{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
 .hgrp{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
 .hgrp .hgrp-body{padding:8px;background:var(--bg)}
 .hgrp .hgrp-body .ritem:last-child{margin-bottom:0}
@@ -2624,8 +2625,8 @@ function syncGroupButtons(){
     const b=$(id); if(b)b.classList.toggle('on',groupMode===m);
   });
 }
-function expandAllGroups(){ _closedG=new Set(); renderMgmt(); renderHistory(); }
-function collapseAllGroups(){ _closedG=new Set(_groupKeys); renderMgmt(); renderHistory(); }
+function expandAllGroups(){ _closedG=new Set(); _closedStat=new Set(); renderMgmt(); renderHistory(); }
+function collapseAllGroups(){ _closedG=new Set(_groupKeys); _closedStat=new Set(_statKeys); renderMgmt(); renderHistory(); }
 function toggleGroup(i){
   const k=_groupKeys[i]; if(k===undefined)return;
   if(_closedG.has(k))_closedG.delete(k); else _closedG.add(k);
@@ -2739,25 +2740,27 @@ function getLocProgressRows(){
   });
   return [...m.values()].sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||a.loc.localeCompare(b.loc,'zh-Hant',{numeric:true}));
 }
-/* ② 出工統計：案場×廠商。今日／明日＝最近一天那張的數字，期間累計＝區間內加總 */
+/* ② 出工統計：**一列＝一天**（2026-09-02 用戶指定；原本是一列＝案場×廠商）。
+ * 案場移到抬頭上，所以列裡只留日期、當天有哪些廠商、當天出工與明日預估。 */
 function getManpowerRows(){
   const m=new Map();
   mgWorkItems().forEach(({r,wi,pname})=>{
-    const ven=(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'（未指定廠商）';
-    const k=pname+'\u0000'+ven;
-    if(!m.has(k))m.set(k,{proj:pname,vendor:ven,total:0,days:new Set(),last:'',w0:0,w1:0});
+    const date=r.date||'（未填日期）';
+    const k=pname+'\u0000'+date;
+    if(!m.has(k))m.set(k,{proj:pname,date,vendors:[],w0:0,w1:0,items:0});
     const o=m.get(k);
-    o.total+=(wi.w0||0);
-    if(r.date)o.days.add(r.date);
-    if(String(r.date||'')>o.last){o.last=r.date||'';o.w0=0;o.w1=0}
-    if(String(r.date||'')===o.last){o.w0+=(wi.w0||0);o.w1+=(wi.w1||0)}
+    const ven=(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'（未指定廠商）';
+    if(o.vendors.indexOf(ven)<0)o.vendors.push(ven);
+    o.w0+=(wi.w0||0); o.w1+=(wi.w1||0); o.items++;
   });
-  return [...m.values()].map(o=>({...o,dayCount:o.days.size}))
-    .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||b.total-a.total);
+  return [...m.values()]
+    .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||String(b.date).localeCompare(String(a.date)));
 }
 /* ③ 材料統計：依「材料名稱＋單位」加總（名稱是設定頁的下拉選項，不會有錯字拆散問題） */
+/* ③ 材料統計：**一列＝一種材料**，案場移到抬頭上（2026-09-02 用戶指定）。
+ * 分組鍵因此是「案場＋名稱＋單位」——同一種材料在不同案場各算各的。 */
 function getMaterialRows(){
-  const f=mgFilter(); const m=new Map();
+  const m=new Map();
   mgReports().forEach(r=>{
     const pname=reportProjName(r)||'（未指定案場）';
     (r.materials||[]).forEach(mt=>{
@@ -2765,19 +2768,32 @@ function getMaterialRows(){
       /* 單位空白的舊資料，用設定頁綁的預設單位歸戶，否則同一種材料會被拆成兩列
          （2026-09-02 用戶指定；沒綁預設的仍然照原樣，不會硬湊） */
       const unit=(mt.unit||'').trim()||matUnitOf(name);
-      const k=name+'\u0000'+unit;
-      if(!m.has(k))m.set(k,{name,unit,qty:0,n:0,projs:new Set(),last:''});
+      const k=pname+'\u0000'+name+'\u0000'+unit;
+      if(!m.has(k))m.set(k,{proj:pname,name,unit,qty:0,n:0,last:''});
       const o=m.get(k);
-      o.qty+=Number(mt.qty)||0; o.n++; o.projs.add(pname);
+      o.qty+=Number(mt.qty)||0; o.n++;
       if(String(r.date||'')>o.last)o.last=r.date||'';
     });
   });
-  return [...m.values()].map(o=>({...o,projText:o.projs.size===1?[...o.projs][0]:(o.projs.size+' 個案場')}))
-    .sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant',{numeric:true}));
+  return [...m.values()]
+    .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||a.name.localeCompare(b.name,'zh-Hant',{numeric:true}));
 }
-/* 統計表共用的畫法：沒資料就說清楚是「這個區間沒有」，不要留一片空白 */
-function statTable(headers,rows,foot){
-  if(!rows.length)return '<div class="empty"><div class="empty-icon">📭</div><h3>這個條件下沒有資料</h3><p style="font-size:12px;color:var(--muted)">試著放寬日期區間，或按「清除」看全部</p></div>';
+/* 三張統計都是「📁 案場當抬頭 → 底下分列」（2026-09-02 用戶指定）。
+ * 底下一列代表什麼，每張表不一樣（她拍板的組合）：
+ *   位置進度＝一個施作位置｜出工統計＝一天｜材料統計＝一種材料
+ * 抬頭可以收合，用的是統計自己的一組狀態（_closedStat），
+ * 不跟報表清單的分組狀態混在一起 —— 瑪摩的報表清單是用日期分組，鍵值對不起來。 */
+let _statKeys=[], _closedStat=new Set();
+function toggleStatGroup(i){
+  const k=_statKeys[i]; if(k===undefined)return;
+  if(_closedStat.has(k))_closedStat.delete(k); else _closedStat.add(k);
+  renderMgmt();
+}
+function statEmptyHtml(){
+  return '<div class="empty"><div class="empty-icon">📭</div><h3>這個條件下沒有資料</h3>'
+    +'<p style="font-size:12px;color:var(--muted)">試著放寬日期區間，或按「清除」看全部</p></div>';
+}
+function statTableHtml(headers,rows,foot){
   return '<div class="tbl-wrap"><table class="master-tbl"><thead><tr>'
     +headers.map(h=>'<th'+(h.num?' style="text-align:right"':'')+'>'+escHtml(h.t)+'</th>').join('')
     +'</tr></thead><tbody>'
@@ -2785,25 +2801,45 @@ function statTable(headers,rows,foot){
     +(foot?'<tr class="tfoot-row" style="font-weight:700;background:var(--bg)">'+foot.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>':'')
     +'</tbody></table></div>';
 }
+/* rows 要帶 proj，這裡照案場分組畫出「抬頭 ＋ 表格」 */
+function statGrouped(rows,headers,cellsOf,summaryOf,footOf){
+  if(!rows.length)return statEmptyHtml();
+  const force=mgmtFilterActive();
+  const m=new Map();
+  rows.forEach(o=>{const k=o.proj||'（未指定案場）'; if(!m.has(k))m.set(k,[]); m.get(k).push(o)});
+  _statKeys=[...m.keys()];
+  return [...m.entries()].map(([key,list],gi)=>{
+    const open=force||!_closedStat.has(key);
+    return '<div class="sgrp">'
+      +'<div class="ghead'+(open?'':' closed')+'" onclick="toggleStatGroup('+gi+')">'
+      +'<span class="gchev">▼</span><span>📁 '+escHtml(key)+'</span>'
+      +'<span class="gcnt">'+escHtml(summaryOf(list))+'</span></div>'
+      +(open?statTableHtml(headers,list.map(cellsOf),footOf?footOf(list):null):'')
+      +'</div>';
+  }).join('');
+}
 function renderMgStat(){
   const box=$('mg-stat'); if(!box)return;
+  const dow=d=>{const x=new Date(d+'T00:00:00');return isNaN(x)?d:(d+'（'+DOW[x.getDay()]+'）')};
   if(mgView==='loc'){
-    const rows=getLocProgressRows();
-    box.innerHTML=statTable(
-      [{t:'案場'},{t:'施作位置'},{t:'最新進度',num:1},{t:'最後回報'},{t:'累計出工',num:1},{t:'回報次數',num:1}],
-      rows.map(o=>[escHtml(o.proj),escHtml(o.loc),o.progress===null?'—':(o.progress+'%'),o.last||'—',_n1(o.w0),o.n]));
+    /* 一列＝一個施作位置（重點是「現在做到哪」） */
+    box.innerHTML=statGrouped(getLocProgressRows(),
+      [{t:'施作位置'},{t:'最新進度',num:1},{t:'最後回報'},{t:'累計出工',num:1},{t:'回報次數',num:1}],
+      o=>[escHtml(o.loc),o.progress===null?'—':(o.progress+'%'),o.last||'—',_n1(o.w0),o.n],
+      list=>list.length+' 個位置 · 出工 '+_n1(list.reduce((s,o)=>s+o.w0,0)));
   } else if(mgView==='man'){
-    const rows=getManpowerRows();
-    const tot=rows.reduce((s,o)=>s+o.total,0), t0=rows.reduce((s,o)=>s+o.w0,0), t1=rows.reduce((s,o)=>s+o.w1,0);
-    box.innerHTML=statTable(
-      [{t:'案場'},{t:'廠商'},{t:'期間累計',num:1},{t:'回報天數',num:1},{t:'最近回報'},{t:'當天出工',num:1},{t:'明日預估',num:1}],
-      rows.map(o=>[escHtml(o.proj),escHtml(o.vendor),_n1(o.total),o.dayCount,o.last||'—',_n1(o.w0),_n1(o.w1)]),
-      ['合計','',_n1(tot),'','',_n1(t0),_n1(t1)]);
+    /* 一列＝一天（重點是每天出多少工） */
+    box.innerHTML=statGrouped(getManpowerRows(),
+      [{t:'日期'},{t:'廠商'},{t:'今日出工',num:1},{t:'明日預估',num:1},{t:'工項數',num:1}],
+      o=>[dow(o.date),escHtml(o.vendors.join('、')),_n1(o.w0),_n1(o.w1),o.items],
+      list=>list.length+' 天 · 出工合計 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
+      list=>['合計','',_n1(list.reduce((s,o)=>s+o.w0,0)),_n1(list.reduce((s,o)=>s+o.w1,0)),list.reduce((s,o)=>s+o.items,0)]);
   } else if(mgView==='mat'){
-    const rows=getMaterialRows();
-    box.innerHTML=statTable(
-      [{t:'材料名稱'},{t:'單位'},{t:'數量合計',num:1},{t:'筆數',num:1},{t:'案場'},{t:'最後使用'}],
-      rows.map(o=>[escHtml(o.name),escHtml(o.unit||'—'),_n1(o.qty),o.n,escHtml(o.projText),o.last||'—']));
+    /* 一列＝一種材料（重點是總共用了多少） */
+    box.innerHTML=statGrouped(getMaterialRows(),
+      [{t:'材料名稱'},{t:'單位'},{t:'數量合計',num:1},{t:'筆數',num:1},{t:'最後使用'}],
+      o=>[escHtml(o.name),escHtml(o.unit||'—'),_n1(o.qty),o.n,o.last||'—'],
+      list=>list.length+' 種材料');
   } else box.innerHTML='';
 }
 function syncMgViewButtons(){
@@ -2818,13 +2854,17 @@ function renderMgmt(){
   /* 三張統計走另一條路：表格與分組工具列收起來，改畫統計 */
   if(mgView!=='list'){
     if(wrap)wrap.style.display='none';
-    if(gbar)gbar.style.display='none';
+    /* 統計也是分組的 → 展開／收合鈕留著；但三張統計一律照案場分，
+       「依案場／依日期」那兩顆用不到，藏起來免得按了沒反應。 */
+    if(gbar)gbar.style.display='';
+    ['gb-proj','gb-date'].forEach(id=>{const b=$(id); if(b)b.style.display='none'});
     $('mgmt-empty').style.display='none';
     renderMgStat();
     return;
   }
   if(wrap)wrap.style.display='';
   if(gbar)gbar.style.display='';
+  ['gb-proj','gb-date'].forEach(id=>{const b=$(id); if(b)b.style.display=''});
   $('mg-stat').innerHTML='';
   list=sortReports(list);
   const tbody=$('master-tbody'); tbody.innerHTML='';
@@ -2924,6 +2964,7 @@ function exportMgmtExcel(){
     doExportExcel(rows);
     return;
   }
+  /* Excel 是平的表，沒有抬頭可用 → 案場放第一欄（2026-09-02 用戶指定「案場移至最前面」） */
   let title='',headers=[],body=[];
   if(mgView==='loc'){
     title='位置進度';
@@ -2931,12 +2972,12 @@ function exportMgmtExcel(){
     body=getLocProgressRows().map(o=>[o.proj,o.loc,o.progress===null?'':o.progress,o.last,_n1(o.w0),o.n]);
   } else if(mgView==='man'){
     title='出工統計';
-    headers=['案場','廠商','期間累計','回報天數','最近回報','當天出工','明日預估'];
-    body=getManpowerRows().map(o=>[o.proj,o.vendor,_n1(o.total),o.dayCount,o.last,_n1(o.w0),_n1(o.w1)]);
+    headers=['案場','日期','廠商','今日出工','明日預估','工項數'];
+    body=getManpowerRows().map(o=>[o.proj,o.date,o.vendors.join('、'),_n1(o.w0),_n1(o.w1),o.items]);
   } else {
     title='材料統計';
-    headers=['材料名稱','單位','數量合計','筆數','案場','最後使用'];
-    body=getMaterialRows().map(o=>[o.name,o.unit,_n1(o.qty),o.n,o.projText,o.last]);
+    headers=['案場','材料名稱','單位','數量合計','筆數','最後使用'];
+    body=getMaterialRows().map(o=>[o.proj,o.name,o.unit,_n1(o.qty),o.n,o.last]);
   }
   if(!body.length){toast('無符合條件的資料','e');return;}
   exportStatExcel(title,headers,body);
