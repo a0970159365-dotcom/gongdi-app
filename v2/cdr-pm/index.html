@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-02.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-02.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -179,6 +179,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .list-row input:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
 .list-num{font-size:11px;color:var(--muted);min-width:18px;text-align:center;font-weight:600}
 /* ── 兩層設定（施作位置→施工項目、廠商→施工人員）2026-08-12 ── */
+.mat-suggest{font-size:10px;color:var(--accent,#b45309);background:#fef3c7;border-radius:3px;padding:1px 5px;flex-shrink:0;font-weight:700}
 .tl-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px}
 .tl-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;overflow:hidden}
 .tl-head{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#f8fafc;border-bottom:1px solid var(--border)}
@@ -910,7 +911,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <div class="fg">
             <div class="g g2" style="gap:16px;align-items:start">
               <div class="fg">
-                <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matnames')">＋ 新增</button></div>
+                <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addMatNameRow()">＋ 新增</button></div>
+                <p class="tl-hint" style="margin-bottom:6px">右邊選這個材料的<b>預設單位</b>：填日報時選了名稱，單位會自動帶入；沒填單位的舊資料，材料統計也會照這個歸戶。標「建議」的是照過去用最多的單位先選好，按「💾 儲存設定」才會生效。</p>
                 <div class="list-field" id="lf-matnames"></div>
               </div>
               <div class="fg">
@@ -1106,6 +1108,7 @@ const S = {
     staffByVendor: {},   // { 廠商: [施工人員, ...] }（第二層）
     matNames: [],
     matUnits: [],
+    matUnitMap: {},                 // 材料名稱 → 預設單位（2026-09-02）
     users: []
   },
   user: { name:'', dept:'', role:'reporter' },
@@ -1167,6 +1170,7 @@ function load() {
       if (!S.cfg.projects) S.cfg.projects=[];
       if (!S.cfg.users) S.cfg.users=[];
       if (!S.cfg.matNames) S.cfg.matNames=[];
+      if (!S.cfg.matUnitMap || typeof S.cfg.matUnitMap!=='object') S.cfg.matUnitMap={};
       if (!S.cfg.matUnits) S.cfg.matUnits=['片','支','桶','包','箱','才','m','m²','公斤','公升'];
       if (!S.cfg.depts?.length) S.cfg.depts=['專案管理部'];
       migrateCfgTwoLevel();
@@ -2513,7 +2517,17 @@ function matUnitOpts(cur) {
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
 function onMatNameChange(sel) {
-  // Auto-fill unit if material has default unit mapping
+  /* 2026-09-02：選了材料名稱 → 單位自動帶入設定頁綁的預設單位。
+     沒綁預設的維持原樣（不會把使用者已經選好的單位清掉）。 */
+  const u=matUnitOf(sel.value);
+  if(u){
+    const row=sel.closest('tr');
+    const us=row&&row.querySelector('[data-f="munit"]');
+    if(us){
+      if(![...us.options].some(o=>o.value===u)) us.add(new Option(u,u),1);
+      us.value=u;
+    }
+  }
   syncReport();
 }
 function delMatRow(btn) { btn.closest('tr').remove(); mnumAll(); toggleMatEmpty(); syncReport(); }
@@ -3206,7 +3220,9 @@ function getMaterialRows(){
     const pname=reportProjName(r)||'（未指定案場）';
     (r.materials||[]).forEach(mt=>{
       const name=(mt&&mt.name||'').trim(); if(!name)return;
-      const unit=(mt.unit||'').trim();
+      /* 單位空白的舊資料，用設定頁綁的預設單位歸戶，否則同一種材料會被拆成兩列
+         （2026-09-02 用戶指定；沒綁預設的仍然照原樣，不會硬湊） */
+      const unit=(mt.unit||'').trim()||matUnitOf(name);
       const k=name+'\u0000'+unit;
       if(!m.has(k))m.set(k,{name,unit,qty:0,n:0,projs:new Set(),last:''});
       const o=m.get(k);
@@ -3799,7 +3815,7 @@ function tlCleanup(){
 
 /* ── SETTINGS ── */
 function loadCfgForm(){
-  loadListField('lf-matnames',S.cfg.matNames);
+  loadMatNameField();
   loadListField('lf-matunits',S.cfg.matUnits);
   renderTwoLevel('loc');
   renderTwoLevel('vendor');
@@ -3808,7 +3824,8 @@ function loadCfgForm(){
 function saveSettings(){
   if(appLockGuard())return;
   if(mngGuard())return;
-  S.cfg.matNames = readListField('lf-matnames');
+  S.cfg.matNames = readMatNameField();
+  S.cfg.matUnitMap = readMatUnitMap();
   S.cfg.matUnits = readListField('lf-matunits');
   tlCleanup();   // 兩層設定在編輯當下已寫進 S.cfg，這裡只清空白
   save(); toast('設定已儲存','s');
@@ -3817,6 +3834,95 @@ function saveSettings(){
 }
 
 /* ── LIST FIELD ── */
+/* ══════ 材料名稱 → 預設單位（2026-09-02 用戶指定）══════
+ * 線上資料的問題：同一個材料被記過兩種單位（例：防水漆／桶 5、防水漆／單位空白 10），
+ * 材料統計依「名稱＋單位」加總 → 同一種材料被拆成兩列。
+ * 治本：在設定頁把名稱和單位綁起來，填日報時自動帶入，統計也照它歸戶。
+ * 存在 cfg.matUnitMap，沒設定的名稱就是「沒有預設單位」，行為與改版前完全一樣。 */
+function matUnitOf(name){
+  const m=S.cfg.matUnitMap||{};
+  return (m[String(name||'').trim()]||'').trim();
+}
+/* 還沒設定預設單位的材料，看它過去實際被記過哪些單位，挑最常用的當建議值。
+ * 只是「先選好」讓她確認，沒按儲存就不算數。 */
+function matUnitSuggest(name){
+  const n=String(name||'').trim(); if(!n)return '';
+  const cnt={};
+  (S.reports||[]).forEach(r=>(r.materials||[]).forEach(mt=>{
+    if(!mt||String(mt.name||'').trim()!==n)return;
+    const u=String(mt.unit||'').trim(); if(!u)return;
+    cnt[u]=(cnt[u]||0)+1;
+  }));
+  return Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||'';
+}
+function matUnitSelectHtml(cur, suggested){
+  const list=S.cfg.matUnits||[];
+  const extra=cur&&list.indexOf(cur)<0?[cur]:[];
+  return '<select class="fi mat-unit-sel" style="max-width:96px;padding:4px 6px;font-size:12px"'
+    +(suggested?' data-suggest="1"':'')+'>'
+    +'<option value="">（無）</option>'
+    +[...extra,...list].map(u=>'<option value="'+escHtml(u)+'"'+(u===cur?' selected':'')+'>'+escHtml(u)+'</option>').join('')
+    +'</select>'+(suggested?'<span class="mat-suggest" title="照過去用最多的單位先選好，按儲存才生效">建議</span>':'');
+}
+function matNameRowHtml(i, name, unit, suggested){
+  return '<span class="list-num">'+(i+1)+'</span>'
+    +'<input type="text" value="'+escHtml(name||'')+'" placeholder="材料名稱..." oninput="onMatNameCfgInput(this)">'
+    +matUnitSelectHtml(unit||'', suggested)
+    +(portalCanDelete()||!name ? '<button class="btn btn-g btn-icon btn-sm" onclick="this.closest(\'.list-row\').remove();renumListField(\'lf-matnames\')">✕</button>' : '');
+}
+function loadMatNameField(){
+  const el=$('lf-matnames'); if(!el)return;
+  el.innerHTML='';
+  (S.cfg.matNames||[]).forEach((name,i)=>{
+    const set=matUnitOf(name);
+    const sug=set?'':matUnitSuggest(name);
+    const row=document.createElement('div');
+    row.className='list-row';
+    row.innerHTML=matNameRowHtml(i,name,set||sug,!set&&!!sug);
+    el.appendChild(row);
+  });
+}
+function addMatNameRow(){
+  if(mngGuard())return;
+  const el=$('lf-matnames');
+  const row=document.createElement('div');
+  row.className='list-row';
+  row.innerHTML=matNameRowHtml(el.children.length,'','',false);
+  el.appendChild(row);
+  row.querySelector('input').focus();
+}
+/* 名稱改掉了，原本掛在舊名稱上的「建議」就不算數了 → 照新名稱重算。
+ * 也適用「這一列還沒選單位」的情況（打了名稱就順手把建議填上）。
+ * 已經自己選過單位的那幾列不動 —— 使用者的選擇優先。 */
+function onMatNameCfgInput(inp){
+  const row=inp.closest('.list-row'); if(!row)return;
+  const sel=row.querySelector('.mat-unit-sel');
+  if(!sel)return;
+  const isSuggest=sel.getAttribute('data-suggest')==='1';
+  if(!isSuggest&&sel.value)return;               // 手動選過的不要蓋掉
+  const sug=matUnitSuggest(inp.value);
+  if(sug&&![...sel.options].some(o=>o.value===sug))sel.add(new Option(sug,sug),1);
+  sel.value=sug||'';
+  sel.setAttribute('data-suggest',sug?'1':'0');
+  if(sug&&!row.querySelector('.mat-suggest')){
+    const tag=document.createElement('span');
+    tag.className='mat-suggest'; tag.title='照過去用最多的單位先選好，按儲存才生效';
+    tag.textContent='建議'; sel.insertAdjacentElement('afterend',tag);
+  }
+  if(!sug){const tg=row.querySelector('.mat-suggest'); if(tg)tg.remove();}
+}
+function readMatNameField(){
+  return [...$('lf-matnames').querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
+}
+function readMatUnitMap(){
+  const out={};
+  [...$('lf-matnames').children].forEach(row=>{
+    const name=(row.querySelector('input')||{}).value||'';
+    const unit=(row.querySelector('.mat-unit-sel')||{}).value||'';
+    if(name.trim()&&unit)out[name.trim()]=unit;
+  });
+  return out;
+}
 function loadListField(id, arr){
   const el=$(id); el.innerHTML='';
   (arr||[]).forEach((v,i)=>{
