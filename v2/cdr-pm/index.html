@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-02.7';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-02.8';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1114,6 +1114,78 @@ const S = {
   projSort: 'desc'
 };
 
+/* ══════ 同案場同日只有一張（2026-09-02 用戶指定）══════
+ * 出事的情境：兩個人前後 90 秒各按「＋ 新增日報」，各自拿到一組隨機 id →
+ * 在系統眼中是兩份不相干的資料，8/12 就寫好的「逐列合併」根本沒機會生效。
+ * 改法：報表 id 改成「案場＋日期」算出來的固定值 → 兩個人算到同一個 id，
+ *       寫進同一筆，合併機制自動接手（我的列以我為準、別人的列以雲端為準）。
+ * 唯一序號沒有消失，只是移到「每一次提交」：sub_日期_時間_填表人，掛在自己填的那幾列上。
+ * 跨部門也算同一張（用戶拍板）——今天線上那組重複就是跨部門造成的。 */
+function reportKey(projId, date){
+  const d = String(date||'').replace(/-/g,'');
+  return (projId && /^\d{8}$/.test(d)) ? ('rpt_' + projId + '_' + d) : '';
+}
+function isKeyedId(id){ return /^rpt_.+_\d{8}$/.test(String(id||'')); }
+function findByKey(key){ return key ? (S.reports.find(r => r && r.id === key) || null) : null; }
+/* 這一次提交的唯一序號：案場＋日期在鍵裡了，這裡帶時間與人 */
+function newSubmissionId(){
+  const n = new Date(), p = x => String(x).padStart(2,'0');
+  return 'sub_' + n.getFullYear() + p(n.getMonth()+1) + p(n.getDate())
+       + '_' + p(n.getHours()) + p(n.getMinutes()) + p(n.getSeconds())
+       + '_' + ((S.user && S.user.name) || '');
+}
+/* 我自己填的列補上提交批次號／時間／部門。
+ * 已經有的不覆蓋 —— 保留「第一次送出」的時間才有追溯意義。 */
+function stampSubmission(rep){
+  const me = (S.user && S.user.name) || '', dept = (S.user && S.user.dept) || '';
+  const sid = newSubmissionId(), at = new Date().toISOString();
+  ['workItems','materials'].forEach(k => {
+    (rep[k]||[]).forEach(row => {
+      if(!row) return;
+      if(!row.owner) row.owner = me;      // 沒主人的舊列＝我現在填的
+      if(row.owner !== me) return;        // 別人的列不要蓋
+      if(!row.subId){ row.subId = sid; row.subAt = at; }
+      if(!row.subDept) row.subDept = dept;
+    });
+  });
+  rep.lastSubId = sid; rep.lastSubAt = at;
+  return sid;
+}
+/* 一張報表現在可能跨部門共有 → 部門要看「裡面有誰填」，不能只看抬頭那一格。
+ * 與「專案工務列出所有填表人」同一手法。 */
+function reportDepts(r){
+  const out = [];
+  const push = d => { d = String(d||'').trim(); if(d && out.indexOf(d) < 0) out.push(d); };
+  push(r && r.dept);
+  ((r && r.workItems)||[]).forEach(wi => push(wi && wi.subDept));
+  ((r && r.materials)||[]).forEach(m => push(m && m.subDept));
+  return out;
+}
+function reportDeptText(r){ const l = reportDepts(r); return l.length ? l.join('、') : '—'; }
+function reportHasDept(r, dept){ return !dept || reportDepts(r).indexOf(dept) >= 0; }
+/* 把我這張草稿併進既有的那一張（存檔時用）。
+ * 我的列直接接在後面；列 id 萬一撞號就換一個。報表層的欄位只補「對方是空的」那些，
+ * 不覆蓋別人已經填好的天氣／注意事項。 */
+function mergeIntoKeyed(target, mine){
+  const out = JSON.parse(JSON.stringify(target));
+  ['workItems','materials'].forEach(k => {
+    const have = new Set((out[k]||[]).map(x => x && x.id).filter(Boolean));
+    out[k] = out[k] || [];
+    (mine[k]||[]).forEach(row => {
+      if(!row) return;
+      const cp = {...row};
+      if(!cp.id || have.has(cp.id)) cp.id = uid();
+      have.add(cp.id);
+      out[k].push(cp);
+    });
+  });
+  (mine.photos||[]).forEach(p => { (out.photos = out.photos || []).push(p); });
+  if(!out.weather && mine.weather) out.weather = mine.weather;
+  out.notes = out.notes || {};
+  if(!out.notes.contact && mine.notes && mine.notes.contact) out.notes.contact = mine.notes.contact;
+  if(!out.notes.other && mine.notes && mine.notes.other) out.notes.other = mine.notes.other;
+  return out;
+}
 function blankReport() {
   return {
     id: uid(), date: today(), dept:'', reporter:'', weather:'',
@@ -1257,6 +1329,9 @@ function save() {
  * 呼叫端（save()）完全不用改。
  */
 var _lastPushed = {};   // id -> 上次推上雲的 JSON 字串
+var _editingLegacy = false;   // 正在編輯的是舊格式（隨機 id）報表 → 存檔時不改鍵
+var _loadingDup = false;      // 防止 checkDeptDateDuplicate ↔ loadReport 互相呼叫成無限迴圈
+var _noAutoLoad = false;      // 帶入流程進行中：不要自動載入既有那張（存檔時才併）
 /* ── 工項合併（多人共編，2026-08-12）──
  * 兩個人同時開同一張日報時，各自的畫面只有自己載入當下的那份 workItems。
  * 直接整份寫回去 → 後存的人會把先存的人新增的列蓋掉。
@@ -1780,27 +1855,43 @@ var _dupReportId = '';
 /* 使用者已經在新增視窗做過決定的「部門|日期」，之後就不要再一直提醒（2026-08-18 用戶要求）。
    換到別的日期會重新判斷；重新整理也會重來。 */
 var _dupHandledFor = '';
+/* 2026-09-02 改：判斷鍵拿掉「部門」（跨部門也算同一張，用戶拍板）。
+ * 而且不再只是提示 —— 草稿還沒填東西就直接把既有那張載進來，接著填。
+ * 已經填了東西才發現撞到的話，提示條照出，存檔時會自動併進去（saveReport 那段）。 */
 function checkDeptDateDuplicate() {
   const bar = $('dup-notice');
   if (!bar) return;
   _dupReportId = '';
   bar.style.display = 'none';
-  const dept = S.user.dept;
   const date = $('f-date').value;
-  /* C 批：共填鍵從「同部門＋同一天」改成「同部門＋同一天＋同案場」。
-     案場還沒選就無從判斷，直接不提示。 */
   const projId = $('f-proj') ? ($('f-proj').value||'') : '';
-  if (!dept||!date||!projId) return;
-  if (_dupHandledFor === dept + '|' + date + '|' + projId) return;
-  const existing = S.reports.find(r=>r.dept===dept && r.date===date && reportProjId(r)===projId);
-  if (existing && existing.id!==S.report.id) {
-    _dupReportId = existing.id;
-    $('dup-notice-text').textContent =
-      dept + ' 在 ' + date + ' 的「' + curProjName() + '」已經有一張日報表了'
-      + (existing.reporter ? '（' + existing.reporter + ' 建的）' : '')
-      + '。要接著填就按右邊，不用另外開一張。';
-    bar.style.display = 'flex';
+  if (!date||!projId) return;
+  const existing = S.reports.find(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
+  if (!existing) return;
+  /* ⚠️ 不能只看 S.report：畫面上剛填的列要等 syncReport() 才進得去資料裡。
+     只看資料的話，「先填兩列、再選案場」會被當成空草稿 → 自動載入別張，剛填的就不見了。
+     所以連畫面上的列與欄位一起看。 */
+  const _domRows = ($('tbody') ? $('tbody').children.length : 0)
+                 + ($('mat-tbody') ? $('mat-tbody').children.length : 0);
+  const _domNotes = (($('n-contact')||{}).value||'') + (($('n-other')||{}).value||'') + (($('f-weather')||{}).value||'');
+  const emptyDraft = !_domRows && !_domNotes
+    && !(S.report.workItems||[]).length && !(S.report.materials||[]).length
+    && !(S.report.notes && (S.report.notes.contact||S.report.notes.other)) && !S.report.weather;
+  if (emptyDraft && _reportStarted && !_loadingDup && !_noAutoLoad) {
+    _loadingDup = true;
+    try {
+      loadReport(existing);
+      toast('已載入這天的日報表（' + (existing.reporter||'') + ' 建的），接著填就好','s');
+    } finally { _loadingDup = false; }
+    return;
   }
+  if (_dupHandledFor === date + '|' + projId) return;
+  _dupReportId = existing.id;
+  $('dup-notice-text').textContent =
+    date + ' 的「' + curProjName() + '」已經有一張日報表了'
+    + (existing.reporter ? '（' + existing.reporter + ' 建的）' : '')
+    + '。要接著填就按右邊；直接存檔的話，你填的明細也會自動併進那一張。';
+  bar.style.display = 'flex';
 }
 function joinDupReport(){
   const r = S.reports.find(x=>x.id===_dupReportId);
@@ -2064,6 +2155,7 @@ function carryApply(){
   const wantWork  = $('carry-work').checked;
   closeCarryModal();
 
+  _noAutoLoad = true;            // 帶入期間先不要自動載入既有那張（見檔案上方說明）
   _startNewReport();
   applyCarryProj();
   const me = (S.user && S.user.name) || '';
@@ -2089,6 +2181,7 @@ function carryApply(){
   if (hint) {
     if (brought.length) {
       hint.textContent = `✓ 已從 ${src.date}（${src.reporter||'—'}）帶入：${brought.join('、')}`;
+  _noAutoLoad = false;          // 帶入完成，之後使用者自己改案場／日期就恢復自動載入
       hint.style.display = 'block';
     } else { hint.style.display = 'none'; }
   }
@@ -2136,6 +2229,7 @@ function newReport(seedDate) {
 /* 真正建立空白報表（帶入視窗的三個出口都會走這裡） */
 function _startNewReport(){
   _reportStarted = true;
+  _editingLegacy = false;            // 新建的一定走固定鍵
   const newR = blankReport();
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
@@ -2221,16 +2315,37 @@ function saveReport() {
   syncReport();
   if (!S.report.dept) { toast('請確認部門（需先登入）','e'); return; }
   if (!S.report.projId) { toast('請先選擇案場','e'); $('f-proj')?.focus(); return; }
+  /* 2026-09-02：新建的報表存檔時改用「案場＋日期」的固定鍵。
+     · 該鍵已經有一張 → 併進去（兩個人同時填就是走這條）
+     · 還沒有 → 這張就用那個鍵，之後誰來都會算到同一個
+     舊報表（既有的隨機 id）維持原樣不動，用戶 09-02 指定。 */
+  const _key = reportKey(S.report.projId, S.report.date);
+  let _merged = false;
+  if (_key && S.report.id !== _key && !_editingLegacy) {
+    /* 先找固定鍵那張；找不到再找「同案場同日的任何一張」——
+       包含舊格式（隨機 id）的報表，這樣舊資料也不會再被多開一張出來。
+       併進舊的那張時沿用它的 id，不去動舊資料的身分。 */
+    const _exist = findByKey(_key)
+      || S.reports.find(r => r && r.id !== S.report.id && r.date === S.report.date
+                             && reportProjId(r) === S.report.projId) || null;
+    if (_exist) { S.report = mergeIntoKeyed(_exist, S.report); _merged = true; }
+    else { S.report.id = _key; }
+  }
+  const _sid = stampSubmission(S.report);
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
   const st = save();
-  if (st.localOk) toast('日報表已儲存','s');
+  if (st.localOk && _merged) toast('已併入這天的日報表（' + (S.report.reporter||'') + ' 建的），你的明細都在裡面','s');
+  else if (st.localOk) toast('日報表已儲存','s');
   else if (st.cloudOk) toast('已存到雲端 — 這台裝置本機空間不足，換裝置開一樣看得到','s');
   else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
   _reportStarted = true;             // 開既有的一張（歷史資料／加入共編）也算走過流程
+  /* 舊報表（不是「案場＋日期」鍵的）維持原本的 id，存檔時不改鍵 ——
+     用戶 2026-09-02 指定「舊資料不用特別理會」。 */
+  _editingLegacy = !isKeyedId(r && r.id);
   S.report = JSON.parse(JSON.stringify(r));
   rememberBaseline(S.report);   // 記下「我打開它時長什麼樣」，存檔時才知道哪些欄位是我真的改過的
   migrateReportProj(S.report);  // 舊的單案場報表就地補上報表層案場（排在基準之後＝算成「我改過」，不會被雲端空值蓋回去）
@@ -2430,6 +2545,21 @@ function recalc() {
   $('tot-today').textContent = t0%1===0?t0:t0.toFixed(1);
   $('tot-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
 }
+/* 重建列時把 owner／提交資訊帶回來（用列 id 對回原本那一列）。
+ * 沒有這一步：瑪摩那支會把別人的列認領成自己的，兩支的提交序號也會每次重生。 */
+function _keepRowMeta(rows, key){
+  const src = {};
+  ((S.report && S.report[key]) || []).forEach(r => { if(r && r.id) src[r.id] = r; });
+  rows.forEach(r => {
+    const o = src[r.id];
+    if(!o) return;
+    if(!r.owner && o.owner) r.owner = o.owner;
+    if(o.subId) r.subId = o.subId;
+    if(o.subAt) r.subAt = o.subAt;
+    if(o.subDept) r.subDept = o.subDept;
+  });
+  return rows;
+}
 function collectRows() {
   const rows=[];
   $('tbody').querySelectorAll('tr').forEach(tr=>{
@@ -2449,7 +2579,7 @@ function collectRows() {
       anote: tr.querySelector('[data-f="anote"]')?.value||''
     });
   });
-  return rows;
+  return _keepRowMeta(rows, 'workItems');
 }
 
 /* ── SUMMARY ── */
@@ -2572,7 +2702,7 @@ function collectMatRows() {
       unit: tr.querySelector('[data-f="munit"]')?.value||''
     });
   });
-  return rows;
+  return _keepRowMeta(rows, 'materials');
 }
 
 /* ── PHOTOS（2026-08-12 改為四層分類）──
@@ -2975,7 +3105,7 @@ function renderHistory() {
   let list=[...visibleReports()].filter(r=>{
     if (m && !r.date.startsWith(m)) return false;
     if (day && r.date!==day) return false;
-    if (dept && r.dept!==dept) return false;
+    if (dept && !reportHasDept(r,dept)) return false;   // 2026-09-02：任一列的填表人部門符合就算
     // 新格式看報表層；拆分前的舊格式還是逐列比對，多案場那幾張在每個案場底下都找得到
     if (proj && r.projName !== proj && !(r.workItems||[]).some(wi=>wi.projName===proj)) return false;
     if (rep && r.reporter!==rep && !(r.workItems||[]).some(wi=>wi.owner===rep)) return false;
@@ -3016,7 +3146,7 @@ function renderHistory() {
           <div class="ritem-info">
             <h3 class="ritem-proj">${escHtml(title)}</h3>
             <p class="ritem-when">${sub}</p>
-            <p>${escHtml(r.dept||'—')} — ${escHtml(reportReporterText(r))}</p>
+            <p>${escHtml(reportDeptText(r))} — ${escHtml(reportReporterText(r))}</p>
           </div>
           <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
           <div class="ritem-actions">
@@ -3187,7 +3317,9 @@ function mgFilter(){
 function mgHit(r,f){
   if(f.from && String(r.date||'')<f.from)return false;
   if(f.to   && String(r.date||'')>f.to)return false;
-  if(f.dept && r.dept!==f.dept)return false;
+  /* 一張報表可能跨部門共有 → 有任一列是這個部門的人填的就算命中（2026-09-02）*/
+  /* 一張報表可能跨部門共有 → 有任一列是這個部門的人填的就算命中（2026-09-02）*/
+  if(f.dept && !reportHasDept(r,f.dept))return false;
   if(f.proj && reportProjId(r)!==f.proj && !(r.workItems||[]).some(wi=>wi.projId===f.proj))return false;
   return true;
 }
@@ -3377,7 +3509,7 @@ function renderMgmt(){
       tr.innerHTML=`
         <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
         <td${byProj?'':' style="font-weight:700"'}>${byProj?r.date:escHtml(reportProjName(r)||'（未指定案場）')}</td>
-        <td>${escHtml(r.dept||'—')}</td>
+        <td>${escHtml(reportDeptText(r))}</td>
         <td>${escHtml(reportReporterText(r))}</td>
         <td style="text-align:center;font-weight:700">${num(t0)}</td>
         <td style="text-align:center">${num(t1)}</td>`;
