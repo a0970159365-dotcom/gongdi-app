@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-02.5';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-02.6';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -121,6 +121,11 @@ textarea.fi{resize:vertical;min-height:60px}
 .sec-mv:hover:not(:disabled){background:rgba(255,255,255,.34)}
 .sec-mv:disabled{opacity:.3;cursor:default}
 .sec-mv-wrap{display:flex;align-items:center;flex-shrink:0}
+/* 拖曳排序（2026-09-02）：抓手、拖曳中變淡、放開的位置畫一條黃線 */
+.drag-handle{cursor:grab;margin-right:7px;opacity:.85;font-size:14px;letter-spacing:-2px}
+.proj-header.dragging{opacity:.45}
+.proj-header.drag-over-top{box-shadow:inset 0 4px 0 #fbbf24}
+.proj-header.drag-over-bottom{box-shadow:inset 0 -4px 0 #fbbf24}
 .proj-header:hover{background:#1e4a6e}
 .proj-cnt{background:rgba(255,255,255,.18);border-radius:10px;padding:1px 8px;font-size:11px;margin-left:8px}
 .chevron{transition:transform .2s}
@@ -1741,9 +1746,13 @@ function renderMain(){
         <button class="sec-mv" title="往上移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',-1)"${gi===0?' disabled':''}>↑</button>
         <button class="sec-mv" title="往下移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',1)"${gi===_groupCount-1?' disabled':''}>↓</button>
       </span>`:'';
+    /* 有排序權的人：整條抬頭可以拖曳（左邊那個 ⠿ 是抓手提示）。
+       手機／平板不支援 HTML5 拖放 → 箭頭一定要留著。 */
+    const pj=esc(proj).replace(/'/g,"\\'");
+    const dragAttr=canMv?` draggable="true" ondragstart="projDragStart(event,'${pj}')" ondragover="projDragOver(event,'${pj}')" ondragleave="projDragLeave(event)" ondrop="projDrop(event,'${pj}')" ondragend="projDragEnd(event)"`:'';
     return`<div class="proj-section">
-      <div class="proj-header${open?'':' sec-collapsed'}" onclick="toggleSec('${sid}',this)">
-        <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
+      <div class="proj-header${open?'':' sec-collapsed'}"${dragAttr} onclick="toggleSec('${sid}',this)">
+        <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
         ${mv}
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
@@ -1808,20 +1817,31 @@ function renderLog(logs){
  * 而不是清單裡的前一項，否則按了畫面沒動、看起來像壞掉。
  * 畫面上出現、但清單裡還沒有的案場（匯入的舊資料）會先補進清單，順序才有得排。 */
 function projMove(proj,dir){
-  if(mngGuard())return;
   const shown=[...new Set(getFiltered().map(r=>r.案場))];      // 畫面上這幾組，順序＝畫面順序
   const at=shown.indexOf(proj);
   if(at<0)return;
   const nb=shown[at+dir];
   if(nb===undefined)return;                                   // 已經在最上／最下
+  projPlaceAt(proj,nb);
+}
+/* 把 proj 搬到 target 現在的位置（箭頭與拖曳共用這一支）。
+ * 往下搬＝插在 target 後面，往上搬＝插在 target 前面 —— 跟畫面看到的一致。 */
+function projPlaceAt(proj,target){
+  if(mngGuard())return;
+  if(!proj||!target||proj===target)return;
+  const shown=[...new Set(getFiltered().map(r=>r.案場))];
+  const iFrom=shown.indexOf(proj), iTo=shown.indexOf(target);
+  if(iFrom<0||iTo<0)return;
   if(!Array.isArray(cfg['案場']))cfg['案場']=[];
   const list=cfg['案場'];
   const added=shown.filter(p=>p&&!list.includes(p));
   if(added.length)list.push(...added);                        // 清單裡沒有的先補進去
-  const from=list.indexOf(proj), to=list.indexOf(nb);
-  if(from<0||to<0)return;
+  const from=list.indexOf(proj);
+  if(from<0)return;
   list.splice(from,1);
-  list.splice(to,0,proj);                                     // 插到鄰居原本的位置
+  const to=list.indexOf(target);
+  if(to<0)return;
+  list.splice(iFrom<iTo?to+1:to,0,proj);
   markCfgAuthoritative();
   saveCfg();
   renderMain();
@@ -1831,6 +1851,43 @@ function projMove(proj,dir){
   if(typeof renderWorktime==='function')renderWorktime();
   if(added.length)toast('已把 '+added.length+' 個還沒在設定清單裡的案場加進清單','');
 }
+/* ── 拖曳排序（2026-09-02 用戶要求：想直接把案場拖到想要的位置）──
+ * 只有具「系統設定維護」權的人拖得動；手機／平板沒有 HTML5 拖放，用箭頭。
+ * 拖到別組上面時會在放開的那一側畫一條黃線，放手才真的換位置。 */
+let _dragProj=null;
+function _clearDragMarks(){
+  document.querySelectorAll('#main-table .proj-header').forEach(h=>
+    h.classList.remove('dragging','drag-over-top','drag-over-bottom'));
+}
+function projDragStart(e,proj){
+  if(!portalCanManageSettings()){e.preventDefault();return}
+  _dragProj=proj;
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',proj)}catch(_){}
+  if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('dragging');
+}
+function projDragOver(e,proj){
+  if(!_dragProj||_dragProj===proj)return;
+  e.preventDefault();
+  try{e.dataTransfer.dropEffect='move'}catch(_){}
+  const shown=[...new Set(getFiltered().map(r=>r.案場))];
+  const up=shown.indexOf(_dragProj)>shown.indexOf(proj);       // 往上搬 → 線畫在上緣
+  const cl=e.currentTarget&&e.currentTarget.classList;
+  if(!cl)return;
+  cl.toggle('drag-over-top',up);
+  cl.toggle('drag-over-bottom',!up);
+}
+function projDragLeave(e){
+  const cl=e.currentTarget&&e.currentTarget.classList;
+  if(cl)cl.remove('drag-over-top','drag-over-bottom');
+}
+function projDrop(e,proj){
+  e.preventDefault();
+  const from=_dragProj;
+  _dragProj=null; _clearDragMarks();
+  if(!from||from===proj)return;
+  projPlaceAt(from,proj);
+}
+function projDragEnd(){ _dragProj=null; _clearDragMarks(); }
 function toggleSec(id,hdr){
   const el=document.getElementById(id);if(!el)return;
   const nowHidden=el.classList.toggle('d-none');
