@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-02.9';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-02.10';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1216,15 +1216,26 @@ function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&
  * 那種情況交給 pushCloud 裡的 mergeReport 逐列合併，這裡硬蓋反而會把別人的改動洗掉。
  * 補完會標記，讓呼叫端接著推一次雲端。 */
 var _rescuedCount = 0;
+var _skippedMerged = 0;
 function rescueLocalNewer(localReports){
-  _rescuedCount = 0;
+  _rescuedCount = 0; _skippedMerged = 0;
   if(!Array.isArray(localReports) || !localReports.length) return 0;
   var cloudIds = new Set((S.reports||[]).map(function(r){ return r && r.id; }).filter(Boolean));
   localReports.forEach(function(lr){
     if(!lr || !lr.id || cloudIds.has(lr.id)) return;
+    /* 2026-09-02 加的防呆：雲端已經有「同案場＋同一天」的報表 →
+       本機這筆多半是被合併掉或在別台被刪掉的舊版本，補回去只會讓重複復活。
+       真正「存檔沒成功」的情況雲端不會有那一天那個案場的報表，所以照樣救得到。 */
+    var lrProj = reportProjId(lr), lrDate = lr.date || '';
+    var replaced = lrProj && lrDate && (S.reports||[]).some(function(r){
+      return r && r.date === lrDate && reportProjId(r) === lrProj;
+    });
+    if(replaced){ _skippedMerged++; return; }
     S.reports.push(lr);
     _rescuedCount++;
   });
+  if(_skippedMerged) console.warn('[同步] 本機有 ' + _skippedMerged
+    + ' 筆舊報表，雲端同案場同日已經有一張（多半是被合併或刪掉了）→ 不補傳');
   return _rescuedCount;
 }
 
@@ -4096,7 +4107,7 @@ function init(){
           localStorage.setItem('cdr_v3', JSON.stringify({
             reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now()
           }));
-          toast('找回 '+_rescuedCount+' 筆還沒上傳的日報表，正在補傳…','s');
+          toast('這台有 '+_rescuedCount+' 筆日報表雲端沒有（上次存檔沒送出去），正在補傳…','s');
           setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
         } else {
           toast('已從雲端同步最新資料 ☁️','s');
