@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-02.4';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-09-02.5';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -117,6 +117,11 @@ textarea.fi{resize:vertical;min-height:60px}
 
 .proj-section{margin-bottom:10px;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .proj-header{background:var(--primary);color:#fff;font-weight:700;font-size:13px;padding:9px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+/* 抬頭右邊的排序箭頭（2026-09-02 用戶指定：要能在進度總表直接調順序） */
+.sec-mv{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:5px;width:26px;height:24px;line-height:1;font-size:12px;cursor:pointer;font-family:inherit;margin-left:4px}
+.sec-mv:hover:not(:disabled){background:rgba(255,255,255,.34)}
+.sec-mv:disabled{opacity:.3;cursor:default}
+.sec-mv-wrap{display:flex;align-items:center;flex-shrink:0}
 .proj-header:hover{background:#1e4a6e}
 .proj-cnt{background:rgba(255,255,255,.18);border-radius:10px;padding:1px 8px;font-size:11px;margin-left:8px}
 .chevron{transition:transform .2s}
@@ -1721,12 +1726,21 @@ function renderMain(){
   filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
   const el=document.getElementById('main-table');
   if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有符合的資料</div>';return}
+  const _groupCount=Object.keys(groups).length;
   el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
     const sid=secId(proj);
     const open=_forceOpen||_openSecs.has(sid);
+    /* 抬頭右邊的 ↑↓：直接在這一頁調案場順序（2026-09-02 用戶指定）。
+       點箭頭時要 stopPropagation，否則會順便把這一組收合起來。 */
+    const canMv=portalCanManageSettings();
+    const mv=canMv?`<span class="sec-mv-wrap">
+        <button class="sec-mv" title="往上移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',-1)"${gi===0?' disabled':''}>↑</button>
+        <button class="sec-mv" title="往下移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',1)"${gi===_groupCount-1?' disabled':''}>↓</button>
+      </span>`:'';
     return`<div class="proj-section">
       <div class="proj-header${open?'':' sec-collapsed'}" onclick="toggleSec('${sid}',this)">
         <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
+        ${mv}
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
         <table class="ptbl">
@@ -1783,6 +1797,36 @@ function renderLog(logs){
   }).join('')+'</ul>';
 }
 
+/* 在進度總表上直接調案場順序（2026-09-02 用戶指定）。
+ * 改的就是設定頁那份「📁 案場」清單 —— 兩邊是同一份資料，改完主表、工時統計、
+ * 匯出、篩選下拉全部跟著走。
+ * 有篩選時只會看到部分案場：這時「往上」＝移到「畫面上前一組」的位置，
+ * 而不是清單裡的前一項，否則按了畫面沒動、看起來像壞掉。
+ * 畫面上出現、但清單裡還沒有的案場（匯入的舊資料）會先補進清單，順序才有得排。 */
+function projMove(proj,dir){
+  if(mngGuard())return;
+  const shown=[...new Set(getFiltered().map(r=>r.案場))];      // 畫面上這幾組，順序＝畫面順序
+  const at=shown.indexOf(proj);
+  if(at<0)return;
+  const nb=shown[at+dir];
+  if(nb===undefined)return;                                   // 已經在最上／最下
+  if(!Array.isArray(cfg['案場']))cfg['案場']=[];
+  const list=cfg['案場'];
+  const added=shown.filter(p=>p&&!list.includes(p));
+  if(added.length)list.push(...added);                        // 清單裡沒有的先補進去
+  const from=list.indexOf(proj), to=list.indexOf(nb);
+  if(from<0||to<0)return;
+  list.splice(from,1);
+  list.splice(to,0,proj);                                     // 插到鄰居原本的位置
+  markCfgAuthoritative();
+  saveCfg();
+  renderMain();
+  if(typeof renderCfgLists==='function')renderCfgLists();
+  if(typeof updateDataLists==='function')updateDataLists();
+  if(typeof renderHistory==='function')renderHistory();
+  if(typeof renderWorktime==='function')renderWorktime();
+  if(added.length)toast('已把 '+added.length+' 個還沒在設定清單裡的案場加進清單','');
+}
 function toggleSec(id,hdr){
   const el=document.getElementById(id);if(!el)return;
   const nowHidden=el.classList.toggle('d-none');
