@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-08-30.8';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-02.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -147,6 +147,21 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .carry-cal .cal-empty{padding:14px;font-size:12px}
 .cal-empty{padding:20px;text-align:center;color:var(--muted);background:var(--bg);border-radius:8px;font-size:13px}
 @media(max-width:560px){.cal-cell{min-height:34px;font-size:13px}.cal-n{font-size:9px}}
+/* 分組抬頭（2026-09-02 用戶指定：專案管理案場當抬頭、瑪摩日期當抬頭）*/
+.grp-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.grp-bar .sp{flex:1 1 auto}
+.gbtn{background:#fff;border:1.5px solid var(--border);color:var(--text);border-radius:6px;padding:5px 11px;font-size:12.5px;font-family:inherit;font-weight:600;cursor:pointer}
+.gbtn:hover{background:var(--bg)}
+.gbtn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.ghead{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--primary);color:#fff;font-weight:700;font-size:13px;cursor:pointer;user-select:none}
+.ghead .gcnt{margin-left:auto;font-weight:500;font-size:12px;background:rgba(255,255,255,.2);border-radius:10px;padding:1px 9px;white-space:nowrap}
+.ghead .gchev{display:inline-block;transition:transform .15s}
+.ghead.closed .gchev{transform:rotate(-90deg)}
+.grp-row td{padding:0!important;border:none!important}
+.hgrp{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.hgrp .hgrp-body{padding:8px;background:var(--bg)}
+.hgrp .hgrp-body .ritem:last-child{margin-bottom:0}
+@media print{.grp-bar{display:none!important}.ghead{background:#14532d!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 .master-tbl{width:100%;border-collapse:collapse;font-size:13px}
 .master-tbl th{background:var(--primary);color:#fff;padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap}
 .master-tbl td{border-bottom:1px solid var(--border);padding:10px 12px;vertical-align:middle}
@@ -578,6 +593,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       </div>
     </div>
     <div class="card-body">
+      <!-- 檢視切換（2026-09-02 用戶指定：搜尋列要能看出工、材料，並自訂追蹤區間）。
+           四個檢視共用同一組篩選條件，切換時條件不會被清掉。 -->
+      <div class="grp-bar no-print" style="margin-bottom:12px">
+        <button id="mv-list" class="gbtn" onclick="setMgView('list')">📋 報表清單</button>
+        <button id="mv-loc"  class="gbtn" onclick="setMgView('loc')">📍 位置進度</button>
+        <button id="mv-man"  class="gbtn" onclick="setMgView('man')">👷 出工統計</button>
+        <button id="mv-mat"  class="gbtn" onclick="setMgView('mat')">📦 材料統計</button>
+      </div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
         <div class="fg" style="flex:0 0 auto">
           <label class="fl">案場</label>
@@ -586,8 +609,22 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </select>
         </div>
         <div class="fg" style="flex:0 0 auto">
-          <label class="fl">日期</label>
-          <input type="date" id="mg-date" class="fi" onchange="renderMgmt()">
+          <label class="fl">起始日</label>
+          <input type="date" id="mg-from" class="fi" onchange="renderMgmt()">
+        </div>
+        <div class="fg" style="flex:0 0 auto">
+          <label class="fl">結束日</label>
+          <input type="date" id="mg-to" class="fi" onchange="renderMgmt()">
+        </div>
+        <!-- 只填一邊也算數：只填起始＝那天以後全部，只填結束＝那天以前全部 -->
+        <div class="fg no-print" style="flex:0 0 auto">
+          <label class="fl">快捷</label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="gbtn" onclick="setMgRange('week')">本週</button>
+            <button class="gbtn" onclick="setMgRange('month')">本月</button>
+            <button class="gbtn" onclick="setMgRange('quarter')">本季</button>
+            <button class="gbtn" onclick="setMgRange('year')">今年</button>
+          </div>
         </div>
         <div class="fg" style="flex:0 0 auto">
           <label class="fl">部門</label>
@@ -597,22 +634,22 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         </div>
         <button class="btn btn-o btn-sm" onclick="clearMgmtFilter()">清除</button>
       </div>
-      <div class="tbl-wrap">
+      <!-- 分組工具列（2026-09-02）：抬頭要用案場還是日期、以及一次展開／收合全部 -->
+      <div class="grp-bar no-print">
+        <button id="gb-proj" class="gbtn" onclick="setGroupMode('proj')">📁 依案場</button>
+        <button id="gb-date" class="gbtn" onclick="setGroupMode('date')">📅 依日期</button>
+        <span class="sp"></span>
+        <button class="gbtn" onclick="expandAllGroups()">⊞ 全部展開</button>
+        <button class="gbtn" onclick="collapseAllGroups()">⊟ 全部收合</button>
+      </div>
+      <div class="tbl-wrap" id="mg-table-wrap">
         <table class="master-tbl">
-          <thead>
-            <tr>
-              <th style="width:36px"></th>
-              <th>案場</th>
-              <th>日期</th>
-              <th>部門</th>
-              <th>專案工務</th>
-              <th>今日出工</th>
-              <th>明日預估</th>
-            </tr>
-          </thead>
+          <!-- 表頭由 renderMgmtHead() 畫：分組用掉的那一欄不再重複出現（2026-09-02）-->
+          <thead id="master-thead"></thead>
           <tbody id="master-tbody"></tbody>
         </table>
       </div>
+      <div id="mg-stat"></div>
       <div id="mgmt-empty" class="empty" style="display:none">
         <div class="empty-icon">📊</div>
         <h3>尚無符合條件的報表</h3>
@@ -697,6 +734,13 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </select>
         </div>
         <button class="btn btn-o btn-sm" onclick="clearHistFilter()">清除</button>
+      </div>
+      <div class="grp-bar no-print">
+        <button id="hb-proj" class="gbtn" onclick="setGroupMode('proj')">📁 依案場</button>
+        <button id="hb-date" class="gbtn" onclick="setGroupMode('date')">📅 依日期</button>
+        <span class="sp"></span>
+        <button class="gbtn" onclick="expandAllGroups()">⊞ 全部展開</button>
+        <button class="gbtn" onclick="collapseAllGroups()">⊟ 全部收合</button>
       </div>
       <div id="hist-list" class="report-list"></div>
       <div id="hist-empty" class="empty" style="display:none">
@@ -1860,7 +1904,7 @@ function renderReport() {
   $('f-dow').value = S.report.date?'星期'+DOW[new Date(S.report.date+'T00:00:00').getDay()]:'';
   $('f-weather').value = S.report.weather||'';
   $('f-dept').value = S.report.dept||S.user.dept||'';
-  $('f-reporter').value = S.report.reporter||S.user.name||'';
+  refreshReporterField();
   $('n-contact').value = S.report.notes?.contact||'';
   $('n-other').value = S.report.notes?.other||'';
   $('tbody').innerHTML=''; rowN=0;
@@ -1872,6 +1916,12 @@ function renderReport() {
   autoGrowAll();
   toggleMatEmpty();
 }
+/* 專案工務欄的內容是算出來的（不是使用者打的），明細一改就要重算 */
+function refreshReporterField(){
+  const el=$('f-reporter'); if(!el)return;
+  const txt=reportReporterText(S.report);
+  el.value = (txt==='—') ? (S.report.reporter||S.user.name||'') : txt;
+}
 function syncReport() {
   S.report.date = $('f-date').value;
   const _p = $('f-proj');
@@ -1879,12 +1929,16 @@ function syncReport() {
   S.report.projName = (_p && _p.value) ? (_p.selectedOptions[0]?.text || '') : '';
   S.report.weather = $('f-weather').value;
   S.report.dept = $('f-dept').value||S.user.dept;
-  S.report.reporter = $('f-reporter').value;
+  /* 專案工務那一格現在顯示的是「所有填表人」的組合字串（可能是「甲、乙、丙」），
+   * 不能再倒回寫進 reporter —— 會把別人的名字寫成這張報表的負責人，連帶影響權限判斷。
+   * 負責人本身在建表時就決定了（newReport／carry* 會設），這裡維持原值。 */
+  S.report.reporter = S.report.reporter || S.user.name;
   S.report.notes = {
     contact: $('n-contact').value,
     other: $('n-other').value
   };
   S.report.workItems = collectRows();
+  refreshReporterField();
   S.report.materials = collectMatRows();
   buildSummary();
 }
@@ -2229,7 +2283,7 @@ function buildPrintTitle(){
 }
 function printPDF(){
   syncReport();
-  const info=[reportProjName(S.report), S.report.dept, S.report.reporter, S.report.date].filter(Boolean).join(' | ');
+  const info=[reportProjName(S.report), S.report.dept, reportReporterText(S.report), S.report.date].filter(Boolean).join(' | ');
   $('ph-info').textContent=info;
   document.title=buildPrintTitle();
   window.print();
@@ -2356,7 +2410,7 @@ function renderCalDay(){
       h += '<div class="ritem"'+(part ? ' style="border-left-color:var(--warning)"' : '')+'>'
          +   '<div class="ritem-date"><div class="day">'+d.getDate()+'</div><div class="mon">'+(d.getMonth()+1)+'月</div></div>'
          +   '<div class="ritem-info"><h3>'+escHtml(reportProjName(r)||'（未指定案場）')+'</h3>'
-         +     '<p style="margin-bottom:2px">'+escHtml(r.dept||'—')+' — '+escHtml(r.reporter||'—')+'</p>'
+         +     '<p style="margin-bottom:2px">'+escHtml(r.dept||'—')+' — '+escHtml(reportReporterText(r))+'</p>'
          +     '<p>出工 '+t0+' 人工 ／ '+((r.workItems||[]).length)+' 筆明細'
          +       (part ? ' ／ <b style="color:var(--warning)">未填完：'+escHtml(calWhyPart(r))+'</b>' : '')
          +     '</p></div>'
@@ -2388,6 +2442,22 @@ function calNewOn(ds){
 /* 歷史資料排序（2026-08-25 用戶指定）：先照案場分群，同案場再依日期新→舊。
    案場名多半是「數字開頭」（雙橡園1617、雙橡園1920…），用 numeric 才會照數字大小排，
    不然 1617 會排在 199 後面。沒有案場的舊資料一律排最後。與 cdr-pm 同一份。 */
+/* 專案工務＝這張報表所有填表人（2026-09-02 用戶指定：「改為顯示下方所有填表人名」）。
+ * 名單＝報表負責人 ∪ 每一列施工明細的填表人，去重複、照出現順序。
+ * 一個人都沒有時退回負責人（瑪摩目前的明細都還沒填填表人，會是這種情況）。
+ * ⚠️ 這是「顯示用」的字串，不可以寫回 report.reporter —— 那一欄仍然是單一負責人，
+ *    權限判斷（canView/canEdit 的 self 層級）靠的就是它。 */
+function reportReporters(r){
+  const out=[];
+  const push=n=>{n=String(n||'').trim(); if(n&&out.indexOf(n)<0)out.push(n)};
+  push(r&&r.reporter);
+  ((r&&r.workItems)||[]).forEach(wi=>push(wi&&wi.owner));
+  return out;
+}
+function reportReporterText(r){
+  const list=reportReporters(r);
+  return list.length?list.join('、'):'—';
+}
 function histSort(a, b){
   /* 案場「不明確」的一律排最後：完全沒案場的舊資料，
      以及還沒拆分、工項橫跨多個案場的舊報表（reportProjName 會顯示成「N 個案場」） */
@@ -2415,27 +2485,54 @@ function renderHistory() {
     if (proj && r.projName !== proj && !(r.workItems||[]).some(wi=>wi.projName===proj)) return false;
     if (rep && r.reporter!==rep && !(r.workItems||[]).some(wi=>wi.owner===rep)) return false;
     return true;
-  }).sort(histSort);
+  });
+  list=sortReports(list);   // 2026-09-02：排序跟著分組模式走（案場優先／日期優先）
   const el=$('hist-list');
   el.innerHTML='';
   $('hist-empty').style.display=list.length?'none':'block';
-  list.forEach(r=>{
-    const d=new Date(r.date+'T00:00:00');
-    const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
-    const div=document.createElement('div');
-    div.className='ritem';
-    div.innerHTML=`
-      <div class="ritem-info">
-        <h3 class="ritem-proj">${escHtml(reportProjName(r)||'（未指定案場）')}</h3>
-        <p class="ritem-when">📅 ${r.date}（${DOW[d.getDay()]}）／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細</p>
-        <p>${escHtml(r.dept||'—')} — ${escHtml(r.reporter||'—')}</p>
-      </div>
-      <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
-      <div class="ritem-actions">
-        <button class="btn btn-o btn-sm" onclick="openReportFromHistory('${r.id}')">開啟</button>
-        ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>`:''}
-      </div>`;
-    el.appendChild(div);
+  syncGroupButtons();
+  const byProj=groupMode==='proj';
+  const force=histFilterActive();          // 篩選後一律展開
+  const groups=groupReports(list);
+  _groupKeys=groups.map(g=>g[0]);
+  groups.forEach((g,gi)=>{
+    const key=g[0], rows=g[1];
+    const open=force||!_closedG.has(key);
+    const s0=rows.reduce((s,r)=>s+(r.workItems||[]).reduce((x,wi)=>x+(wi.w0||0),0),0);
+    const sec=document.createElement('div');
+    sec.className='hgrp';
+    sec.innerHTML=`<div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
+      <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
+      <span class="gcnt">${rows.length} 張 · 出工 ${s0%1===0?s0:s0.toFixed(1)}</span></div>`;
+    if(open){
+      const body=document.createElement('div');
+      body.className='hgrp-body';
+      rows.forEach(r=>{
+        const d=new Date(r.date+'T00:00:00');
+        const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
+        const div=document.createElement('div');
+        div.className='ritem';
+        /* 抬頭已經寫了分組的那一項，卡片標題就換成另一項（案場↔日期），避免整頁都在重複同一個名字 */
+        const title=byProj?(r.date+'（'+DOW[d.getDay()]+'）'):(reportProjName(r)||'（未指定案場）');
+        const sub=byProj
+          ?`出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細`
+          :`📅 ${r.date}（${DOW[d.getDay()]}）／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細`;
+        div.innerHTML=`
+          <div class="ritem-info">
+            <h3 class="ritem-proj">${escHtml(title)}</h3>
+            <p class="ritem-when">${sub}</p>
+            <p>${escHtml(r.dept||'—')} — ${escHtml(reportReporterText(r))}</p>
+          </div>
+          <div class="ritem-date"><div class="day">${d.getDate()}</div><div class="mon">${d.getMonth()+1}月</div></div>
+          <div class="ritem-actions">
+            <button class="btn btn-o btn-sm" onclick="openReportFromHistory('${r.id}')">開啟</button>
+            ${portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteReport('${r.id}')">刪除</button>`:''}
+          </div>`;
+        body.appendChild(div);
+      });
+      sec.appendChild(body);
+    }
+    el.appendChild(sec);
   });
 }
 function populateHistFilters() {
@@ -2489,37 +2586,269 @@ function importData(e){
 }
 
 /* ── MANAGEMENT ── */
+/* ══════ 分組顯示（2026-09-02 用戶指定）══════
+ * 專案管理：案場當抬頭 → 底下依日期分列；瑪摩：日期當抬頭（新到舊）→ 底下依案場。
+ * 兩支共用這一套，只差預設值 GROUP_DEFAULT；使用者可用切換鈕改成另一種看法，
+ * 選擇記在瀏覽器裡（不同 App 各記各的）。
+ * 展開狀態：預設全開；按「全部收合」才會關起來。有下篩選時一律全開 ——
+ * 篩完只看到一排抬頭會以為東西不見了。 */
+const GROUP_DEFAULT='date';
+const GROUP_LSKEY='cdr_v3_group';
+let groupMode=(function(){try{const v=localStorage.getItem(GROUP_LSKEY);return (v==='proj'||v==='date')?v:GROUP_DEFAULT}catch(e){return GROUP_DEFAULT}})();
+let _closedG=new Set();      // 只記「被收起來的」抬頭，預設全開
+let _groupKeys=[];           // 這次畫出來的抬頭順序，給 onclick 用索引取用（名稱可能有引號）
+
+function setGroupMode(m){
+  const v=(m==='date')?'date':'proj';
+  if(v===groupMode)return;
+  groupMode=v; _closedG=new Set();
+  try{localStorage.setItem(GROUP_LSKEY,groupMode)}catch(e){}
+  renderMgmt(); renderHistory();
+}
+function syncGroupButtons(){
+  [['gb-proj','proj'],['gb-date','date'],['hb-proj','proj'],['hb-date','date']].forEach(([id,m])=>{
+    const b=$(id); if(b)b.classList.toggle('on',groupMode===m);
+  });
+}
+function expandAllGroups(){ _closedG=new Set(); renderMgmt(); renderHistory(); }
+function collapseAllGroups(){ _closedG=new Set(_groupKeys); renderMgmt(); renderHistory(); }
+function toggleGroup(i){
+  const k=_groupKeys[i]; if(k===undefined)return;
+  if(_closedG.has(k))_closedG.delete(k); else _closedG.add(k);
+  renderMgmt(); renderHistory();
+}
+function groupKeyOf(r){
+  return groupMode==='proj' ? (reportProjName(r)||'（未指定案場）') : (r.date||'（未填日期）');
+}
+function groupLabel(k){
+  if(groupMode!=='date')return k;
+  const d=new Date(k+'T00:00:00');
+  return isNaN(d)?k:(k+'（'+DOW[d.getDay()]+'）');
+}
+/* 分組但不改變已排好的先後（sortReports 已經照模式排過） */
+function groupReports(list){
+  const m=new Map();
+  list.forEach(r=>{const k=groupKeyOf(r); if(!m.has(k))m.set(k,[]); m.get(k).push(r)});
+  return [...m.entries()];
+}
+function sortReports(list){
+  const byDate=(a,b)=>String(b.date||'').localeCompare(String(a.date||''));
+  const byProj=(a,b)=>{
+    const amb=r=>legacyProjIds(r).length>1;
+    const pa=amb(a)?'':(reportProjName(a)||''), pb=amb(b)?'':(reportProjName(b)||'');
+    if(pa===pb)return 0;
+    if(!pa)return 1;
+    if(!pb)return -1;
+    return pa.localeCompare(pb,'zh-Hant',{numeric:true});
+  };
+  return [...list].sort(groupMode==='proj'
+    ? ((a,b)=>byProj(a,b)||byDate(a,b))
+    : ((a,b)=>byDate(a,b)||byProj(a,b)));
+}
+function mgmtFilterActive(){
+  const f=mgFilter();
+  return !!(f.from||f.to||f.dept||f.proj);
+}
+function histFilterActive(){
+  return ['filter-month','filter-date','filter-dept','filter-proj','filter-reporter']
+    .some(id=>$(id)&&$(id).value);
+}
+/* 表頭：分組用掉的那一欄不用再出現在每一列 */
+function renderMgmtHead(){
+  const th=$('master-thead'); if(!th)return;
+  th.innerHTML='<tr><th style="width:36px"></th>'
+    +(groupMode==='proj'?'<th>日期</th>':'<th>案場</th>')
+    +'<th>部門</th><th>專案工務</th><th>今日出工</th><th>明日預估</th></tr>';
+}
+/* ══════ 管理總表的檢視與日期區間（2026-09-02 用戶指定）══════
+ * 原本只有「一張報表一列」＋單一日期。現在同一頁四個檢視，共用同一組條件：
+ *   list 報表清單（原本的）／loc 位置進度／man 出工統計／mat 材料統計
+ * 日期改成起訖區間，預設不套用＝看全部 —— 一進來就被篩掉會讓人以為報表不見了。 */
+const MGVIEW_LSKEY=GROUP_LSKEY.replace('_group','_mgview');
+let mgView=(function(){try{const v=localStorage.getItem(MGVIEW_LSKEY);return ['list','loc','man','mat'].indexOf(v)>=0?v:'list'}catch(e){return 'list'}})();
+function setMgView(v){
+  mgView=['list','loc','man','mat'].indexOf(v)>=0?v:'list';
+  try{localStorage.setItem(MGVIEW_LSKEY,mgView)}catch(e){}
+  renderMgmt();
+}
+function setMgRange(type){
+  const now=new Date();
+  let from,to;
+  if(type==='week'){ const day=now.getDay(); from=new Date(now); from.setDate(now.getDate()-day); to=new Date(from); to.setDate(from.getDate()+6); }
+  else if(type==='month'){ from=new Date(now.getFullYear(),now.getMonth(),1); to=new Date(now.getFullYear(),now.getMonth()+1,0); }
+  else if(type==='quarter'){ const q=Math.floor(now.getMonth()/3); from=new Date(now.getFullYear(),q*3,1); to=new Date(now.getFullYear(),q*3+3,0); }
+  else { from=new Date(now.getFullYear(),0,1); to=new Date(now.getFullYear(),11,31); }
+  $('mg-from').value=ymd(from); $('mg-to').value=ymd(to);
+  renderMgmt();
+}
+/* 篩選判準集中在這裡：畫面、統計、匯出全部走同一個函式，
+   才不會再出現「畫面 3 列、Excel 卻是全部」那種事（2026-08-30 的教訓）。 */
+function mgFilter(){
+  return { from:($('mg-from')||{}).value||'', to:($('mg-to')||{}).value||'',
+           dept:($('mg-dept')||{}).value||'', proj:($('mg-proj')||{}).value||'' };
+}
+function mgHit(r,f){
+  if(f.from && String(r.date||'')<f.from)return false;
+  if(f.to   && String(r.date||'')>f.to)return false;
+  if(f.dept && r.dept!==f.dept)return false;
+  if(f.proj && reportProjId(r)!==f.proj && !(r.workItems||[]).some(wi=>wi.projId===f.proj))return false;
+  return true;
+}
+function mgReports(){ const f=mgFilter(); return visibleReports().filter(r=>mgHit(r,f)); }
+/* 舊報表一張可能混多個案場 → 篩了案場就只留那個案場的工項 */
+function mgWorkItems(){
+  const f=mgFilter(); const out=[];
+  mgReports().forEach(r=>{
+    const rpid=reportProjId(r);
+    (r.workItems||[]).forEach(wi=>{
+      const pid=rpid||wi.projId||'';
+      if(f.proj && pid!==f.proj)return;
+      out.push({r,wi,pid,pname:rpid?(r.projName||reportProjName(r)):(wi.projName||'（未指定案場）')});
+    });
+  });
+  return out;
+}
+const _n1=v=>v%1===0?v:Number(v.toFixed(1));
+
+/* ① 位置進度：每個「案場＋施作位置」取最新一張日報的進度% */
+function getLocProgressRows(){
+  const m=new Map();
+  mgWorkItems().forEach(({r,wi,pname})=>{
+    const loc=wi.loc||'（未填位置）';
+    const k=pname+'\u0000'+loc;
+    if(!m.has(k))m.set(k,{proj:pname,loc,progress:null,pdate:'',last:'',w0:0,n:0});
+    const o=m.get(k);
+    o.w0+=(wi.w0||0); o.n++;
+    if(String(r.date||'')>o.last)o.last=r.date||'';
+    const p=Number(wi.progress);
+    if(!isNaN(p)&&wi.progress!==''&&wi.progress!==null&&String(r.date||'')>=o.pdate){o.progress=p;o.pdate=r.date||''}
+  });
+  return [...m.values()].sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||a.loc.localeCompare(b.loc,'zh-Hant',{numeric:true}));
+}
+/* ② 出工統計：案場×廠商。今日／明日＝最近一天那張的數字，期間累計＝區間內加總 */
+function getManpowerRows(){
+  const m=new Map();
+  mgWorkItems().forEach(({r,wi,pname})=>{
+    const ven=(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'（未指定廠商）';
+    const k=pname+'\u0000'+ven;
+    if(!m.has(k))m.set(k,{proj:pname,vendor:ven,total:0,days:new Set(),last:'',w0:0,w1:0});
+    const o=m.get(k);
+    o.total+=(wi.w0||0);
+    if(r.date)o.days.add(r.date);
+    if(String(r.date||'')>o.last){o.last=r.date||'';o.w0=0;o.w1=0}
+    if(String(r.date||'')===o.last){o.w0+=(wi.w0||0);o.w1+=(wi.w1||0)}
+  });
+  return [...m.values()].map(o=>({...o,dayCount:o.days.size}))
+    .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||b.total-a.total);
+}
+/* ③ 材料統計：依「材料名稱＋單位」加總（名稱是設定頁的下拉選項，不會有錯字拆散問題） */
+function getMaterialRows(){
+  const f=mgFilter(); const m=new Map();
+  mgReports().forEach(r=>{
+    const pname=reportProjName(r)||'（未指定案場）';
+    (r.materials||[]).forEach(mt=>{
+      const name=(mt&&mt.name||'').trim(); if(!name)return;
+      const unit=(mt.unit||'').trim();
+      const k=name+'\u0000'+unit;
+      if(!m.has(k))m.set(k,{name,unit,qty:0,n:0,projs:new Set(),last:''});
+      const o=m.get(k);
+      o.qty+=Number(mt.qty)||0; o.n++; o.projs.add(pname);
+      if(String(r.date||'')>o.last)o.last=r.date||'';
+    });
+  });
+  return [...m.values()].map(o=>({...o,projText:o.projs.size===1?[...o.projs][0]:(o.projs.size+' 個案場')}))
+    .sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant',{numeric:true}));
+}
+/* 統計表共用的畫法：沒資料就說清楚是「這個區間沒有」，不要留一片空白 */
+function statTable(headers,rows,foot){
+  if(!rows.length)return '<div class="empty"><div class="empty-icon">📭</div><h3>這個條件下沒有資料</h3><p style="font-size:12px;color:var(--muted)">試著放寬日期區間，或按「清除」看全部</p></div>';
+  return '<div class="tbl-wrap"><table class="master-tbl"><thead><tr>'
+    +headers.map(h=>'<th'+(h.num?' style="text-align:right"':'')+'>'+escHtml(h.t)+'</th>').join('')
+    +'</tr></thead><tbody>'
+    +rows.map(cells=>'<tr>'+cells.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>').join('')
+    +(foot?'<tr class="tfoot-row" style="font-weight:700;background:var(--bg)">'+foot.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>':'')
+    +'</tbody></table></div>';
+}
+function renderMgStat(){
+  const box=$('mg-stat'); if(!box)return;
+  if(mgView==='loc'){
+    const rows=getLocProgressRows();
+    box.innerHTML=statTable(
+      [{t:'案場'},{t:'施作位置'},{t:'最新進度',num:1},{t:'最後回報'},{t:'累計出工',num:1},{t:'回報次數',num:1}],
+      rows.map(o=>[escHtml(o.proj),escHtml(o.loc),o.progress===null?'—':(o.progress+'%'),o.last||'—',_n1(o.w0),o.n]));
+  } else if(mgView==='man'){
+    const rows=getManpowerRows();
+    const tot=rows.reduce((s,o)=>s+o.total,0), t0=rows.reduce((s,o)=>s+o.w0,0), t1=rows.reduce((s,o)=>s+o.w1,0);
+    box.innerHTML=statTable(
+      [{t:'案場'},{t:'廠商'},{t:'期間累計',num:1},{t:'回報天數',num:1},{t:'最近回報'},{t:'當天出工',num:1},{t:'明日預估',num:1}],
+      rows.map(o=>[escHtml(o.proj),escHtml(o.vendor),_n1(o.total),o.dayCount,o.last||'—',_n1(o.w0),_n1(o.w1)]),
+      ['合計','',_n1(tot),'','',_n1(t0),_n1(t1)]);
+  } else if(mgView==='mat'){
+    const rows=getMaterialRows();
+    box.innerHTML=statTable(
+      [{t:'材料名稱'},{t:'單位'},{t:'數量合計',num:1},{t:'筆數',num:1},{t:'案場'},{t:'最後使用'}],
+      rows.map(o=>[escHtml(o.name),escHtml(o.unit||'—'),_n1(o.qty),o.n,escHtml(o.projText),o.last||'—']));
+  } else box.innerHTML='';
+}
+function syncMgViewButtons(){
+  [['mv-list','list'],['mv-loc','loc'],['mv-man','man'],['mv-mat','mat']].forEach(([id,v])=>{
+    const b=$(id); if(b)b.classList.toggle('on',mgView===v);
+  });
+}
 function renderMgmt(){
-  const date=$('mg-date').value;
-  const dept=$('mg-dept').value;
-  const proj=$('mg-proj').value;
-  let list=[...visibleReports()].filter(r=>{
-    if(date&&r.date!==date)return false;
-    if(dept&&r.dept!==dept)return false;
-    if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return false;
-    return true;
-  /* 管理總表也照「先案場、再日期」（2026-08-28 用戶指定，與歷史資料同一套 histSort）*/
-  }).sort((a,b)=>histSort(a,b)||(a.dept||'').localeCompare(b.dept||''));
+  syncMgViewButtons(); syncGroupButtons();
+  const wrap=$('mg-table-wrap'), gbar=document.querySelector('#page-mgmt .grp-bar:not([style])');
+  let list=mgReports();
+  /* 三張統計走另一條路：表格與分組工具列收起來，改畫統計 */
+  if(mgView!=='list'){
+    if(wrap)wrap.style.display='none';
+    if(gbar)gbar.style.display='none';
+    $('mgmt-empty').style.display='none';
+    renderMgStat();
+    return;
+  }
+  if(wrap)wrap.style.display='';
+  if(gbar)gbar.style.display='';
+  $('mg-stat').innerHTML='';
+  list=sortReports(list);
   const tbody=$('master-tbody'); tbody.innerHTML='';
   $('mgmt-empty').style.display=list.length?'none':'block';
-  list.forEach(r=>{
-    const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
-    const t1=(r.workItems||[]).reduce((s,wi)=>s+(wi.w1||0),0);
-    const tr=document.createElement('tr');
-    tr.className='master-row';
-    tr.innerHTML=`
-      <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
-      <td style="font-weight:700">${escHtml(reportProjName(r)||'（未指定案場）')}</td>
-      <td>${r.date}</td>
-      <td>${escHtml(r.dept||'—')}</td>
-      <td>${escHtml(r.reporter||'—')}</td>
-      <td style="text-align:center;font-weight:700">${t0%1===0?t0:t0.toFixed(1)}</td>
-      <td style="text-align:center">${t1%1===0?t1:t1.toFixed(1)}</td>`;
-    tbody.appendChild(tr);
-    const det=document.createElement('tr');
-    det.className='detail-row'; det.id='det-'+r.id; det.style.display='none';
-    det.innerHTML=`<td colspan="7"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
-    tbody.appendChild(det);
+  renderMgmtHead(); syncGroupButtons();
+  const byProj=groupMode==='proj';
+  const force=mgmtFilterActive();          // 篩選後一律展開
+  const groups=groupReports(list);
+  _groupKeys=groups.map(g=>g[0]);
+  const COLS=6;
+  const num=v=>v%1===0?v:v.toFixed(1);
+  groups.forEach((g,gi)=>{
+    const key=g[0], rows=g[1];
+    const open=force||!_closedG.has(key);
+    const s0=rows.reduce((s,r)=>s+(r.workItems||[]).reduce((x,wi)=>x+(wi.w0||0),0),0);
+    const head=document.createElement('tr');
+    head.className='grp-row';
+    head.innerHTML=`<td colspan="${COLS}"><div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
+      <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
+      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}</span></div></td>`;
+    tbody.appendChild(head);
+    if(!open)return;
+    rows.forEach(r=>{
+      const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
+      const t1=(r.workItems||[]).reduce((s,wi)=>s+(wi.w1||0),0);
+      const tr=document.createElement('tr');
+      tr.className='master-row';
+      tr.innerHTML=`
+        <td><button class="expand-btn" onclick="toggleDetail(this,'${r.id}')">▶</button></td>
+        <td${byProj?'':' style="font-weight:700"'}>${byProj?r.date:escHtml(reportProjName(r)||'（未指定案場）')}</td>
+        <td>${escHtml(r.dept||'—')}</td>
+        <td>${escHtml(reportReporterText(r))}</td>
+        <td style="text-align:center;font-weight:700">${num(t0)}</td>
+        <td style="text-align:center">${num(t1)}</td>`;
+      tbody.appendChild(tr);
+      const det=document.createElement('tr');
+      det.className='detail-row'; det.id='det-'+r.id; det.style.display='none';
+      det.innerHTML=`<td colspan="${COLS}"><div class="detail-inner" id="det-inner-${r.id}"></div></td>`;
+      tbody.appendChild(det);
+    });
   });
 }
 function toggleDetail(btn,id){
@@ -2555,7 +2884,7 @@ function populateMgmtFilters(){
   );
   if(cd) dSel.value=cd; if(cp) pSel.value=cp;
 }
-function clearMgmtFilter(){$('mg-date').value='';$('mg-dept').value='';$('mg-proj').value='';renderMgmt();}
+function clearMgmtFilter(){$('mg-from').value='';$('mg-to').value='';$('mg-dept').value='';$('mg-proj').value='';renderMgmt();}
 /* 管理總表的「📊 匯出 Excel」要用的資料列（2026-08-30 修：用戶回報畫面 3 列、Excel 卻是全部）。
  * 原本這顆直接叫 getFilteredRows() → getExRows()，讀的是**報表下載頁**那組欄位
  * （ex-proj-checks／ex-date-from／ex-loc…），完全沒讀管理總表自己的 mg-proj／mg-date／mg-dept
@@ -2563,28 +2892,66 @@ function clearMgmtFilter(){$('mg-date').value='';$('mg-dept').value='';$('mg-pro
  * 現在照管理總表自己的條件展開（一列＝一個工項，跟報表下載同一種列格式與排序）。
  * 篩選判準與 renderMgmt() 逐條對齊，畫面看到幾張報表，匯出就是那幾張的工項。 */
 function getMgmtRows(){
-  const date=$('mg-date').value, dept=$('mg-dept').value, proj=$('mg-proj').value;
-  const rows=[];
-  visibleReports().forEach(r=>{
-    if(date&&r.date!==date)return;
-    if(dept&&r.dept!==dept)return;
-    if(proj && reportProjId(r)!==proj && !(r.workItems||[]).some(wi=>wi.projId===proj))return;
-    const rpid=reportProjId(r);
-    (r.workItems||[]).forEach(wi=>{
-      const pid=rpid||wi.projId||'';
-      /* 拆分前的舊報表一張可能混多個案場 —— 篩了案場就只留那個案場的工項，
-         否則會把同一張裡別的案場那幾列一起匯出去 */
-      if(proj && pid!==proj) return;
-      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi,
-        projId:pid, projName: rpid ? (r.projName||reportProjName(r)) : (wi.projName||'')});
-    });
-  });
+  /* 2026-09-02：改吃日期區間（原本是單一天），判準與畫面共用 mgWorkItems() */
+  const rows=mgWorkItems().map(({r,wi,pid,pname})=>({
+    date:r.date,dept:r.dept,reporter:reportReporterText(r),...wi,
+    projId:pid, projName: reportProjId(r) ? pname : (wi.projName||'')
+  }));
   return sortExRows(rows);
 }
 function exportMgmtExcel(){
-  const rows=getMgmtRows();
-  if(!rows.length){toast('無符合條件的資料','e');return;}
-  doExportExcel(rows);
+  /* 匯出的是「畫面上這個檢視」的內容（2026-09-02）：
+     報表清單走原本的工項格式，三張統計各自輸出自己的表 —— 看到什麼就匯出什麼。 */
+  if(mgView==='list'){
+    const rows=getMgmtRows();
+    if(!rows.length){toast('無符合條件的資料','e');return;}
+    doExportExcel(rows);
+    return;
+  }
+  let title='',headers=[],body=[];
+  if(mgView==='loc'){
+    title='位置進度';
+    headers=['案場','施作位置','最新進度%','最後回報','累計出工','回報次數'];
+    body=getLocProgressRows().map(o=>[o.proj,o.loc,o.progress===null?'':o.progress,o.last,_n1(o.w0),o.n]);
+  } else if(mgView==='man'){
+    title='出工統計';
+    headers=['案場','廠商','期間累計','回報天數','最近回報','當天出工','明日預估'];
+    body=getManpowerRows().map(o=>[o.proj,o.vendor,_n1(o.total),o.dayCount,o.last,_n1(o.w0),_n1(o.w1)]);
+  } else {
+    title='材料統計';
+    headers=['材料名稱','單位','數量合計','筆數','案場','最後使用'];
+    body=getMaterialRows().map(o=>[o.name,o.unit,_n1(o.qty),o.n,o.projText,o.last]);
+  }
+  if(!body.length){toast('無符合條件的資料','e');return;}
+  exportStatExcel(title,headers,body);
+}
+/* 統計表的 Excel：欄位是動態的，所以不共用 doExportExcel（那支寫死了工項那 15/16 欄） */
+async function exportStatExcel(title,headers,body){
+  toast('產生 Excel 中…');
+  try{
+    const wb=new ExcelJS.Workbook();
+    const ws=wb.addWorksheet(title);
+    ws.addRow(headers);
+    ws.getRow(1).eachCell(cell=>{
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+      cell.font={color:{argb:'FFFFFFFF'},bold:true};
+      cell.alignment={horizontal:'center',vertical:'middle'};
+    });
+    ws.getRow(1).height=22;
+    body.forEach((r,i)=>{
+      const row=ws.addRow(r);
+      if(i%2===1)row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
+      row.eachCell(c=>c.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
+    });
+    ws.columns=headers.map((h,i)=>({header:h,key:i,width:i===0?26:16}));
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    const f=mgFilter();
+    const span=(f.from||f.to)?('_'+(f.from||'起')+'_'+(f.to||'訖')):'';
+    a.download="日報表-瑪摩工程"+'-'+title+span+'.xlsx'; a.click();
+    toast('Excel 已匯出','s');
+  }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
 
 /* ── EXPORT PAGE ── */
@@ -2658,11 +3025,11 @@ function getExRows(){
       if(locF&&wi.loc!==locF)return;
       if(leadF&&wiVendor(wi)!==leadF&&wiStaff(wi)!==leadF)return;
       if(wi.w0<wMin||wi.w0>wMax)return;
-      rows.push({date:r.date,dept:r.dept,reporter:r.reporter,...wi,projId:pid,projName:pnm});
+      rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),...wi,projId:pid,projName:pnm});
     });
     if(matF){
       (r.materials||[]).filter(m=>m.name===matF).forEach(m=>{
-        rows.push({date:r.date,dept:r.dept,reporter:r.reporter,projId:'',projName:'',
+        rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:'',projName:'',
           loc:'',work:'',vendor:'',staff:'',w0:'',vendor2:'',staff2:'',w1:'',progress:'',atype:'',anote:'',
           _matRow:true,matName:m.name,matQty:m.qty,matUnit:m.unit});
       });
@@ -2675,15 +3042,19 @@ function getExRows(){
    沒案場的（材料列、舊資料）一律排最後，判準與 histSort 一致。
    2026-08-30 抽成獨立函式 —— 管理總表匯出也要用同一套排序。 */
 function sortExRows(rows){
-  return rows.sort((a,b)=>{
+  /* 2026-09-02：跟著分組模式走 —— 依案場看就先案場再日期，依日期看就先日期再案場。
+     欄位順序則是各支固定（專案管理案場第一欄、瑪摩日期第一欄），不隨切換鈕變動。 */
+  const projCmp=(a,b)=>{
     const pa=a.projName||'', pb=b.projName||'';
-    if(pa!==pb){
-      if(!pa) return 1;
-      if(!pb) return -1;
-      return pa.localeCompare(pb,'zh-Hant',{numeric:true});
-    }
-    return String(b.date||'').localeCompare(String(a.date||''));
-  });
+    if(pa===pb)return 0;
+    if(!pa)return 1;
+    if(!pb)return -1;
+    return pa.localeCompare(pb,'zh-Hant',{numeric:true});
+  };
+  const dateCmp=(a,b)=>String(b.date||'').localeCompare(String(a.date||''));
+  return rows.sort((typeof groupMode!=='undefined'&&groupMode==='date')
+    ? ((a,b)=>dateCmp(a,b)||projCmp(a,b))
+    : ((a,b)=>projCmp(a,b)||dateCmp(a,b)));
 }
 function previewExport(){
   const rows=getExRows();

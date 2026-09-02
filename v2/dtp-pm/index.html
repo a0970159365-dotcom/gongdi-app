@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-08-26.5';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-02.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -174,6 +174,9 @@ textarea.fi{resize:vertical;min-height:60px}
 /* 設定項目改名（2026-08-20）*/
 .cfg-edit{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px;line-height:1;flex-shrink:0}
 .cfg-edit:hover{color:var(--primary-l)}
+.cfg-mv{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 3px;line-height:1;flex-shrink:0}
+.cfg-mv:hover:not(:disabled){color:var(--primary-l)}
+.cfg-mv:disabled{opacity:.25;cursor:default}
 .cfg-row.editing{background:#f5f3ff;border-radius:6px;border-bottom-color:transparent;padding:5px 6px}
 .cfg-edit-inp{flex:1;font-family:inherit;font-size:13px;padding:4px 8px;border-radius:5px;border:1.5px solid var(--primary-l);background:#fff;color:var(--text);min-width:0}
 .cfg-ok{background:none;border:none;color:var(--success);cursor:pointer;font-size:13px;font-weight:800;padding:0 4px;line-height:1;flex-shrink:0}
@@ -371,8 +374,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <div id="page-history" class="page">
   <div class="card">
     <div class="card-header">
-      <span class="card-title">歷史資料（依更新時間排序）</span>
-      <input type="text" id="hist-q" class="fi" placeholder="搜尋..." style="max-width:200px" oninput="renderHistory()">
+      <span class="card-title">歷史資料</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button id="hs-time" class="btn btn-p btn-sm" onclick="setHistSort('time')">🕐 依更新時間</button>
+        <button id="hs-proj" class="btn btn-g btn-sm" onclick="setHistSort('proj')">📁 依案場</button>
+        <input type="text" id="hist-q" class="fi" placeholder="搜尋..." style="max-width:200px" oninput="renderHistory()">
+      </div>
     </div>
     <div class="card-body" id="hist-list"></div>
   </div>
@@ -993,6 +1000,26 @@ function cfgDel(key,idx){
   markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
+/* 清單手動排序（2026-09-02 用戶指定：「按箭頭調整順序，前面的序號跟著變動」）。
+ * 順序本身就是資料 —— 對調兩列即可，序號是渲染時的 i+1，自然跟著重編。
+ * 要 markCfgAuthoritative()：cfg 平常是「聯集合併」（只補雲端多出來的項目），
+ * 排序是明確意圖，這次用本機版本覆蓋，否則另一台裝置的舊順序可能把它蓋回去。
+ * 案場順序會連動主表／歷史資料／工時統計／匯出 → 排完一起重畫。 */
+function cfgMove(key,idx,dir){
+  if(mngGuard())return;
+  const arr=cfg[key];
+  if(!Array.isArray(arr))return;
+  const j=idx+dir;
+  if(j<0||j>=arr.length)return;
+  const t=arr[idx];arr[idx]=arr[j];arr[j]=t;
+  markCfgAuthoritative();
+  saveCfg();renderCfgLists();updateDataLists();
+  if(key==='案場'){
+    if(typeof renderMain==='function')renderMain();
+    if(typeof renderHistory==='function')renderHistory();
+    if(typeof renderWorktime==='function')renderWorktime();
+  }
+}
 function cfgAddFromBtn(key){
   if(mngGuard())return;
   if(appLockGuard())return;
@@ -1134,6 +1161,7 @@ function renderCfgLists(){
       :arr.map((v,i)=>`<div class="cfg-row" id="cfgrow-${key}-${i}">
           <span class="cfg-row-num">${i+1}</span>
           <span class="cfg-row-lbl">${esc(v)}</span>
+          ${portalCanManageSettings()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}
           ${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}
           ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
@@ -1608,7 +1636,7 @@ function openExportPicker(){
   document.getElementById('xp-overlay').classList.add('show');
 }
 function renderExportPicker(){
-  const names=[...xpGroups.keys()].sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true}));
+  const names=[...xpGroups.keys()].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
   document.getElementById('xp-list').innerHTML=names.map(n=>
     '<label class="xp-row"><input type="checkbox" data-xp="'+esc(n)+'"'+(xpSel.has(n)?' checked':'')
     +' onchange="xpToggle(this.getAttribute(\'data-xp\'),this.checked)">'
@@ -1640,10 +1668,22 @@ function fnDate(d){
 }
 /* 檔名裡不能出現的字元（Windows 不接受） */
 function fnSafe(s){ return String(s||'').replace(/[\\\/:*?"<>|]/g,'_'); }
+/* 案場的顯示順序＝設定頁清單的順序（2026-09-02 用戶指定，排完全站跟著走）。
+ * 清單裡沒有的案場（清單被刪過、或匯入的舊資料）一律排最後，彼此維持原本的先後。 */
+function projOrderIdx(name){
+  const i=(cfg['案場']||[]).indexOf(name);
+  return i<0?9999:i;
+}
+/* 穩定排序：同案場的紀錄維持傳進來時的順序，不會每次重畫就跳動 */
+function sortByProjOrder(list){
+  return list.map((r,i)=>({r,i}))
+    .sort((a,b)=>(projOrderIdx(a.r.案場)-projOrderIdx(b.r.案場))||(a.i-b.i))
+    .map(x=>x.r);
+}
 function getFiltered(){
   const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
   // 2026-08-20：三個篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
-  return records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
+  return sortByProjOrder(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
     if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
     if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
     if(msSel.status.size&&!msSel.status.has(getMainStatus(r)))return false;
@@ -1652,11 +1692,11 @@ function getFiltered(){
       if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
     }
     return true;
-  });
+  }));
 }
 
 function updateFilters(){
-  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort();
+  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
   const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   const ss=(cfg['狀態']||[]).slice();
   if(!document.getElementById('msp-proj'))return;
@@ -1755,10 +1795,12 @@ function toggleSec(id,hdr){
 // ============================================================
 // 工時計算頁
 // ============================================================
-let wtSort={key:'work',dir:'desc'};
+/* 預設依案場排（2026-09-02 用戶指定：工時統計也照主表的案場順序）。
+ * 點欄位標題仍可改排序，只是一進來的預設值換了。 */
+let wtSort={key:'proj',dir:'asc'};
 
 function populateWtFilters(){
-  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort();
+  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
   const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   const pSel=document.getElementById('wt-proj'),eSel=document.getElementById('wt-exec'),stSel=document.getElementById('wt-status');
   if(!pSel)return;
@@ -1814,7 +1856,7 @@ function getWorktimeRows(){
   out.sort((a,b)=>{
     let av,bv;
     switch(k){
-      case'proj':av=a.r.案場||'';bv=b.r.案場||'';break;
+      case'proj':av=projOrderIdx(a.r.案場);bv=projOrderIdx(b.r.案場);break;
       case'exec':av=a.r.執行者||'';bv=b.r.執行者||'';break;
       case'loc':av=a.r.施作位置||'';bv=b.r.施作位置||'';break;
       case'start':av=a.stat.startDate;bv=b.stat.startDate;break;
@@ -1939,9 +1981,24 @@ async function exportWorktimeExcel(){
   URL.revokeObjectURL(url);toast('已匯出 ✓','s');
 }
 
+/* 歷史資料的排法（2026-09-02 用戶選 C：兩種都留）。
+ * 預設仍是「依更新時間」—— 這一頁的用途是追最近動態（卡片上就印著更新日期），
+ * 全改成案場順序的話，昨天才動過的那筆會掉到清單中後段。
+ * 想照案場翻時按另一顆，選擇記在瀏覽器裡，下次進來維持上次的看法。 */
+let histSortMode=(function(){try{return localStorage.getItem('dtp_hist_sort')==='proj'?'proj':'time'}catch(e){return'time'}})();
+function setHistSort(m){
+  histSortMode=(m==='proj')?'proj':'time';
+  try{localStorage.setItem('dtp_hist_sort',histSortMode)}catch(e){}
+  renderHistory();
+}
 function renderHistory(){
   const q=(document.getElementById('hist-q')||{value:''}).value.toLowerCase();
-  const sorted=[...visibleRecords()].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  const byTime=[...visibleRecords()].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  // 依案場時，同一個案場裡仍然是「新到舊」（先照時間排好再照案場穩定重排）
+  const sorted=histSortMode==='proj'?sortByProjOrder(byTime):byTime;
+  const bT=document.getElementById('hs-time'),bP=document.getElementById('hs-proj');
+  if(bT)bT.className='btn btn-sm '+(histSortMode==='time'?'btn-p':'btn-g');
+  if(bP)bP.className='btn btn-sm '+(histSortMode==='proj'?'btn-p':'btn-g');
   const filtered=q?sorted.filter(r=>{
     const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
     return[r.案場,r.執行者,r.施作位置,logText].join(' ').toLowerCase().includes(q);
