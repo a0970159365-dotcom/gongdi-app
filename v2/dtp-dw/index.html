@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-02.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-09-02.4';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -376,8 +376,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="card-header">
       <span class="card-title">歷史資料</span>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <button id="hs-time" class="btn btn-p btn-sm" onclick="setHistSort('time')">🕐 依更新時間</button>
         <button id="hs-proj" class="btn btn-g btn-sm" onclick="setHistSort('proj')">📁 依案場</button>
+        <button id="hs-time" class="btn btn-p btn-sm" onclick="setHistSort('time')">🕐 依更新時間</button>
+        <button class="btn btn-o btn-sm" onclick="histExpandAll(true)">全部展開</button>
+        <button class="btn btn-o btn-sm" onclick="histExpandAll(false)">全部收合</button>
         <input type="text" id="hist-q" class="fi" placeholder="搜尋..." style="max-width:200px" oninput="renderHistory()">
       </div>
     </div>
@@ -1543,7 +1545,10 @@ function sortLogs(logs){
 // 重繪（存檔、雲端同步）之後照著還原 —— 這就是第 5 項「存檔後展開狀態被重置」的修法。
 // 只存在這次瀏覽，重新整理回到預設收合。
 let _openSecs=new Set();
-function secId(proj){return 's_'+String(proj||'').replace(/\W/g,'_')}
+/* 2026-09-02 修：原本 replace(/\W/g,'_') 會把中文全換成底線 →
+   「惠國建設-烏日案」與「九上建設-后里案」都是 8 個字，產生一模一樣的 id，
+   收合其中一組會連另一組一起收。改成用字元碼組出唯一的 id。 */
+function secId(proj){return 's_'+Array.from(String(proj||'')).map(c=>c.charCodeAt(0).toString(36)).join('_')}
 function expandAll(open){
   if(open){
     const groups=[...new Set(getFiltered().map(r=>r.案場))];
@@ -1987,6 +1992,35 @@ function setHistSort(m){
   try{localStorage.setItem('dtp_hist_sort',histSortMode)}catch(e){}
   renderHistory();
 }
+/* 歷史資料的分組展開狀態（2026-09-02）：跟主表一樣，預設全部展開，
+ * 使用者收起來的記在 _closedHist，重繪後照著還原。只存在這次瀏覽。 */
+let _closedHist=new Set();
+function histSecId(key){return 'h_'+Array.from(String(key||'')).map(c=>c.charCodeAt(0).toString(36)).join('_')}
+/* onclick 用「這次畫出來的第幾組」，名稱裡有引號也不會出事 */
+let _histKeys=[];
+function toggleHistSec(i){
+  const key=_histKeys[i]; if(key===undefined)return;
+  const id=histSecId(key);
+  if(_closedHist.has(id))_closedHist.delete(id); else _closedHist.add(id);
+  renderHistory();
+}
+function histExpandAll(open){
+  if(open){_closedHist=new Set()}
+  else{
+    const keys=(histSortMode==='proj')
+      ? [...new Set(visibleRecords().map(r=>r.案場||'（未填案場）'))]
+      : [...new Set(visibleRecords().map(r=>histDayOf(r)))];
+    _closedHist=new Set(keys.map(histSecId));
+  }
+  renderHistory();
+}
+/* 依更新時間分組時的抬頭：用「更新日期」當一組（同一天更新的放一起） */
+function histDayOf(r){
+  const t=r&&r.updatedAt;
+  if(!t)return '（沒有更新時間）';
+  const d=new Date(t);
+  return isNaN(d)?String(t).slice(0,10):(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
+}
 function renderHistory(){
   const q=(document.getElementById('hist-q')||{value:''}).value.toLowerCase();
   const byTime=[...visibleRecords()].sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
@@ -2001,17 +2035,29 @@ function renderHistory(){
   }):sorted;
   const el=document.getElementById('hist-list');
   if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有資料</div>';return}
-  el.innerHTML=filtered.map(r=>{
+  /* 2026-09-02 用戶指定：依案場 → 案場當抬頭；依更新時間 → 更新日期當抬頭，
+     底下再 break down 那一組的紀錄。有搜尋字時一律展開，否則篩完只看到一排抬頭。 */
+  const _force=!!q;
+  const groups=new Map();
+  filtered.forEach(r=>{
+    const k=(histSortMode==='proj')?(r.案場||'（未填案場）'):histDayOf(r);
+    if(!groups.has(k))groups.set(k,[]);
+    groups.get(k).push(r);
+  });
+  const card=r=>{
     const last=(r.進度記錄||[]).slice(-1)[0]||{};
     const lastTxt=last.text?`${last.date?fmtLogDate(last.date)+' ':''}${last.location?'['+last.location+'] ':''}${last.text}`:'—';
     const dt=r.updatedAt?new Date(r.updatedAt).toLocaleDateString('zh-TW'):'—';
     const st=getMainStatus(r);
     const sub=[r.執行者,r.施作位置].filter(Boolean).join(' · ');
     const stuckCls=isStuck(r)?' style="border-left-color:#dc2626;background:#fef2f2"':'';
+    /* 抬頭已經寫了分組的那一項，卡片左欄就顯示另一項（案場↔更新時間），不重複同一個字 */
+    const head=(histSortMode==='proj')?('更新：'+esc(dt)):esc(r.案場);
+    const subhead=(histSortMode==='proj')?'':('更新：'+esc(dt));
     return`<div class="hist-item"${stuckCls} onclick="openEdit('${esc(r.id)}')">
       <div style="min-width:110px">
-        <div class="hist-proj">${esc(r.案場)}</div>
-        <div class="hist-time">更新：${esc(dt)}</div>
+        <div class="hist-proj">${head}</div>
+        ${subhead?`<div class="hist-time">${subhead}</div>`:''}
         <div style="margin-top:5px"><span class="st-badge ${stClassName(st)}">${esc(st)}</span></div>
       </div>
       <div style="flex:1">
@@ -2020,6 +2066,18 @@ function renderHistory(){
         ${r.備註?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.備註.split('\n')[0])}</div>`:''}
       </div>
     </div>`;
+  };
+  _histKeys=[...groups.keys()];
+  el.innerHTML=[...groups.entries()].map(([key,rows],gi)=>{
+    const id=histSecId(key);
+    const open=_force||!_closedHist.has(id);
+    const icon=(histSortMode==='proj')?'📁':'🕐';
+    return`<div class="proj-section">
+      <div class="proj-header${open?'':' sec-collapsed'}" onclick="toggleHistSec(${gi})">
+        <span><span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>${icon} ${esc(key)}<span class="proj-cnt">${rows.length} 筆</span></span>
+      </div>
+      <div class="${open?'':'d-none'}" style="padding:8px;background:var(--bg)">${rows.map(card).join('')}</div>
+    </div><div style="height:2px"></div>`;
   }).join('');
 }
 
