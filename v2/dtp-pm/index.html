@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-02.6';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1018,7 +1018,7 @@ function cfgDel(key,idx){
  * 排序是明確意圖，這次用本機版本覆蓋，否則另一台裝置的舊順序可能把它蓋回去。
  * 案場順序會連動主表／歷史資料／工時統計／匯出 → 排完一起重畫。 */
 function cfgMove(key,idx,dir){
-  if(mngGuard())return;
+  if(sortGuard())return;   /* 2026-09-03：排序改由「資料排序」權管，不再看「系統設定維護」 */
   const arr=cfg[key];
   if(!Array.isArray(arr))return;
   const j=idx+dir;
@@ -1173,7 +1173,7 @@ function renderCfgLists(){
       :arr.map((v,i)=>`<div class="cfg-row" id="cfgrow-${key}-${i}">
           <span class="cfg-row-num">${i+1}</span>
           <span class="cfg-row-lbl">${esc(v)}</span>
-          ${portalCanManageSettings()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}
+          ${portalCanDragSort()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}
           ${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}
           ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
@@ -1741,7 +1741,7 @@ function renderMain(){
     const open=_forceOpen||_openSecs.has(sid);
     /* 抬頭右邊的 ↑↓：直接在這一頁調案場順序（2026-09-02 用戶指定）。
        點箭頭時要 stopPropagation，否則會順便把這一組收合起來。 */
-    const canMv=portalCanManageSettings();
+    const canMv=portalCanDragSort();   /* 2026-09-03：↑↓ 與拖曳改由「資料排序」權管 */
     const mv=canMv?`<span class="sec-mv-wrap">
         <button class="sec-mv" title="往上移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',-1)"${gi===0?' disabled':''}>↑</button>
         <button class="sec-mv" title="往下移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',1)"${gi===_groupCount-1?' disabled':''}>↓</button>
@@ -1827,7 +1827,7 @@ function projMove(proj,dir){
 /* 把 proj 搬到 target 現在的位置（箭頭與拖曳共用這一支）。
  * 往下搬＝插在 target 後面，往上搬＝插在 target 前面 —— 跟畫面看到的一致。 */
 function projPlaceAt(proj,target){
-  if(mngGuard())return;
+  if(sortGuard())return;   /* 2026-09-03：硬呼叫也擋得住 */
   if(!proj||!target||proj===target)return;
   const shown=[...new Set(getFiltered().map(r=>r.案場))];
   const iFrom=shown.indexOf(proj), iTo=shown.indexOf(target);
@@ -1860,7 +1860,7 @@ function _clearDragMarks(){
     h.classList.remove('dragging','drag-over-top','drag-over-bottom'));
 }
 function projDragStart(e,proj){
-  if(!portalCanManageSettings()){e.preventDefault();return}
+  if(!portalCanDragSort()){e.preventDefault();return}
   _dragProj=proj;
   try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',proj)}catch(_){}
   if(e.currentTarget&&e.currentTarget.classList)e.currentTarget.classList.add('dragging');
@@ -2488,6 +2488,38 @@ function requireManageSettings(){
   toast('你的角色只能檢視設定，不能新增或修改。需要開通請找主管或系統管理員','e');
   return false;
 }
+/* ── 資料排序權（2026-09-03 用戶指定）────────────────────────────────
+ * 案場的排列順序有三個入口（系統設定頁的 ↑↓、進度總表抬頭的 ↑↓、進度總表拖曳），
+ * 改的都是同一份 cfg['案場']。以前這三個都掛在「系統設定維護」底下 ——
+ * 只要開了維護權（可能只是想讓某人自己加案場），就連帶能改全公司共用的排列順序。
+ * 現在拆成入口的獨立勾選框 canDragSort，預設只給主管與總經理室（用戶指定）。
+ * 舊資料還沒有這個欄位時回退到同一套判準（名稱含「主管」或看全公司），
+ * 避免雲端那份還沒遷移完的瞬間主管突然拖不動。
+ * ⚠️ 與其他權限一樣是畫面層防呆，擋不住直接對資料庫發請求的人。 */
+function portalCanDragSort(){
+  try{
+    const p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u = p.currentUser; if(!u || !u.roleId) return false;
+    const r = (p.roles||[]).find(x => x.id === u.roleId);
+    if(!r) return false;
+    if(typeof r.canDragSort === 'boolean') return !!r.canDragSort;
+    /* 還沒遷移到這個欄位時的回退：**不能比改版前更寬**。
+       改版前只要有「系統設定維護」權就能排序 → 回退值一定要先過那一關，
+       再套「主管或看全公司」的判準（＝入口遷移用的同一套）。
+       這樣在雲端那份還沒遷移完的空窗期，不會有人突然多出排序權。 */
+    const mng = (typeof r.canManageSettings === 'boolean')
+      ? !!r.canManageSettings
+      : (/主管/.test(r.name||'') || r.level === 'all');
+    return mng && (/主管/.test(r.name||'') || r.level === 'all');
+  }catch(e){ return false; }
+}
+function requireDragSort(){
+  if(portalCanDragSort()) return true;
+  toast('你的角色不能調整案場順序。需要開通請找主管或系統管理員','e');
+  return false;
+}
+/* 排序類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
+function sortGuard(){ return !requireDragSort(); }
 /* 寫入類動作的統一守門：回 true 代表「已擋下」，呼叫端直接 return */
 function mngGuard(){ return !requireManageSettings(); }
 /* 設定頁唯讀提示條 + 切換 body.no-mng（收掉 data-mng 按鈕、鎖住欄位） */

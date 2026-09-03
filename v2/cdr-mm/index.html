@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-02.10';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-03.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -146,6 +146,8 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .carry-cal .cal-day-head{margin:12px 0 6px;font-size:13px}
 .carry-cal .cal-empty{padding:14px;font-size:12px}
 .cal-empty{padding:20px;text-align:center;color:var(--muted);background:var(--bg);border-radius:8px;font-size:13px}
+.carry-noneS{background:#fef3c7;border:1.5px solid var(--warning);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e;text-align:center}
+.carry-noneS-sub{font-weight:400;font-size:12px;margin-top:4px;color:#92400e}
 @media(max-width:560px){.cal-cell{min-height:34px;font-size:13px}.cal-n{font-size:9px}}
 /* 分組抬頭（2026-09-02 用戶指定：專案管理案場當抬頭、瑪摩日期當抬頭）*/
 .grp-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
@@ -1753,9 +1755,13 @@ function carryCandidates(pid, all) {
      看全公司的帳號（系統維護／總經理室／副總）自己部門沒有日報 → 候選永遠是空的；
      跨部門互看的角色（r7～r11）也只看得到自己那半邊。
      歷史資料、日曆檢視、管理總表、報表下載全都用 visibleReports()，這裡跟上。 */
+  /* 2026-09-03：拿掉「排除目前開著的那一張」（原本是 r.id !== S.report.id）。
+     `.8` 加了「一進日報填寫就自動載入今天那張」之後，按「＋ 新增」時候選會把
+     正開著的那一張排掉 —— 該案場只有那一張時，月曆整片沒顏色、按「帶入這張」
+     還會跳「請先選一張」。帶入本來就是「複製內容去開新的一張」，
+     複製自己那張也無妨（使用者按了「＋ 新增」就是要另開一張）。 */
   const list = visibleReports()
-    .filter(r => r && r.id !== (S.report && S.report.id)
-                 && (!p || reportProjId(r) === p))
+    .filter(r => r && (!p || reportProjId(r) === p))
     .sort((a, b) => String(b.date||'').localeCompare(String(a.date||'')));
   /* 列表只給最近 20 張（再多也捲不完）；月曆要全部，否則翻到舊月份會是空的 */
   return all ? list : list.slice(0, 20);
@@ -1830,7 +1836,13 @@ function renderCarryCal(host){
   const prev = new Date(Y, M - 1, 0).getDate();
   const T = today();
 
+  /* 2026-09-03：這個案場一張可帶的日報都沒有時，月曆會整片沒顏色 ——
+     以前只有按了「帶入這張」才跳紅字，使用者以為是壞掉。改成一打開就講清楚，
+     並直接把「不用帶入，開空白的」那條路指出來。 */
   let h = '<div class="carry-cal">'
+    + (all.length ? '' :
+        '<div class="carry-noneS">這個案場還沒有可以帶入的日報表'
+      + '<div class="carry-noneS-sub">按下面的「＋ 建立今天的空白日報」就可以開始填</div></div>')
     + '<div class="cal-bar">'
     +   '<button type="button" class="btn btn-o btn-sm" onclick="carryCalShift(-1)">‹ 上個月</button>'
     +   '<span class="cal-title">' + Y + ' 年 ' + M + ' 月</span>'
@@ -1858,7 +1870,9 @@ function renderCarryCal(host){
     + '</div>';
 
   if (!CARRY_CAL.sel){
-    h += '<div class="cal-empty">點上面有顏色的日期，挑一張帶入</div>';
+    h += '<div class="cal-empty">' + (all.length
+       ? '點上面有顏色的日期，挑一張帶入'
+       : '這個案場沒有日報可以帶入；也可以點任一天，直接建立那天的空白日報') + '</div>';
   } else {
     const d = new Date(CARRY_CAL.sel + 'T00:00:00');
     const rs = map[CARRY_CAL.sel] || [];
@@ -1896,7 +1910,7 @@ function renderCarryBody() {
   const list = carryCandidates();
   host.innerHTML = list.length
     ? list.map((r, i) => carryRow(r, i === 0)).join('')
-    : `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">這個案場還沒有可以帶入的舊日報表</div>`;
+    : `<div style="padding:14px;text-align:center;color:var(--muted);font-size:13px">這個案場還沒有可以帶入的日報表<br><span style="font-size:12px">按下面的「＋ 建立今天的空白日報」就可以開始填</span></div>`;
   carryTodayNote();
 }
 /* 黃框只講「要不要加入」，日期／建立人／筆數都在下面那份清單裡，不重複講一次 */
@@ -1986,7 +2000,15 @@ function updateCarryBtns(){
 function carryApply(){
   if (!_carryProjId) { toast('請先選擇案場','e'); return; }
   const sel = document.querySelector('input[name="carry-src"]:checked');
-  if (!sel) { toast('請先選一張要帶入的日報表，或按「不用，空白就好」','e'); return; }
+  /* 2026-09-03：訊息裡的按鈕名稱要跟畫面上那顆一致（原本寫「不用，空白就好」，
+     畫面上其實叫「＋ 建立今天的空白日報」，使用者找不到那顆鈕）。
+     另外分兩種講法：真的沒東西可帶 vs 有東西但還沒挑。 */
+  if (!sel) {
+    toast(carryCandidates(undefined, true).length
+      ? '請先選一張要帶入的日報表，或按「＋ 建立今天的空白日報」'
+      : '這個案場沒有可以帶入的日報表，請按「＋ 建立今天的空白日報」','e');
+    return;
+  }
   const src = S.reports.find(r => r.id === sel.value);
   if (!src) { toast('找不到那張日報表','e'); return; }
   const wantMat   = $('carry-mat').checked;
@@ -2019,10 +2041,15 @@ function carryApply(){
   if (hint) {
     if (brought.length) {
       hint.textContent = `✓ 已從 ${src.date}（${src.reporter||'—'}）帶入：${brought.join('、')}`;
-  _noAutoLoad = false;          // 帶入完成，之後使用者自己改案場／日期就恢復自動載入
       hint.style.display = 'block';
     } else { hint.style.display = 'none'; }
   }
+  /* 2026-09-03 修：這一行原本卡在 `if (brought.length)` 裡面 ——
+     三個勾選都沒帶到東西（或找不到 #mat-carry-hint）時就永遠不會執行，
+     `_noAutoLoad` 從此卡在 true，這一整個 session 之後改案場／改日期
+     都不會再自動載入既有那張 → 又會開出同案場同日的第二張（`.8` 要防的就是這個）。
+     一定要無條件解除。 */
+  _noAutoLoad = false;          // 帶入完成，之後使用者自己改案場／日期就恢復自動載入
   recalc(); buildSummary(); syncReport();
   goPage('report');                // 同上：帶入完要切到報表頁才看得到（2026-08-30）
   toast(brought.length ? '已帶入舊資料' : '那張沒有可帶入的內容，已建立空白日報表', brought.length?'s':'');
