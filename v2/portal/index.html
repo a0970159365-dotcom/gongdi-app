@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-09-03.7';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -178,9 +178,19 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 
 /* ── TABLE ── */
 .data-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
-/* 權限角色表欄位多（2026-08-17 再加一欄「權限設定」）→ 窄螢幕改成左右滑，不要把欄位擠變形 */
+/* 表格欄位多 → 窄螢幕改成左右滑，不要把欄位擠變形。
+   ⚠️ 新增多欄表格時記得一起加 wide-tbl，否則手機上右邊的欄位滑不到（2026-09-03 員工表就是這樣）。 */
+@media(max-width:900px){
+  .data-card.wide-tbl{position:relative}
+  .data-card.wide-tbl::after{
+    content:"← 左右滑動看更多 →"; display:block; position:sticky; left:0;
+    font-size:11px; color:var(--muted,#64748b); text-align:center; padding:6px 0 8px;
+  }
+}
 .data-card.wide-tbl{overflow-x:auto;overflow-y:hidden}
 .data-card.wide-tbl table{min-width:1040px}
+/* 員工表 8 欄，比角色表窄一些就夠（2026-09-03） */
+.data-card.emp-tbl table{min-width:860px}
 table{width:100%;border-collapse:collapse}
 thead{background:var(--bg)}
 th{text-align:left;padding:11px 14px;font-weight:800;font-size:12px;color:var(--primary);letter-spacing:.3px;text-transform:uppercase;border-bottom:2px solid var(--border)}
@@ -466,7 +476,10 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
         <div class="count">共 <strong id="emp-count">0</strong> 位員工</div>
         <button class="btn btn-accent" onclick="openEmpModal()">+ 新增員工</button>
       </div>
-      <div class="data-card">
+      <!-- 2026-09-03 她在手機上回報「滑不到操作欄」：這張 8 欄的表原本沒有橫向捲動容器
+           （角色表 2026-08-17 加過，員工表漏了）→ 窄螢幕會把 8 欄硬擠進去，
+           每個中文字被壓成一行，右邊的「操作」根本看不到也滑不到。 -->
+      <div class="data-card wide-tbl emp-tbl">
         <table>
           <thead><tr>
             <th style="width:50px">序號</th>
