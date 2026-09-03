@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.11';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.13';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1432,6 +1432,14 @@ function _localCopy(data, cloudOk){
  * 這是最後一道網：就算未來又有人寫出「本機照片被清掉」的 bug，也推不上雲。 */
 var _photoDeleteOk = {};                 // 報表 id -> 這一筆的照片是使用者自己刪的
 function markPhotoDelete(rid){ if(rid) _photoDeleteOk[rid] = true; }
+/* 「使用者刻意刪掉的那幾列」——只在真的按了刪除時才會設。
+   mergeRows 的「補回別人的列」規則要跳過這些，否則主管刪了別人的照片／工項／材料，
+   存檔時又會被接回去（2026-09-03 她回報「手機刪了、筆電還在」就是這個）。 */
+var _deletedIds = {};
+function markRowDeleted(id, rid){
+  if(id) _deletedIds[id] = true;
+  if(rid) markPhotoDelete(rid);
+}
 function _photoCountGuard(local, cloud){
   if(!local || !cloud) return true;                       // 沒得比就放行
   var lp = (local.photos||[]).length, cp = (cloud.photos||[]).length;
@@ -1527,8 +1535,11 @@ function mergeRows(localItems, cloudItems, me, baseItems){
     return cloudById.get(x.id);
   });
   // ③：雲端才有的別人的列，接在後面
+  //    例外（2026-09-03）：使用者**刻意刪掉**的那幾列不要復活。
+  //    畫面上主管可以刪別人的列（會先跳確認框），不排除的話存檔時又會被接回來，
+  //    使用者看到的就是「手機刪了、換台裝置打開又出現」。
   var extra = (cloudItems||[]).filter(function(x){
-    return x && x.id && !localIds.has(x.id) && x.owner && x.owner !== me;
+    return x && x.id && !localIds.has(x.id) && x.owner && x.owner !== me && !_deletedIds[x.id];
   });
   return kept.concat(extra);
 }
@@ -2766,7 +2777,11 @@ function updProg(inp) {
   const fill = inp.closest('.prog-wrap')?.querySelector('.prog-bar-fill');
   if (fill) fill.style.width=v+'%';
 }
-function delRow(btn) { btn.closest('tr').remove(); renum(); recalc(); buildSummary(); syncReport(); }
+function delRow(btn) {
+  var tr=btn.closest('tr');
+  markRowDeleted(tr && tr.dataset && tr.dataset.id, S.report && S.report.id);   // 刻意刪 → 合併時不要復活
+  tr.remove(); renum(); recalc(); buildSummary(); syncReport();
+}
 function renum() { $('tbody').querySelectorAll('.rnum').forEach((td,i)=>td.textContent=i+1); }
 function recalc() {
   let t0=0, t1=0;
@@ -2990,7 +3005,11 @@ function onMatNameChange(sel) {
   }
   syncReport();
 }
-function delMatRow(btn) { btn.closest('tr').remove(); mnumAll(); toggleMatEmpty(); syncReport(); }
+function delMatRow(btn) {
+  var tr=btn.closest('tr');
+  markRowDeleted(tr && tr.dataset && tr.dataset.mid, S.report && S.report.id);  // 同上
+  tr.remove(); mnumAll(); toggleMatEmpty(); syncReport();
+}
 function mnumAll() { $('mat-tbody').querySelectorAll('.mnum').forEach((td,i)=>td.textContent=i+1); }
 function toggleMatEmpty() {
   const empty = $('mat-empty');
@@ -3290,9 +3309,11 @@ function deletePhoto(){
       toast(`這張是 ${p.owner} 上傳的，只有本人能刪`,'e'); return;
     }
   }
+  markRowDeleted(p && p.id, S.report && S.report.id);   // 刻意刪掉 → 合併時不要復活
   S.report.photos.splice(viewPhIdx,1);
   $('ph-overlay').classList.remove('show');
   renderPhotos(); syncReport();
+  toast('已刪除，記得按「💾 儲存報表」才會同步到其他裝置','');
 }
 /* 把照片打包成 zip，資料夾就是 案場/施作位置/施工項目/日期 —— 與本地化後的伺服器路徑同一套規則 */
 async function downloadPhotosZip(){
