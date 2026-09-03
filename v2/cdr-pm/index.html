@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.9';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.10';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -3046,6 +3046,10 @@ var THUMB_MAX_EDGE = 320;
 var THUMB_QUALITY  = 0.6;
 function makeThumb(dataUri){
   return new Promise(function(resolve){
+    /* 同樣的逾時保護：縮圖做不出來就回空字串，列表會退回用原圖，不會卡住整個流程 */
+    var done=false;
+    function fin(v){ if(done) return; done=true; resolve(v); }
+    var timer=setTimeout(function(){ fin(''); }, PHOTO_DECODE_TIMEOUT);
     try{
       var img = new Image();
       img.onload = function(){
@@ -3057,13 +3061,14 @@ function makeThumb(dataUri){
           cv.width=cw; cv.height=ch;
           cv.getContext('2d').drawImage(img,0,0,cw,ch);
           var out=cv.toDataURL('image/jpeg', THUMB_QUALITY);
+          clearTimeout(timer);
           /* 原圖本來就比縮圖還小 → 不用另外做縮圖，列表直接用原圖 */
-          resolve(out.length < String(dataUri).length ? out : '');
-        }catch(e){ resolve(''); }
+          fin(out.length < String(dataUri).length ? out : '');
+        }catch(e){ clearTimeout(timer); fin(''); }
       };
-      img.onerror = function(){ resolve(''); };
+      img.onerror = function(){ clearTimeout(timer); fin(''); };
       img.src = dataUri;
-    }catch(e){ resolve(''); }
+    }catch(e){ clearTimeout(timer); fin(''); }
   });
 }
 /* ── 取一張照片的「原圖」──────────────────────────────────────────
@@ -3087,11 +3092,25 @@ function photoFull(p){
 }
 /* 列表要顯示的那一張：有縮圖用縮圖，沒有（舊資料）就用原圖 */
 function photoSrc(p){ return (p && (p.thumb || p.data)) || ''; }
+/* 逾時（2026-09-03）：手機上遇到解不開的圖，img 的 onload／onerror 可能**兩個都不觸發**，
+   Promise 就卡住不結束 → 使用者看到的就是「按了完全沒反應」。
+   每一段都給時限，時間到就用當下最好的結果收尾，絕不讓它懸在那裡。 */
+var PHOTO_READ_TIMEOUT = 20000;   // 讀檔
+var PHOTO_DECODE_TIMEOUT = 15000; // 解碼＋壓縮
 function compressImage(file){
   return new Promise(function(resolve){
+    var done = false;
+    function finish(v){ if(done) return; done = true; resolve(v); }
+    /* 讀檔逾時：連 FileReader 都沒回來（檔案在雲端硬碟／iCloud 還沒下載完就會這樣） */
+    var readTimer = setTimeout(function(){ finish({ timeout:'read' }); }, PHOTO_READ_TIMEOUT);
     var rd = new FileReader();
     rd.onload = function(ev){
+      clearTimeout(readTimer);
       var raw = ev.target.result;
+      /* 解碼逾時：時間到就直接用原檔（至少照片不會不見），不再等 img 事件 */
+      var decodeTimer = setTimeout(function(){
+        finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, slow: true });
+      }, PHOTO_DECODE_TIMEOUT);
       var img = new Image();
       img.onload = function(){
         try{
@@ -3107,19 +3126,26 @@ function compressImage(file){
             var out2 = cv.toDataURL('image/jpeg', PHOTO_RETRY_QUALITY);
             if (out2.length < out.length) out = out2;
           }
+          clearTimeout(decodeTimer);
           // 壓完反而更大（例如本來就很小的圖）→ 用原檔
-          if (out.length >= raw.length) { resolve({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
-          resolve({ data: out, w: cw, h: ch, ow: w, oh: h });
-        }catch(err){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); }
+          if (out.length >= raw.length) { finish({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
+          finish({ data: out, w: cw, h: ch, ow: w, oh: h });
+        }catch(err){ clearTimeout(decodeTimer); finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, nocanvas: true }); }
       };
-      img.onerror = function(){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); };
+      /* 解不開（HEIC 之類）→ 還是把原檔收下來，讓使用者至少留得住照片 */
+      img.onerror = function(){ clearTimeout(decodeTimer); finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, undecodable: true }); };
       img.src = raw;
     };
-    rd.onerror = function(){ resolve(null); };
-    rd.readAsDataURL(file);
+    rd.onerror = function(){ clearTimeout(readTimer); finish({ readError: true }); };
+    try { rd.readAsDataURL(file); }
+    catch(e){ clearTimeout(readTimer); finish({ readError: true }); }
   });
 }
 function uploadPhotos(e) {
+  try { return _uploadPhotos(e); }
+  catch(err){ toast('照片上傳失敗：' + ((err && err.message) || err), 'e'); }
+}
+function _uploadPhotos(e) {
   const tgt=phTargetFromSelect();
   /* 2026-09-03：這一段原本有三條「靜默失敗」的路，使用者按了完全沒反應也沒訊息 ——
      她與客戶回報的「無法上傳照片」多半就是踩到其中一條。每一條都要講話。 */
@@ -3134,11 +3160,15 @@ function uploadPhotos(e) {
   /* 「還沒選工項」排在這裡才對：使用者按了取消（沒選檔）不該跳任何訊息（2026-09-03） */
   if(!tgt){ toast('照片要掛在某一個工項底下：請先在「施工明細」新增一列，再回到這裡右上角選那一項','e'); return; }
   if(!files.length){ toast('選到的檔案不是圖片，請重新選擇','e'); return; }
-  if(files.length > 1) toast('照片處理中…');
+  toast('照片處理中…（' + files.length + ' 張）');
   Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
-    let n = 0, bad = [];
+    let n = 0, bad = [], slow = [], undec = [];
     list.forEach(({ r, f }) => {
-      if(!r){ bad.push(f.name||'（未命名）'); return; }
+      const nm = f.name || '（未命名）';
+      if(!r || r.readError){ bad.push(nm); return; }
+      if(r.timeout){ bad.push(nm + '（讀取逾時）'); return; }
+      if(r.undecodable) undec.push(nm);
+      if(r.slow) slow.push(nm);
       var _pid = uid();
       /* ⚠️ 原圖**先留在報表裡**（2026-09-03）：這樣它會跟報表一起進雲端，
          跟改版前一樣不會掉。等確認推進 cdr_pm_photos 之後，_pushPendingFull()
@@ -3162,9 +3192,15 @@ function uploadPhotos(e) {
     Promise.all(_thumbJobs.splice(0)).then(function(){ renderPhotos(); syncReport(); });
     renderPhotos(); syncReport();
     if(n) toast('已加入 ' + n + ' 張照片，記得按「💾 儲存報表」','s');
-    if(bad.length) toast('這 ' + bad.length + ' 張讀不到，可能是相機的 HEIC 格式：'
-      + bad.slice(0,3).join('、') + '　→ 手機相機設定改成「相容性最佳／JPEG」再拍一次','e');
+    if(undec.length) toast('有 ' + undec.length + ' 張這台手機解不開（多半是 HEIC），已用原檔存下來：'
+      + undec.slice(0,2).join('、') + '　→ 相機設定改「相容性最佳／JPEG」拍會比較小張','');
+    if(slow.length) toast('有 ' + slow.length + ' 張處理太久，已直接用原檔（檔案會比較大）','');
+    if(bad.length) toast('這 ' + bad.length + ' 張讀不到：' + bad.slice(0,3).join('、')
+      + '　→ 檔案可能還在雲端下載中，等一下再試一次','e');
     if(!n && !bad.length) toast('沒有加入任何照片，請再試一次','e');
+  }).catch(function(err){
+    /* 這裡不該被走到；真的走到就一定要讓使用者看到，不要又變成「沒反應」 */
+    toast('照片處理失敗：' + ((err && err.message) || err), 'e');
   });
 }
 /* 依 案場 → 施作位置 → 施工項目 → 日期 分層列出 */

@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.8';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-03.10';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2491,11 +2491,22 @@ var PHOTO_MAX_EDGE = 1600;   // 長邊上限（px）
 var PHOTO_QUALITY  = 0.72;   // JPEG 品質
 var PHOTO_MAX_BYTES = 500*1024;   // 壓完還超過就再降一階
 var PHOTO_RETRY_QUALITY = 0.55;
+/* 逾時（2026-09-03）：手機上遇到解不開的圖，img 的 onload／onerror 可能**兩個都不觸發**，
+   Promise 就卡住不結束 → 使用者看到的就是「按了完全沒反應」（她手機實測重現過）。 */
+var PHOTO_READ_TIMEOUT = 20000;
+var PHOTO_DECODE_TIMEOUT = 15000;
 function compressImage(file){
   return new Promise(function(resolve){
+    var done = false;
+    function finish(v){ if(done) return; done = true; resolve(v); }
+    var readTimer = setTimeout(function(){ finish({ timeout:'read' }); }, PHOTO_READ_TIMEOUT);
     var rd = new FileReader();
     rd.onload = function(ev){
+      clearTimeout(readTimer);
       var raw = ev.target.result;
+      var decodeTimer = setTimeout(function(){
+        finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, slow: true });
+      }, PHOTO_DECODE_TIMEOUT);
       var img = new Image();
       img.onload = function(){
         try{
@@ -2511,18 +2522,24 @@ function compressImage(file){
             var out2 = cv.toDataURL('image/jpeg', PHOTO_RETRY_QUALITY);
             if (out2.length < out.length) out = out2;
           }
-          if (out.length >= raw.length) { resolve({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
-          resolve({ data: out, w: cw, h: ch, ow: w, oh: h });
-        }catch(err){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); }
+          clearTimeout(decodeTimer);
+          if (out.length >= raw.length) { finish({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
+          finish({ data: out, w: cw, h: ch, ow: w, oh: h });
+        }catch(err){ clearTimeout(decodeTimer); finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, nocanvas: true }); }
       };
-      img.onerror = function(){ resolve({ data: raw, w: 0, h: 0, ow: 0, oh: 0 }); };
+      img.onerror = function(){ clearTimeout(decodeTimer); finish({ data: raw, w: 0, h: 0, ow: 0, oh: 0, undecodable: true }); };
       img.src = raw;
     };
-    rd.onerror = function(){ resolve(null); };
-    rd.readAsDataURL(file);
+    rd.onerror = function(){ clearTimeout(readTimer); finish({ readError: true }); };
+    try { rd.readAsDataURL(file); }
+    catch(e){ clearTimeout(readTimer); finish({ readError: true }); }
   });
 }
 function uploadPhotos(e) {
+  try { return _uploadPhotos(e); }
+  catch(err){ toast('照片上傳失敗：' + ((err && err.message) || err), 'e'); }
+}
+function _uploadPhotos(e) {
   const phase=$('ph-phase').value;
   /* 2026-09-03：這一段原本有三條「靜默失敗」的路，使用者按了完全沒反應也沒訊息 ——
      她與客戶回報的「無法上傳照片」多半就是踩到其中一條。每一條都要講話。 */
@@ -2535,11 +2552,15 @@ function uploadPhotos(e) {
   e.target.value='';
   if(!picked.length) return;                       // 使用者自己取消，不用吵他
   if(!files.length){ toast('選到的檔案不是圖片，請重新選擇','e'); return; }
-  if(files.length > 1) toast('照片處理中…');
+  toast('照片處理中…（' + files.length + ' 張）');
   Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
-    let n = 0, bad = [];
+    let n = 0, bad = [], slow = [], undec = [];
     list.forEach(({ r, f }) => {
-      if(!r){ bad.push(f.name||'（未命名）'); return; }
+      const nm = f.name || '（未命名）';
+      if(!r || r.readError){ bad.push(nm); return; }
+      if(r.timeout){ bad.push(nm + '（讀取逾時）'); return; }
+      if(r.undecodable) undec.push(nm);
+      if(r.slow) slow.push(nm);
       S.report.photos.push({
         id:uid(), data:r.data, phase:phase, name:f.name, ts:Date.now(),
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h
@@ -2548,9 +2569,14 @@ function uploadPhotos(e) {
     });
     renderPhotos();
     if(n) toast('已加入 ' + n + ' 張照片，記得按「💾 儲存報表」','s');
-    if(bad.length) toast('這 ' + bad.length + ' 張讀不到，可能是相機的 HEIC 格式：'
-      + bad.slice(0,3).join('、') + '　→ 手機相機設定改成「相容性最佳／JPEG」再拍一次','e');
+    if(undec.length) toast('有 ' + undec.length + ' 張這台手機解不開（多半是 HEIC），已用原檔存下來：'
+      + undec.slice(0,2).join('、') + '　→ 相機設定改「相容性最佳／JPEG」拍會比較小張','');
+    if(slow.length) toast('有 ' + slow.length + ' 張處理太久，已直接用原檔（檔案會比較大）','');
+    if(bad.length) toast('這 ' + bad.length + ' 張讀不到：' + bad.slice(0,3).join('、')
+      + '　→ 檔案可能還在雲端下載中，等一下再試一次','e');
     if(!n && !bad.length) toast('沒有加入任何照片，請再試一次','e');
+  }).catch(function(err){
+    toast('照片處理失敗：' + ((err && err.message) || err), 'e');
   });
 }
 function renderPhotos() {
