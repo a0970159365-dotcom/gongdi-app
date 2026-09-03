@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -945,14 +945,20 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             </div>
           </div>
           <div class="fg">
-            <!-- 材料名稱 → 單位（兩層，2026-09-02 用戶指定比照「施作位置／施工項目」）-->
-            <div class="fg">
-              <div class="flex-b mb2">
-                <label class="fl" style="margin:0">材料名稱 ／ 單位</label>
-                <button class="btn btn-a btn-sm" data-mng onclick="addMatGroup()">＋ 新增材料名稱</button>
+            <!-- 材料名稱（每列一個預設單位）＋ 單位清單
+                 2026-09-03 用戶拍板 A 案：改回 09-02.2 的做法。
+                 兩層設定（.7）在她的資料上每個材料底下都只有一個單位，
+                 等於多一層純粹的工 —— 加一種材料要 5 步，這樣只要 3 步。 -->
+            <div class="g g2" style="gap:16px;align-items:start">
+              <div class="fg">
+                <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addMatNameRow()">＋ 新增</button></div>
+                <p class="tl-hint" style="margin-bottom:6px">右邊選這個材料的<b>預設單位</b>：填日報時選了名稱，單位會自動帶入；沒填單位的舊資料，材料統計也會照這個歸戶。標「建議」的是照過去用最多的單位先選好，按「💾 儲存設定」才會生效。</p>
+                <div class="list-field" id="lf-matnames"></div>
               </div>
-              <div class="tl-hint">先建立材料名稱，再點開它加入底下的單位。日報填寫時選了材料名稱，單位就只會出現該材料底下的選項；只設一種單位的話會直接帶入。沒填單位的舊資料，材料統計也會照這裡歸戶。</div>
-              <div id="mat-groups"></div>
+              <div class="fg">
+                <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
+                <div class="list-field" id="lf-matunits"></div>
+              </div>
             </div>
             <!-- 部門與使用者改由入口網頁集中管理 -->
             <div style="margin-top:18px;background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
@@ -1142,7 +1148,7 @@ const S = {
     staffByVendor: {},   // { 廠商: [施工人員, ...] }（第二層）
     matNames: [],
     matUnits: [],
-    unitsByMat: {},      // { 材料名稱: [單位, ...] }（第二層，2026-09-02 比照 worksByLoc）
+    matUnitMap: {},      // { 材料名稱: 預設單位 }（2026-09-03 A 案，改回 09-02.2 的做法）
     users: []
   },
   user: { name:'', dept:'', role:'reporter' },
@@ -1299,16 +1305,29 @@ function load() {
          ① 先用 09-02.2 那版的 matUnitMap（名稱→單一預設單位）
          ② 沒有的話，看報表裡這個材料實際用過哪些單位
          ③ 再沒有就留空 —— 那個材料的單位下拉會列出全部單位（跟改版前一樣） */
-      if (!S.cfg.unitsByMat || typeof S.cfg.unitsByMat!=='object' || Array.isArray(S.cfg.unitsByMat)) S.cfg.unitsByMat={};
-      (S.cfg.matNames||[]).forEach(function(n){
-        if (Array.isArray(S.cfg.unitsByMat[n])) return;
-        const one = (S.cfg.matUnitMap||{})[n];
-        S.cfg.unitsByMat[n] = one ? [one] : [];
+      /* 2026-09-03（A 案）：兩層那份 unitsByMat 自動搬回「名稱 → 一個預設單位」。
+         她線上 13 種材料底下都只有一個單位，所以是一對一搬過來、不會遺失；
+         真的設了多種的話取第一個（設定頁看得到，要改隨時能改）。
+         已經有的 matUnitMap 不覆蓋 —— 那是她自己選過的。 */
+      if (!S.cfg.matUnitMap || typeof S.cfg.matUnitMap!=='object' || Array.isArray(S.cfg.matUnitMap)) S.cfg.matUnitMap={};
+      const _ubm = S.cfg.unitsByMat;
+      if (_ubm && typeof _ubm==='object' && !Array.isArray(_ubm)) {
+        Object.keys(_ubm).forEach(function(n){
+          if (S.cfg.matUnitMap[n]) return;
+          const arr = _ubm[n];
+          if (Array.isArray(arr) && arr.length && arr[0]) S.cfg.matUnitMap[n] = arr[0];
+        });
+        /* 單位清單在兩層那版是自動維護的聯集，改回手動清單時要把它留下來，
+           否則她的「支／箱／組」會不見。 */
+        const _all = [...new Set(Object.values(_ubm).flat().filter(Boolean))];
+        S.cfg.matUnits = [...new Set([...(S.cfg.matUnits||[]), ..._all])];
+        delete S.cfg.unitsByMat;
+      }
+      /* 名稱已經被刪掉的，預設單位也跟著清掉 */
+      Object.keys(S.cfg.matUnitMap).forEach(function(k){
+        if (!(S.cfg.matNames||[]).includes(k)) delete S.cfg.matUnitMap[k];
       });
-      Object.keys(S.cfg.unitsByMat).forEach(function(k){
-        if (!(S.cfg.matNames||[]).includes(k)) delete S.cfg.unitsByMat[k];
-      });
-      if (!S.cfg.matUnits) S.cfg.matUnits=['片','支','桶','包','箱','才','m','m²','公斤','公升'];
+      if (!S.cfg.matUnits || !S.cfg.matUnits.length) S.cfg.matUnits=['片','支','桶','包','箱','才','m','m²','公斤','公升'];
       if (!S.cfg.depts?.length) S.cfg.depts=['專案管理部'];
       migrateCfgTwoLevel();
     }
@@ -2758,7 +2777,7 @@ function addMatRow(m) {
     <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
     <td><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
     <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
-    <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'', m?.name||'')}</select></td>
+    <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
     <td class="no-print">${mine
       ? `<button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button>`
       : (canUn
@@ -2773,37 +2792,29 @@ function matNameOpts(cur) {
   return `<option value="">— 選擇材料 —</option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
-/* 這個材料設定了哪些單位（第二層）。沒設定的就回全部單位，行為與改版前一樣。 */
-function unitsOfMat(name){
-  const m=S.cfg.unitsByMat||{};
-  const own=m[String(name||'').trim()];
-  return (Array.isArray(own)&&own.length)?own:(S.cfg.matUnits||[]);
-}
-/* 只設一種單位時＝這個材料的預設單位（材料統計拿它把「沒填單位」的舊資料歸戶）*/
+/* 這個材料的預設單位（2026-09-03 改回 A 案：一個材料一個單位）。
+ * 材料統計也拿它把「沒填單位」的舊資料歸戶，否則同一種材料會被拆成兩列。 */
 function matUnitOf(name){
-  const m=S.cfg.unitsByMat||{};
-  const own=m[String(name||'').trim()];
-  return (Array.isArray(own)&&own.length===1)?own[0]:'';
+  const m=S.cfg.matUnitMap||{};
+  return (m[String(name||'').trim()]||'').trim();
 }
-function matUnitOpts(cur, matName) {
-  const list = unitsOfMat(matName);
+function matUnitOpts(cur) {
+  const list = S.cfg.matUnits||[];
   const extra = cur&&!list.includes(cur)?[cur]:[];
   return `<option value=""></option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
 function onMatNameChange(sel) {
-  /* 2026-09-02：材料名稱 → 單位是兩層的（比照施作位置→施工項目）。
-     換了材料名稱，單位下拉就換成那個材料底下的選項：
-       · 只設一種 → 直接帶入
-       · 設了多種 → 保留原本選的（如果還在清單裡），否則清空讓人自己選
-       · 沒設定 → 列出全部單位，跟改版前一樣 */
-  const row=sel.closest('tr');
-  const us=row&&row.querySelector('[data-f="munit"]');
-  if(us){
-    const list=unitsOfMat(sel.value);
-    const keep=list.includes(us.value)?us.value:'';
-    us.innerHTML=matUnitOpts(keep, sel.value);
-    if(!keep&&list.length===1)us.value=list[0];
+  /* 選了材料名稱 → 單位自動帶入設定頁綁的預設單位。
+     沒綁預設的維持原樣（不會把使用者已經選好的單位清掉）。 */
+  const u=matUnitOf(sel.value);
+  if(u){
+    const row=sel.closest('tr');
+    const us=row&&row.querySelector('[data-f="munit"]');
+    if(us){
+      if(![...us.options].some(o=>o.value===u)) us.add(new Option(u,u),1);
+      us.value=u;
+    }
   }
   syncReport();
 }
@@ -4115,10 +4126,9 @@ async function exportExcel(){
 const TL_DEFS = {
   loc:    { host:'loc-groups',    parentKey:'locs',    childKey:'worksByLoc',    parentName:'施作位置', childName:'施工項目' },
   vendor: { host:'vendor-groups', parentKey:'vendors', childKey:'staffByVendor', parentName:'廠商',     childName:'施工人員' },
-  /* 2026-09-02 用戶指定：材料也改成同一種兩層設定 */
-  mat:    { host:'mat-groups',    parentKey:'matNames', childKey:'unitsByMat',   parentName:'材料名稱', childName:'單位' },
+  /* 2026-09-03：材料改回「一列一個預設單位」（A 案），不再走兩層編輯器 */
 };
-const tlCollapsed = { loc:{}, vendor:{}, mat:{} };   // 記住哪些群組收合中，重繪後維持原狀
+const tlCollapsed = { loc:{}, vendor:{} };   // 記住哪些群組收合中，重繪後維持原狀
 
 function renderTwoLevel(kind){
   const def=TL_DEFS[kind], host=$(def.host);
@@ -4170,7 +4180,6 @@ function tlAddParent(kind){
   if(inp){ inp.focus(); inp.select(); }
 }
 function addLocGroup(){ tlAddParent('loc'); }
-function addMatGroup(){ tlAddParent('mat'); }
 function addVendorGroup(){ tlAddParent('vendor'); }
 function tlRenameParent(kind,pi,val){
   if(mngGuard()){renderTwoLevel(kind);return;}
@@ -4249,26 +4258,30 @@ function loadCfgForm(){
 
   renderTwoLevel('loc');
   renderTwoLevel('vendor');
-  renderTwoLevel('mat');
+  /* 材料改回「名稱清單＋每列一個預設單位」＋ 獨立的單位清單（2026-09-03 A 案） */
+  loadMatNameField();
+  loadListField('lf-matunits', S.cfg.matUnits);
   renderProjTable();
 }
 function saveSettings(){
   if(appLockGuard())return;
   if(mngGuard())return;
-  /* 材料名稱／單位改成兩層後，編輯當下就寫進 S.cfg（跟施作位置那組一樣），
-     這裡不用再從清單欄位讀回來。matUnits 仍然維護：它是所有單位的聯集，
-     給「還沒設定單位的材料」當備選清單用。 */
-  S.cfg.matUnits = [...new Set(Object.values(S.cfg.unitsByMat||{}).flat().filter(Boolean))];
+  /* 材料改回兩張清單（2026-09-03 A 案）：名稱（含預設單位）與單位各自讀回來。
+     matUnitMap 只收「名稱與單位都有填」的那幾列，沒選單位＝沒有預設單位。 */
+  S.cfg.matNames   = readMatNameField();
+  S.cfg.matUnitMap = readMatUnitMap();
+  S.cfg.matUnits   = readListField('lf-matunits');
+  delete S.cfg.unitsByMat;   // 兩層那份不再使用，也不要留在雲端誤導下一個人
 
-  tlCleanup();   // 兩層設定在編輯當下已寫進 S.cfg，這裡只清空白
+  tlCleanup();   // 施作位置／廠商那兩組在編輯當下已寫進 S.cfg，這裡只清空白
   save(); toast('設定已儲存','s');
   // Refresh form dropdowns
   if(S.page==='report') renderReport();
 }
 
 /* ── LIST FIELD ── */
-/* 材料名稱 → 單位的設定已改成兩層編輯器（TL_DEFS.mat），
- * 對照與帶入的函式在 matUnitOpts／unitsOfMat／matUnitOf（上面日報填寫那一段）。 */
+/* 材料名稱 → 預設單位（2026-09-03 A 案，改回 09-02.2 的做法）：
+ * 設定頁一列一個下拉，對照與帶入的函式在 matUnitOpts／matUnitOf（上面日報填寫那一段）。 */
 /* 還沒設定預設單位的材料，看它過去實際被記過哪些單位，挑最常用的當建議值。
  * 只是「先選好」讓她確認，沒按儲存就不算數。 */
 function matUnitSuggest(name){
