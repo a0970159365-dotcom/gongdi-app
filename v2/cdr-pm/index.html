@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.10';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.11';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1342,7 +1342,7 @@ function load() {
     }
     if (d.user) S.user={...S.user,...d.user};
     if (d.projSort) S.projSort = d.projSort;
-    _dropStrippedPhotos(S.reports);   // 本機那份的照片是空殼，等雲端補回來（2026-09-03）
+    _cleanLegacyStripped(S.reports);  // 清掉舊版留下的空殼（2026-09-03 事故後）
   } catch(e){}
 }
 /* ── 兩層結構遷移（2026-08-12）──
@@ -1400,20 +1400,45 @@ function migrateCfgTwoLevel(){
  * 照片放在裡面沒有意義（雲端才是真相）。拿掉之後 5MB → 約 40KB。
  * 例外：**雲端這次沒推成功**（離線）時仍然把照片留在本機，
  *       否則那幾張照片會在重新整理之後消失 —— rescueLocalNewer 就是靠本機這份救回來的。 */
+/* ⚠️ 2026-09-03 事故修正：這一支只准清掉「原圖已經確定安全」的那幾張。
+ *
+ * 原本的寫法把**每一張**照片的 data 都清空並標記，開機再把標記過的整筆刪掉 ——
+ * 結果本機那份比雲端少照片，而本機 updatedAt 又比較新 → init() 保留本機 →
+ * 下次存檔就把「沒有照片」的版本推上雲。2026-08-30 雙橡園2279 的 2 張就是這樣沒的。
+ *
+ * 現在的規則：
+ *   · 有 thumb  → 原圖已經在 cdr_pm_photos 節點，本機清掉 data、**保留 thumb**
+ *                （畫面照樣顯示得出來，本機也不會比雲端少東西）
+ *   · 沒有 thumb → 舊照片，本機是它唯一的離線副本 → **原樣留著，一個字都不動**
+ */
 function _localCopy(data, cloudOk){
   if(!cloudOk) return data;                 // 沒推上雲 → 原樣留著（含照片）
   return Object.assign({}, data, {
     reports: (data.reports||[]).map(function(r){
       if(!r || !(r.photos||[]).length) return r;
-      /* 照片本體不進本機；保留「有幾張、是誰上傳的」這些小欄位，
-         畫面在雲端還沒同步回來之前才不會顯示成「這張沒有照片」。 */
       return Object.assign({}, r, {
         photos: r.photos.map(function(p){
-          return Object.assign({}, p, { data: '', _localStripped: true });
+          if(!p) return p;
+          if(!p.thumb) return p;            // 舊照片：原樣留著，絕對不動
+          return Object.assign({}, p, { data: '' });   // 有縮圖才敢清原圖
         })
       });
     })
   });
+}
+/* 🚨 保險絲（2026-09-03 事故後加）：
+ * 推上雲之前比對「這一筆在雲端有幾張照片」——本機比雲端少就**不要推那一筆**。
+ * 照片只會因為使用者主動刪除而變少，而刪除會走 delPhoto()，那裡會標記允許。
+ * 這是最後一道網：就算未來又有人寫出「本機照片被清掉」的 bug，也推不上雲。 */
+var _photoDeleteOk = {};                 // 報表 id -> 這一筆的照片是使用者自己刪的
+function markPhotoDelete(rid){ if(rid) _photoDeleteOk[rid] = true; }
+function _photoCountGuard(local, cloud){
+  if(!local || !cloud) return true;                       // 沒得比就放行
+  var lp = (local.photos||[]).length, cp = (cloud.photos||[]).length;
+  if(lp >= cp) return true;
+  if(_photoDeleteOk[local.id]) return true;               // 使用者自己刪的，放行
+  console.warn('擋下一次可能的照片遺失：' + local.id + ' 本機 ' + lp + ' 張 < 雲端 ' + cp + ' 張');
+  return false;
 }
 /* 存檔時把「這次新上傳的原圖」推到 cdr_pm_photos/{id}（2026-09-03）。
    推成功才從待推清單移除；失敗就留著，下次存檔再試。 */
@@ -1451,12 +1476,15 @@ function save() {
   }
   return { cloudOk, localOk };
 }
-/* 從本機讀回來的報表，照片是被抽掉的空殼（_localStripped）→ 雲端那份一定要贏。
-   沒有這一段的話，本機那份空殼會在合併時把雲端的照片洗掉。 */
-function _dropStrippedPhotos(list){
+/* 2026-09-03 事故後移除 _dropStrippedPhotos：
+   它會把「本機被抽掉內容的照片」整筆從陣列刪掉，導致本機比雲端少照片、
+   而本機又比較新 → 保留本機 → 下次存檔把沒照片的版本推上雲。
+   現在 _localCopy 只清有 thumb 的那幾張、而且保留該筆，所以不需要這一支了。
+   舊裝置的 localStorage 可能還留著 _localStripped 標記的空殼，開機時清乾淨： */
+function _cleanLegacyStripped(list){
   (list||[]).forEach(function(r){
     if(r && Array.isArray(r.photos))
-      r.photos = r.photos.filter(function(p){ return p && !p._localStripped; });
+      r.photos = r.photos.filter(function(p){ return p && !(p._localStripped && !p.thumb && !p.data); });
   });
   return list;
 }
@@ -1582,16 +1610,20 @@ async function pushCloud(data) {
     var me = (S.user && S.user.name) || '';
     var changed = reports.filter(function(r){ return r && r.id && _lastPushed[r.id] !== cur[r.id]; });
     for (var ci = 0; ci < changed.length; ci++) {
-      var r = changed[ci], toWrite = r;
+      var r = changed[ci], toWrite = r, cloud = null;
       if (window._cdrGet) {
         try {
-          var cloud = await window._cdrGet('reports/' + r.id);
+          cloud = await window._cdrGet('reports/' + r.id);
           if (cloud) {
             var base = _baselines[r.id] ? JSON.parse(_baselines[r.id]) : null;
             toWrite = mergeReport(r, cloud, me, base);
           }
         } catch(e) { /* 讀不到雲端就照原樣寫，至少不會擋住存檔 */ }
       }
+      /* 🚨 保險絲（2026-09-03 事故後）：這一筆的照片比雲端少就不要推。
+         2026-08-30 雙橡園2279 的 2 張就是被「本機少了照片的版本」蓋掉的。
+         使用者自己刪照片會走 delPhoto()／markPhotoDelete()，那種情況放行。 */
+      if (!_photoCountGuard(toWrite, cloud)) { continue; }
       jobs.push(window._cdrSet('reports/' + r.id, _noUndef(toWrite)));   // 合併後可能生出 undefined，送出前先清
       rememberBaseline(toWrite);   // 存完之後，基準就是「剛剛寫上去的那份」，下次才比得出我又改了什麼
     }

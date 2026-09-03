@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.10';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-03.11';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1281,7 +1281,7 @@ function load() {
     }
     if (d.user) S.user={...S.user,...d.user};
     if (d.projSort) S.projSort = d.projSort;
-    _dropStrippedPhotos(S.reports);   // 本機那份的照片是空殼，等雲端補回來（2026-09-03）
+    _cleanLegacyStripped(S.reports);  // 清掉舊版留下的空殼（2026-09-03 事故後）
   } catch(e){}
 }
 /* 2026-08-18 改：先推雲端，再寫本機（與 cdr-pm 同步）。
@@ -1292,6 +1292,27 @@ function load() {
  * localStorage 上限只有 5MB → 一裝滿，之後每次存檔本機都寫不進去。
  * localStorage 在這個 App 只是「離線快取 ＋ 雲端寫失敗時的救援來源」，照片放裡面沒有意義。
  * 例外：雲端這次沒推成功（離線）時仍把照片留在本機，否則重新整理就不見了。 */
+/* ⚠️ 2026-09-03 事故修正：只准清掉「原圖已經確定安全」的那幾張。
+ * 原本每一張都清空並標記、開機再把標記過的整筆刪掉 → 本機比雲端少照片，
+ * 而本機 updatedAt 又比較新 → 保留本機 → 下次存檔把「沒有照片」的版本推上雲。
+ * 專案管理的 2026-08-30 雙橡園2279 就是這樣掉了 2 張。
+ *
+ * 規則：有 thumb（原圖已在 cdr_v3_photos）才清 data 並保留該筆；
+ *       沒有 thumb 的（瑪摩目前全部都是）→ 原樣留著，一個字都不動。 */
+/* 🚨 保險絲（2026-09-03 事故後加）：
+ * 推上雲之前比對「這一筆在雲端有幾張照片」——本機比雲端少就**不要推那一筆**。
+ * 照片只會因為使用者主動刪除而變少，那時會呼叫 markPhotoDelete() 放行。
+ * 這是最後一道網：就算未來又有人寫出「本機照片被清掉」的 bug，也推不上雲。 */
+var _photoDeleteOk = {};
+function markPhotoDelete(rid){ if(rid) _photoDeleteOk[rid] = true; }
+function _photoCountGuard(local, cloud){
+  if(!local || !cloud) return true;
+  var lp = (local.photos||[]).length, cp = (cloud.photos||[]).length;
+  if(lp >= cp) return true;
+  if(_photoDeleteOk[local.id]) return true;
+  console.warn('擋下一次可能的照片遺失：' + local.id + ' 本機 ' + lp + ' 張 < 雲端 ' + cp + ' 張');
+  return false;
+}
 function _localCopy(data, cloudOk){
   if(!cloudOk) return data;
   return Object.assign({}, data, {
@@ -1299,7 +1320,9 @@ function _localCopy(data, cloudOk){
       if(!r || !(r.photos||[]).length) return r;
       return Object.assign({}, r, {
         photos: r.photos.map(function(p){
-          return Object.assign({}, p, { data: '', _localStripped: true });
+          if(!p) return p;
+          if(!p.thumb) return p;            // 本機是它唯一的離線副本 → 不動
+          return Object.assign({}, p, { data: '' });
         })
       });
     })
@@ -1320,11 +1343,12 @@ function save() {
   }
   return { cloudOk, localOk };
 }
-/* 從本機讀回來的照片是空殼 → 濾掉，等雲端補回來；不濾的話會在合併時洗掉雲端的照片 */
-function _dropStrippedPhotos(list){
+/* 2026-09-03 事故後移除 _dropStrippedPhotos（它會把照片整筆刪掉）。
+   舊裝置的 localStorage 可能還留著空殼，開機時清乾淨： */
+function _cleanLegacyStripped(list){
   (list||[]).forEach(function(r){
     if(r && Array.isArray(r.photos))
-      r.photos = r.photos.filter(function(p){ return p && !p._localStripped; });
+      r.photos = r.photos.filter(function(p){ return p && !(p._localStripped && !p.thumb && !p.data); });
   });
   return list;
 }
@@ -1370,9 +1394,17 @@ async function pushCloud(data) {
       return;
     }
     var jobs = [];
-    reports.forEach(function(r){
-      if(r && r.id && _lastPushed[r.id] !== cur[r.id]) jobs.push(window._cdrSet('reports/'+r.id, _noUndef(r)));   // 送出前先清 undefined
-    });
+    var changed = reports.filter(function(r){ return r && r.id && _lastPushed[r.id] !== cur[r.id]; });
+    for (var ci = 0; ci < changed.length; ci++) {
+      var r = changed[ci], cloud = null;
+      if (window._cdrGet) {
+        try { cloud = await window._cdrGet('reports/' + r.id); }
+        catch(e) { /* 讀不到就照原樣寫，至少不會擋住存檔 */ }
+      }
+      /* 🚨 這一筆的照片比雲端少就不要推（2026-09-03 事故後） */
+      if (!_photoCountGuard(r, cloud)) { continue; }
+      jobs.push(window._cdrSet('reports/'+r.id, _noUndef(r)));   // 送出前先清 undefined
+    }
     dels.forEach(function(id){ jobs.push(window._cdrRemove('reports/'+id)); });
     jobs.push(window._cdrSet('cfg', data.cfg));
     jobs.push(window._cdrSet('projSort', data.projSort || null));
