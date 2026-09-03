@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.13';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.14';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -614,7 +614,11 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <!-- 操作列 -->
   <div class="card no-print">
     <div class="card-body flex-b" style="padding:12px 16px">
-      <button class="btn btn-o btn-sm" onclick="clearForm()">🗑️ 清除表單</button>
+      <div class="flex gap2">
+        <button class="btn btn-o btn-sm" onclick="clearForm()">🗑️ 清除表單</button>
+        <!-- 2026-09-03：誤按清除的救命鈕，平常隱藏，清除後才出現 -->
+        <button class="btn btn-p btn-sm" id="undo-clear-btn" style="display:none" onclick="undoClearForm()">↩ 復原清除</button>
+      </div>
       <div class="flex gap2">
         <button class="btn btn-xl btn-sm" onclick="exportExcel()">📊 匯出 Excel</button>
         <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 列印 PDF</button>
@@ -707,7 +711,6 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   <div class="card cal-wrap">
     <div class="card-header">
       <span class="card-title">日曆檢視<span id="cal-proj-tag" style="font-weight:400;color:var(--muted);font-size:13px;margin-left:8px"></span></span>
-      <button class="btn btn-o btn-sm" onclick="calGoToday()">回到本月</button>
     </div>
     <div class="card-body">
       <!-- 案場先選（2026-09-03 用戶指定）：「在日期表出現以前，先出現案場」。
@@ -729,10 +732,13 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <!-- 還沒選案場時，月曆整段不畫（她要的步驟：先案場 → 再日期） -->
       <div id="cal-need-proj" class="cal-empty" style="display:none">請先在上方選擇案場，才會出現日期</div>
       <div id="cal-body">
+      <!-- 2026-09-03 她指定：「回到本月」從卡片右上角移到「下個月」旁邊，
+           三顆翻月的鈕放在一起比較好按。 -->
       <div class="cal-bar">
         <button class="btn btn-o btn-sm" onclick="calShift(-1)">‹ 上個月</button>
         <span class="cal-title" id="cal-title">—</span>
         <button class="btn btn-o btn-sm" onclick="calShift(1)">下個月 ›</button>
+        <button class="btn btn-o btn-sm" onclick="calGoToday()">回到本月</button>
       </div>
       <!-- 圖例上下各一份（2026-08-28 用戶指定）：月曆一長，只放下面要捲動才看得到 -->
       <div class="cal-legend cal-legend-top">
@@ -1059,6 +1065,22 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
   </div>
 </div>
 
+<!-- 適用品項（2026-09-03 她指定：先建全域清單，再依案場勾選）-->
+<div id="scope-overlay" class="overlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title" id="scope-title">適用品項</div>
+    <div class="flex gap2" style="justify-content:flex-end;margin-bottom:10px">
+      <button class="btn btn-o btn-sm" onclick="scopeSelectAll(true)">全部勾選</button>
+      <button class="btn btn-o btn-sm" onclick="scopeSelectAll(false)">全部取消</button>
+    </div>
+    <div id="scope-body" style="max-height:52vh;overflow-y:auto"></div>
+    <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap;margin-top:16px">
+      <button class="btn btn-o" onclick="closeScopeModal()">取消</button>
+      <button class="btn btn-p" onclick="saveScope()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
 <div id="proj-overlay" class="overlay">
   <div class="modal">
     <div class="modal-title" id="pm-title">新增案場</div>
@@ -1155,6 +1177,10 @@ const S = {
     matNames: [],
     matUnits: [],
     matUnitMap: {},      // { 材料名稱: 預設單位 }（2026-09-03 A 案，改回 09-02.2 的做法）
+    /* 案場 → 這個案場適用哪些品項（2026-09-03）。
+       { <案場id>: { locs:[...], vendors:[...], mats:[...] } }
+       某一組是空的或不存在 ＝ 那一組全部可用（向下相容） */
+    scopeByProj: {},
     users: []
   },
   user: { name:'', dept:'', role:'reporter' },
@@ -1275,12 +1301,55 @@ function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&
  * 補完會標記，讓呼叫端接著推一次雲端。 */
 var _rescuedCount = 0;
 var _skippedMerged = 0;
+var _skippedDeleted = 0;   // 因為有刪除墓碑而不補傳的筆數（2026-09-03）
+/* ── 刪除墓碑（2026-09-03）────────────────────────────────────────
+ * 她回報「剛刪掉的報表又跑回來」。原因是刪除沒有留下記錄，
+ * 別台裝置（或同一台的另一個瀏覽器）本機還留著那筆 → 救援機制當成「沒存成功」補回雲端。
+ * 現在刪除會在 cdr_pm/deleted/{id} 留一筆時間戳，跨裝置都看得到，救援機制就會跳過。
+ * ⚠️ 墓碑刻意不做過期清理：誤刪要救回來（從備份）的成本，遠低於「刪不掉、一直復活」。 */
+var _tombstones = {};        // id -> 刪除時間（從雲端讀回來的）
+/* ⚠️ 墓碑不能殺掉「後來重新建立的同一個 id」。
+ * 一報表一案場之後 id 是「案場＋日期」算出來的固定值（rpt_p1_20260903），
+ * 所以刪掉今天那張、明天又有人建同案場同日的 → id 會一模一樣。
+ * 判斷加上時間：報表的 createdAt 比墓碑還新 → 那是新建的，墓碑不算數。 */
+function isDeleted(id, r){
+  var t = id && _tombstones[id];
+  if(!t) return false;
+  if(r){
+    var made = Date.parse(r.createdAt || '') || 0;
+    if(made > t) return false;              // 墓碑之後才建的 → 是新的一張
+  }
+  return true;
+}
+/* 使用者自己又把同一個 id 建回來（同案場同日）→ 墓碑要拿掉，否則它會一直被清掉 */
+function clearTombstone(id){
+  if(!id || !_tombstones[id]) return;
+  delete _tombstones[id];
+  try { if(window._cdrRemove) window._cdrRemove('deleted/' + id); } catch(e){}
+  console.warn('[同步] 同一個報表 id 被重新建立 → 移除刪除墓碑：' + id);
+}
+function markReportDeleted(id){
+  if(!id) return;
+  _tombstones[id] = Date.now();
+  try { if(window._cdrSet) window._cdrSet('deleted/' + id, _tombstones[id]); } catch(e){}
+}
+/* 把有墓碑的報表從陣列裡清掉（本機殘留、或別台補上來的都算） */
+function dropDeleted(list){
+  if(!Array.isArray(list)) return list;
+  var before = list.length;
+  var kept = list.filter(function(r){ return !(r && isDeleted(r.id, r)); });
+  if(kept.length !== before)
+    console.warn('[同步] 清掉 ' + (before - kept.length) + ' 筆已刪除的報表（雲端有墓碑）');
+  return kept;
+}
 function rescueLocalNewer(localReports){
-  _rescuedCount = 0; _skippedMerged = 0;
+  _rescuedCount = 0; _skippedMerged = 0; _skippedDeleted = 0;
   if(!Array.isArray(localReports) || !localReports.length) return 0;
   var cloudIds = new Set((S.reports||[]).map(function(r){ return r && r.id; }).filter(Boolean));
   localReports.forEach(function(lr){
     if(!lr || !lr.id || cloudIds.has(lr.id)) return;
+    /* 2026-09-03：這一筆是被刻意刪掉的 → 絕對不要補回雲端 */
+    if(isDeleted(lr.id, lr)){ _skippedDeleted++; return; }
     /* 2026-09-02 加的防呆：雲端已經有「同案場＋同一天」的報表 →
        本機這筆多半是被合併掉或在別台被刪掉的舊版本，補回去只會讓重複復活。
        真正「存檔沒成功」的情況雲端不會有那一天那個案場的報表，所以照樣救得到。 */
@@ -1294,6 +1363,8 @@ function rescueLocalNewer(localReports){
   });
   if(_skippedMerged) console.warn('[同步] 本機有 ' + _skippedMerged
     + ' 筆舊報表，雲端同案場同日已經有一張（多半是被合併或刪掉了）→ 不補傳');
+  if(_skippedDeleted) console.warn('[同步] 本機有 ' + _skippedDeleted
+    + ' 筆報表已經被刻意刪除（雲端有墓碑）→ 不補傳');
   return _rescuedCount;
 }
 
@@ -2008,6 +2079,33 @@ function checkLegacyProj(){
   }
 }
 /* 換案場：同部門＋同一天＋同案場才算同一張，所以案場一改就要重新判斷 */
+/* 換案場 → 適用品項可能不一樣，下拉的**選項**要換掉（2026-09-03）。
+ * ⚠️ 刻意「只換選項、保留已選的值」，不整張重建 ——
+ *    重建會把填一半的狀態（第二層的施工項目、剛打的數字）弄掉，
+ *    煙霧測試也立刻抓到（改掉施作位置後施工項目殘留）。
+ * 已經選好的值即使不在新清單裡也保留（selOpts 會把它接在最前面），
+ * 否則換個案場就把人家填好的東西清空了。 */
+function refreshScopedSelects(){
+  var locs = scopedLocs(), vendors = scopedVendors(), mats = scopedMatNames();
+  var swap = function(sel, list, ph){
+    if(!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = selOpts(list, cur, ph);
+    sel.value = cur;                      // 不在清單裡的話 selOpts 已經補上，設得回去
+  };
+  ($('tbody') ? [].slice.call($('tbody').querySelectorAll('tr')) : []).forEach(function(tr){
+    swap(tr.querySelector('[data-f="loc"]'),     locs,    '施作位置...');
+    swap(tr.querySelector('[data-f="vendor"]'),  vendors, '廠商...');
+    swap(tr.querySelector('[data-f="vendor2"]'), vendors, '廠商...');
+  });
+  ($('mat-tbody') ? [].slice.call($('mat-tbody').querySelectorAll('tr')) : []).forEach(function(tr){
+    var sel = tr.querySelector('[data-f="mname"]');
+    if(!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = matNameOpts(cur);
+    sel.value = cur;
+  });
+}
 function onProjChange(){
   const sel = $('f-proj');
   // 沒走正規流程就不給選案場 —— 選了等於直接開始一張新的日報表（2026-08-26 用戶指定）
@@ -2016,6 +2114,7 @@ function onProjChange(){
     S.report.projId = sel ? (sel.value||'') : '';
     S.report.projName = (sel && sel.value) ? (sel.selectedOptions[0]?.text || '') : '';
   }
+  refreshScopedSelects();   // 換案場 → 適用品項可能不一樣，下拉要重畫（2026-09-03）
   // 不清「已決定過」記號：記號本身已含案場，換案場就是新的一組，換回來代表已經決定過了
   checkDeptDateDuplicate();
   buildSummary();
@@ -2479,6 +2578,8 @@ function newReport(seedDate) {
 }
 /* 真正建立空白報表（帶入視窗的三個出口都會走這裡） */
 function _startNewReport(){
+  /* 開新的一張 → 上一次清除的快照失效，不然按復原會把別張的內容蓋上來（2026-09-03） */
+  _clearedSnapshot = null; applyUndoClearUI();
   _reportStarted = true;
   _editingLegacy = false;            // 新建的一定走固定鍵
   const newR = blankReport();
@@ -2582,6 +2683,7 @@ function saveReport() {
     if (_exist) { S.report = mergeIntoKeyed(_exist, S.report); _merged = true; }
     else { S.report.id = _key; }
   }
+  clearTombstone(S.report.id);   // 使用者又把同一個 id 建回來了 → 墓碑失效（2026-09-03）
   const _sid = stampSubmission(S.report);
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
@@ -2593,6 +2695,7 @@ function saveReport() {
   else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
+  _clearedSnapshot = null; applyUndoClearUI();   // 換到別張 → 舊快照失效（2026-09-03）
   _reportStarted = true;             // 開既有的一張（歷史資料／加入共編）也算走過流程
   /* 舊報表（不是「案場＋日期」鍵的）維持原本的 id，存檔時不改鍵 ——
      用戶 2026-09-02 指定「舊資料不用特別理會」。 */
@@ -2620,14 +2723,43 @@ function openReportFromHistory(id, from){
 }
 var _backTo = 'history';   /* 報表是從歷史資料還是從日曆點進來的 */
 function backToHistory(){ goPage(_backTo==='cal' ? 'cal' : 'history'); }
+/* ── 清除表單（2026-09-03 她拍板）────────────────────────────────
+ * A. 確認文字要講清楚後果：清的是「畫面上這張」，已存檔的不受影響
+ * B. 加「↩ 復原清除」—— 誤按之後，關掉分頁前都救得回來
+ *
+ * 為什麼需要復原：清除本身不動雲端，但**清除後如果沒發現、繼續填同案場同日再存檔**，
+ * 存檔的合併規則只保留「我這台的列 ＋ 別人的列」→ 我自己原本那幾列會被當成刪掉。
+ * 復原鈕就是把那條路切斷。
+ */
+var _clearedSnapshot = null;      // 清除前的整張報表（只留最後一次，她指定）
 function clearForm() {
-  if (!confirm('確定清除目前表單？')) return;
+  if (!confirm('確定要清除表單嗎？\n\n這將清空畫面上這張表單的所有明細（施工明細、材料、備註、照片）。\n先前已存檔的日報表不受影響。\n\n清除後可以按「↩ 復原清除」救回來。')) return;
+  /* 先拍一張快照再清 —— 復原就是把它放回去 */
+  try { _clearedSnapshot = JSON.parse(JSON.stringify(S.report)); } catch(e){ _clearedSnapshot = null; }
   S.report = blankReport();
   S.report.dept = S.user.dept;
   S.report.reporter = S.user.name;
   rememberBaseline(S.report);
   renderReport();
   applyPermissions();
+  applyUndoClearUI();
+  toast('已清除表單。按「↩ 復原清除」可以救回來','');
+}
+function undoClearForm() {
+  if (!_clearedSnapshot) { toast('沒有可以復原的內容','e'); return; }
+  S.report = _clearedSnapshot;
+  _clearedSnapshot = null;        // 只留最後一次（她指定）
+  _reportStarted = true;          // 復原回來的是一張正在填的報表，欄位要解鎖
+  rememberBaseline(S.report);
+  renderReport();
+  applyPermissions();
+  applyUndoClearUI();
+  toast('已復原清除前的內容','s');
+}
+/* 有東西可以復原時才顯示那顆鈕 */
+function applyUndoClearUI(){
+  var b = $('undo-clear-btn');
+  if (b) b.style.display = _clearedSnapshot ? '' : 'none';
 }
 
 /* ── WORK TABLE ── */
@@ -2651,12 +2783,12 @@ function addRow(it) {
   if(!mine) tr.classList.add('row-locked');
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
-    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.locs,loc0,'施作位置...')}</select></td>
+    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)"${dis}>${selOpts(scopedLocs(),loc0,'施作位置...')}</select></td>
     <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)"${dis}>${selOpts(worksOf(loc0),v('work'),'施工項目...')}</select></td>
-    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.vendors,vd0,'廠商...')}</select></td>
+    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)"${dis}>${selOpts(scopedVendors(),vd0,'廠商...')}</select></td>
     <td data-label="今日施工人員"><select class="cs" data-f="staff" onchange="syncReport()"${dis}>${selOpts(staffOf(vd0),v('staff'),'施工人員...')}</select></td>
     <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
-    <td data-label="明日廠商"><select class="cs" data-f="vendor2" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.vendors,vd1,'廠商...')}</select></td>
+    <td data-label="明日廠商"><select class="cs" data-f="vendor2" onchange="onRowChange(this)"${dis}>${selOpts(scopedVendors(),vd1,'廠商...')}</select></td>
     <td data-label="明日施工人員"><select class="cs" data-f="staff2" onchange="syncReport()"${dis}>${selOpts(staffOf(vd1),v('staff2'),'施工人員...')}</select></td>
     <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
     <td data-label="完成進度%">
@@ -2973,8 +3105,52 @@ function addMatRow(m) {
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
+/* ══════ 依案場圈選品項（2026-09-03 她拍板：只勾第一層）══════
+ * 全域清單是唯一真相，這裡只是篩子。三組：locs（施作位置）／vendors（廠商）／mats（材料名稱）。
+ * 沒勾＝全部可用，所以還沒設定的案場行為與改版前完全相同。 */
+var SCOPE_KINDS = [
+  { key:'locs',    label:'📍 施作位置', cfgKey:'locs',     icon:'📍' },
+  { key:'vendors', label:'🏭 廠商',     cfgKey:'vendors',  icon:'🏭' },
+  { key:'mats',    label:'📦 材料名稱', cfgKey:'matNames', icon:'📦' },
+];
+function projScope(projId){
+  var m = S.cfg.scopeByProj || {};
+  return (projId && m[projId]) || null;
+}
+function isScoped(projId, kind){
+  var sc = projScope(projId);
+  return !!(sc && Array.isArray(sc[kind]) && sc[kind].length);
+}
+/* 這個案場在這一組可以用哪些項目。
+ * 沒勾 → 全域清單原樣回傳。
+ * 有勾 → 勾選的那幾個，**再加上「這張報表已經用過的」**
+ *        （否則打開舊報表會看到空白下拉，像壞掉）。 */
+function scopedList(kind, cfgKey, projId, usedValues){
+  var all = S.cfg[cfgKey] || [];
+  if(!isScoped(projId, kind)) return all;
+  var pick = projScope(projId)[kind];
+  var set = new Set(pick);
+  (usedValues || []).forEach(function(v){ if(v) set.add(v); });
+  /* 順序照全域清單走，才不會每個案場的下拉順序都不一樣 */
+  var out = all.filter(function(v){ return set.has(v); });
+  /* 全域清單裡已經沒有、但報表用過的（被刪掉的舊項目）→ 接在最後，不要讓它消失 */
+  set.forEach(function(v){ if(all.indexOf(v) < 0) out.push(v); });
+  return out;
+}
+/* 目前這張報表用過的值（給上面那支當「不能消失的名單」） */
+function usedInReport(field){
+  var out = [];
+  ((S.report && S.report.workItems) || []).forEach(function(w){ if(w && w[field]) out.push(w[field]); });
+  if(field === 'name') ((S.report && S.report.materials) || []).forEach(function(m){ if(m && m.name) out.push(m.name); });
+  return out;
+}
+function scopedLocs(){   return scopedList('locs',    'locs',     curProjId(), usedInReport('loc')); }
+function scopedVendors(){ var u = usedInReport('vendor').concat(usedInReport('vendor2'));
+                          return scopedList('vendors', 'vendors',  curProjId(), u); }
+function scopedMatNames(){ return scopedList('mats',    'matNames', curProjId(), usedInReport('name')); }
+function curProjId(){ var sel = $('f-proj'); return (sel && sel.value) || (S.report && S.report.projId) || ''; }
 function matNameOpts(cur) {
-  const list = S.cfg.matNames||[];
+  const list = scopedMatNames();
   const extra = cur&&!list.includes(cur)?[cur]:[];
   return `<option value="">— 選擇材料 —</option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
@@ -3693,8 +3869,10 @@ function deleteReport(id){
   if(appLockGuard())return;
   if(!requireDelete())return;
   if(!confirm('確定刪除這筆報表？'))return;
+  markReportDeleted(id);            // 先立墓碑，別台才不會又把它補回來（2026-09-03）
   S.reports=S.reports.filter(r=>r.id!==id);
   save(); renderHistory();
+  toast('已刪除','s');
 }
 function exportAll(){
   const blob=new Blob([JSON.stringify({reports:S.reports,cfg:S.cfg},null,2)],{type:'application/json'});
@@ -4593,6 +4771,7 @@ function saveSettings(){
   delete S.cfg.unitsByMat;   // 兩層那份不再使用，也不要留在雲端誤導下一個人
 
   tlCleanup();   // 施作位置／廠商那兩組在編輯當下已寫進 S.cfg，這裡只清空白
+  pruneScopeAll();   // 全域清單裡已經沒有的品項，各案場的勾選一起清掉（2026-09-03）
   save(); toast('設定已儲存','s');
   // Refresh form dropdowns
   if(S.page==='report') renderReport();
@@ -4739,11 +4918,88 @@ function renderProjTable(){
       <td>${escHtml(p.name)}</td>
       <td style="color:var(--muted);font-size:12px">${escHtml(p.note||'')}</td>
       <td class="no-print">
+        <button class="btn btn-o btn-sm" data-mng onclick="openScopeModal('${p.id}')" title="設定這個案場用得到哪些施作位置／廠商／材料">⚙️ 適用品項${scopeBadge(p.id)}</button>
         <button class="btn btn-o btn-sm" data-mng onclick="openProjModal('${p.id}')">編輯</button>
         ${locked?'<span style="font-size:11px;color:var(--warning);margin-left:4px">🔒 使用中</span>':(portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`:'')}
       </td>`;
     tbody.appendChild(tr);
   });
+}
+/* ── 適用品項的勾選視窗（2026-09-03）── */
+function scopeBadge(projId){
+  var sc = projScope(projId);
+  if(!sc) return '';
+  var n = SCOPE_KINDS.reduce(function(s,k){ return s + ((sc[k.key]||[]).length ? 1 : 0); }, 0);
+  return n ? ' <span style="font-size:10px;background:var(--primary);color:#fff;border-radius:8px;padding:0 5px">'+n+'</span>' : '';
+}
+/* 全域清單裡已經不存在的品項 → 從每個案場的勾選裡移除，不留孤兒 */
+function pruneScopeAll(){
+  var m = S.cfg.scopeByProj; if(!m) return;
+  Object.keys(m).forEach(function(pid){
+    SCOPE_KINDS.forEach(function(k){
+      var all = S.cfg[k.cfgKey] || [];
+      var arr = m[pid] && m[pid][k.key];
+      if(Array.isArray(arr)) m[pid][k.key] = arr.filter(function(v){ return all.indexOf(v) >= 0; });
+    });
+    var any = SCOPE_KINDS.some(function(k){ return ((m[pid]||{})[k.key]||[]).length; });
+    if(!any) delete m[pid];        // 全空 → 回到「全部可用」
+  });
+}
+var _scopeProjId = '';
+function openScopeModal(projId){
+  if(mngGuard())return;
+  _scopeProjId = projId;
+  var p = (S.cfg.projects||[]).find(function(x){ return x && x.id===projId; }) || {};
+  $('scope-title').textContent = (p.name||'') + ' · 適用品項';
+  var sc = projScope(projId) || {};
+  $('scope-body').innerHTML = SCOPE_KINDS.map(function(k){
+    var all = S.cfg[k.cfgKey] || [];
+    var picked = new Set(sc[k.key]||[]);
+    var allOn = !picked.size;      // 沒勾＝全部可用
+    return '<div class="fg" style="margin-bottom:14px">'
+      + '<div class="flex-b mb2"><label class="fl" style="margin:0">'+k.label+'</label>'
+      +   '<span style="font-size:11.5px;color:var(--muted)">'
+      +     (allOn ? '目前：全部可用' : ('目前：勾了 '+picked.size+' / '+all.length))
+      +   '</span></div>'
+      + (all.length
+          ? '<div class="list-field" data-scope="'+k.key+'">'
+            + all.map(function(v){
+                return '<label class="list-row" style="cursor:pointer;gap:8px">'
+                  + '<input type="checkbox" value="'+escHtml(v)+'"'+(picked.has(v)?' checked':'')+'>'
+                  + '<span style="flex:1;min-width:0;overflow-wrap:anywhere">'+escHtml(v)+'</span></label>';
+              }).join('')
+            + '</div>'
+          : '<div class="tl-empty">全域清單裡還沒有'+k.label.replace(/^\S+\s*/,'')+'</div>')
+      + '</div>';
+  }).join('')
+    + '<div class="tl-hint">一個都不勾＝<b>這一組全部可用</b>（跟改版前一樣）。'
+    + '第二層（施工項目／施工人員／單位）跟著第一層走，勾了「基座」就連它底下的施工項目一起帶。<br>'
+    + '已經被日報表用過的品項，即使沒勾也還是會出現在下拉裡，舊報表才不會壞掉。</div>';
+  $('scope-overlay').classList.add('show');
+}
+function closeScopeModal(){ $('scope-overlay').classList.remove('show'); }
+function scopeSelectAll(on){
+  $('scope-body').querySelectorAll('input[type=checkbox]').forEach(function(c){ c.checked = !!on; });
+}
+function saveScope(){
+  if(mngGuard())return;
+  if(!S.cfg.scopeByProj) S.cfg.scopeByProj = {};
+  var out = {};
+  SCOPE_KINDS.forEach(function(k){
+    var host = $('scope-body').querySelector('[data-scope="'+k.key+'"]');
+    if(!host) { out[k.key] = []; return; }
+    out[k.key] = [...host.querySelectorAll('input[type=checkbox]')]
+      .filter(function(c){ return c.checked; }).map(function(c){ return c.value; });
+  });
+  /* 三組都空 → 整筆刪掉，回到「全部可用」，不要在雲端留一堆空物件 */
+  var any = SCOPE_KINDS.some(function(k){ return (out[k.key]||[]).length; });
+  if(any) S.cfg.scopeByProj[_scopeProjId] = out;
+  else delete S.cfg.scopeByProj[_scopeProjId];
+  save();
+  closeScopeModal();
+  renderProjTable();
+  if(S.page==='report') refreshScopedSelects();
+  toast('已儲存這個案場的適用品項','s');
 }
 function openProjModal(id){
   if(mngGuard())return;
@@ -4980,7 +5236,12 @@ function init(){
       root = root || {};
       var localData = JSON.parse(localStorage.getItem('cdr_pm')||'{}');
       // 新格式 cdr_pm/reports/{id} 優先；沒有才吃舊格式 cdr_pm/all（整包），並在下面自動遷移
-      var newReports = root.reports ? Object.values(root.reports) : null;
+      /* 先把墓碑收下來（2026-09-03）：後面判斷「要不要補傳／要不要顯示」都靠它 */
+      _tombstones = (root.deleted && typeof root.deleted === 'object') ? root.deleted : {};
+      S.reports = dropDeleted(S.reports);       // 本機殘留的已刪報表先清掉
+      var newReports = root.reports ? Object.values(root.reports).filter(function(r){
+        return !(r && isDeleted(r.id, r));         // 雲端萬一還留著（別台舊版補上去的）也濾掉
+      }) : null;
       var cloud = null, fromLegacy = false;
       if(newReports && newReports.length){
         cloud = { reports:newReports, cfg:root.cfg, projSort:root.projSort, updatedAt:root.updatedAt || 0 };
