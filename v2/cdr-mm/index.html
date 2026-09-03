@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.11';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-03.12';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1277,7 +1277,9 @@ function load() {
         if (!(S.cfg.matNames||[]).includes(k)) delete S.cfg.matUnitMap[k];
       });
       if (!S.cfg.matUnits || !S.cfg.matUnits.length) S.cfg.matUnits=['片','支','桶','包','箱','才','m','m²','公斤','公升'];
-      if (!S.cfg.depts?.length) S.cfg.depts=['專案管理部','工程部','景觀部','監造部'];
+      /* 2026-09-03：種子拿掉「工程部／景觀部／監造部」—— 公司沒有這三個部門，
+         它們只會在全新裝置、雲端還沒回來時出現在畫面上，造成誤會。 */
+      if (!S.cfg.depts?.length) S.cfg.depts=['專案管理部'];
     }
     if (d.user) S.user={...S.user,...d.user};
     if (d.projSort) S.projSort = d.projSort;

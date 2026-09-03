@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.7';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-09-03.12';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -832,12 +832,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+/* 🚨 雲端閘門（2026-09-03）：**雲端還沒回覆之前，一律不准寫回雲端。**
+ * 全新裝置（例如從 LINE 改用外部瀏覽器開）本機是空的 → 程式會先鋪種子資料。
+ * 這時候只要有任何動作觸發存檔，種子就會把雲端真正的部門／員工／角色蓋掉。
+ * 這是 2026-07-21 資料遺失事故的同一種形狀，一定要有閘門。 */
+const _cloudSeen = {};                 // path -> 這個節點的雲端資料已經回來過
+const _pendingWrites = {};             // path -> 閘門開之前最後一次想寫的內容
 window._fbSet = async (path, data) => {
+  if (!_cloudSeen[path]) {
+    /* 還沒看過雲端 → 先記著，等雲端回來後再寫（避免用本機種子覆蓋雲端） */
+    _pendingWrites[path] = data;
+    console.warn('[閘門] ' + path + ' 的雲端資料還沒回來，暫不寫入');
+    setSync('', '連線中…');
+    return;
+  }
   try { await set(ref(db, 'portal/'+path), data); setSync('ok','已同步'); }
   catch(e){ console.error(e); setSync('err','同步失敗'); }
 };
 window._fbWatch = (path, cb) => {
-  onValue(ref(db, 'portal/'+path), snap => cb(snap.val()), err => { console.error(err); setSync('err','讀取失敗'); });
+  onValue(ref(db, 'portal/'+path), snap => {
+    _cloudSeen[path] = true;           // 這個節點的雲端資料到手了 → 閘門打開
+    cb(snap.val());
+    /* 閘門開之前被擋下來的那一次寫入：等使用者下一個動作再寫就好，
+       這裡刻意不自動補寫 —— 那一份很可能就是種子資料。 */
+    if (_pendingWrites[path]) { delete _pendingWrites[path]; }
+  }, err => { console.error(err); setSync('err','讀取失敗'); });
 };
 // 通知專用：寫入個別通知（子 App 也透過這個函式 — 直接呼叫 Firebase 即可）
 window._fbSetChild = async (path, key, data) => {
@@ -894,9 +913,9 @@ const SEED_DEPTS = [
   { id:'d1', code:'D001', name:'瑪摩石工程事業處', note:'總公司 / 事業處層級' },
   { id:'d2', code:'D002', name:'專案管理部', note:'專案統籌、客戶對接' },
   { id:'d3', code:'D003', name:'規劃設計部', note:'圖面規劃、設計繪製' },
-  { id:'d4', code:'D004', name:'工程部', note:'現場施工管理' },
-  { id:'d5', code:'D005', name:'景觀部', note:'景觀工程' },
-  { id:'d6', code:'D006', name:'監造部', note:'品質監造' },
+  /* 2026-09-03 拿掉「工程部／景觀部／監造部」——
+     公司實際上沒有這三個部門，它們只是最早的範例資料，
+     卻會在全新裝置第一次開啟時出現在畫面上（她手機用外部瀏覽器開就看到了）。 */
 ];
 // 業務規則：屬於以下部門的員工，新增/編輯時預設權限角色為「系統管理員」
 const FULL_ACCESS_DEPTS = ['總經理室'];

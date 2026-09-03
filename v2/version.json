@@ -1,11 +1,12 @@
 {
-  "version": "2026-09-03.11",
+  "version": "2026-09-03.12",
   "updated": "2026-09-03",
   "critical": [
     "dtp",
     "dtp_pm",
     "cdr",
-    "cdr_pm"
+    "cdr_pm",
+    "portal"
   ],
   "note": "v2（5 App 版）自己的公告板 — 與根目錄 version.json 完全獨立，兩套各自跳各自的更新橫幅。各 App 開機時抓 ../version.json 比對自己的 APP_VERSION，不一致就跳「系統已更新」橫幅。critical 陣列裡列到的 App 會跳紅色「重要更新」橫幅且不給關閉——只有改到「資料怎麼寫進 Firebase」的更新才列進去；純畫面／文字／單頁修正不要列。paths 欄位給 000_Agent/scripts/check-version.js 用（有 paths 就照它檢查，沒有就用內建的 4 支舊版路徑）。",
   "paths": {
@@ -17,8 +18,8 @@
     "sop": "sop/index.html"
   },
   "apps": {
-    "portal": "2026-09-03.7",
-    "cdr": "2026-09-03.11",
+    "portal": "2026-09-03.12",
+    "cdr": "2026-09-03.12",
     "cdr_pm": "2026-09-03.11",
     "dtp": "2026-09-03.1",
     "dtp_pm": "2026-09-03.1",
