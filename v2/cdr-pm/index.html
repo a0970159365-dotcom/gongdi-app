@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.14';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.15';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -150,6 +150,10 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .carry-cal .cal-empty{padding:14px;font-size:12px}
 .cal-empty{padding:20px;text-align:center;color:var(--muted);background:var(--bg);border-radius:8px;font-size:13px}
 .cal-proj-row{margin-bottom:14px}
+/* 案場清單的狀態徽章（2026-09-03） */
+.proj-st{display:inline-block;font-size:11px;font-weight:700;border-radius:9px;padding:1px 8px;white-space:nowrap}
+.proj-st.used{background:#fef3c7;border:1px solid var(--warning);color:#92400e}
+.proj-st.free{background:var(--bg);border:1px solid var(--border);color:var(--muted)}
 .carry-noneS{background:#fef3c7;border:1.5px solid var(--warning);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e;text-align:center}
 .carry-noneS-sub{font-weight:400;font-size:12px;margin-top:4px;color:#92400e}
 @media(max-width:560px){.cal-cell{min-height:34px;font-size:13px}.cal-n{font-size:9px}}
@@ -944,9 +948,11 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
               <table class="stbl">
                 <thead><tr>
                   <th style="width:36px;text-align:center">#</th>
-                  <th>案場名稱</th>
+                  <!-- 2026-09-03 她指定：名稱縮窄、多一個「狀態」欄放在說明旁邊 -->
+                  <th style="width:160px">案場名稱</th>
                   <th>說明</th>
-                  <th class="no-print" style="width:90px">操作</th>
+                  <th class="no-print" style="width:132px">狀態</th>
+                  <th class="no-print" style="width:150px">操作</th>
                 </tr></thead>
                 <tbody id="proj-tbody"></tbody>
               </table>
@@ -4914,13 +4920,21 @@ function renderProjTable(){
   sorted.forEach((p,i)=>{
     const locked=isProjLocked(p.id);
     const tr=document.createElement('tr');
+    /* 狀態欄（2026-09-03 她指定）：「🔒 使用中／未使用」＋「編輯」都放這裡；
+       「操作」欄留給「⚙️ 適用品項」與「刪除」。
+       「使用中」＝已經有日報表用到這個案場 → 不給刪，只能改名。 */
     tr.innerHTML=`<td style="text-align:center">${i+1}</td>
-      <td>${escHtml(p.name)}</td>
-      <td style="color:var(--muted);font-size:12px">${escHtml(p.note||'')}</td>
-      <td class="no-print">
+      <td style="overflow-wrap:anywhere">${escHtml(p.name)}</td>
+      <td style="color:var(--muted);font-size:12px;overflow-wrap:anywhere">${escHtml(p.note||'')}</td>
+      <td class="no-print" style="white-space:nowrap">
+        ${locked
+          ? '<span class="proj-st used" title="已經有日報表用到這個案場，不能刪除">🔒 使用中</span>'
+          : '<span class="proj-st free" title="還沒有日報表用到它，可以刪除">未使用</span>'}
+        <button class="btn btn-o btn-sm" data-mng style="margin-left:6px" onclick="openProjModal('${p.id}')">編輯</button>
+      </td>
+      <td class="no-print" style="white-space:nowrap">
         <button class="btn btn-o btn-sm" data-mng onclick="openScopeModal('${p.id}')" title="設定這個案場用得到哪些施作位置／廠商／材料">⚙️ 適用品項${scopeBadge(p.id)}</button>
-        <button class="btn btn-o btn-sm" data-mng onclick="openProjModal('${p.id}')">編輯</button>
-        ${locked?'<span style="font-size:11px;color:var(--warning);margin-left:4px">🔒 使用中</span>':(portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`:'')}
+        ${locked ? '' : (portalCanDelete()?`<button class="btn btn-d btn-sm" onclick="deleteProj('${p.id}')">刪除</button>`:'')}
       </td>`;
     tbody.appendChild(tr);
   });
