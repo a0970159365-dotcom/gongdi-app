@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.15';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.16';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1911,6 +1911,70 @@ function inScope(report, level){
   if (level === 'cross') return report.dept===u.dept || (u.crossDepts||[]).includes(report.dept);
   return report.dept===u.dept;
 }
+/* ── 部門可見範圍的提醒（2026-09-03 她指定）────────────────────────
+ * 回傳這個部門「誰看得到」：
+ *   all   —— level=all 的人（管理層，永遠看得到）
+ *   field —— 其他角色（現場同仁）裡看得到的人
+ * field 是空的 → 這個部門的報表現場同仁一個都看不到，要提醒。 */
+function deptViewers(dept){
+  var d = String(dept||'').trim();
+  var out = { all: [], field: [], dept: d };
+  if(!d) return out;
+  try{
+    var p = JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var roles = p.roles || [], emps = p.employees || [];
+    var roleOf = function(id){ return roles.find(function(r){ return r && r.id===id; }) || null; };
+    emps.forEach(function(e){
+      if(!e || !e.name) return;
+      var r = roleOf(e.roleId); if(!r) return;
+      var lv = r.level || 'dept';
+      var label = e.name + '（' + (r.name||'') + '）';
+      if(lv === 'all'){ out.all.push(label); return; }
+      if(lv === 'self') return;                                    // 只看自己建的
+      if(lv === 'dept'){ if(e.dept === d) out.field.push(label); return; }
+      if(lv === 'cross'){
+        if(e.dept === d || (r.crossDepts||[]).indexOf(d) >= 0) out.field.push(label);
+      }
+    });
+  }catch(e){}
+  return out;
+}
+/* 這個部門的報表，除了管理層之外沒有人看得到。
+ * ⚠️ **資料不足時一律不判斷**（回 false）：
+ *   員工名冊還沒從雲端載回來的時候（新裝置、剛開頁），deptViewers 會算出「沒人看得到」，
+ *   那會對**每一張**報表都跳警告 —— 測試 one-report-per-day 立刻抓到（存檔被 confirm 擋掉、0 筆）。
+ *   寧可漏警告，也不要憑不完整的資料嚇人。 */
+function isLowVisibilityDept(dept){
+  var d = String(dept||'').trim();
+  if(!d) return false;
+  var v = deptViewers(dept);
+  /* 名冊或角色還沒載進來 → 判斷不了，不要警告 */
+  if(!v.all.length && !v.field.length) return false;
+  return !v.field.length;
+}
+/* 日報填寫頁的常駐提示條 */
+function applyDeptVisibilityNotice(){
+  var host = $('page-report');
+  if(!host) return;
+  var dept = (S.report && S.report.dept) || (S.user && S.user.dept) || '';
+  var bar = document.getElementById('dept-vis-warn');
+  if(!isLowVisibilityDept(dept)){ if(bar) bar.remove(); return; }
+  var v = deptViewers(dept);
+  if(!bar){
+    bar = document.createElement('div');
+    bar.id = 'dept-vis-warn';
+    bar.className = 'no-print';
+    bar.style.cssText = 'background:#fef3c7;border:1.5px solid var(--warning);border-radius:8px;'
+      + 'padding:11px 14px;margin-bottom:12px;font-size:13px;line-height:1.7;color:#92400e';
+    var body = host.querySelector('.card');
+    if(body && body.parentNode) body.parentNode.insertBefore(bar, body);
+    else host.insertBefore(bar, host.firstChild);
+  }
+  bar.innerHTML = '⚠️ <b>這張日報表的部門是「' + escHtml(v.dept) + '」，現場同仁看不到。</b><br>'
+    + '目前只有 ' + v.all.length + ' 位管理層看得到：' + escHtml(v.all.slice(0,4).join('、'))
+    + (v.all.length > 4 ? ' 等' : '') + '。<br>'
+    + '要讓現場的人看得到，請把上方的<b>部門</b>改成他們所屬的部門（例如「專案管理部」）。';
+}
 function canView(report){
   const u=S.user||{};
   if(report && report.reporter && u.name && report.reporter===u.name) return true;  // 保險：填報人本人的報表，不論部門一律可見
@@ -2596,6 +2660,7 @@ function _startNewReport(){
   rememberBaseline(S.report);
   renderReport();
   applyPermissions();
+  applyDeptVisibilityNotice();      // 部門只有管理層看得到 → 掛提示條（2026-09-03）
   $('f-date').value = today();
   onDateChange();
   return newR;
@@ -2677,6 +2742,18 @@ function saveReport() {
      · 該鍵已經有一張 → 併進去（兩個人同時填就是走這條）
      · 還沒有 → 這張就用那個鍵，之後誰來都會算到同一個
      舊報表（既有的隨機 id）維持原樣不動，用戶 09-02 指定。 */
+  /* 🚨 只有管理層看得到的部門 → 存檔前確認一次（同一張只問一次，2026-09-03 她指定）。
+     她就是這樣用「系統維護」建了一張，現場同仁全都看不到，卻以為是同步壞了。 */
+  if(isLowVisibilityDept(S.report.dept) && !_deptWarnAcked[S.report.id]){
+    var _v = deptViewers(S.report.dept);
+    if(!confirm('這張日報表的部門是「' + _v.dept + '」。\n\n'
+      + '這個部門的報表只有 ' + _v.all.length + ' 位管理層看得到（'
+      + _v.all.slice(0,3).join('、') + (_v.all.length>3?' 等':'') + '），\n'
+      + '**現場同仁一個都看不到**。\n\n'
+      + '如果這是正式的日報表，請取消，把上方的「部門」改成同仁所屬的部門。\n'
+      + '確定要用「' + _v.dept + '」存檔嗎？')) return;
+    _deptWarnAcked[S.report.id] = true;
+  }
   const _key = reportKey(S.report.projId, S.report.date);
   let _merged = false;
   if (_key && S.report.id !== _key && !_editingLegacy) {
@@ -2711,6 +2788,7 @@ function loadReport(r) {
   migrateReportProj(S.report);  // 舊的單案場報表就地補上報表層案場（排在基準之後＝算成「我改過」，不會被雲端空值蓋回去）
   renderReport();
   applyPermissions();
+  applyDeptVisibilityNotice();  // 部門只有管理層看得到 → 掛提示條（2026-09-03）
   checkDeptDateDuplicate();     // 載進來之後就是同一張了 → 提示條要跟著收起來
 }
 /* 從歷史資料開啟報表 → 切到報表頁並顯示「‹ 返回歷史資料」返回列 */
@@ -2738,6 +2816,7 @@ function backToHistory(){ goPage(_backTo==='cal' ? 'cal' : 'history'); }
  * 復原鈕就是把那條路切斷。
  */
 var _clearedSnapshot = null;      // 清除前的整張報表（只留最後一次，她指定）
+var _deptWarnAcked = {};          // 這一張已經確認過「部門只有管理層看得到」（2026-09-03）
 function clearForm() {
   if (!confirm('確定要清除表單嗎？\n\n這將清空畫面上這張表單的所有明細（施工明細、材料、備註、照片）。\n先前已存檔的日報表不受影響。\n\n清除後可以按「↩ 復原清除」救回來。')) return;
   /* 先拍一張快照再清 —— 復原就是把它放回去 */
