@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.4';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.6';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -573,12 +573,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <div class="g g2" style="gap:14px">
         <div class="fg">
           <label class="fl" style="margin-bottom:4px">與工地聯絡事項</label>
-          <textarea id="n-contact" class="fi" rows="4" placeholder="與營造廠、業主、其他工種的配合重點..." oninput="updPV(this)"></textarea>
+          <textarea id="n-contact" class="fi" rows="4" placeholder="與營造廠、業主、其他工種的配合重點..." oninput="updPV(this);buildSummary()"></textarea>
           <div class="pv" id="n-contact_pv"></div>
         </div>
         <div class="fg">
           <label class="fl" style="margin-bottom:4px">其他工程配合重點</label>
-          <textarea id="n-other" class="fi" rows="4" placeholder="其他配合事項、臨時協調、注意事項..." oninput="updPV(this)"></textarea>
+          <textarea id="n-other" class="fi" rows="4" placeholder="其他配合事項、臨時協調、注意事項..." oninput="updPV(this);buildSummary()"></textarea>
           <div class="pv" id="n-other_pv"></div>
         </div>
       </div>
@@ -1479,8 +1479,9 @@ function mergeReport(local, cloud, me, base){
     contact: _pickScalar(lb.contact, cb.contact, bb ? bb.contact : undefined),
     other:   _pickScalar(lb.other,   cb.other,   bb ? bb.other   : undefined)
   };
-  // 摘要要含別人的列，否則只剩我自己那幾條
-  out.summary = summaryFromItems(out.workItems, out.date||'', out.projName||'');
+  // 摘要要含別人的列，否則只剩我自己那幾條；材料／備註／天氣也用合併後的版本
+  out.summary = summaryFromItems(out.workItems, out.date||'', out.projName||'',
+                                 out.materials, out.notes, out.weather);
   return out;
 }
 function _snapshotReports(list){
@@ -2732,20 +2733,92 @@ function collectRows() {
  * 全形分號分隔、不留空白。用分號不用逗號，是為了日後匯 CSV 不會被當成欄位分隔符切斷。 */
 /* 由工項資料產生摘要文字。抽成獨立函式是因為存檔合併別人的列之後，
  * 要用「合併後的完整清單」重算一次摘要，否則摘要只會有我自己那幾列。 */
-function summaryFromItems(items, dateStr, projName){
-  const ymd = (dateStr||'').replace(/-/g,'');
+/* ══════ 今日工作摘要（2026-09-03 用戶指定的新格式）══════
+ * 改版前：每一行都黏一份「20250401.雙橡園2279」的抬頭，沒有星期／天氣／材料／備註。
+ * 改版後：
+ *   工程日報表_20250401_雙橡園2279_星期二_天氣小雨      ← 標題只出現一次
+ *
+ *   1. 基座；基座西向大門施作；進度20%；廖學健          ← 一行一個工項（她選 A）
+ *   2. …
+ *
+ *   ［材料］                                            ← 另起一段（她選「另起一段」）
+ *   1. 不鏽鋼角鐵；10 支；廖學健
+ *
+ *   ［備註事項］
+ *   與工地聯絡事項
+ *   （原樣照貼，換行保留）                               ← 她選「原樣」
+ *   其他工程配合重點
+ *   （同上）
+ *
+ * 她拍板的細節，改的時候不要「順手優化」掉：
+ *   · 空白工項**照樣產生**並佔一個編號（她選「產生」，不是略過）
+ *   · 案場名稱**照設定頁原樣**，程式不加橫線
+ *   · 天氣沒填 → 標題那一段整段省略（標題是一行，掛個「天氣—」很難看）
+ *   · 材料／備註沒有內容 → **段落標題留著、內容寫「無」**（她選「無」）
+ *     ⚠️ 天氣是「省略」、材料備註是「無」，兩者刻意不同，不要統一。
+ */
+function summaryWeekday(dateStr){
+  const d = new Date(String(dateStr||'') + 'T00:00:00');
+  return isNaN(d) ? '' : ('星期' + DOW[d.getDay()]);
+}
+function summaryTitle(dateStr, projName, weather){
+  const parts = ['工程日報表'];
+  const ymd = String(dateStr||'').replace(/-/g,'');
+  if(ymd) parts.push(ymd);
+  if(projName) parts.push(projName);          // 照設定頁原樣（她指定）
+  const w = summaryWeekday(dateStr);
+  if(w) parts.push(w);
+  const wx = String(weather||'').trim();
+  if(wx) parts.push('天氣' + wx);             // 沒填就整段省略（她指定）
+  return parts.join('_');
+}
+/* 一筆材料一行，格式與施工明細一致（都用「；」）。數量與單位中間留一個空格。 */
+function summaryMatLine(m){
+  const name = String((m&&m.name)||'').trim();
+  const qty  = (m && m.qty !== undefined && m.qty !== null && m.qty !== '') ? m.qty : '';
+  const unit = String((m&&m.unit)||'').trim();
+  const amount = [qty, unit].filter(v => v !== '' && v !== undefined).join(' ');
+  return [name, amount, (m&&m.owner)||''].filter(Boolean).join('；');
+}
+function summaryFromItems(items, dateStr, projName, mats, notes, weather){
   const rp = projName||'';
-  return (items||[]).map(wi=>{
-    // C 批起案場由報表層提供；拆分前的舊資料若報表層還沒有，就沿用工項上的
-    const projName = rp || wi.projName || '';
-    if(!(projName||wi.loc||wi.work)) return null;
-    const head = (ymd && projName) ? `${ymd}.${projName}` : (projName || ymd || '');
-    return [head, wi.loc, wi.work, `進度${parseFloat(wi.progress)||0}%`, wi.owner].filter(Boolean).join('；');
-  }).filter(Boolean).join('\n');
+  const out = [summaryTitle(dateStr, rp || ((items||[])[0]||{}).projName || '', weather), ''];
+
+  /* ── 施工明細 ── */
+  const lines = (items||[]).map(wi=>{
+    /* C 批起案場由報表層提供；拆分前的舊資料若報表層還沒有，就沿用工項上的 */
+    const pn = rp || wi.projName || '';
+    /* 空白工項照樣產生（她指定「產生」）—— 只有「整列都沒有東西」才不算一列，
+       但位置與項目空著、只有進度與填表人的那種，仍然要佔一個編號。 */
+    if(!(pn || wi.loc || wi.work || wi.owner)) return null;
+    return [wi.loc, wi.work, `進度${parseFloat(wi.progress)||0}%`, wi.owner].filter(Boolean).join('；');
+  }).filter(v => v !== null);
+  out.push(lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+
+  /* ── 材料 ── */
+  const ml = (mats||[]).map(summaryMatLine).filter(Boolean);
+  out.push('', '［材料］', ml.length ? ml.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+
+  /* ── 備註事項（原樣照貼，換行保留）── */
+  const nb = notes || {};
+  const c = String(nb.contact||'').trim(), o = String(nb.other||'').trim();
+  out.push('', '［備註事項］');
+  out.push('與工地聯絡事項', c || '無');
+  out.push('', '其他工程配合重點', o || '無');
+
+  return out.join('\n');
 }
 function buildSummary() {
   refreshPhWorkOptions();   // 工項一變，照片要掛哪一項的下拉也跟著更新
-  const txt = summaryFromItems(collectRows(), $('f-date')?.value || S.report?.date || '', curProjName());
+  /* 材料／備註／天氣一律從畫面現況讀（不從 S.report），
+     這樣不管 buildSummary 是被誰在什麼時候呼叫的，摘要都跟畫面一致。 */
+  const _mats = (typeof collectMatRows === 'function' && $('mat-tbody')) ? collectMatRows() : ((S.report||{}).materials||[]);
+  const _notes = $('n-contact')
+    ? { contact: $('n-contact').value, other: ($('n-other')||{}).value||'' }
+    : ((S.report||{}).notes||{});
+  const _weather = $('f-weather') ? $('f-weather').value : ((S.report||{}).weather||'');
+  const txt = summaryFromItems(collectRows(), $('f-date')?.value || S.report?.date || '', curProjName(),
+                               _mats, _notes, _weather);
   $('f-summary').value = txt;
   $('f-summary-pv').textContent = txt;
   autoGrow($('f-summary'));
