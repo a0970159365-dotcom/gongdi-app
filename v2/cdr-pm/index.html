@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.8';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.9';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -351,6 +351,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     window._cdrRemove = function(p){ return _db.ref('cdr_pm/'+p).remove(); };
     // 一次讀回整個 cdr_pm 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
     window._cdrGetRoot = function(){ return _db.ref('cdr_pm').once('value').then(function(s){ return s.exists()?s.val():null; }); };
+    /* 照片原圖放在 cdr_pm **之外**的獨立節點（2026-09-03）——
+       這樣 _cdrGetRoot() 開頁抓整包時，原圖根本不會被下載到。
+       報表裡只留縮圖，點開某一張才來這裡抓那一張。 */
+    window._phGet = function(id){ return _db.ref('cdr_pm_photos/'+id).once('value').then(function(s){ return s.exists()?s.val():null; }); };
+    window._phSet = function(id,d){ return _db.ref('cdr_pm_photos/'+id).set(d==null?null:d); };
+    window._phRemove = function(id){ return _db.ref('cdr_pm_photos/'+id).remove(); };
   } catch(e){ console.warn('Firebase init failed:',e); }
 })();
 </script>
@@ -1409,11 +1415,31 @@ function _localCopy(data, cloudOk){
     })
   });
 }
+/* 存檔時把「這次新上傳的原圖」推到 cdr_pm_photos/{id}（2026-09-03）。
+   推成功才從待推清單移除；失敗就留著，下次存檔再試。 */
+function _pushPendingFull(){
+  if(!window._phSet) return;
+  Object.keys(_pendingFull).forEach(function(id){
+    var d=_pendingFull[id];
+    try{
+      window._phSet(id, d).then(function(){
+        delete _pendingFull[id];
+        /* 確認原圖已經在 cdr_pm_photos 了 → 才把報表裡那一份清掉（下次存檔生效）。
+           在此之前原圖是「兩邊都有」，寧可重複也不要弄丟。 */
+        (S.reports||[]).forEach(function(r){
+          ((r&&r.photos)||[]).forEach(function(p){ if(p && p.id===id && p.thumb) p.data=''; });
+        });
+        ((S.report&&S.report.photos)||[]).forEach(function(p){ if(p && p.id===id && p.thumb) p.data=''; });
+      }).catch(function(e){ console.warn('照片原圖推送失敗（會在下次存檔重試）：', id, e && e.message); });
+    }catch(e){ console.warn('照片原圖推送失敗：', id, e && e.message); }
+  });
+}
 function save() {
   const data = {
     reports: S.reports, cfg: S.cfg, user: S.user,
     projSort: S.projSort, updatedAt: Date.now()
   };
+  _pushPendingFull();
   let cloudOk = false, localOk = false;
   try { if(window._cdrSet){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
   try { localStorage.setItem('cdr_pm', JSON.stringify(_localCopy(data, cloudOk))); localOk = true; }
@@ -2967,8 +2993,8 @@ function phPath(p){
 }
 /* 檔名/資料夾名不能有這些字元，一律換成底線 */
 function safeName(s){ return String(s||'').replace(/[\\/:*?"<>|]/g,'_').trim()||PH_UNSET; }
-function phExt(p){
-  const m=/^data:image\/([a-z0-9+.-]+);/i.exec(p.data||'');
+function phExt(p, src){
+  const m=/^data:image\/([a-z0-9+.-]+);/i.exec(src||p.data||p.thumb||'');
   const t=(m?m[1]:'jpeg').toLowerCase();
   return t==='jpeg'?'jpg':t;
 }
@@ -3014,6 +3040,53 @@ var PHOTO_MAX_EDGE = 1600;   // 長邊上限（px）
 var PHOTO_QUALITY  = 0.72;   // JPEG 品質
 var PHOTO_MAX_BYTES = 500*1024;   // 壓完還超過就再降一階
 var PHOTO_RETRY_QUALITY = 0.55;
+/* 縮圖（2026-09-03）：只給列表用，長邊 320、品質 0.6，一張約 15~25KB。
+   縮圖留在報表裡（開頁要顯示），原圖搬到 cdr_pm_photos 節點。 */
+var THUMB_MAX_EDGE = 320;
+var THUMB_QUALITY  = 0.6;
+function makeThumb(dataUri){
+  return new Promise(function(resolve){
+    try{
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w=img.width, h=img.height;
+          var sc=Math.min(1, THUMB_MAX_EDGE/Math.max(w,h));
+          var cw=Math.max(1,Math.round(w*sc)), ch=Math.max(1,Math.round(h*sc));
+          var cv=document.createElement('canvas');
+          cv.width=cw; cv.height=ch;
+          cv.getContext('2d').drawImage(img,0,0,cw,ch);
+          var out=cv.toDataURL('image/jpeg', THUMB_QUALITY);
+          /* 原圖本來就比縮圖還小 → 不用另外做縮圖，列表直接用原圖 */
+          resolve(out.length < String(dataUri).length ? out : '');
+        }catch(e){ resolve(''); }
+      };
+      img.onerror = function(){ resolve(''); };
+      img.src = dataUri;
+    }catch(e){ resolve(''); }
+  });
+}
+/* ── 取一張照片的「原圖」──────────────────────────────────────────
+ * 三種來源，依序試：
+ *   ① 這一輪已經抓過 → 記憶體快取
+ *   ② 照片物件自己還帶著 data（舊資料，或剛上傳還沒送出雲端）
+ *   ③ 去 cdr_pm_photos/{id} 抓
+ * 抓不到就回縮圖（至少看得到東西），不要讓畫面變破圖。 */
+var _fullCache = {};      // 這一輪已經抓過／剛上傳的原圖（記憶體，不落地）
+var _pendingFull = {};    // 還沒推上雲的原圖：id -> dataURI（存檔時一起送）
+var _thumbJobs = [];      // 正在產生的縮圖
+function photoFull(p){
+  if(!p) return Promise.resolve('');
+  if(p.data) return Promise.resolve(p.data);
+  if(_fullCache[p.id]) return Promise.resolve(_fullCache[p.id]);
+  if(!window._phGet) return Promise.resolve(p.thumb||'');
+  return window._phGet(p.id).then(function(d){
+    if(d){ _fullCache[p.id]=d; return d; }
+    return p.thumb||'';
+  }).catch(function(){ return p.thumb||''; });
+}
+/* 列表要顯示的那一張：有縮圖用縮圖，沒有（舊資料）就用原圖 */
+function photoSrc(p){ return (p && (p.thumb || p.data)) || ''; }
 function compressImage(file){
   return new Promise(function(resolve){
     var rd = new FileReader();
@@ -3066,14 +3139,27 @@ function uploadPhotos(e) {
     let n = 0, bad = [];
     list.forEach(({ r, f }) => {
       if(!r){ bad.push(f.name||'（未命名）'); return; }
+      var _pid = uid();
+      /* ⚠️ 原圖**先留在報表裡**（2026-09-03）：這樣它會跟報表一起進雲端，
+         跟改版前一樣不會掉。等確認推進 cdr_pm_photos 之後，_pushPendingFull()
+         才會把這一格清掉、下次存檔就瘦身。
+         不這樣做的話：使用者上傳完馬上關掉分頁 → 原圖只存在記憶體裡 → 真的不見。 */
+      _fullCache[_pid] = r.data;
+      _pendingFull[_pid] = r.data;
       S.report.photos.push({
-        id:uid(), data:r.data, name:f.name, ts:Date.now(),
+        id:_pid, data:r.data, thumb:'', name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
         projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
       });
+      _thumbJobs.push(makeThumb(r.data).then(function(th){
+        var ph=(S.report.photos||[]).find(function(x){ return x && x.id===_pid; });
+        if(ph){ ph.thumb = th || r.data; }   // 做不出縮圖就退回原圖，至少看得到
+      }));
       n++;
     });
+    /* 縮圖是非同步做的 → 等它們好了再重畫一次，畫面才不會先閃一下空白 */
+    Promise.all(_thumbJobs.splice(0)).then(function(){ renderPhotos(); syncReport(); });
     renderPhotos(); syncReport();
     if(n) toast('已加入 ' + n + ' 張照片，記得按「💾 儲存報表」','s');
     if(bad.length) toast('這 ' + bad.length + ' 張讀不到，可能是相機的 HEIC 格式：'
@@ -3105,7 +3191,7 @@ function renderPhotos() {
         <div class="photo-grid">
           ${items.map(({p,i})=>`
             <div class="photo-thumb" onclick="openPh(${i})">
-              <img src="${p.data}" alt="${escHtml(p.name)}">
+              <img src="${photoSrc(p)}" alt="${escHtml(p.name)}" loading="lazy">
               <div class="photo-thumb-info">${escHtml(p.name)}</div>
             </div>`).join('')}
         </div>
@@ -3115,7 +3201,12 @@ function renderPhotos() {
 function openPh(i) {
   viewPhIdx=i;
   const p=S.report.photos[i];
-  $('ph-img').src=p.data; $('ph-cap').textContent=p.name;
+  /* 先把縮圖放上去（立刻有東西看），再去抓原圖換上（2026-09-03 縮圖／原圖分離）。
+     抓回來時要確認使用者還在看同一張，否則連點兩張會換錯圖。 */
+  $('ph-img').src=photoSrc(p); $('ph-cap').textContent=p.name;
+  photoFull(p).then(function(full){
+    if(full && viewPhIdx===i && $('ph-overlay').classList.contains('show')) $('ph-img').src=full;
+  });
   const lbl=$('ph-phase-lbl');
   if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=phPath(p).join(' / '); }
   $('ph-overlay').classList.add('show');
@@ -3144,11 +3235,14 @@ async function downloadPhotosZip(){
   try{
     const zip=new JSZip();
     const seq={};
-    list.forEach(p=>{
+    /* 2026-09-03：原圖不在報表裡了 → 逐張抓回來再打包 */
+    const fulls=await Promise.all(list.map(p=>photoFull(p)));
+    list.forEach((p,i)=>{
       const dir=phPath(p).map(safeName).join('/');
       seq[dir]=(seq[dir]||0)+1;
-      const fn=String(seq[dir]).padStart(2,'0')+'.'+phExt(p);
-      const b64=String(p.data||'').split(',')[1]||'';
+      const src=fulls[i]||'';
+      const fn=String(seq[dir]).padStart(2,'0')+'.'+phExt(p,src);
+      const b64=String(src).split(',')[1]||'';
       if(b64) zip.folder(dir).file(fn,b64,{base64:true});
     });
     const blob=await zip.generateAsync({type:'blob'});
