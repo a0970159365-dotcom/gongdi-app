@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -165,6 +165,23 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .ghead.closed .gchev{transform:rotate(-90deg)}
 .grp-row td{padding:0!important;border:none!important}
 .sgrp{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.stat-exp-th{width:34px}
+.stat-exp-td{width:34px;text-align:center;padding-left:4px;padding-right:4px}
+.stat-exp{background:none;border:1px solid var(--border);border-radius:5px;width:24px;height:24px;
+  cursor:pointer;color:var(--muted);font-size:11px;line-height:1;font-family:inherit;
+  transition:transform .12s ease}
+.stat-exp:hover{color:var(--primary);border-color:var(--primary)}
+.stat-exp.on{transform:rotate(90deg);color:var(--primary);border-color:var(--primary)}
+.stat-detail-row>td{background:var(--bg);padding:0 !important}
+.mat-unit{display:inline-block;font-size:12px;color:var(--muted)}
+.mat-hits{padding:10px 12px}
+.mat-hits-t{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.mat-hits-tbl{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card,#fff);
+  border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.mat-hits-tbl th{background:var(--bg);color:var(--muted);font-weight:700;text-align:left;
+  padding:5px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+.mat-hits-tbl td{padding:5px 9px;border-bottom:1px solid var(--border)}
+.mat-hits-tbl tr:last-child td{border-bottom:none}
 .hgrp{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px}
 .hgrp .hgrp-body{padding:8px;background:var(--bg)}
 .hgrp .hgrp-body .ritem:last-child{margin-bottom:0}
@@ -3542,13 +3559,17 @@ function getMaterialRows(){
          （2026-09-02 用戶指定；沒綁預設的仍然照原樣，不會硬湊） */
       const unit=(mt.unit||'').trim()||matUnitOf(name);
       const k=pname+'\u0000'+name+'\u0000'+unit;
-      if(!m.has(k))m.set(k,{proj:pname,name,unit,qty:0,n:0,last:''});
+      if(!m.has(k))m.set(k,{proj:pname,name,unit,qty:0,n:0,last:'',hits:[]});
       const o=m.get(k);
       o.qty+=Number(mt.qty)||0; o.n++;
       if(String(r.date||'')>o.last)o.last=r.date||'';
+      /* 2026-09-03：把每一筆的日期收起來，展開時就看得到「這種材料在哪幾天用過」。
+         填表人取那一列自己的 owner（沒有才退回報表負責人）—— 多人共編時才對得上。 */
+      o.hits.push({date:r.date||'', qty:Number(mt.qty)||0, who:(mt.owner||r.reporter||'')});
     });
   });
   return [...m.values()]
+    .map(o=>{ o.hits.sort((x,y)=>String(y.date).localeCompare(String(x.date))); return o; })
     .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||a.name.localeCompare(b.name,'zh-Hant',{numeric:true}));
 }
 /* 三張統計都是「📁 案場當抬頭 → 底下分列」（2026-09-02 用戶指定）。
@@ -3566,16 +3587,43 @@ function statEmptyHtml(){
   return '<div class="empty"><div class="empty-icon">📭</div><h3>這個條件下沒有資料</h3>'
     +'<p style="font-size:12px;color:var(--muted)">試著放寬日期區間，或按「清除」看全部</p></div>';
 }
-function statTableHtml(headers,rows,foot){
-  return '<div class="tbl-wrap"><table class="master-tbl"><thead><tr>'
-    +headers.map(h=>'<th'+(h.num?' style="text-align:right"':'')+'>'+escHtml(h.t)+'</th>').join('')
-    +'</tr></thead><tbody>'
-    +rows.map(cells=>'<tr>'+cells.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>').join('')
-    +(foot?'<tr class="tfoot-row" style="font-weight:700;background:var(--bg)">'+foot.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>':'')
-    +'</tbody></table></div>';
+/* details：可選，[{open:bool, html:'…'}]，一列一個。有的話那一列會多一顆展開鈕，
+   底下再掛一列明細（預設收合，用戶 2026-09-03 指定）。 */
+function statTableHtml(headers,rows,foot,details,rowKeys){
+  const hasD=Array.isArray(details);
+  const th=(hasD?'<th class="stat-exp-th"></th>':'')
+    +headers.map(h=>'<th'+(h.num?' style="text-align:right"':'')+(h.w?' style="width:'+h.w+'"':'')+'>'+escHtml(h.t)+'</th>').join('');
+  const body=rows.map((cells,ri)=>{
+    const d=hasD?details[ri]:null;
+    const open=!!(d&&d.open);
+    const btn=hasD
+      ? '<td class="stat-exp-td">'+(d&&d.html
+          ? '<button type="button" class="stat-exp'+(open?' on':'')+'" title="'+(open?'收合':'展開看各筆日期')
+            +'" onclick="toggleStatRow('+JSON.stringify(String(rowKeys&&rowKeys[ri]||ri)).replace(/"/g,'&quot;')+')">▸</button>'
+          : '')+'</td>'
+      : '';
+    let h='<tr>'+btn+cells.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>';
+    if(open&&d&&d.html){
+      h+='<tr class="stat-detail-row"><td></td><td colspan="'+headers.length+'">'+d.html+'</td></tr>';
+    }
+    return h;
+  }).join('');
+  const ft=foot
+    ? '<tr class="tfoot-row" style="font-weight:700;background:var(--bg)">'+(hasD?'<td></td>':'')
+      +foot.map((c,i)=>'<td'+(headers[i]&&headers[i].num?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>'
+    : '';
+  return '<div class="tbl-wrap"><table class="master-tbl"><thead><tr>'+th+'</tr></thead><tbody>'
+    +body+ft+'</tbody></table></div>';
+}
+/* 展開／收合某一種材料的明細。用「案場＋名稱＋單位」當鍵，
+   重畫之後仍然對得上（用索引的話，一改篩選就會展開到別列去）。 */
+let _openStatRows=new Set();
+function toggleStatRow(key){
+  if(_openStatRows.has(key))_openStatRows.delete(key); else _openStatRows.add(key);
+  renderMgmt();
 }
 /* rows 要帶 proj，這裡照案場分組畫出「抬頭 ＋ 表格」 */
-function statGrouped(rows,headers,cellsOf,summaryOf,footOf){
+function statGrouped(rows,headers,cellsOf,summaryOf,footOf,detailOf,keyOf){
   if(!rows.length)return statEmptyHtml();
   const force=mgmtFilterActive();
   const m=new Map();
@@ -3587,7 +3635,8 @@ function statGrouped(rows,headers,cellsOf,summaryOf,footOf){
       +'<div class="ghead'+(open?'':' closed')+'" onclick="toggleStatGroup('+gi+')">'
       +'<span class="gchev">▼</span><span>📁 '+escHtml(key)+'</span>'
       +'<span class="gcnt">'+escHtml(summaryOf(list))+'</span></div>'
-      +(open?statTableHtml(headers,list.map(cellsOf),footOf?footOf(list):null):'')
+      +(open?statTableHtml(headers,list.map(cellsOf),footOf?footOf(list):null,
+          detailOf?list.map(detailOf):null, keyOf?list.map(keyOf):null):'')
       +'</div>';
   }).join('');
 }
@@ -3608,12 +3657,33 @@ function renderMgStat(){
       list=>list.length+' 天 · 出工合計 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
       list=>['合計','',_n1(list.reduce((s,o)=>s+o.w0,0)),_n1(list.reduce((s,o)=>s+o.w1,0)),list.reduce((s,o)=>s+o.items,0)]);
   } else if(mgView==='mat'){
-    /* 一列＝一種材料（重點是總共用了多少） */
+    /* 一列＝一種材料（重點是總共用了多少）。
+       2026-09-03 用戶指定：單位縮小、移到「數量合計」後面；每一列可展開看各筆日期。 */
     box.innerHTML=statGrouped(getMaterialRows(),
-      [{t:'材料名稱'},{t:'單位'},{t:'數量合計',num:1},{t:'筆數',num:1},{t:'最後使用'}],
-      o=>[escHtml(o.name),escHtml(o.unit||'—'),_n1(o.qty),o.n,o.last||'—'],
-      list=>list.length+' 種材料');
+      [{t:'材料名稱'},{t:'數量合計',num:1},{t:'單位',w:'64px'},{t:'筆數',num:1},{t:'最後使用'}],
+      o=>[escHtml(o.name),_n1(o.qty),'<span class="mat-unit">'+escHtml(o.unit||'—')+'</span>',o.n,o.last||'—'],
+      list=>list.length+' 種材料',
+      null,
+      o=>({ open:_openStatRows.has(matRowKey(o)), html:matHitsHtml(o) }),
+      o=>matRowKey(o));
   } else box.innerHTML='';
+}
+/* 一種材料在這個案場的每一筆：日期（星期）｜數量｜填表人。
+   同一天多筆就各列一行 —— 合併起來反而看不出「那天到底進了幾次」。 */
+function matRowKey(o){ return (o.proj||'')+'\u0000'+(o.name||'')+'\u0000'+(o.unit||''); }
+function matHitsHtml(o){
+  const hits=(o&&o.hits)||[];
+  if(!hits.length)return '';
+  const dow=d=>{const x=new Date(d+'T00:00:00');return isNaN(x)?(d||'—'):(d+'（'+DOW[x.getDay()]+'）')};
+  return '<div class="mat-hits"><div class="mat-hits-t">'+escHtml(o.name)
+    +' 的使用紀錄（'+hits.length+' 筆）</div>'
+    +'<table class="mat-hits-tbl"><thead><tr><th>日期</th><th style="text-align:right">數量</th>'
+    +'<th>單位</th><th>填表人</th></tr></thead><tbody>'
+    +hits.map(h=>'<tr><td>'+escHtml(dow(h.date))+'</td>'
+      +'<td style="text-align:right">'+_n1(h.qty)+'</td>'
+      +'<td>'+escHtml(o.unit||'—')+'</td>'
+      +'<td>'+escHtml(h.who||'—')+'</td></tr>').join('')
+    +'</tbody></table></div>';
 }
 function syncMgViewButtons(){
   [['mv-list','list'],['mv-loc','loc'],['mv-man','man'],['mv-mat','mat']].forEach(([id,v])=>{
@@ -3749,8 +3819,9 @@ function exportMgmtExcel(){
     body=getManpowerRows().map(o=>[o.proj,o.date,o.vendors.join('、'),_n1(o.w0),_n1(o.w1),o.items]);
   } else {
     title='材料統計';
-    headers=['案場','材料名稱','單位','數量合計','筆數','最後使用'];
-    body=getMaterialRows().map(o=>[o.proj,o.name,o.unit,_n1(o.qty),o.n,o.last]);
+    /* 欄序跟畫面一致（2026-09-03）：案場｜材料名稱｜數量合計｜單位｜筆數｜最後使用 */
+    headers=['案場','材料名稱','數量合計','單位','筆數','最後使用'];
+    body=getMaterialRows().map(o=>[o.proj,o.name,_n1(o.qty),o.unit,o.n,o.last]);
   }
   if(!body.length){toast('無符合條件的資料','e');return;}
   exportStatExcel(title,headers,body);
