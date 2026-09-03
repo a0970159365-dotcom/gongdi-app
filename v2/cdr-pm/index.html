@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.4';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1308,12 +1308,15 @@ function load() {
       /* 2026-09-03（A 案）：兩層那份 unitsByMat 自動搬回「名稱 → 一個預設單位」。
          她線上 13 種材料底下都只有一個單位，所以是一對一搬過來、不會遺失；
          真的設了多種的話取第一個（設定頁看得到，要改隨時能改）。
-         已經有的 matUnitMap 不覆蓋 —— 那是她自己選過的。 */
+
+         ⚠️ unitsByMat 比 matUnitMap 新（09-02 下午才換成兩層），所以**兩層那份優先**。
+         線上實例：澳洲膠 在 matUnitMap 是「桶」（09-02 早上），在兩層裡被改成「組」——
+         「已有 matUnitMap 就不覆蓋」會把她後來改的設定蓋回舊值。
+         matUnitMap 只用來補「兩層裡沒有的那幾個名稱」。 */
       if (!S.cfg.matUnitMap || typeof S.cfg.matUnitMap!=='object' || Array.isArray(S.cfg.matUnitMap)) S.cfg.matUnitMap={};
       const _ubm = S.cfg.unitsByMat;
       if (_ubm && typeof _ubm==='object' && !Array.isArray(_ubm)) {
         Object.keys(_ubm).forEach(function(n){
-          if (S.cfg.matUnitMap[n]) return;
           const arr = _ubm[n];
           if (Array.isArray(arr) && arr.length && arr[0]) S.cfg.matUnitMap[n] = arr[0];
         });
