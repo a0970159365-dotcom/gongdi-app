@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-03.6';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-03.8';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1336,6 +1336,7 @@ function load() {
     }
     if (d.user) S.user={...S.user,...d.user};
     if (d.projSort) S.projSort = d.projSort;
+    _dropStrippedPhotos(S.reports);   // 本機那份的照片是空殼，等雲端補回來（2026-09-03）
   } catch(e){}
 }
 /* ── 兩層結構遷移（2026-08-12）──
@@ -1385,6 +1386,29 @@ function migrateCfgTwoLevel(){
  * 舊版是先寫 localStorage，手機空間不足時整個 try 直接跳走 → 雲端那行根本沒執行，
  * 使用者看到「儲存失敗」但同時也看到「已儲存」，換電腦一看資料根本不在（會掉資料）。
  * 現在兩件事各自 try：雲端進得去就算存到了，本機只是快取。 */
+/* ⚠️ 2026-09-03：localStorage 不再存照片。
+ * 起因：她與客戶回報「本機空間不足」與「照片上傳沒反應」。線上實測 ——
+ *   reports 整包 4.93MB，其中**照片 base64 佔 4.89MB（99%）**，localStorage 上限只有 5MB
+ *   → 一裝滿，之後每次存檔本機都寫不進去，畫面一直跳「這台裝置本機空間不足」。
+ * localStorage 在這個 App 的角色本來就只是「離線快取 ＋ 雲端寫失敗時的救援來源」，
+ * 照片放在裡面沒有意義（雲端才是真相）。拿掉之後 5MB → 約 40KB。
+ * 例外：**雲端這次沒推成功**（離線）時仍然把照片留在本機，
+ *       否則那幾張照片會在重新整理之後消失 —— rescueLocalNewer 就是靠本機這份救回來的。 */
+function _localCopy(data, cloudOk){
+  if(!cloudOk) return data;                 // 沒推上雲 → 原樣留著（含照片）
+  return Object.assign({}, data, {
+    reports: (data.reports||[]).map(function(r){
+      if(!r || !(r.photos||[]).length) return r;
+      /* 照片本體不進本機；保留「有幾張、是誰上傳的」這些小欄位，
+         畫面在雲端還沒同步回來之前才不會顯示成「這張沒有照片」。 */
+      return Object.assign({}, r, {
+        photos: r.photos.map(function(p){
+          return Object.assign({}, p, { data: '', _localStripped: true });
+        })
+      });
+    })
+  });
+}
 function save() {
   const data = {
     reports: S.reports, cfg: S.cfg, user: S.user,
@@ -1392,9 +1416,23 @@ function save() {
   };
   let cloudOk = false, localOk = false;
   try { if(window._cdrSet){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
-  try { localStorage.setItem('cdr_pm', JSON.stringify(data)); localOk = true; }
-  catch(e){ console.warn('本機儲存失敗（多半是空間不足）：', e && e.message); }
+  try { localStorage.setItem('cdr_pm', JSON.stringify(_localCopy(data, cloudOk))); localOk = true; }
+  catch(e){
+    console.warn('本機儲存失敗（多半是空間不足）：', e && e.message);
+    /* 再退一步：連 cfg／user 都存不下就真的滿了，先把照片全部拿掉再試一次 */
+    try { localStorage.setItem('cdr_pm', JSON.stringify(_localCopy(data, true))); localOk = true; }
+    catch(e2){ console.warn('去掉照片後仍存不下：', e2 && e2.message); }
+  }
   return { cloudOk, localOk };
+}
+/* 從本機讀回來的報表，照片是被抽掉的空殼（_localStripped）→ 雲端那份一定要贏。
+   沒有這一段的話，本機那份空殼會在合併時把雲端的照片洗掉。 */
+function _dropStrippedPhotos(list){
+  (list||[]).forEach(function(r){
+    if(r && Array.isArray(r.photos))
+      r.photos = r.photos.filter(function(p){ return p && !p._localStripped; });
+  });
+  return list;
 }
 /* ── per-record 同步（2026-07-29 治本改造）──
  * 舊版：每次存檔都把 {reports,cfg,user,projSort} 整包 set 到 cdr_pm/all，靠 updatedAt 誰新誰贏。
@@ -2482,7 +2520,7 @@ function saveReport() {
   const st = save();
   if (st.localOk && _merged) toast('已併入這天的日報表（' + (S.report.reporter||'') + ' 建的），你的明細都在裡面','s');
   else if (st.localOk) toast('日報表已儲存','s');
-  else if (st.cloudOk) toast('已存到雲端 — 這台裝置本機空間不足，換裝置開一樣看得到','s');
+  else if (st.cloudOk) toast('已存到雲端 ✓（這台裝置的離線暫存滿了，但資料都在雲端，換裝置開一樣看得到）','s');
   else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
@@ -2966,11 +3004,16 @@ function phTargetFromSelect(){
 /* ── 照片壓縮（2026-08-18）────────────────────────────────────────
  * 起因：手機拍一張就 3~5MB，轉 base64 後更大，直接超過瀏覽器本機儲存上限
  *       → 存檔整個失敗，連雲端都沒寫進去（使用者以為存好了，其實資料掉了）。
- * 做法：上傳時用 canvas 縮到長邊 PHOTO_MAX_EDGE、轉 JPEG PHOTO_QUALITY，一張約 400~600KB。
+ * 做法：上傳時用 canvas 縮到長邊 PHOTO_MAX_EDGE、轉 JPEG PHOTO_QUALITY。
+ * 2026-09-03 調小：原本 2048/0.85，線上實測最大一張仍有 1.70MB、15 張就吃掉 4.89MB。
+ * 改成 1600/0.72（工地照片看細節綽綽有餘），一張約 150~300KB。
+ * 壓完仍超過 PHOTO_MAX_BYTES 的，再降一次品質重壓。
  * ⚠️ 本地化部署後如果要改成「原檔上傳到檔案伺服器」，只要動這兩個常數與 uploadPhotos()。
  *    每張照片有保留 origName／origSize／origW／origH，將來要補傳原檔對得起來。 */
-var PHOTO_MAX_EDGE = 2048;   // 長邊上限（px）
-var PHOTO_QUALITY  = 0.85;   // JPEG 品質
+var PHOTO_MAX_EDGE = 1600;   // 長邊上限（px）
+var PHOTO_QUALITY  = 0.72;   // JPEG 品質
+var PHOTO_MAX_BYTES = 500*1024;   // 壓完還超過就再降一階
+var PHOTO_RETRY_QUALITY = 0.55;
 function compressImage(file){
   return new Promise(function(resolve){
     var rd = new FileReader();
@@ -2986,6 +3029,11 @@ function compressImage(file){
           cv.width = cw; cv.height = ch;
           cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
           var out = cv.toDataURL('image/jpeg', PHOTO_QUALITY);
+          /* 還是太大（很大張的相機照）→ 再降一階品質重壓一次 */
+          if (out.length > PHOTO_MAX_BYTES) {
+            var out2 = cv.toDataURL('image/jpeg', PHOTO_RETRY_QUALITY);
+            if (out2.length < out.length) out = out2;
+          }
           // 壓完反而更大（例如本來就很小的圖）→ 用原檔
           if (out.length >= raw.length) { resolve({ data: raw, w: w, h: h, ow: w, oh: h }); return; }
           resolve({ data: out, w: cw, h: ch, ow: w, oh: h });
@@ -3000,15 +3048,24 @@ function compressImage(file){
 }
 function uploadPhotos(e) {
   const tgt=phTargetFromSelect();
-  if(!tgt){ toast('請先在上方新增工項，再選要把照片掛在哪一項','e'); e.target.value=''; return; }
-  const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+  /* 2026-09-03：這一段原本有三條「靜默失敗」的路，使用者按了完全沒反應也沒訊息 ——
+     她與客戶回報的「無法上傳照片」多半就是踩到其中一條。每一條都要講話。 */
+  const picked = Array.from(e.target.files||[]);
+  /* 有些手機（尤其從「檔案」選取、或部分相機 App）給的 file.type 是空字串 →
+     原本用 type 過濾會整批被丟掉。改成「有 type 就看 type，沒有就看副檔名」。 */
+  const looksImage = f => (f.type ? f.type.startsWith('image/')
+    : /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(f.name||''));
+  const files = picked.filter(looksImage);
   e.target.value='';
-  if(!files.length) return;
+  if(!picked.length) return;                       // 使用者自己取消，不用吵他
+  /* 「還沒選工項」排在這裡才對：使用者按了取消（沒選檔）不該跳任何訊息（2026-09-03） */
+  if(!tgt){ toast('照片要掛在某一個工項底下：請先在「施工明細」新增一列，再回到這裡右上角選那一項','e'); return; }
+  if(!files.length){ toast('選到的檔案不是圖片，請重新選擇','e'); return; }
   if(files.length > 1) toast('照片處理中…');
   Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
-    let n = 0;
+    let n = 0, bad = [];
     list.forEach(({ r, f }) => {
-      if(!r) return;
+      if(!r){ bad.push(f.name||'（未命名）'); return; }
       S.report.photos.push({
         id:uid(), data:r.data, name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
@@ -3018,7 +3075,10 @@ function uploadPhotos(e) {
       n++;
     });
     renderPhotos(); syncReport();
-    if(n) toast('已加入 ' + n + ' 張照片','s');
+    if(n) toast('已加入 ' + n + ' 張照片，記得按「💾 儲存報表」','s');
+    if(bad.length) toast('這 ' + bad.length + ' 張讀不到，可能是相機的 HEIC 格式：'
+      + bad.slice(0,3).join('、') + '　→ 手機相機設定改成「相容性最佳／JPEG」再拍一次','e');
+    if(!n && !bad.length) toast('沒有加入任何照片，請再試一次','e');
   });
 }
 /* 依 案場 → 施作位置 → 施工項目 → 日期 分層列出 */
