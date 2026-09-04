@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.12';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-04.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1183,7 +1183,12 @@ function mergeIntoKeyed(target, mine){
       out[k].push(cp);
     });
   });
-  (mine.photos||[]).forEach(p => { (out.photos = out.photos || []).push(p); });
+  /* photos 一律先建好陣列 —— 原本寫在 forEach 裡面，兩邊都沒照片時就不會建，
+     合併結果整個少掉 photos 欄位，接著按上傳就炸「reading push」。
+     根因是 Firebase 不儲存空陣列：photos:[] 存上去就整個欄位消失。
+     （2026-09-04 專案管理踩到，這裡是一模一樣的寫法，一起修。） */
+  out.photos = Array.isArray(out.photos) ? out.photos : [];
+  (mine.photos||[]).forEach(p => { out.photos.push(p); });
   if(!out.weather && mine.weather) out.weather = mine.weather;
   out.notes = out.notes || {};
   if(!out.notes.contact && mine.notes && mine.notes.contact) out.notes.contact = mine.notes.contact;
@@ -2595,6 +2600,8 @@ function _uploadPhotos(e) {
       if(r.timeout){ bad.push(nm + '（讀取逾時）'); return; }
       if(r.undecodable) undec.push(nm);
       if(r.slow) slow.push(nm);
+      /* 保險：雲端讀回來的報表可能沒有 photos 欄位（Firebase 不存空陣列） */
+      if(!Array.isArray(S.report.photos)) S.report.photos = [];
       S.report.photos.push({
         id:uid(), data:r.data, phase:phase, name:f.name, ts:Date.now(),
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h
@@ -2638,6 +2645,7 @@ function openPh(i) {
 function closePh(e){if(e.target===$('ph-overlay'))$('ph-overlay').classList.remove('show');}
 function deletePhoto(){
   if(viewPhIdx<0)return;
+  if(!Array.isArray(S.report.photos)) S.report.photos = [];
   S.report.photos.splice(viewPhIdx,1);
   $('ph-overlay').classList.remove('show');
   renderPhotos();

@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-04.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-04.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1350,7 +1350,10 @@ function mergeIntoKeyed(target, mine){
       out[k].push(cp);
     });
   });
-  (mine.photos||[]).forEach(p => { (out.photos = out.photos || []).push(p); });
+  /* photos 一律先建好陣列 —— 原本寫在 forEach 裡面，兩邊都沒照片時就不會建，
+     合併結果整個少掉 photos 欄位，接著按上傳就炸「reading push」（2026-09-04 線上災情）。 */
+  out.photos = Array.isArray(out.photos) ? out.photos : [];
+  (mine.photos||[]).forEach(p => { out.photos.push(p); });
   if(!out.weather && mine.weather) out.weather = mine.weather;
   out.notes = out.notes || {};
   if(!out.notes.contact && mine.notes && mine.notes.contact) out.notes.contact = mine.notes.contact;
@@ -2418,7 +2421,7 @@ function mergeDupHere(){
   let rows = 0;
   dups.forEach(function(d){
     rows += ((d.workItems||[]).length) + ((d.materials||[]).length);
-    S.report = mergeIntoKeyed(S.report, d);
+    S.report = normReport(mergeIntoKeyed(S.report, d));
   });
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx] = S.report;
@@ -2757,7 +2760,7 @@ function initReport() {
   const newR = blankReport();
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
-  S.report = newR;
+  S.report = normReport(newR);
   rememberBaseline(S.report);
   renderReport();
   applyPermissions();
@@ -2798,7 +2801,7 @@ function _startNewReport(){
   newR.dept = S.user.dept;
   newR.reporter = S.user.name;
   newR.date = today();
-  S.report = newR;
+  S.report = normReport(newR);
   rememberBaseline(S.report);
   renderReport();
   applyPermissions();
@@ -2905,7 +2908,7 @@ function saveReport() {
     const _exist = findByKey(_key)
       || S.reports.find(r => r && r.id !== S.report.id && r.date === S.report.date
                              && reportProjId(r) === S.report.projId) || null;
-    if (_exist) { S.report = mergeIntoKeyed(_exist, S.report); _merged = true; }
+    if (_exist) { S.report = normReport(mergeIntoKeyed(_exist, S.report)); _merged = true; }
     else { S.report.id = _key; }
   }
   clearTombstone(S.report.id);   // 使用者又把同一個 id 建回來了 → 墓碑失效（2026-09-03）
@@ -2925,7 +2928,7 @@ function loadReport(r) {
   /* 舊報表（不是「案場＋日期」鍵的）維持原本的 id，存檔時不改鍵 ——
      用戶 2026-09-02 指定「舊資料不用特別理會」。 */
   _editingLegacy = !isKeyedId(r && r.id);
-  S.report = JSON.parse(JSON.stringify(r));
+  S.report = normReport(JSON.parse(JSON.stringify(r)));
   rememberBaseline(S.report);   // 記下「我打開它時長什麼樣」，存檔時才知道哪些欄位是我真的改過的
   migrateReportProj(S.report);  // 舊的單案場報表就地補上報表層案場（排在基準之後＝算成「我改過」，不會被雲端空值蓋回去）
   renderReport();
@@ -2965,7 +2968,7 @@ function clearForm() {
   if (!confirm('確定要清除表單嗎？\n\n這將清空畫面上這張表單的所有明細（施工明細、材料、備註、照片）。\n先前已存檔的日報表不受影響。')) return;
   /* 先拍一張快照再清 —— 復原就是把它放回去 */
   try { _clearedSnapshot = JSON.parse(JSON.stringify(S.report)); } catch(e){ _clearedSnapshot = null; }
-  S.report = blankReport();
+  S.report = normReport(blankReport());
   S.report.dept = S.user.dept;
   S.report.reporter = S.user.name;
   rememberBaseline(S.report);
@@ -2976,7 +2979,7 @@ function clearForm() {
 }
 function undoClearForm() {
   if (!_clearedSnapshot) { toast('沒有可以復原的內容','e'); return; }
-  S.report = _clearedSnapshot;
+  S.report = normReport(_clearedSnapshot);
   _clearedSnapshot = null;        // 只留最後一次（她指定）
   _reportStarted = true;          // 復原回來的是一張正在填的報表，欄位要解鎖
   rememberBaseline(S.report);
@@ -2989,6 +2992,24 @@ function undoClearForm() {
 function applyUndoClearUI(){
   var b = $('undo-clear-btn');
   if (b) b.style.display = _clearedSnapshot ? '' : 'none';
+}
+
+/* ══════════ 報表正規化（2026-09-04 修線上災情）══════════
+ * ⚠️ **Firebase 不儲存空陣列**：存檔時 photos:[] / materials:[] 會讓整個欄位消失，
+ *    從雲端讀回來就變成 undefined。於是「這張報表還沒有任何照片」的情況下，
+ *    按上傳就會炸在 S.report.photos.push(...)。
+ *    （實測 2026-09-04：線上 19 張報表有 14 張沒有 photos 欄位。）
+ *
+ * 所以只要是要拿來當「目前這張」的報表，一律先補好陣列再用。
+ * 這裡刻意**不動原本就有值的欄位**，只補 undefined／不是陣列的。
+ */
+function normReport(r){
+  if(!r) return r;
+  ['workItems','materials','photos'].forEach(function(k){
+    if(!Array.isArray(r[k])) r[k] = [];
+  });
+  if(!r.notes || typeof r.notes !== 'object') r.notes = {};
+  return r;
 }
 
 /* ── WORK TABLE ── */
@@ -3652,6 +3673,8 @@ function _uploadPhotos(e) {
          不這樣做的話：使用者上傳完馬上關掉分頁 → 原圖只存在記憶體裡 → 真的不見。 */
       _fullCache[_pid] = r.data;
       _pendingFull[_pid] = r.data;
+      /* 保險：就算上面的正規化沒跑到（例如未來新增別的載入路徑），這裡也不會炸 */
+      if(!Array.isArray(S.report.photos)) S.report.photos = [];
       S.report.photos.push({
         id:_pid, data:r.data, thumb:'', name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
@@ -3735,6 +3758,7 @@ function deletePhoto(){
     }
   }
   markRowDeleted(p && p.id, S.report && S.report.id);   // 刻意刪掉 → 合併時不要復活
+  if(!Array.isArray(S.report.photos)) S.report.photos = [];
   S.report.photos.splice(viewPhIdx,1);
   $('ph-overlay').classList.remove('show');
   renderPhotos(); syncReport();
