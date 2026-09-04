@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-04.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-04.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -592,7 +592,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th style="width:64px">明日<br>出工</th>
             <th style="width:76px">完成<br>進度%</th>
             <th style="min-width:90px">異常類型</th>
-            <th style="min-width:100px">異常說明</th>
+            <th style="min-width:100px">備註說明</th>
             <th style="min-width:70px">填表人</th>
             <th class="no-print" style="width:30px">刪</th>
           </tr>
@@ -963,7 +963,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th>案場</th><th>日期</th><th>部門</th><th>專案工務</th>
             <th>施作位置</th><th>施工項目</th><th>今日廠商</th><th>今日施工人員</th>
             <th>今日出工</th><th>明日廠商</th><th>明日施工人員</th><th>明日出工</th>
-            <th>完成進度%</th><th>異常類型</th><th>異常說明</th><th>填表人</th>
+            <th>完成進度%</th><th>異常類型</th><th>備註說明</th><th>填表人</th>
           </tr>
         </thead>
         <tbody id="ex-tbody"></tbody>
@@ -2960,7 +2960,9 @@ function backToHistory(){ goPage(_backTo==='cal' ? 'cal' : 'history'); }
 var _clearedSnapshot = null;      // 清除前的整張報表（只留最後一次，她指定）
 var _deptWarnAcked = {};          // 這一張已經確認過「部門只有管理層看得到」（2026-09-03）
 function clearForm() {
-  if (!confirm('確定要清除表單嗎？\n\n這將清空畫面上這張表單的所有明細（施工明細、材料、備註、照片）。\n先前已存檔的日報表不受影響。\n\n清除後可以按「↩ 復原清除」救回來。')) return;
+  /* 2026-09-04 她指定：確認視窗最後那一句提到復原鈕的話拿掉。
+     鈕本身沒動，清除完還是會跳一次提示帶到它 —— 只是確認視窗不再多這一句。 */
+  if (!confirm('確定要清除表單嗎？\n\n這將清空畫面上這張表單的所有明細（施工明細、材料、備註、照片）。\n先前已存檔的日報表不受影響。')) return;
   /* 先拍一張快照再清 —— 復原就是把它放回去 */
   try { _clearedSnapshot = JSON.parse(JSON.stringify(S.report)); } catch(e){ _clearedSnapshot = null; }
   S.report = blankReport();
@@ -2990,10 +2992,24 @@ function applyUndoClearUI(){
 }
 
 /* ── WORK TABLE ── */
+/* 異常類型的選項：下拉裡帶 emoji 好認，但摘要是要複製貼到 Email／LINE 的，
+   所以另外留一份純文字（2026-09-04 她指定異常類型也要進摘要）。 */
+const ATYPES = [
+  ['',         '— 無 —',      ''],
+  ['material', '🧱 材料未到', '材料未到'],
+  ['weather',  '🌧️ 天候影響', '天候影響'],
+  ['previous', '⏳ 前項未完', '前項未完'],
+  ['other',    '❓ 其他',      '其他'],
+];
+/* 摘要用的純文字標籤；認不得的值（舊資料手改過）就原樣顯示，不要吞掉 */
+function atypeText(v){
+  if(!v) return '';
+  const hit = ATYPES.find(a => a[0] === v);
+  return hit ? hit[2] : String(v);
+}
 function addRow(it) {
   const tbody = $('tbody'); const n=++rowN;
-  const aOpts = [['','— 無 —'],['material','🧱 材料未到'],['weather','🌧️ 天候影響'],['previous','⏳ 前項未完'],['other','❓ 其他']]
-    .map(([v,l])=>`<option value="${v}"${it?.atype===v?' selected':''}>${l}</option>`).join('');
+  const aOpts = ATYPES.map(([v,l])=>`<option value="${v}"${it?.atype===v?' selected':''}>${l}</option>`).join('');
   const v = f => it?(it[f]??''):'';
   const prog = it?Math.min(100,Math.max(0,parseFloat(it.progress)||0)):0;
   // 這一列是誰建的：舊資料沒有 owner → 視為無主，任何人都能改（不讓歷史資料變成沒人能碰）
@@ -3025,7 +3041,7 @@ function addRow(it) {
       </div>
     </td>
     <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()"${dis}>${aOpts}</select></td>
-    <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="說明..." oninput="syncReport()"${dis}></td>
+    <td data-label="備註說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="備註..." oninput="syncReport()"${dis}></td>
     <td data-label="填表人">${canUn
       ? `<button type="button" class="lock-btn" onclick="unlockRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 填的內容">${escHtml(owner)} 🔒</button>`
       : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}${
@@ -3261,7 +3277,13 @@ function summaryFromItems(items, dateStr, projName, mats, notes, weather){
     /* 空白工項照樣產生（她指定「產生」）—— 只有「整列都沒有東西」才不算一列，
        但位置與項目空著、只有進度與填表人的那種，仍然要佔一個編號。 */
     if(!(pn || wi.loc || wi.work || wi.owner)) return null;
-    return [wi.loc, wi.work, `進度${parseFloat(wi.progress)||0}%`, wi.owner].filter(Boolean).join('；');
+    /* 2026-09-04 她指定：異常類型與備註說明都接在**施工項目後面**。
+       兩個都是 filter(Boolean) 濾掉的，沒填就完全不會多出東西（實測 47 列裡只有 5 列有填），
+       所以絕大多數的摘要看起來跟改版前一樣。 */
+    return [wi.loc, wi.work, atypeText(wi.atype), wi.anote,
+            `進度${parseFloat(wi.progress)||0}%`, wi.owner]
+           .map(x => String(x == null ? '' : x).trim())
+           .filter(Boolean).join('；');
   }).filter(v => v !== null);
   out.push(lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
 
@@ -4746,7 +4768,7 @@ async function doExportExcel(rows){
   try{
     const wb=new ExcelJS.Workbook();
     const ws=wb.addWorksheet('日報表-專案管理');
-    const headers=['案場','日期','部門','專案工務','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','異常說明','填表人'];
+    const headers=['案場','日期','部門','專案工務','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','備註說明','填表人'];
     ws.addRow(headers);
     ws.getRow(1).eachCell(cell=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
@@ -4805,7 +4827,7 @@ async function exportExcel(){
     // 工項
     if(hasWork){
       const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','異常說明','填表人'];
+      const headers=['#','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','備註說明','填表人'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
         const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wi.vendor||'',wi.staff||'',wi.w0||0,wi.vendor2||'',wi.staff2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'',wi.owner||'']);

@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-08-30.10';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-09-04.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -68,6 +68,23 @@
       .set-2col{grid-template-columns:1fr 1fr;align-items:start}
       .set-2col.sidebar{grid-template-columns:minmax(280px,22rem) 1fr}
     }
+    /* 四步引導（2026-09-04）—— 兩個頁籤改成一次一步 */
+    .wiz{display:flex;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff}
+    .wiz-s{flex:1 1 150px;display:flex;gap:9px;align-items:flex-start;padding:11px 13px;
+      border-right:1px solid #e5e7eb;min-width:0;background:none;text-align:left;cursor:pointer;font:inherit}
+    .wiz-s:last-child{border-right:none}
+    .wiz-s.on{background:#1d4ed8;color:#fff}
+    .wiz-s.done{background:#ecfdf5}
+    .wiz-s .n{flex:0 0 21px;height:21px;border-radius:50%;background:#e5e7eb;color:#6b7280;
+      font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+    .wiz-s.on .n{background:#fff;color:#1d4ed8}
+    .wiz-s.done .n{background:#059669;color:#fff}
+    .wiz-s .t{min-width:0}
+    .wiz-s .t b{display:block;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+    .wiz-s .t span{font-size:11px;opacity:.75;display:block;line-height:1.5;overflow-wrap:anywhere}
+    .cfg-step{border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;padding:16px;background:#f8fafc}
+    .wiz-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+    .autosave-tag{font-size:12px;color:#059669;white-space:nowrap}
     .set-tab{flex:1;padding:9px 10px;border-radius:10px;font-weight:700;font-size:13px;
              color:#6b7280;background:transparent;border:0;cursor:pointer;white-space:nowrap}
     .set-tab.on{background:#fff;color:#1d4ed8;box-shadow:0 1px 3px rgba(0,0,0,.12)}
@@ -306,40 +323,59 @@
   <div id="view-settings" class="view p-4 space-y-4">
     <button onclick="backToPortal()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">🏠 返回主系統</button>
 
-    <!-- 兩大部份（2026-08-30 用戶指定）：案場／廠商在左（預設），SOP 設定在右 -->
-    <div class="flex gap-1 bg-gray-100 rounded-xl p-1" data-set-tabs>
-      <button id="set-tab-base" onclick="setCfgPart('base')" class="set-tab on">📍 案場管理與施工廠商</button>
-      <button id="set-tab-sop"  onclick="setCfgPart('sop')"  class="set-tab">📋 查檢表 SOP 設定</button>
-    </div>
+    <!-- 四步引導（2026-09-04 她指定，比照日報表—專案管理）：
+         ① 案場 ② 施工廠商 ③ 範圍／項目 ④ 查檢表
+         原本是兩個頁籤，分法跟實際建置順序對不上 —— 要建一張查檢表得先確認範圍與項目存在，
+         中間要來回切頁籤；而且第二個頁籤一次攤開三張卡，不知道從哪裡開始。 -->
+    <div class="wiz" id="cfg-wiz"></div>
 
-    <!-- 第 1 部份：案場管理與施工廠商 -->
-    <div id="set-part-base" class="space-y-4">
-      <div class="set-2col">
-        <div id="cfg-cases"       class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases"       data-label="案場管理"  data-icon="📍"></div>
-        <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商"  data-icon="🔨"></div>
-      </div>
-      <!-- 部門管理 / 人員管理 已移除：改由入口網頁集中管理 -->
-      <div style="background:#eef6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
+    <!-- ① 案場 -->
+    <div id="cfg-step-1" class="cfg-step">
+      <div id="cfg-cases" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="cases" data-label="案場管理" data-icon="📍"></div>
+      <!-- 部門／人員改由入口網頁集中管理。放在第 ① 步下面（跟日報表一致）-->
+      <div style="margin-top:16px;background:#eef6ff;border:1px solid #bfdbfe;border-radius:16px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
         ℹ️ <strong>部門管理 / 人員管理 已移至入口網頁集中管理</strong><br>
         如需新增/編輯部門、員工，請至
         <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
       </div>
     </div>
 
-    <!-- 第 2 部份：查檢表 SOP 設定 -->
-    <div id="set-part-sop" class="space-y-4" style="display:none">
+    <!-- ② 施工廠商 -->
+    <div id="cfg-step-2" class="cfg-step" style="display:none">
+      <div id="cfg-contractors" class="cfg-block bg-white rounded-2xl p-4 shadow-sm" data-key="contractors" data-label="施工廠商" data-icon="🔨"></div>
+    </div>
+
+    <!-- ③ 範圍／項目 —— 查檢表要掛在這底下，所以順序不能跟第 ④ 步顛倒 -->
+    <div id="cfg-step-3" class="cfg-step" style="display:none">
+      <div id="cfg-cats" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
+    </div>
+
+    <!-- ④ 查檢表 -->
+    <div id="cfg-step-4" class="cfg-step" style="display:none">
       <div id="cfg-tpl-all" class="bg-white rounded-2xl p-4 shadow-sm"></div>
-      <div class="set-2col sidebar">
-        <div id="cfg-cats"      class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
+      <div class="set-2col sidebar" style="margin-top:16px">
+        <div id="cfg-tpl-pick" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
         <div id="cfg-templates" class="cfg-block bg-white rounded-2xl p-4 shadow-sm"></div>
       </div>
     </div>
+
+    <!-- 底部：上一步／下一步 ＋ 保險用的手動儲存 -->
+    <div class="wiz-nav">
+      <button class="border-2 border-gray-300 text-gray-700 font-medium px-4 py-2 rounded-xl text-sm hover:bg-gray-50"
+        id="wiz-prev" onclick="cfgStepGo(-1)">‹ 上一步</button>
+      <div class="flex items-center gap-2">
+        <span id="cfg-autosave" class="autosave-tag"></span>
+        <button onclick="saveConfig(true)" data-mng class="border-2 border-blue-300 text-blue-700 font-medium px-4 py-2 rounded-xl text-sm hover:bg-blue-50">&#128190; 儲存設定</button>
+        <button class="bg-blue-700 hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-xl text-sm"
+          id="wiz-next" onclick="cfgStepGo(1)">下一步 ›</button>
+      </div>
+    </div>
+
     <div class="bg-white rounded-2xl p-4 shadow-sm">
       <h3 class="text-sm font-semibold text-gray-700 mb-2">☁️ 雲端同步狀態</h3>
       <div id="sync-status-text" class="text-sm text-gray-400 mb-3">— 尚未同步</div>
       <button onclick="syncNow()" class="w-full border-2 border-blue-300 text-blue-700 font-medium py-2 rounded-xl text-sm hover:bg-blue-50">立即同步至雲端</button>
     </div>
-    <button onclick="saveConfig()" data-mng class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-2xl shadow-md text-base">&#128190; 儲存設定</button>
   </div>
 
 </main>
@@ -639,6 +675,9 @@ var PAGE_TITLES = {
 var BOTTOM_NAV_VIEWS = {home:true,history:true,settings:true};
 
 function showView(v){
+  /* 離開設定頁 → 自動存一次（2026-09-04）。goTo 與 goBack 都走這裡，掛這邊才不會漏。
+     要在改掉 S.view 之前判斷。 */
+  if (S.view === 'settings' && v !== 'settings' && typeof autoSaveConfig === 'function') autoSaveConfig();
   S.view=v;
   document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('active'); });
   var el=$('view-'+v);
@@ -1564,20 +1603,77 @@ function deleteReport(id){
 /* ══════════ 設定頁的兩大部份（2026-08-30 用戶指定）══════════
  * 第 1 部份＝查檢表 SOP 設定，第 2 部份＝案場管理與施工廠商。
  * 以前整頁由上往下五張卡，改 SOP 時下面的案場／廠商一直在干擾，筆電上更明顯。 */
-function setCfgPart(p){
-  S.cfgPart = (p==='base') ? 'base' : 'sop';
-  try{ localStorage.setItem('sop_cfg_part', S.cfgPart); }catch(e){}
+/* ══════════ 設定頁四步引導（2026-09-04 她指定，比照日報表—專案管理）══════════
+ * ① 案場 → ② 施工廠商 → ③ 範圍／項目 → ④ 查檢表
+ * 第 ③ 步一定要排在第 ④ 步前面：查檢表要掛在「範圍→項目」底下，沒先建就沒地方掛。
+ * 每一步的標籤顯示目前筆數，已經建好的打勾。 */
+var CFG_STEPS = [
+  { n:1, title:'案場',      sum:function(){ return (S.config.cases||[]).length + ' 個'; },
+    done:function(){ return (S.config.cases||[]).length > 0; } },
+  { n:2, title:'施工廠商',  sum:function(){ return (S.config.contractors||[]).length + ' 家'; },
+    done:function(){ return (S.config.contractors||[]).length > 0; } },
+  { n:3, title:'範圍／項目', sum:function(){ return catL1().length + ' 範圍 · ' + catL2().length + ' 項目'; },
+    done:function(){ return catL1().length > 0; } },
+  { n:4, title:'查檢表',    sum:function(){
+      var live = TEMPLATES.filter(function(t){ return t && !t.void; }).length;
+      return live + ' 張'; },
+    done:function(){ return TEMPLATES.some(function(t){ return t && !t.void && (t.items||[]).length; }); } },
+];
+var _cfgStep = 1;
+try{ _cfgStep = Math.min(4, Math.max(1, parseInt(localStorage.getItem('sop_cfg_step'),10) || 1)); }catch(e){}
+
+function cfgStepTo(n){
+  n = Math.min(4, Math.max(1, n|0));
+  if(n !== _cfgStep) autoSaveConfig();     // 離開這一步 → 自動存
+  _cfgStep = n;
+  try{ localStorage.setItem('sop_cfg_step', String(n)); }catch(e){}
   applyCfgPart();
   window.scrollTo(0,0);
 }
+function cfgStepGo(d){ cfgStepTo(_cfgStep + d); }
+/* 舊的呼叫端（記憶體裡的舊分頁、書籤）不要壞掉 */
+function setCfgPart(p){ cfgStepTo(p==='base' ? 1 : 4); }
+
+function renderCfgWiz(){
+  var el = $('cfg-wiz'); if(!el) return;
+  el.innerHTML = CFG_STEPS.map(function(st){
+    var on = (st.n === _cfgStep);
+    var ok = !on && st.done();
+    return '<button type="button" class="wiz-s' + (on?' on':'') + (ok?' done':'') + '"'
+      + ' onclick="cfgStepTo(' + st.n + ')">'
+      + '<span class="n">' + (ok ? '✓' : st.n) + '</span>'
+      + '<span class="t"><b>' + st.n + '. ' + esc(st.title) + '</b>'
+      + '<span>' + esc(st.sum()) + '</span></span></button>';
+  }).join('');
+}
+
 function applyCfgPart(){
-  var isSop = (S.cfgPart!=='base');
-  var a=$('set-part-sop'), b=$('set-part-base');
-  if(a) a.style.display = isSop ? '' : 'none';
-  if(b) b.style.display = isSop ? 'none' : '';
-  var ta=$('set-tab-sop'), tb=$('set-tab-base');
-  if(ta) ta.className = 'set-tab' + (isSop ? ' on' : '');
-  if(tb) tb.className = 'set-tab' + (isSop ? '' : ' on');
+  for(var i=1;i<=4;i++){
+    var el = $('cfg-step-' + i);
+    if(el) el.style.display = (i === _cfgStep) ? '' : 'none';
+  }
+  renderCfgWiz();
+  /* 第 ③ 步的範圍／項目、第 ④ 步的查檢表，切過去時重畫一次才會是最新的 */
+  if(_cfgStep === 3) renderCatsSection();
+  if(_cfgStep === 4){ renderTplPickSection(); renderTemplatesSection(); }
+  var prev = $('wiz-prev'), next = $('wiz-next');
+  if(prev){ prev.style.visibility = (_cfgStep===1) ? 'hidden' : '';
+            prev.textContent = '‹ 上一步：' + ((CFG_STEPS[_cfgStep-2]||{}).title || ''); }
+  if(next){ next.style.visibility = (_cfgStep===4) ? 'hidden' : '';
+            next.textContent = '下一步：' + ((CFG_STEPS[_cfgStep]||{}).title || '') + ' ›'; }
+}
+
+/* 自動存：切步驟、離開設定頁各一次，**靜默**不跳 toast
+   —— 每切一步就彈一次提示會很吵，手動那顆才跳。 */
+function autoSaveConfig(){
+  if(!portalCanManageSettings()) return;  // 沒有維護權就什麼都不做（mngGuard 會跳警告，自動存不能吵）
+  saveConfig(false);
+  var tag = $('cfg-autosave');
+  if(tag){
+    tag.textContent = '✓ 已自動儲存';
+    clearTimeout(window._asT);
+    window._asT = setTimeout(function(){ if(tag) tag.textContent=''; }, 2600);
+  }
 }
 
 /* ══════════ 所有 SOP 一覽（2026-08-30 用戶指定）══════════
@@ -1978,17 +2074,41 @@ function setCfgCat(level, v){
   renderCatsSection(); renderTemplatesSection();
 }
 
+/* 2026-09-04 改四步時拆成兩半：
+     · 第 ③ 步只留「範圍／項目」兩層分類的維護
+     · 第 ④ 步才是「選一張查檢表來編」（原本的 tplRowHtml）
+   拆開的原因：這張卡原本同時是「分類編輯器」又是「要編哪張表的選擇器」，
+   兩件事混在一起，所以四步分不開。 */
 function renderCatsSection(){
   var el=$('cfg-cats');
   if(!el) return;
   cfgEnsureSel(); cfgSyncEditing();
-  /* 「＋ 新增」擺在標題上方（2026-08-26 用戶指定）—— 它是這張卡最主要的動作，放最前面最好找 */
+  el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-1">📂 範圍 / 項目</h3>'
+    +'<p class="text-xs text-gray-400 mb-3">查檢表要掛在「範圍 → 項目」底下，所以先在這裡建好，下一步才選得到。</p>'
+    +catRowHtml(1,'範圍')
+    +catRowHtml(2,'項目');
+  /* 第 ④ 步的選單也跟著更新（分類改名後，那邊的下拉才會對） */
+  renderTplPickSection();
+}
+/* 第 ④ 步左上：＋新增 ＋ 「要編哪一張查檢表」 */
+function renderTplPickSection(){
+  var el=$('cfg-tpl-pick');
+  if(!el) return;
+  cfgEnsureSel(); cfgSyncEditing();
   el.innerHTML=addMenuHtml()
-    +'<h3 class="text-sm font-semibold text-gray-700 mb-1">📂 範圍 / 項目 / SOP</h3>'
-    +'<p class="text-xs text-gray-400 mb-3">由上往下選：範圍 → 項目 → SOP。選好之後，下面那張卡就是在編輯這一張表。</p>'
+    +'<h3 class="text-sm font-semibold text-gray-700 mb-1">📋 要編哪一張查檢表</h3>'
+    +'<p class="text-xs text-gray-400 mb-3">目前範圍：<b>'+esc(catNameIcon(1,S.cfgCat1))+'</b> ／ 項目：<b>'+esc(catNameIcon(2,S.cfgCat2))+'</b>'
+    +'<br>要換範圍或項目，回上一步調整。</p>'
     +catRowHtml(1,'範圍')
     +catRowHtml(2,'項目')
     +tplRowHtml();
+}
+/* 帶 emoji 的分類顯示名稱。
+   ⚠️ 不要叫 catName —— 上面 584 行早就有一個同名的（回傳純名稱，不帶 emoji），
+   蓋掉會讓分類改名、路徑標題等一票功能全部多一個 emoji。 */
+function catNameIcon(level,id){
+  var c=catFind(level,id);
+  return c ? ((c.icon||'')+' '+c.name).trim() : '（未指定）';
 }
 
 /* ── 一顆「＋ 新增」統一入口（2026-08-26 用戶指定）──────────────────
@@ -2446,13 +2566,18 @@ function removeCfgItem(key,idx){
   S.config[key].splice(idx,1);
   renderSettings();
 }
-function saveConfig(){
+/* manual===false 是自動存（切步驟／離開設定頁）→ 靜默；其餘照舊跳 toast。
+   參數預設 undefined，所以舊的呼叫端 saveConfig() 行為完全不變。 */
+function saveConfig(manual){
   if(mngGuard())return;
   saveLS();
+  var quiet = (manual === false);
   if(window._sopSet){
-    window._sopSet('config', S.config).then(function(){ showToast('設定已儲存並同步'); }).catch(function(){ showToast('設定已存本機'); });
+    window._sopSet('config', S.config)
+      .then(function(){ if(!quiet) showToast('設定已儲存並同步'); })
+      .catch(function(){ if(!quiet) showToast('設定已存本機'); });
   } else {
-    showToast('設定已儲存');
+    if(!quiet) showToast('設定已儲存');
   }
 }
 function syncNow(){
