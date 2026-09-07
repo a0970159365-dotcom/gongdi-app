@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-04.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-07.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -3623,13 +3623,16 @@ async function exportExcel(){
  * ⚠️ 這份與 cdr-pm 的 addNoteRow 是同一套算法，改一邊要記得改另一邊（測試會比對）。
  */
 function addNoteRow(ws, label, text, lastCol, colw){
-  const row = ws.addRow([label, String(text||'')]);
+  /* 2026-09-07：標籤原本只放 A 欄（寬 6），「與工地聯絡事項」七個字被切成「與工」，
+     而且後面 B 欄的合併內容會壓上來。改成標籤自己合併 A:B，內容退到 C 欄起。 */
+  const row = ws.addRow([label, '', String(text||'')]);
+  const rn = row.number;
+  ws.mergeCells(rn, 1, rn, 2);
   row.getCell(1).font = {bold:true};
   row.getCell(1).alignment = {vertical:'top'};
-  const rn = row.number;
-  ws.mergeCells(rn, 2, rn, lastCol);
-  row.getCell(2).alignment = {wrapText:true, vertical:'top'};
-  let w = 0; for(let c=2;c<=lastCol;c++) w += (colw[c-1]||0);
+  ws.mergeCells(rn, 3, rn, lastCol);
+  row.getCell(3).alignment = {wrapText:true, vertical:'top'};
+  let w = 0; for(let c=3;c<=lastCol;c++) w += (colw[c-1]||0);
   const usable = Math.max(10, w - 2);          // 留一點內距，免得估太滿
   const lines = String(text||'').split('\n').reduce((sum,seg)=>{
     let units = 0;
