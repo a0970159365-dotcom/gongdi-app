@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-04.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-07.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -624,6 +624,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th style="min-width:140px">材料名稱</th>
             <th style="width:80px">數量</th>
             <th style="width:80px">單位</th>
+            <!-- 2026-09-07 她回報：匯出 Excel 有「備註」欄，但日報表畫面上沒有欄位可以填 → 永遠是空的。補上。 -->
+            <th style="min-width:110px">備註</th>
             <th class="no-print" style="width:30px">刪</th>
           </tr>
         </thead>
@@ -3367,6 +3369,7 @@ function addMatRow(m) {
     <td><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
     <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
     <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
+    <td><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
     <td class="no-print">${mine
       ? `<button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button>`
       : (canUn
@@ -3469,7 +3472,8 @@ function collectMatRows() {
       owner: tr.dataset.owner||'',   // 多人共編：這一列是誰加的（disabled 的欄位 .value 照樣讀得到，資料不會掉）
       name: tr.querySelector('[data-f="mname"]')?.value||'',
       qty: parseFloat(tr.querySelector('[data-f="mq"]')?.value)||0,
-      unit: tr.querySelector('[data-f="munit"]')?.value||''
+      unit: tr.querySelector('[data-f="munit"]')?.value||'',
+      note: tr.querySelector('[data-f="mnote"]')?.value||''
     });
   });
   return _keepRowMeta(rows, 'materials');
@@ -3804,9 +3808,11 @@ document.addEventListener('input',e=>{if(e.target.matches('textarea.fi'))autoGro
 /* 進站當下的頁面標題；列印時會被暫時改成檔名，離開預覽要還原回來 */
 var BASE_TITLE=document.title;
 function buildPrintTitle(){
+  /* 2026-09-07 她指定：檔名不要帶專案工務的人名。
+     列印出來的內容裡照樣有（頁首的 ph-info 那一行），只是檔名不放 ——
+     檔名會出現在下載清單、郵件附件、共用資料夾，帶著人名不合適。 */
   const parts=['日報表-專案管理', S.report.date||today()];
   const pn=reportProjName(S.report); if(pn) parts.push(pn);
-  if(S.report.reporter) parts.push(S.report.reporter);
   return parts.join('_');
 }
 function printPDF(){
@@ -4749,7 +4755,7 @@ function previewExport(){
     tr.innerHTML=[r._matRow?'(材料)':escHtml(r.projName||''),r.date,r.dept,r.reporter,
       escHtml(r.loc||''),escHtml(r.work||''),escHtml(r.vendor||''),escHtml(r.staff||''),
       r.w0!==''?r.w0:'',escHtml(r.vendor2||''),escHtml(r.staff2||''),r.w1!==''?r.w1:'',
-      r.progress!==''?r.progress+'%':'',escHtml(r.atype||''),escHtml(r.anote||''),escHtml(r.owner||'')]
+      r.progress!==''?r.progress+'%':'',escHtml(atypeText(r.atype)),escHtml(r.anote||''),escHtml(r.owner||'')]
       .map(v=>`<td>${v}</td>`).join('');
     tbody.appendChild(tr);
   });
@@ -4768,13 +4774,16 @@ function doExport(){
  * 字寬估法：半形 1、中文 2；換行符先切段各自算，再加總。
  */
 function addNoteRow(ws, label, text, lastCol, colw){
-  const row = ws.addRow([label, String(text||'')]);
+  /* 2026-09-07：標籤原本只放 A 欄（寬 6），「與工地聯絡事項」七個字被切成「與工」，
+     而且後面 B 欄的合併內容會壓上來。改成標籤自己合併 A:B，內容退到 C 欄起。 */
+  const row = ws.addRow([label, '', String(text||'')]);
+  const rn = row.number;
+  ws.mergeCells(rn, 1, rn, 2);
   row.getCell(1).font = {bold:true};
   row.getCell(1).alignment = {vertical:'top'};
-  const rn = row.number;
-  ws.mergeCells(rn, 2, rn, lastCol);
-  row.getCell(2).alignment = {wrapText:true, vertical:'top'};
-  let w = 0; for(let c=2;c<=lastCol;c++) w += (colw[c-1]||0);
+  ws.mergeCells(rn, 3, rn, lastCol);
+  row.getCell(3).alignment = {wrapText:true, vertical:'top'};
+  let w = 0; for(let c=3;c<=lastCol;c++) w += (colw[c-1]||0);
   const usable = Math.max(10, w - 2);          // 留一點內距，免得估太滿
   const lines = String(text||'').split('\n').reduce((sum,seg)=>{
     let units = 0;
@@ -4783,6 +4792,143 @@ function addNoteRow(ws, label, text, lastCol, colw){
   }, 0);
   row.height = Math.max(18, lines * 14);
   return row;
+}
+
+/* ── 匯出 Excel：【現場照片】區（2026-09-07 她選丙案）─────────────────
+ * 丙案＝工項表完全不動，另開一區排在工項之後、材料之前，
+ * 依「施作位置 → 施工項目」分小標題。她選它的理由是工項表維持原樣，
+ * 一頁印得完、也還能篩選排序。
+ *
+ * 照片一律用**報表裡現成的縮圖**、寬 160px（她定的）。不去雲端拉原圖 ——
+ * 幾十張要等快一分鐘，檔案也會從幾百 KB 變成幾十 MB。
+ *
+ * ⚠️ exceljs 的圖片是「浮在儲存格上面」的，tl 收的是欄／列索引（可以是小數）。
+ *    要讓照片橫向並排，得自己把像素位置換算成小數欄索引；欄寬是算出來的，
+ *    所以這一段**一定要在欄寬定案之後**才跑。 */
+const PH_XL_W = 160;                                   // 她指定的照片寬度（px）
+/* Excel 欄寬單位 → 像素（預設字型下的近似式，用來換算照片要擺在第幾欄） */
+function xlColPx(colw){ return colw.map(function(w){ return Math.round(w * 7 + 5); }); }
+/* ⚠️ 不要用小數欄索引（2026-09-07 她回報「照片重疊」踩到的坑）：
+   exceljs 把 tl.col 的小數部分換算成**固定 640000 EMU（約 67px）**的偏移量，
+   跟該欄的實際寬度無關。欄比 67px 寬時偏移量根本不夠，第二張以後就會往左疊上第一張。
+   所以照片一律靠在「整數欄」的左邊界 —— 沒有偏移量，就沒有換算誤差。
+   這一支挑出彼此至少相隔 step 像素的欄，回傳欄索引（0 起算）。 */
+function photoCols(colPx, step, imgW){
+  var starts = [], acc = 0, i;
+  for (i = 0; i < colPx.length; i++) { starts.push(acc); acc += colPx[i]; }
+  var cols = [], want = 0;
+  for (i = 0; i < starts.length; i++) {
+    if (starts[i] < want) continue;
+    if (starts[i] + imgW > acc) break;      // 再放就超出整張表的右邊了
+    cols.push(i); want = starts[i] + step;
+  }
+  return cols.length ? cols : [0];          // 表太窄時至少放得下一張
+}
+/* 照片框高：有原始長寬就照比例，沒有就用 4:3；夾在 90～220 之間，
+   免得一張直式照片把整列撐成一根長條。 */
+function phBoxH(p){
+  var w = Number(p && p.w) || 0, h = Number(p && p.h) || 0;
+  var px = (w > 0 && h > 0) ? Math.round(PH_XL_W * h / w) : Math.round(PH_XL_W * 3 / 4);
+  return Math.max(90, Math.min(220, px));
+}
+/* 依 施作位置 → 施工項目 分組。順序照工項表，工項表裡沒有的（照片單獨指定過）排在後面。
+   沒有影像資料的照片直接跳過 —— 舊照片可能只剩雲端那一份，本機沒有縮圖。 */
+function photoGroups(r){
+  var order = [], map = {};
+  var key = function(a, b){ return (a || "") + "\u0000" + (b || ""); };
+  ((r && r.workItems) || []).forEach(function(wi){
+    var k = key(wi.loc, wi.work);
+    if (!map[k]) { map[k] = { loc: wi.loc || "", work: wi.work || "", photos: [] }; order.push(k); }
+  });
+  ((r && r.photos) || []).forEach(function(p){
+    if (!p || !photoSrc(p)) return;
+    var k = key(p.loc, p.work);
+    if (!map[k]) { map[k] = { loc: p.loc || "", work: p.work || "", photos: [] }; order.push(k); }
+    map[k].photos.push(p);
+  });
+  return order.map(function(k){ return map[k]; }).filter(function(g){ return g.photos.length; });
+}
+/* 把照片區寫進工作表，回傳實際插進去的張數（0 ＝ 這張報表沒有照片，什麼都不會多出來） */
+function addPhotoSection(wb, ws, r, colw, lastCol){
+  var groups = photoGroups(r);
+  if (!groups.length) return 0;
+  var colPx = xlColPx(colw);
+  var GAP = 12;
+  /* 可以放照片的欄（彼此至少相隔一張照片＋間距），一行最多 6 張 */
+  var slots = photoCols(colPx, PH_XL_W + GAP, PH_XL_W).slice(0, 6);
+  var perLine = slots.length;
+  var total = groups.reduce(function(sum, g){ return sum + g.photos.length; }, 0);
+  var n = 0;
+
+  var tr = ws.addRow(["【現場照片】", "共 " + total + " 張"]);
+  tr.getCell(1).font = { bold: true, size: 12, color: { argb: "FF1A3A5C" } };
+  tr.getCell(2).font = { size: 11, color: { argb: "FF64748B" } };
+
+  groups.forEach(function(g){
+    var title = "📍 " + (g.loc || PH_UNSET) + "　›　" + (g.work || PH_UNSET)
+              + "　（" + g.photos.length + " 張）";
+    var head = ws.addRow([title]);
+    ws.mergeCells(head.number, 1, head.number, lastCol);
+    head.getCell(1).font = { bold: true, color: { argb: "FF1A3A5C" } };
+    head.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF4FA" } };
+    head.height = 18;
+
+    for (var i = 0; i < g.photos.length; i += perLine) {
+      var line = g.photos.slice(i, i + perLine);
+      var boxH = Math.max.apply(null, line.map(phBoxH));
+      var imgRow = ws.addRow([]);
+      imgRow.height = Math.round(boxH * 0.75) + 4;      // 像素 → 點（Excel 列高的單位）
+      var capRow = ws.addRow([]);
+      capRow.height = 13;
+      line.forEach(function(p, j){
+        var src = photoSrc(p);
+        var m = /^data:image\/([a-z0-9+.-]+);base64,([\s\S]+)$/i.exec(src || "");
+        if (!m) return;                                  // 不是 base64 影像 → 跳過，不要讓整支匯出爆掉
+        var ext = m[1].toLowerCase() === "png" ? "png" : "jpeg";
+        var col = slots[j];
+        var id = wb.addImage({ base64: m[2], extension: ext });
+        ws.addImage(id, { tl: { col: col, row: imgRow.number - 1 },
+                          ext: { width: PH_XL_W, height: phBoxH(p) } });
+        /* 檔名寫在照片正下方、同一欄。要找原圖時拿這個檔名去「📷 照片 → 下載全部」那邊對。 */
+        var cell = capRow.getCell(Math.min(lastCol, col + 1));
+        if (!cell.value) cell.value = p.origName || p.name || "";
+        cell.font = { size: 8, color: { argb: "FF64748B" } };
+        n++;
+      });
+    }
+    ws.addRow([]);
+  });
+  return n;
+}
+
+/* ── 匯出檔名（2026-09-07 她指定：要看得出是哪個案場）──
+ * 下載一堆檔案時，光看「日報表-專案管理_2026-09-07」分不出是哪個案場。
+ * 案場名可能帶 / : * 這種檔名不能用的字，一律走 safeName() 換成底線；
+ * 空白也拿掉（Windows 檔名可以有空白，但貼進網址或 LINE 會斷行）。 */
+function excelFileName(projName, dateStr){
+  /* ⚠️ 空字串丟給 safeName() 會拿到「（未指定）」（那是給照片資料夾用的預設值），
+     直接套下去，沒有案場的報表檔名會多出一段「_（未指定）」。先擋掉空值。 */
+  const pn = projName ? safeName(projName).replace(/\s+/g, '') : '';
+  return '日報表-專案管理' + (pn ? '_'+pn : '') + '_' + (dateStr||today()) + '.xlsx';
+}
+
+/* ── 依實際內容算欄寬（2026-09-07）──
+ * exceljs 沒有 auto-fit，欄寬要自己算。中文字大約是半形的兩倍寬，
+ * 所以不能用 String.length，要逐字判斷。表頭是粗體再多給一點。
+ * 夾上下限：太窄擠成一團，太寬會被一段長備註撐到螢幕外。 */
+function autoColW(ws, nCols, min, max){
+  const w=new Array(nCols).fill(0);
+  ws.eachRow(row=>{
+    const bold=!!(row.getCell(1).font&&row.getCell(1).font.bold);
+    for(let c=1;c<=nCols;c++){
+      const v=row.getCell(c).value;
+      if(v==null||typeof v==='object') continue;   // 合併／公式格不算
+      let u=0; for(const ch of String(v)) u += /[\x00-\xff]/.test(ch) ? 1 : 2;
+      if(bold) u+=1.5;
+      if(u>w[c-1]) w[c-1]=u;
+    }
+  });
+  return w.map(u=>Math.min(max,Math.max(min,Math.ceil(u+2.6))));
 }
 
 /* ── EXCEL EXPORT ── */
@@ -4803,17 +4949,21 @@ async function doExportExcel(rows){
     ws.getRow(1).height=22;
     rows.forEach((r,i)=>{
       const row=ws.addRow([r.projName||'',r.date,r.dept,r.reporter,r.loc||'',r.work||'',
-        r.vendor||'',r.staff||'',r.w0,r.vendor2||'',r.staff2||'',r.w1,r.progress,r.atype||'',r.anote||'',r.owner||'']);
+        r.vendor||'',r.staff||'',r.w0,r.vendor2||'',r.staff2||'',r.w1,r.progress,atypeText(r.atype),r.anote||'',r.owner||'']);
       if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
       row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
     });
-    ws.columns=[160,110,90,110,120,120,100,100,60,100,100,60,70,90,180,80].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
+    /* 2026-09-07：欄寬原本是寫死的一份像素清單，中文欄位常常不夠寬。
+       改成依實際內容自己算（中文 2、半形 1，表頭加一點），夾在 8～34 之間。 */
+    ws.columns=autoColW(ws,headers.length,8,34).map(w=>({width:w}));
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     const dates=rows.map(r=>r.date).filter(Boolean).sort();
     const fnDate=dates.length?(dates[0]===dates[dates.length-1]?dates[0]:`${dates[0]}_${dates[dates.length-1]}`):today();
-    a.download=`日報表-專案管理_${fnDate}.xlsx`; a.click();
+    /* 檔名要看得出案場（2026-09-07 她指定）；跨多個案場就標「多案場」 */
+    const _pns=[...new Set(rows.map(r=>r.projName).filter(Boolean))];
+    a.download=excelFileName(_pns.length===1 ? _pns[0] : (_pns.length>1 ? '多案場' : ''), fnDate); a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
@@ -4823,7 +4973,9 @@ async function exportExcel(){
   const hasWork=(r.workItems||[]).length>0;
   const hasMat=(r.materials||[]).length>0;
   const hasNote=!!(r.notes?.contact||r.notes?.other);
-  if(!hasWork&&!hasMat&&!hasNote){toast('無資料可匯出','e');return;}
+  /* 2026-09-07：照片自己也算資料 —— 只拍了照、還沒填工項的那種報表也要匯得出來 */
+  const hasPhoto=((r.photos||[]).filter(p=>p&&photoSrc(p))).length>0;
+  if(!hasWork&&!hasMat&&!hasNote&&!hasPhoto){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
@@ -4837,36 +4989,71 @@ async function exportExcel(){
     // 基本資訊
     /* C 批：工項表的「專案/工地」欄拿掉（案場升到報表層，改放基本資訊），14 欄 → 13 欄 */
     const LASTCOL = 13;                    // 工項表共 13 欄（A~M），備註要合併到這一欄
-    const COLW = [6,18,28,16,16,10,16,16,10,10,14,30,12];   // 與 ws.columns 同一份，算列高要用
+    /* 2026-09-07 她回報「很多欄位不夠寬，字擠在一起」。
+       原因不只是設窄了 —— 同一張工作表底下有兩張欄位意義完全不同的表：
+       工項表 13 欄（C ＝施工項目）、材料表 5 欄（C ＝單位），
+       一份寫死的欄寬不可能同時餵飽兩張。改成把每一列寫進去的內容記下來，最後一起算。 */
+    const _colw = new Array(LASTCOL).fill(0);
+    /* 這一列有多寬（中文算 2、半形算 1）；表頭是粗體，多給一點 */
+    const wtrack = (vals, bold) => (vals||[]).forEach((v,i)=>{
+      if(i>=LASTCOL) return;
+      let u=0; for(const ch of String(v==null?'':v)) u += /[\x00-\xff]/.test(ch) ? 1 : 2;
+      if(bold) u+=1.5;
+      if(u>_colw[i]) _colw[i]=u;
+    });
     ws.addRow(['日報表-專案管理']).font={size:16,bold:true};
     ws.mergeCells('A1:M1');
     ws.getCell('A1').alignment={horizontal:'center'};
     ws.addRow([]);
-    const pinfo=ws.addRow(['案場',reportProjName(r)||'']);
+    const pinfoV=['案場',reportProjName(r)||''];
+    wtrack(pinfoV,true);
+    const pinfo=ws.addRow(pinfoV);
     {const c1=pinfo.getCell(1);c1.font={bold:true};c1.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};}
     pinfo.getCell(2).font={bold:true};
-    const info=ws.addRow(['日期',r.date||'','部門',r.dept||'','填報人',r.reporter||'','天氣',r.weather||'']);
+    const infoV=['日期',r.date||'','部門',r.dept||'','填報人',r.reporter||'','天氣',r.weather||''];
+    wtrack(infoV,true);
+    const info=ws.addRow(infoV);
     [1,3,5,7].forEach(c=>{const cell=info.getCell(c);cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};});
     ws.addRow([]);
     // 工項
     if(hasWork){
       const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
       const headers=['#','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','備註說明','填表人'];
+      wtrack(headers,true);
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
-        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wi.vendor||'',wi.staff||'',wi.w0||0,wi.vendor2||'',wi.staff2||'',wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'',wi.owner||'']);
+        /* 異常類型存的是代號（weather／material…），直接印會變成一串英文 —— 改印中文 */
+        const vals=[i+1,wi.loc||'',wi.work||'',wi.vendor||'',wi.staff||'',wi.w0||0,wi.vendor2||'',wi.staff2||'',wi.w1||0,wi.progress||0,atypeText(wi.atype),wi.anote||'',wi.owner||''];
+        wtrack(vals);
+        const row=ws.addRow(vals);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
       ws.addRow([]);
     }
+    /* ⚠️ 材料表**先量、後寫**（2026-09-07）：
+       照片區要插在材料前面，而照片的橫向位置得換算欄寬才擺得準，
+       欄寬又必須把材料的內容一起算進去 —— 所以順序只能是「量完全部 → 定欄寬 → 才開始寫」。 */
+    const MAT_HEADERS=['#','材料名稱','單位','數量','備註'];
+    const matVals=(r.materials||[]).map((m,i)=>[i+1,m.name||'',m.unit||'',m.qty||0,m.note||'']);
+    if(hasMat){ wtrack(MAT_HEADERS,true); matVals.forEach(v=>wtrack(v)); }
+
+    /* 欄寬定案：夾在 6～32 之間 —— 太窄擠成一團，
+       太寬（例如有人在備註打了一整段）會把整張表撐到螢幕外。 */
+    const COLW=_colw.map(u=>Math.min(32,Math.max(6,Math.ceil(u+2.6))));
+    /* 備註事項的標籤合併 A:B，兩欄加起來至少要放得下「與工地聯絡事項」 */
+    if(COLW[0]+COLW[1] < 20) COLW[1] = 20 - COLW[0];
+    ws.columns=COLW.map(w=>({width:w}));
+
+    // 現場照片（丙案）—— 工項表不動，另開一區排在材料前面
+    if(hasPhoto) addPhotoSection(wb, ws, r, COLW, LASTCOL);
+
     // 材料
     if(hasMat){
       const tr=ws.addRow(['【材料管制】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','材料名稱','單位','數量','備註'];
-      const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
-      (r.materials||[]).forEach((m,i)=>{
-        const row=ws.addRow([i+1,m.name||'',m.unit||'',m.qty||0,m.note||'']);
+      const hr=ws.addRow(MAT_HEADERS);hr.eachCell(styleHead);hr.height=22;
+      matVals.forEach((vals,i)=>{
+        const row=ws.addRow(vals);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -4878,11 +5065,10 @@ async function exportExcel(){
       if(r.notes?.contact) addNoteRow(ws,'與工地聯絡事項',r.notes.contact,LASTCOL,COLW);
       if(r.notes?.other)   addNoteRow(ws,'其他工程配合重點',r.notes.other,LASTCOL,COLW);
     }
-    ws.columns=COLW.map(w=>({width:w}));
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download=`日報表-專案管理_${r.date||today()}.xlsx`; a.click();
+    a.download=excelFileName(reportProjName(r), r.date); a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
