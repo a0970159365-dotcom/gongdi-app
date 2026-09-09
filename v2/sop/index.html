@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-09-09.2';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -1768,15 +1768,21 @@ function renderTplAllList(){
     if(!byG[g]){ byG[g]=[]; order.push(g); }
     byG[g].push(t);
   });
-  /* 欄位標題只在「第一個展開的組」印一次 —— 每組都印一次，三組就重複三次，很吵 */
-  var headDone=false;
+  /* 2026-09-09 她回報「SOP 名稱和狀態欄位的文字未對齊」。
+     原本欄位標題只印在「第一個展開的組」，而**每一組又各自是一張 table**、欄寬各算各的 ——
+     於是第二組以後既沒有欄名、欄位也跟第一組對不起來（名字越長偏得越多）。
+     改法（她選甲案）：每一組都印一次表頭，而且欄寬**寫死並共用同一組**，上下連成一條直線。
+     欄寬寫在這裡而不是 CSS，是因為表頭與內容要成對維護，拆開放很容易改了一邊忘了另一邊。 */
+  var TPL_COLW = ['72px', '', '56px', '76px', '104px'];   // 項目／SOP 名稱（吃剩下的）／品項／狀態／按鈕
+  var tplColGroup = '<colgroup>' + TPL_COLW.map(function(w){
+    return '<col' + (w ? ' style="width:' + w + '"' : '') + '>';
+  }).join('') + '</colgroup>';
   el.innerHTML=order.map(function(gid){
     var list=byG[gid];
     /* 搜尋時一律展開 —— 正在找東西的人不想再點一次 */
     var open=q ? true : tplGroupOpen(gid);
     var thead='';
-    if(open && !headDone){
-      headDone=true;
+    if(open){
       thead='<thead><tr class="border-b border-gray-200 text-xs text-gray-400">'
         +'<th class="px-2 py-1 font-medium whitespace-nowrap">項目</th>'
         +'<th class="px-2 py-1 font-medium">SOP 名稱</th>'
@@ -1795,8 +1801,9 @@ function renderTplAllList(){
       +'<span class="ml-auto text-xs text-gray-400 font-normal">'+list.length+' 份</span>'
       +'</div>'
       +(open
-        ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse">'
-          +thead+'<tbody class="divide-y divide-gray-100">'+list.map(tplAllRowHtml).join('')+'</tbody></table></div>'
+        ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse" '
+          +'style="table-layout:fixed;min-width:520px">'
+          +tplColGroup+thead+'<tbody class="divide-y divide-gray-100">'+list.map(tplAllRowHtml).join('')+'</tbody></table></div>'
         : '')
       +'</div>';
   }).join('')
@@ -1808,7 +1815,9 @@ function tplAllRowHtml(t){
   return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
     +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
     +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(catNameIcon(2,tplCat(t,2)))+'</td>'
-    +'<td class="px-2 py-1.5 text-sm '+(on?'font-bold text-blue-700':'font-medium text-gray-800')+'">'+esc(t.name||'')+'</td>'
+    /* 欄寬寫死之後（2026-09-09），名字太長要在自己的格子裡收尾，不能把別欄擠歪 */
+    +'<td class="px-2 py-1.5 text-sm truncate '+(on?'font-bold text-blue-700':'font-medium text-gray-800')
+      +'" title="'+esc(t.name||'')+'">'+esc(t.name||'')+'</td>'
     +'<td class="px-2 py-1.5 text-xs text-gray-500 text-center whitespace-nowrap">'+((t.items||[]).length)+'</td>'
     +'<td class="px-2 py-1.5 text-xs whitespace-nowrap">'
     +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>':'<span class="text-green-700">使用中</span>')

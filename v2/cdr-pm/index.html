@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-09.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -339,20 +339,23 @@ input[type="file"]{display:none}
   .cs{width:100%;font-size:14px;padding:7px 30px 7px 10px;min-height:38px;border-radius:6px}
   .ci{width:100%;font-size:14px;padding:7px 10px;border-radius:6px}
   .ci[type="number"]{max-width:unset;text-align:left}
-  /* 材料明細（2026-09-09）：加了「填表人」變成 7 欄，手機寬度塞不下。
-     施工明細在這個斷點是整個卡片化的，材料只有 3 個欄位、卡片化反而變得又高又囉唆，
-     所以維持表格、改成一組較窄的欄寬，不夠的部分靠 .tbl-wrap 的 overflow-x 左右滑。
-     ⚠️ 這裡的 .cs/.ci 在手機被放大成 38px 高、14px 字（上面幾行），欄寬要跟著放，不能照抄桌機的。 */
-  .mtbl{min-width:560px}
-  .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:26px}
-  .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:132px}
-  .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:66px}
-  .mtbl th:nth-child(4),.mtbl td:nth-child(4){width:82px}
-  .mtbl th:nth-child(6),.mtbl td:nth-child(6){width:64px}
-  .mtbl th:nth-child(7),.mtbl td:nth-child(7){width:30px}
-  /* 材料列的下拉不要吃到手機那組 38px 高的放大規則裡的左右內距，字才不會被箭頭壓到 */
-  .mtbl .cs{padding:7px 26px 7px 8px}
-  .mtbl .ci{padding:7px 8px}
+  /* 材料明細（2026-09-09 她指定：「請參考施工明細欄位，變成同一頁可填寫」）──
+     加了「填表人」變成 7 欄，手機寬度塞不下。先前讓它左右滑，但備註／填表人整個在畫面外，
+     手指還會誤觸頁面捲動。改成與施工明細**同一套卡片版型**：一筆材料＝一張卡，完全不用滑。
+     ⚠️ table-layout:fixed 與那組 px 欄寬是桌機用的，這裡要一併解掉，否則卡片會被欄寬綁住。 */
+  .mtbl{min-width:unset;table-layout:auto}
+  .mtbl thead tr{display:none}
+  .mtbl tbody tr{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--border);border-radius:10px;margin-bottom:10px;padding:10px 8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.07);position:relative;gap:3px 8px}
+  .mtbl tbody tr:nth-child(even) td{background:transparent}   /* 表格的斑馬紋在卡片上會變成半塊灰 */
+  .mtbl td{display:flex;flex-direction:column;gap:2px;border:none;padding:3px 4px}
+  .mtbl td::before{content:attr(data-label);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .mtbl td:first-child{display:none}                          /* 序號：卡片上不需要 */
+  /* 名字長的欄位各佔一整行；數量與單位並排（她看過示意圖確認的排法） */
+  .mtbl td[data-label="材料名稱"],
+  .mtbl td[data-label="備註"],
+  .mtbl td[data-label="填表人"]{grid-column:span 2}
+  .mtbl td[data-label="填表人"]{padding-top:2px}
+  .mtbl td[data-label="填表人"] .owner-cell{font-size:13px}
 }
 @media print{
   .no-print{display:none!important}
@@ -3423,9 +3426,9 @@ function addMatRow(m) {
   tr.dataset.owner = owner;
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
-    <td><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
-    <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
-    <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
+    <td data-label="材料名稱"><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
+    <td data-label="數量"><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
+    <td data-label="單位"><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
     <td data-label="備註"><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
     <td data-label="填表人">${canUn
       ? `<button type="button" class="lock-btn" onclick="unlockMatRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 加的材料">${escHtml(owner)} 🔒</button>`
@@ -4916,9 +4919,9 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
   var total = groups.reduce(function(sum, g){ return sum + g.photos.length; }, 0);
   var n = 0;
 
-  var tr = ws.addRow(["【現場照片】", "共 " + total + " 張"]);
+  var tr = ws.addRow(["【現場照片】　共 " + total + " 張"]);
+  ws.mergeCells(tr.number, 1, tr.number, lastCol);
   tr.getCell(1).font = { bold: true, size: 12, color: { argb: "FF1A3A5C" } };
-  tr.getCell(2).font = { size: 11, color: { argb: "FF64748B" } };
 
   groups.forEach(function(g){
     var title = "📍 " + (g.loc || PH_UNSET) + "　›　" + (g.work || PH_UNSET)
@@ -4932,10 +4935,10 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
     for (var i = 0; i < g.photos.length; i += perLine) {
       var line = g.photos.slice(i, i + perLine);
       var boxH = Math.max.apply(null, line.map(phBoxH));
+      var capRow = ws.addRow([]);                       // ⚠️ 檔名列一定要排在照片列**前面**
+      capRow.height = 13;
       var imgRow = ws.addRow([]);
       imgRow.height = Math.round(boxH * 0.75) + 4;      // 像素 → 點（Excel 列高的單位）
-      var capRow = ws.addRow([]);
-      capRow.height = 13;
       line.forEach(function(p, j){
         var src = photoSrc(p);
         var m = /^data:image\/([a-z0-9+.-]+);base64,([\s\S]+)$/i.exec(src || "");
@@ -4945,7 +4948,8 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
         var id = wb.addImage({ base64: m[2], extension: ext });
         ws.addImage(id, { tl: { col: col, row: imgRow.number - 1 },
                           ext: { width: PH_XL_W, height: phBoxH(p) } });
-        /* 檔名寫在照片正下方、同一欄。要找原圖時拿這個檔名去「📷 照片 → 下載全部」那邊對。 */
+        /* 檔名寫在照片正上方、同一欄（2026-09-09 她指定）。
+           要找原圖時拿這個檔名去「📷 照片 → 下載全部」那邊對。 */
         var cell = capRow.getCell(Math.min(lastCol, col + 1));
         if (!cell.value) cell.value = p.origName || p.name || "";
         cell.font = { size: 8, color: { argb: "FF64748B" } };
