@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-09.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-09.3';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -4866,7 +4866,17 @@ function addNoteRow(ws, label, text, lastCol, colw){
  *    所以這一段**一定要在欄寬定案之後**才跑。 */
 const PH_XL_W = 160;                                   // 她指定的照片寬度（px）
 /* Excel 欄寬單位 → 像素（預設字型下的近似式，用來換算照片要擺在第幾欄） */
-function xlColPx(colw){ return colw.map(function(w){ return Math.round(w * 7 + 5); }); }
+/* 欄寬（Excel 的單位）→ 像素。
+ * ⚠️ 2026-09-09 她回報「照片上下左右重疊」，病因就在這一行的那個係數。
+ *    Excel 的欄寬單位是「**預設字體**的數字寬度」，不是像素 ——
+ *    Calibri 11 的數字寬是 7px，但**她的 Excel 預設字體是新細明體，只有 6px**。
+ *    用 7 去換算，算出來的欄比實際寬約 15%，照片的落點就被推得太開、
+ *    真正畫出來時反而互相疊上去（實測她那張：相鄰間距只剩 148px，而照片寬 160px）。
+ *    我們無法知道每台電腦的預設字體，所以**一律用最窄的那種（6）來算** ——
+ *    在新細明體下剛剛好，在 Calibri 下只會更鬆，兩邊都不會疊。
+ *    代價是一行少放一兩張照片，多幾列而已。 */
+var XL_MDW = 6;                                        // max digit width（px），刻意取保守值
+function xlColPx(colw){ return colw.map(function(w){ return Math.round(w * XL_MDW + 5); }); }
 /* ⚠️ 不要用小數欄索引（2026-09-07 她回報「照片重疊」踩到的坑）：
    exceljs 把 tl.col 的小數部分換算成**固定 640000 EMU（約 67px）**的偏移量，
    跟該欄的實際寬度無關。欄比 67px 寬時偏移量根本不夠，第二張以後就會往左疊上第一張。
@@ -4936,9 +4946,19 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
       var line = g.photos.slice(i, i + perLine);
       var boxH = Math.max.apply(null, line.map(phBoxH));
       var capRow = ws.addRow([]);                       // ⚠️ 檔名列一定要排在照片列**前面**
-      capRow.height = 13;
+      capRow.height = 15;                               // 13 太貼，字上下各留一點（2026-09-09）
       var imgRow = ws.addRow([]);
-      imgRow.height = Math.round(boxH * 0.75) + 4;      // 像素 → 點（Excel 列高的單位）
+      /* 像素 → 點（Excel 列高的單位）。
+         ⚠️ 這裡刻意**等比放大 1.3 倍**，不是加固定的幾個像素 ——
+         2026-09-09 實測她的檔案：列高 237px、照片 213px，檔案裡明明還有 24px 空隙，
+         但她的 Excel 畫出來照片是 252px（宣告 213px）、整整大了約 18%，
+         於是壓到下一排的檔名。多半是 Windows 顯示縮放（125%／150%）——
+         Excel 對圖片和對列高用了不同的換算，而那個倍率我們在程式裡量不到。
+         固定的邊界（+18）在大張的直式照片上不夠用，因為誤差是**按比例**長大的，
+         所以保險也要按比例給。1.3 倍可以扛到 130% 的縮放。
+         代價是 100% 縮放的人照片下方會多一段空白 —— 檔名在照片**上方**，
+         那段空白剛好變成兩排照片之間的間隔，不難看。 */
+      imgRow.height = Math.ceil(boxH * 0.75 * 1.3) + 4;
       line.forEach(function(p, j){
         var src = photoSrc(p);
         var m = /^data:image\/([a-z0-9+.-]+);base64,([\s\S]+)$/i.exec(src || "");
