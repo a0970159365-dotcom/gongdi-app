@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-07.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1334,6 +1334,28 @@ function _localCopy(data, cloudOk){
       });
     })
   });
+}
+/* ══════ 本機快照：寫失敗也絕對不能丟例外（2026-09-09 事故）══════
+ * 她在「日報表—專案管理」回報：日曆檢視一進去，最近幾天新建的日報沒有點點，
+ * 翻個月或點一下日期就全出現了。病因在雲端同步回來之後這一段：
+ *     S.reports = cloud.reports;          ← 資料已經換成新的
+ *     localStorage.setItem('cdr_v3', …);  ← ⚠️ 空間不足會丟 QuotaExceededError
+ *     if(S.page) goPage(S.page);          ← 重畫（例外一丟就永遠跑不到）
+ * 例外被鏈尾的 .catch 吞掉（只 console.warn），於是「資料是新的、畫面是舊的」。
+ * 瑪摩這一支的程式碼一模一樣 —— 這是缺陷不是功能差異，所以一起修
+ * （功能／版面才等她指定；會當掉或看到錯資料的一起修）。
+ *
+ * 規則：先原樣寫，滿了就退成「清掉有縮圖的原圖」再寫一次（與 save() 同一套），
+ * 兩次都失敗就放棄快取、回傳 false，**但絕不丟例外**。
+ * ⚠️ 照片安全：這裡寫的 updatedAt 是**雲端的**時間戳，本機這份永遠不會比雲端新
+ *    → 不會贏 → 不會被推上去。 */
+function _cacheLocal(snapshot){
+  try { localStorage.setItem('cdr_v3', JSON.stringify(snapshot)); return true; }
+  catch(e){
+    console.warn('本機快照寫入失敗（多半是空間不足）：', e && e.message);
+    try { localStorage.setItem('cdr_v3', JSON.stringify(_localCopy(snapshot, true))); return true; }
+    catch(e2){ console.warn('去掉原圖後仍存不下，這次不做本機快取：', e2 && e2.message); return false; }
+  }
 }
 function save() {
   const data = {
@@ -4253,15 +4275,11 @@ function init(){
         // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
         // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
         // 本機快照存「現在這台的身分」而非雲端的 user，避免下次 load() 又把舊身分讀回來
-        localStorage.setItem('cdr_v3', JSON.stringify({
-          reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime
-        }));
-        if(S.page) goPage(S.page);
+        _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime });
+        if(S.page) goPage(S.page);   // ⚠️ 這一行以前會被上面那行的 quota 例外跳過 → 畫面停在舊資料
         if(_rescuedCount){
           // 撈回來的還沒進雲端 → 立刻補推一次，並且本機快照要含它們（上面那行 setItem 寫的是雲端版）
-          localStorage.setItem('cdr_v3', JSON.stringify({
-            reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now()
-          }));
+          _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now() });
           toast('這台有 '+_rescuedCount+' 筆日報表雲端沒有（上次存檔沒送出去），正在補傳…','s');
           setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
         } else {
@@ -4279,7 +4297,12 @@ function init(){
         console.info('[遷移] cdr_v3/all（舊整包）→ cdr_v3/reports/{id}（per-record），共 '+(mig.reports||[]).length+' 筆');
         pushCloud(mig);
       }
-    }).catch(function(e){ console.warn('Firebase load failed:',e); });
+    }).catch(function(e){
+      console.warn('Firebase load failed:', e);
+      /* 就算同步中途出事，也要用「現在 S 裡的資料」重畫一次（2026-09-09）。
+         這裡重畫最多是畫成跟原本一樣，不會有副作用。 */
+      try { if(S.page) goPage(S.page); } catch(e2){ console.warn('重畫失敗：', e2 && e2.message); }
+    });
   }
 
   if (portalLoggedIn() && initPortalUser()) {

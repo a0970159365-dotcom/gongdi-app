@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-09-04.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -1679,39 +1679,161 @@ function autoSaveConfig(){
 /* ══════════ 所有 SOP 一覽（2026-08-30 用戶指定）══════════
  * 以前只能靠三段下拉一格一格切，看不到全貌 —— 她問「要怎麼檢視現有所有的 SOP」，答案是做不到。
  * 這張表列出全部（含已作廢的，設定頁本來就要能把作廢的叫出來恢復），點一列就跳去編它。 */
+/* ── 一覽的篩選狀態（2026-09-07 甲-A）────────────────────────────
+ * 只活在記憶體裡，離開設定頁就重來 —— 這是「怎麼看」的狀態，不是資料。
+ *   TPLQ  搜尋字串
+ *   TPLF  狀態篩選：all / live / void
+ *   TPLG  哪幾組展開了（key ＝ 範圍的 id）；沒有紀錄就用預設值
+ */
+var TPLQ = '', TPLF = 'all', TPLG = {};
+function tplAllSetF(f){ TPLF = f; renderTplAllSection(); }
+/* ⚠️ 打字時只重畫清單，不重畫整區 —— 重畫整區會把輸入框換掉，游標與注音都會斷 */
+function tplAllQ(v){ TPLQ = v; renderTplAllList(); }
+function tplAllToggle(gid){ TPLG[gid] = !tplGroupOpen(gid); renderTplAllList(); }
+function tplGroupOpen(gid){
+  if (Object.prototype.hasOwnProperty.call(TPLG, gid)) return !!TPLG[gid];
+  /* 預設值：SOP 還不多的時候全部展開（收起來反而像東西不見了）；
+     多起來才只展開「目前在編的那一張」所在的那一組。 */
+  if (TEMPLATES.length <= 12) return true;
+  var t = TEMPLATES.filter(function(x){ return x.id === S.editingTplId; })[0];
+  return !!(t && tplCat(t, 1) === gid);
+}
+/* 一列符不符合目前的搜尋與篩選 */
+function tplAllMatch(t, q){
+  if (TPLF === 'live' && t.void) return false;
+  if (TPLF === 'void' && !t.void) return false;
+  if (!q) return true;
+  var hay = (t.name || '') + ' ' + (tplPath(t.id, true) || '');
+  return hay.toLowerCase().indexOf(q) >= 0;
+}
 function renderTplAllSection(){
   var el=$('cfg-tpl-all'); if(!el) return;
-  var all=TEMPLATES.slice().sort(function(a,b){
-    var pa=tplPath(a.id)||'', pb=tplPath(b.id)||'';
-    return pa.localeCompare(pb) || String(a.name||'').localeCompare(String(b.name||''));
-  });
-  var voidN=all.filter(function(t){ return t.void; }).length;
-  var rows=all.map(function(t){
-    var on=(S.tplOpened && t.id===S.editingTplId);
-    return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
-      +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
-      +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(tplPath(t.id)||'📦 （未分類）')+'</td>'
-      +'<td class="px-2 py-1.5 text-sm '+(on?'font-bold text-blue-700':'font-medium text-gray-800')+'">'+esc(t.name||'')+'</td>'
-      +'<td class="px-2 py-1.5 text-xs text-gray-500 text-center whitespace-nowrap">'+((t.items||[]).length)+'</td>'
-      +'<td class="px-2 py-1.5 text-xs whitespace-nowrap">'
-      +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>':'<span class="text-green-700">使用中</span>')
-      +'</td></tr>';
-  }).join('');
+  var chip=function(f,label){
+    return '<button type="button" data-tpl-filt="'+f+'" onclick="tplAllSetF(\''+f+'\')" '
+      +'class="px-3 py-1 rounded-full text-xs border '
+      +(TPLF===f?'bg-blue-50 border-blue-300 text-blue-700 font-bold':'border-gray-300 text-gray-500 hover:bg-gray-50')
+      +'">'+label+'</button>';
+  };
   el.innerHTML='<div class="flex items-baseline justify-between mb-2 flex-wrap gap-1">'
     +'<h3 class="text-sm font-semibold text-gray-700">📋 所有 SOP 一覽</h3>'
-    +'<span class="text-xs text-gray-400" data-tpl-all-count>共 '+all.length+' 個'
-      +(voidN?'（含已作廢 '+voidN+' 個）':'')+'</span></div>'
-    +(all.length
-      ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse">'
-        +'<thead><tr class="border-b border-gray-200 text-xs text-gray-400">'
-        +'<th class="px-2 py-1 font-medium whitespace-nowrap">範圍 › 項目</th>'
+    +'<span class="text-xs text-gray-400" data-tpl-all-count>'+tplAllCountText()+'</span></div>'
+    /* 2026-09-07 甲-A：搜尋、篩選、「＋ 新增」全部收在這一排 ——
+       「找不到 → 所以我要新開一張」是同一個動作的兩半，放在同一個地方才不用把視線移開。 */
+    +'<div class="flex items-center gap-2 flex-wrap mb-3">'
+    +'<input data-tpl-q type="search" value="'+esc(TPLQ)+'" oninput="tplAllQ(this.value)" '
+    +'placeholder="🔍 打名稱、範圍或項目都能找 — 例如「乾掛」" '
+    +'class="flex-1 min-w-[180px] border border-gray-300 rounded-xl px-3 py-1.5 text-sm">'
+    +chip('all','全部')+chip('live','使用中')+chip('void','已作廢')
+    +'<button data-tpl-add onclick="openNewFlow()" data-mng '
+    +'class="px-4 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 whitespace-nowrap">＋ 新增</button>'
+    +'</div>'
+    +'<div id="tpl-all-list"></div>';
+  renderTplAllList();
+}
+function tplAllCountText(){
+  var q=(TPLQ||'').trim().toLowerCase();
+  var hit=TEMPLATES.filter(function(t){ return tplAllMatch(t,q); });
+  var voidN=hit.filter(function(t){ return t.void; }).length;
+  return '共 '+hit.length+' 個'+(voidN?'（含已作廢 '+voidN+' 個）':'')
+    +((q||TPLF!=='all')?'　·　已篩選':'');
+}
+/* 清單本體：依「範圍」分組、可收合 */
+function renderTplAllList(){
+  var el=$('tpl-all-list'); if(!el) return;
+  var cnt=$('cfg-tpl-all') && $('cfg-tpl-all').querySelector('[data-tpl-all-count]');
+  if(cnt) cnt.textContent=tplAllCountText();
+
+  var q=(TPLQ||'').trim().toLowerCase();
+  /* ⚠️ 排序照【設定裡的範圍 → 項目順序】，不要拿 tplPath 的字串來排 ——
+     路徑字串前面帶著 emoji，localeCompare 是照 emoji 的編碼排的，
+     結果會變成 景觀 → 內裝 → 牆面，跟第 ③ 步看到的順序對不上。 */
+  var ordL1=catL1().map(function(c){ return c.id; });
+  var ordL2=catL2().map(function(c){ return c.id; });
+  var rank=function(arr,id){ var i=arr.indexOf(id); return i<0 ? 9999 : i; };   // 未分類排最後
+  var hit=TEMPLATES.filter(function(t){ return tplAllMatch(t,q); }).sort(function(a,b){
+    return rank(ordL1,tplCat(a,1))-rank(ordL1,tplCat(b,1))
+        || rank(ordL2,tplCat(a,2))-rank(ordL2,tplCat(b,2))
+        || String(a.name||'').localeCompare(String(b.name||''));
+  });
+  if(!hit.length){
+    el.innerHTML = TEMPLATES.length
+      ? '<div data-tpl-all-empty class="text-xs text-gray-400 py-4 text-center">沒有符合的 SOP —— 要新開一張就按右上角的「＋ 新增」</div>'
+      : '<div data-tpl-all-empty class="text-xs text-gray-400 py-3 text-center">還沒有任何 SOP —— 點右上角的「＋ 新增」</div>';
+    return;
+  }
+  /* 分組：key ＝ 範圍（第一層）的 id，順序照 hit 的排序 */
+  var order=[], byG={};
+  hit.forEach(function(t){
+    var g=tplCat(t,1);
+    if(!byG[g]){ byG[g]=[]; order.push(g); }
+    byG[g].push(t);
+  });
+  /* 欄位標題只在「第一個展開的組」印一次 —— 每組都印一次，三組就重複三次，很吵 */
+  var headDone=false;
+  el.innerHTML=order.map(function(gid){
+    var list=byG[gid];
+    /* 搜尋時一律展開 —— 正在找東西的人不想再點一次 */
+    var open=q ? true : tplGroupOpen(gid);
+    var thead='';
+    if(open && !headDone){
+      headDone=true;
+      thead='<thead><tr class="border-b border-gray-200 text-xs text-gray-400">'
+        +'<th class="px-2 py-1 font-medium whitespace-nowrap">項目</th>'
         +'<th class="px-2 py-1 font-medium">SOP 名稱</th>'
         +'<th class="px-2 py-1 font-medium text-center whitespace-nowrap">品項</th>'
         +'<th class="px-2 py-1 font-medium whitespace-nowrap">狀態</th>'
-        +'</tr></thead><tbody class="divide-y divide-gray-100">'+rows+'</tbody></table></div>'
-        +'<p class="text-xs text-gray-400 mt-2">點任一列 → 右邊就切成在編輯那一張。</p>'
-      : '<div class="text-xs text-gray-400 py-3 text-center">還沒有任何 SOP —— 點下面那張卡的「＋ 新增」</div>');
+        +'<th class="px-2 py-1"></th></tr></thead>';
+    }
+    var gname=(gid===UNCAT)?'📦 （未分類）':catNameIcon(1,gid);
+    return '<div data-tpl-grp="'+esc(gid)+'" class="border border-gray-200 rounded-xl mb-2 overflow-hidden">'
+      +'<div data-tpl-grp-h tabindex="0" role="button" aria-expanded="'+open+'" '
+      +'onclick="tplAllToggle(\''+gid+'\')" '
+      +'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" '
+      +'class="flex items-center gap-2 px-3 py-2 bg-gray-50 cursor-pointer text-sm font-semibold text-gray-700">'
+      +'<span class="text-xs text-gray-400 w-3">'+(open?'▼':'▶')+'</span>'
+      +'<span>'+esc(gname)+'</span>'
+      +'<span class="ml-auto text-xs text-gray-400 font-normal">'+list.length+' 份</span>'
+      +'</div>'
+      +(open
+        ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse">'
+          +thead+'<tbody class="divide-y divide-gray-100">'+list.map(tplAllRowHtml).join('')+'</tbody></table></div>'
+        : '')
+      +'</div>';
+  }).join('')
+  +'<p class="text-xs text-gray-400 mt-2">點任一列 → 下面就切成在編輯那一張。'
+  +'按列尾的「⧉ 以此為範本」→ 直接用它開一張新的（查驗品項一起帶過來）。</p>';
 }
+function tplAllRowHtml(t){
+  var on=(S.tplOpened && t.id===S.editingTplId);
+  return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
+    +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
+    +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(catNameIcon(2,tplCat(t,2)))+'</td>'
+    +'<td class="px-2 py-1.5 text-sm '+(on?'font-bold text-blue-700':'font-medium text-gray-800')+'">'+esc(t.name||'')+'</td>'
+    +'<td class="px-2 py-1.5 text-xs text-gray-500 text-center whitespace-nowrap">'+((t.items||[]).length)+'</td>'
+    +'<td class="px-2 py-1.5 text-xs whitespace-nowrap">'
+    +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>':'<span class="text-green-700">使用中</span>')
+    +'</td>'
+    /* 帶入現有 SOP：在看到的那一列直接按，範本就選好了 —— 不用進彈窗再找一次 */
+    +'<td class="px-2 py-1.5 text-right whitespace-nowrap">'
+    +'<button data-tpl-use="'+esc(t.id)+'" data-mng onclick="newFromTpl(\''+t.id+'\',event)" '
+    +'title="用這一張當範本開一張新的" '
+    +'class="px-2 py-0.5 text-xs rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100">'
+    +'⧉ 以此為範本</button></td>'
+    +'</tr>';
+}
+/* 從一覽的某一列直接開新增流程：範本已經選好，跳過「先挑範本」那一頁 */
+function newFromTpl(id, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  if(mngGuard()) return;
+  var t=TEMPLATES.filter(function(x){ return x.id===id; })[0];
+  if(!t){ showToast('找不到這個 SOP'); return; }
+  var c1=tplCat(t,1), c2=tplCat(t,2);
+  NF={ open:true, mode:'place', step:1, src:id, fromRow:true,
+       cat1:(c1===UNCAT?'':c1), cat2:(c2===UNCAT?'':c2),
+       name:'', mat:(t.materialLabel||'材質'), addingCat:0 };
+  renderNewFlow();
+}
+
 /* 從一覽點進去：三段跟著跳到它所在的格子，編輯區就是它 */
 function jumpToTpl(id){
   var tpl=TEMPLATES.find(function(t){ return t.id===id; });
@@ -1778,12 +1900,12 @@ function addCfgItem(key){
  *
  * 狀態全放在 NF 這個物件裡，關掉就整個重設 —— 不留半套狀態在 S 裡面。
  */
-var NF = { open:false, mode:'', step:1, src:'', cat1:'', cat2:'', name:'', mat:'', addingCat:0 };
+var NF = { open:false, mode:'', step:1, src:'', fromRow:false, cat1:'', cat2:'', name:'', mat:'', addingCat:0 };
 
 function openNewFlow(){
   if(mngGuard())return;
   cfgEnsureSel();
-  NF = { open:true, mode:'pick', step:1, src:'',
+  NF = { open:true, mode:'pick', step:1, src:'', fromRow:false,
          cat1:(S.cfgCat1===UNCAT?'':S.cfgCat1), cat2:(S.cfgCat2===UNCAT?'':S.cfgCat2),
          name:'', mat:'材質', addingCat:0 };
   renderNewFlow();
@@ -1964,7 +2086,8 @@ function renderNewFlow(){
       +'<button onclick="nfShowList()" class="text-xs text-blue-600 hover:underline flex-shrink-0">變更</button>'
       +'</div>'
       +'<div class="text-sm font-semibold mb-1">要放在哪裡？</div>'
-      +'<div class="text-xs text-gray-500 mb-3">預設放在你目前選的那一格</div>'
+      +'<div class="text-xs text-gray-500 mb-3">'
+      +(NF.fromRow?'預設跟範本放在同一格':'預設放在你目前選的那一格')+'</div>'
       +'<label class="block text-xs text-gray-500 mb-1">範圍</label>'+nfCatPills(1)
       +'<label class="block text-xs text-gray-500 mb-1">項目</label>'+nfCatPills(2)
       +'<label class="block text-xs text-gray-500 mb-1">SOP 名稱 <span class="text-red-500">*</span></label>'
@@ -2091,17 +2214,27 @@ function renderCatsSection(){
   renderTplPickSection();
 }
 /* 第 ④ 步左上：＋新增 ＋ 「要編哪一張查檢表」 */
+/* 2026-09-07 甲-A：這張卡原本同時是「新增入口」與「要編哪一張的選擇器」。
+ * 「＋ 新增」搬到上面一覽的標題列了；SOP ▾ 跟一覽 100% 重複，一覽又可以搜尋 → 整段拿掉。
+ * 留下來的是「目前這一格」（範圍／項目）—— 它還有兩個作用：
+ *   ① 新增 SOP 預設會建在這一格　② 範圍／項目的就地改名與刪除掛在這兩列上。 */
 function renderTplPickSection(){
   var el=$('cfg-tpl-pick');
   if(!el) return;
   cfgEnsureSel(); cfgSyncEditing();
-  el.innerHTML=addMenuHtml()
-    +'<h3 class="text-sm font-semibold text-gray-700 mb-1">📋 要編哪一張查檢表</h3>'
-    +'<p class="text-xs text-gray-400 mb-3">目前範圍：<b>'+esc(catNameIcon(1,S.cfgCat1))+'</b> ／ 項目：<b>'+esc(catNameIcon(2,S.cfgCat2))+'</b>'
-    +'<br>要換範圍或項目，回上一步調整。</p>'
+  var n=cfgTplList().length;
+  el.innerHTML='<h3 class="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-2">'
+    +'<span class="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white bg-blue-900">A</span>'
+    +'📍 目前這一格</h3>'
+    +'<p class="text-xs text-gray-400 mb-3">按「＋ 新增」建立的 SOP 會放進這一格。</p>'
     +catRowHtml(1,'範圍')
     +catRowHtml(2,'項目')
-    +tplRowHtml();
+    +'<div class="border-t pt-3 mt-3">'
+    +(n
+      ? '<p class="text-xs text-gray-400">這一格有 <b>'+n+'</b> 張 SOP。'
+        +'要編哪一張，<b>在上面那張一覽點一列</b>就好 —— 它可以搜尋，也可以依範圍收合。</p>'
+      : '<p class="text-xs text-gray-400">（這裡還沒有 SOP）<br>按上面一覽右上角的「＋ 新增」建一張。</p>')
+    +'</div>';
 }
 /* 帶 emoji 的分類顯示名稱。
    ⚠️ 不要叫 catName —— 上面 584 行早就有一個同名的（回傳純名稱，不帶 emoji），
@@ -2115,13 +2248,8 @@ function catNameIcon(level,id){
  * 原本三個層級各有各的新增鈕（範圍／項目各一條小連結、SOP 一顆大按鈕），
  * 散在三個地方。改成上方一顆「＋ 新增」，按了問要新增哪一層。
  * 新增 SOP 一律建在「目前選到的那一格」（範圍＋項目），跟原本的行為一樣。 */
-/* 上方那顆「＋ 新增」。按了開新增流程（openNewFlow）：先問要不要拿現有的當範本，
- * 選空白才一步一步問範圍→項目→名稱。舊的「三選一」小選單已由那個流程取代。 */
-function addMenuHtml(){
-  return '<div class="mb-3" data-mng>'
-    +'<button onclick="openNewFlow()" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700">＋ 新增</button>'
-    +'</div>';
-}
+/* 2026-09-07 甲-A：那顆「＋ 新增」搬到「所有 SOP 一覽」的標題列了（見 renderTplAllSection），
+ * 這裡原本的 addMenuHtml() 因此整支拿掉 —— 同一顆鈕不留兩份。 */
 
 /* 一層分類的一整列：下拉 ＋ 改名／刪除 ＋ 新增 */
 function catRowHtml(level,label){
@@ -2173,25 +2301,12 @@ function catRowHtml(level,label){
 }
 
 /* 第三段：這一格裡的工法 */
-function tplRowHtml(){
-  var list=cfgTplList();
-  /* 還沒選之前停在「— 請選擇 —」，右邊才會是留白的空狀態（2026-08-30） */
-  var opts='<option value=""'+(S.tplOpened?'':' selected')+'>— 請選擇 SOP —</option>'
-    + list.map(function(t){
-        return '<option value="'+esc(t.id)+'"'+((S.tplOpened&&t.id===S.editingTplId)?' selected':'')+'>'+esc(t.name)+(t.void?'　【已作廢】':'')+'</option>';
-      }).join('');
-  var h='<div class="border-t pt-3" data-tpl-row>'
-    +'<label class="block text-xs text-gray-500 mb-1">SOP</label>';
-  if(list.length){
-    h+='<select data-tpl-sel onchange="switchTplEditor(this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">'+opts+'</select>';
-  } else {
-    h+='<div class="text-xs text-gray-400 border border-dashed border-gray-300 rounded-xl px-3 py-2">（這裡還沒有 SOP）</div>';
-  }
-  /* 2026-08-30 用戶指定：新增 SOP 只留上方那顆「＋ 新增」一個入口。
-     這裡原本還有一顆「⧉ 複製 SOP」，跟「＋ 新增 →⧉ 複製現有 SOP」是兩套做同一件事，
-     而且功能比較弱（不能自己命名、不能選要不要帶查驗品項）→ 整個拿掉。 */
-  return h+'</div>';
-}
+/* 2026-09-07 甲-A：這裡原本是「SOP ▾」下拉（只列目前這一格的）。
+ * 一覽加了搜尋與收合之後，它就是第二套做同一件事的選法，而且比較弱（不能搜尋、看不到品項數與狀態）
+ * → 整支拿掉。要換編輯對象一律從上面那張一覽點一列（jumpToTpl）。
+ * ⚠️ cfgTplList() 沒有跟著拿掉 —— 它還是「這一格有哪些 SOP」的唯一真相，
+ *    cfgSyncEditing()／setCfgCat() 都靠它。 */
+
 
 function startCatAdd(level){
   if(mngGuard())return;
@@ -2272,6 +2387,68 @@ function syncTemplatesFromConfig(){
     S.config.templates.forEach(function(t){ TEMPLATES.push(t); });
   }
 }
+/* ── SOP 明細分成 B／C／D 三段（2026-09-07 她選建議二）─────────────────
+ * 起因：實測一張 14 項的 SOP，明細高 2301px、光查驗品項就佔 1806px（78%），
+ *       因為每一項的準則框都固定攤開著。整個第 ④ 步 3088px，筆電要捲四個畫面。
+ *   B 基本資料（名稱、材質標籤）
+ *   C 查驗品項  ← 預設展開，九成時間在這裡
+ *   D 狀態與管理（搬分類／作廢／刪除）← 危險操作，預設收著且用警示色
+ * 左邊那張「📍 目前這一格」就是 A，維持在原位（她選的就是「維持左右兩欄」）。
+ *
+ * 這些狀態只活在記憶體裡 —— 是「怎麼看」，不是資料，不進 config、不上雲。 */
+var TSEC = { B:false, C:true, D:false };
+var TITEM = {};      // 哪幾個查驗品項展開了準則（key ＝ 品項 id）
+function tplSecToggle(k){ TSEC[k] = !TSEC[k]; renderTemplatesSection(); }
+function tplItemToggle(id){ TITEM[id] = !TITEM[id]; renderTemplatesSection(); }
+/* 一段的標題列（可收合，右邊寫摘要，收著也知道裡面有什麼） */
+function tplSecHead(k, title, sum, danger){
+  var on = !!TSEC[k];
+  return '<div data-tpl-sec-h="'+k+'" tabindex="0" role="button" aria-expanded="'+on+'" '
+    +'onclick="tplSecToggle(\''+k+'\')" '
+    +'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click();}" '
+    +'class="flex items-center gap-2 px-3 py-2 bg-gray-50 cursor-pointer text-sm font-semibold text-gray-700">'
+    +'<span class="text-xs text-gray-400 w-3">'+(on?'▼':'▶')+'</span>'
+    +'<span class="w-5 h-5 rounded flex items-center justify-center text-xs font-bold text-white '
+    +(danger?'bg-amber-600':'bg-blue-900')+'">'+k+'</span>'
+    +'<span>'+esc(title)+'</span>'
+    +'<span class="ml-auto text-xs text-gray-400 font-normal">'+esc(sum)+'</span></div>';
+}
+function tplSec(k, title, sum, body, danger){
+  return '<div data-tpl-sec="'+k+'" class="border '+(danger?'border-amber-200':'border-gray-200')
+    +' rounded-xl mb-2 overflow-hidden">'
+    +tplSecHead(k,title,sum,danger)
+    +(TSEC[k] ? '<div class="p-3">'+body+'</div>' : '')
+    +'</div>';
+}
+/* 一個查驗品項：預設只有一行名稱；按了「＋ 準則／準則 ✓」才展開文字框。
+   ⚠️ 收著的時候**連 textarea 都不畫** —— 只是隱藏的話高度省不下來。
+   內容不會掉：文字框失焦時就已經寫回 it.criterion 了。 */
+function tplItemHtml(tpl, it, i){
+  var on = !!TITEM[it.id];
+  var has = !!String(it.criterion||'').trim();
+  var btnCls = on ? 'border-gray-300 text-gray-500 bg-white'
+             : (has ? 'border-blue-300 bg-blue-50 text-blue-700 font-semibold'
+                    : 'border-gray-300 text-gray-400 bg-white');
+  return '<div data-tpl-item="'+esc(it.id)+'" class="border border-gray-200 rounded-lg mb-1.5 overflow-hidden bg-white">'
+    +'<div class="flex items-center gap-2 px-2 py-1.5 bg-gray-50">'
+    +'<span class="text-xs text-gray-400 w-5 text-center font-medium">'+(i+1)+'</span>'
+    +'<input type="text" value="'+esc(it.name)+'" class="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm font-medium" '
+    +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'name\',this.value)" placeholder="查驗品項名稱">'
+    +'<button type="button" data-tpl-crit="'+esc(it.id)+'" onclick="tplItemToggle(\''+it.id+'\')" '
+    +'title="'+(has?'這一項已經寫了準則':'這一項還沒有準則')+'" '
+    +'class="flex-shrink-0 px-2 py-1 text-xs rounded-lg border '+btnCls+'">'
+    +(on?'收起準則':(has?'準則 ✓':'＋ 準則'))+'</button>'
+    +'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" data-mng title="刪除這個查驗品項" '
+    +'class="flex-shrink-0 w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>'
+    +'</div>'
+    +(on
+      ? '<div class="px-2 pb-2 pt-1"><textarea class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 resize-y" rows="3" '
+        +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'criterion\',this.value)" '
+        +'placeholder="查驗準則（可多行）...">'+esc(it.criterion||'')+'</textarea></div>'
+      : '')
+    +'</div>';
+}
+
 function renderTemplatesSection(){
   var el = $('cfg-templates');
   if(!el) return;
@@ -2284,32 +2461,43 @@ function renderTemplatesSection(){
       + '<div data-tpl-empty class="text-center text-gray-400 py-10">'
       +   '<div class="text-4xl mb-3">📋</div>'
       +   '<div class="text-sm font-medium text-gray-500 mb-1">還沒有選擇 SOP</div>'
-      +   '<div class="text-xs leading-relaxed">從左邊選一張，或按左邊的「＋ 新增」<br>建立新的（也可以複製現有的）</div>'
+      +   '<div class="text-xs leading-relaxed">在上面那張「所有 SOP 一覽」點一列，<br>或按一覽右上角的「＋ 新增」建立新的<br>（也可以在任一列按「⧉ 以此為範本」）</div>'
       + '</div>';
     renderTplAllSection();   // 早退也要把上面那張一覽畫出來，否則整個空掉
     return;
   }
   var tpl = TEMPLATES.find(function(t){ return t.id === S.editingTplId; }) || null;
-  var itemsHtml = '';
-  if(tpl && tpl.items && tpl.items.length){
-    itemsHtml = tpl.items.map(function(it, i){
-      return '<div class="border border-gray-200 rounded-lg p-3 mb-2 bg-gray-50">'
-        +'<div class="flex items-start gap-2 mb-2">'
-        +'<span class="text-xs text-gray-400 mt-2 w-6 text-center font-medium">'+(i+1)+'.</span>'
-        +'<input type="text" value="'+esc(it.name)+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm font-medium" '
-        +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'name\',this.value)" placeholder="查驗品項名稱">'
-        +'<button onclick="removeTplItem(\''+tpl.id+'\',\''+it.id+'\')" data-mng title="刪除這個查驗品項" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded">&#10005;</button>'
-        +'</div>'
-        +'<textarea class="w-full border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 resize-y" rows="3" '
-        +'onblur="updateTplItem(\''+tpl.id+'\',\''+it.id+'\',\'criterion\',this.value)" placeholder="查驗準則（可多行）...">'+esc(it.criterion||'')+'</textarea>'
-        +'</div>';
-    }).join('');
-  } else {
-    itemsHtml = '<div class="text-xs text-gray-400 py-3 text-center">此 SOP 尚無查驗品項，點下方新增</div>';
+  if(!tpl){
+    el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">✏️ SOP 設定</h3>'
+      + '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有 SOP —— 點「所有 SOP 一覽」右上角的「＋ 新增」</div>';
+    renderTplAllSection();
+    return;
   }
-  /* 搬家選單：按了「🔀 搬到其他分類」才展開，平常收著，避免大類／中類在畫面上出現兩次 */
+
+  /* ── B 基本資料 ── */
+  var bBody = '<div class="flex items-center gap-2 mb-2">'
+    +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">名稱</label>'
+    +'<input type="text" value="'+esc(tpl.name||'')+'" class="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm" '
+    +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="SOP 名稱"></div>'
+    +'<div class="flex items-center gap-2">'
+    +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
+    +'<input type="text" value="'+esc(tpl.materialLabel||'')+'" class="flex-1 min-w-0 border border-gray-300 rounded px-2 py-1 text-sm" '
+    +'onblur="updateTemplate(\''+tpl.id+'\',\'materialLabel\',this.value)" placeholder="例：材質名稱 / 石材種類"></div>'
+    +'<p class="text-xs text-gray-400 mt-2">材質標籤是填表時那一欄的抬頭 — 例如「石材種類」「材質名稱」。</p>';
+  var bSum = (tpl.materialLabel||'（未設材質標籤）');
+
+  /* ── C 查驗品項 ── */
+  var items = tpl.items || [];
+  var noCrit = items.filter(function(it){ return !String(it.criterion||'').trim(); }).length;
+  var cBody = (items.length
+      ? items.map(function(it,i){ return tplItemHtml(tpl,it,i); }).join('')
+      : '<div class="text-xs text-gray-400 py-3 text-center">此 SOP 尚無查驗品項，點下方新增</div>')
+    +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗品項</button>';
+  var cSum = items.length + ' 項' + (noCrit ? '　·　' + noCrit + ' 項還沒寫準則' : '');
+
+  /* ── D 狀態與管理（危險操作，跟日常編輯分開）── */
   var movePickerHtml = '';
-  if(tpl && S.showMovePicker){
+  if(S.showMovePicker){
     movePickerHtml = '<div class="mt-2 border border-blue-300 bg-blue-50 rounded-xl p-3" data-mng data-move-picker>'
       +'<div class="text-xs font-semibold text-blue-700 mb-2">把「'+esc(tpl.name)+'」搬到：</div>'
       +'<div class="flex items-center gap-2 mb-2"><label class="text-xs text-gray-600 w-10 flex-shrink-0">大類</label>'
@@ -2321,46 +2509,33 @@ function renderTemplatesSection(){
       +'<button onclick="toggleMovePicker()" class="px-3 py-2 text-xs text-gray-500 hover:underline">取消</button>'
       +'</div></div>';
   }
-  var tplInfoHtml = '';
-  if(tpl){
-    tplInfoHtml = '<div class="border border-blue-200 bg-blue-50 rounded-lg p-3 mb-4">'
-      +'<div class="text-xs font-semibold text-blue-700 mb-2">✏️ SOP 資訊</div>'
-      +'<div class="space-y-2">'
-      +'<div class="flex items-center gap-2">'
-      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">名稱</label>'
-      +'<input type="text" value="'+esc(tpl.name||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
-      +'onblur="updateTemplate(\''+tpl.id+'\',\'name\',this.value)" placeholder="SOP 名稱">'
-      +'</div>'
-      +'<div class="flex items-center gap-2">'
-      +'<label class="text-xs text-gray-600 w-16 flex-shrink-0">材質標籤</label>'
-      +'<input type="text" value="'+esc(tpl.materialLabel||'')+'" class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm" '
-      +'onblur="updateTemplate(\''+tpl.id+'\',\'materialLabel\',this.value)" placeholder="例：材質名稱 / 石材種類">'
-      +'</div>'
-      +'</div>'
-      // 作廢／恢復（2026-08-13 新增）：作廢後首頁選不到、不能再新建，歷史報表完全不受影響
-      +'<div class="mt-3 flex items-center gap-3 flex-wrap">'
-      +'<button onclick="toggleMovePicker()" data-mng class="text-xs text-blue-700 hover:underline font-medium">🔀 搬到其他分類</button>'
-      +(tpl.void
-        ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
-        : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此 SOP</button>')
-      +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline">🗑️ 刪除此 SOP</button>':'')
-      +'</div>'
-      +'<div class="text-xs text-gray-500 mt-2">'
-      +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
-                 : '作廢＝停用但不刪除，歷史報表不受影響，隨時可恢復。')
-      +'</div>'
-      +movePickerHtml
-      +'</div>';
-  }
-  /* 標題直接寫「正在編輯哪一張」＋它的三階路徑，跟上面那張卡的選擇對得起來 */
-  el.innerHTML = '<h3 class="text-sm font-semibold text-gray-700 mb-1">'+(tpl?('✏️ '+esc(tpl.name)):'✏️ SOP 設定')+'</h3>'
-    +(tpl?'<p class="text-xs text-gray-400 mb-3" data-tpl-path>'+esc(tplPath(tpl.id)||'📦 （未分類）')+'</p>':'')
-    +tplInfoHtml
-    +(tpl ? ('<div class="text-xs text-gray-500 mb-2 font-medium border-t pt-3">📋 查驗品項（共 '+(tpl.items||[]).length+' 項）</div>'
-      +itemsHtml
-      +'<button onclick="addTplItem(\''+tpl.id+'\')" data-mng class="w-full border-2 border-dashed border-blue-300 text-blue-600 font-medium py-2 rounded-xl text-sm hover:bg-blue-50 mt-2">+ 新增查驗品項</button>')
-      : '<div class="text-xs text-gray-400 py-4 text-center">這裡還沒有 SOP —— 點上面那張卡的「＋ 新增」→「SOP」</div>')
-    +'<p class="text-xs text-gray-400 mt-3">改完後請拉到頁面最下方按 <span class="font-medium">「儲存設定」</span> 上傳雲端。既有歷史報表不受影響。</p>';
+  var dBody = '<div class="border border-amber-200 bg-amber-50 rounded-xl p-3">'
+    +'<div class="flex items-center gap-4 flex-wrap mb-2">'
+    +'<button onclick="toggleMovePicker()" data-mng class="text-xs text-blue-700 hover:underline font-medium">🔀 搬到其他分類</button>'
+    +(tpl.void
+      ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
+      : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此 SOP</button>')
+    +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline font-medium">🗑️ 刪除此 SOP</button>':'')
+    +'</div>'
+    +'<p class="text-xs text-gray-500">'
+    +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
+               : '作廢＝停用但不刪除，歷史報表不受影響，隨時可恢復。')
+    +'</p>'+movePickerHtml+'</div>';
+  var dSum = tpl.void ? '🚫 已作廢' : '使用中';
+
+  /* 標題列：名稱 ＋ 路徑 ＋ 就地的儲存鈕（原本要捲到整頁最下面才按得到） */
+  el.innerHTML = '<div class="flex items-start justify-between gap-2 flex-wrap mb-3">'
+    +'<div class="min-w-0">'
+    +'<h3 class="text-sm font-semibold text-gray-700 mb-0.5">✏️ '+esc(tpl.name)+'</h3>'
+    +'<p class="text-xs text-gray-400" data-tpl-path>'+esc(tplPath(tpl.id)||'📦 （未分類）')+'</p>'
+    +'</div>'
+    +'<button onclick="saveConfig(true)" data-mng data-tpl-save '
+    +'class="flex-shrink-0 px-3 py-1.5 bg-green-700 text-white text-xs font-bold rounded-lg hover:bg-green-800">💾 儲存設定</button>'
+    +'</div>'
+    + tplSec('B','基本資料', bSum, bBody, false)
+    + tplSec('C','查驗品項', cSum, cBody, false)
+    + tplSec('D','狀態與管理', dSum, dBody, true)
+    + '<p class="text-xs text-gray-400 mt-2">改完按上面那顆「💾 儲存設定」上傳雲端。既有歷史報表不受影響。</p>';
   /* 編輯區一動，上面那張一覽的名稱／品項數／狀態／反白就要跟著更新 */
   renderTplAllSection();
 }
@@ -2390,7 +2565,11 @@ function addTplItem(tplId){
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
   if(!tpl.items) tpl.items = [];
-  tpl.items.push({ id: uid(), name: '', criterion: '' });
+  var nid = uid();
+  tpl.items.push({ id: nid, name: '', criterion: '' });
+  /* 剛建好的那一項直接展開 —— 你就是為了寫它才按新增的 */
+  TITEM[nid] = true;
+  TSEC.C = true;
   syncTemplatesToConfig();
   renderTemplatesSection();
 }

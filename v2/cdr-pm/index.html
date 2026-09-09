@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-07.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把照片依 案場/施作位置/施工項目/日期 打包成 zip。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -83,7 +83,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .prog-wrap{display:flex;flex-direction:column;gap:2px;align-items:center;min-width:56px}
 .prog-bar-bg{height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;width:52px}
 .prog-bar-fill{height:100%;background:var(--success);border-radius:2px;transition:width .3s}
-.mtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:380px}
+.mtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:680px;table-layout:fixed}
 .mtbl th{background:#475569;color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
 .mtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
 .mtbl tbody tr:nth-child(even) td{background:#f8fafc}
@@ -339,6 +339,20 @@ input[type="file"]{display:none}
   .cs{width:100%;font-size:14px;padding:7px 30px 7px 10px;min-height:38px;border-radius:6px}
   .ci{width:100%;font-size:14px;padding:7px 10px;border-radius:6px}
   .ci[type="number"]{max-width:unset;text-align:left}
+  /* 材料明細（2026-09-09）：加了「填表人」變成 7 欄，手機寬度塞不下。
+     施工明細在這個斷點是整個卡片化的，材料只有 3 個欄位、卡片化反而變得又高又囉唆，
+     所以維持表格、改成一組較窄的欄寬，不夠的部分靠 .tbl-wrap 的 overflow-x 左右滑。
+     ⚠️ 這裡的 .cs/.ci 在手機被放大成 38px 高、14px 字（上面幾行），欄寬要跟著放，不能照抄桌機的。 */
+  .mtbl{min-width:560px}
+  .mtbl th:nth-child(1),.mtbl td:nth-child(1){width:26px}
+  .mtbl th:nth-child(2),.mtbl td:nth-child(2){width:132px}
+  .mtbl th:nth-child(3),.mtbl td:nth-child(3){width:66px}
+  .mtbl th:nth-child(4),.mtbl td:nth-child(4){width:82px}
+  .mtbl th:nth-child(6),.mtbl td:nth-child(6){width:64px}
+  .mtbl th:nth-child(7),.mtbl td:nth-child(7){width:30px}
+  /* 材料列的下拉不要吃到手機那組 38px 高的放大規則裡的左右內距，字才不會被箭頭壓到 */
+  .mtbl .cs{padding:7px 26px 7px 8px}
+  .mtbl .ci{padding:7px 8px}
 }
 @media print{
   .no-print{display:none!important}
@@ -620,13 +634,20 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <table class="mtbl">
         <thead>
           <tr>
-            <th style="width:28px">#</th>
-            <th style="min-width:140px">材料名稱</th>
-            <th style="width:80px">數量</th>
-            <th style="width:80px">單位</th>
+            <!-- 2026-09-09 欄寬（她指定：填表人小一點＝和施工明細一樣寬，備註大一點）。
+                 ⚠️ 表格是 table-layout:fixed（見 .mtbl）——「寫在這裡的寬度就是最後的寬度」。
+                 第一版改用 width:100% 撐大備註，結果自動演算法把其他欄壓到內容最小寬度，
+                 下拉被壓成只剩箭頭（她截圖：材料名稱剩半個字）。fixed 版面不會有這個問題。
+                 備註**刻意不給寬度** → 固定欄以外剩下的空間全部歸它。 -->
+            <th style="width:30px">#</th>
+            <th style="width:190px">材料名稱</th>
+            <th style="width:76px">數量</th>
+            <th style="width:96px">單位</th>
             <!-- 2026-09-07 她回報：匯出 Excel 有「備註」欄，但日報表畫面上沒有欄位可以填 → 永遠是空的。補上。 -->
-            <th style="min-width:110px">備註</th>
-            <th class="no-print" style="width:30px">刪</th>
+            <th>備註</th>
+            <!-- 2026-09-09 她指定：填表人比照施工明細獨立成一欄顯示（原本只有「別人的列」才在刪除欄看得到名字）。 -->
+            <th style="width:76px">填表人</th>
+            <th class="no-print" style="width:34px">刪</th>
           </tr>
         </thead>
         <tbody id="mat-tbody"></tbody>
@@ -1591,6 +1612,28 @@ function _localCopy(data, cloudOk){
       });
     })
   });
+}
+/* ══════ 本機快照：寫失敗也絕對不能丟例外（2026-09-09 事故）══════
+ * 她回報：日曆檢視一進去，最近幾天新建的日報**沒有點點**，翻個月或點一下日期就全出現了。
+ * 原因是雲端同步回來之後這一段：
+ *     S.reports = cloud.reports;          ← 資料已經換成新的
+ *     localStorage.setItem('cdr_pm', …);  ← ⚠️ 空間不足會丟 QuotaExceededError
+ *     if(S.page) goPage(S.page);          ← 重畫（永遠跑不到）
+ * 例外把整個 .then 打斷、被最後的 .catch 吞掉（只有 console.warn），
+ * 於是「資料是新的、畫面是舊的」。使用者一點日期就觸發 renderCal()，點點才冒出來 ——
+ * 看起來像「要再扣一次日期才會出現」。
+ *
+ * 這支的規則：先原樣寫，滿了就退成「清掉有縮圖的原圖」再寫一次（與 save() 同一套），
+ * 兩次都失敗就放棄快取、回傳 false，**但絕不丟例外**。
+ * ⚠️ 照片安全（2026-09-03 事故的三個問題）：這裡寫的 updatedAt 是**雲端的**時間戳，
+ *    本機這份永遠不會比雲端新 → 不會贏 → 不會被推上去；_photoCountGuard 仍是最後一道網。 */
+function _cacheLocal(snapshot){
+  try { localStorage.setItem('cdr_pm', JSON.stringify(snapshot)); return true; }
+  catch(e){
+    console.warn('本機快照寫入失敗（多半是空間不足）：', e && e.message);
+    try { localStorage.setItem('cdr_pm', JSON.stringify(_localCopy(snapshot, true))); return true; }
+    catch(e2){ console.warn('去掉原圖後仍存不下，這次不做本機快取：', e2 && e2.message); return false; }
+  }
 }
 /* 🚨 保險絲（2026-09-03 事故後加）：
  * 推上雲之前比對「這一筆在雲端有幾張照片」——本機比雲端少就**不要推那一筆**。
@@ -3136,8 +3179,18 @@ function unlockMatRow(btn){
   if(!_unlockConfirm(owner)) return;
   _unlockedRows[id] = true;
   tr.querySelectorAll('select,input').forEach(function(el){ el.disabled = false; });
-  var last = tr.lastElementChild;
-  if(last) last.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>';
+  /* 2026-09-09 填表人獨立成一欄之後，鎖頭在「填表人」格、刪除鈕在最後一格，
+     不能再靠 lastElementChild 抓（那樣會把刪除鈕塞進填表人欄）。比照 unlockRow 各自處理。 */
+  var cell = tr.querySelector('.lock-btn, .owner-cell');
+  if(cell){
+    var span = document.createElement('span');
+    span.className = 'owner-cell unlocked';
+    span.textContent = owner + ' 🔓';
+    span.title = '已解鎖：你正在修改 ' + owner + ' 加的材料';
+    cell.replaceWith(span);
+  }
+  var del = tr.querySelector('.col-del');
+  if(del) del.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>';
   toast('已解鎖，這一列現在可以修改');
 }
 /* 第二層選項查表：沒選第一層時回空陣列，下拉就只剩提示文字 */
@@ -3251,7 +3304,7 @@ function collectRows() {
  *   2. …
  *
  *   ［材料］                                            ← 另起一段（她選「另起一段」）
- *   1. 不鏽鋼角鐵；10 支；廖學健
+ *   1. 不鏽鋼角鐵；10 支；A棟3～5樓；廖學健      ← 備註接在數量後（2026-09-09）
  *
  *   ［備註事項］
  *   與工地聯絡事項
@@ -3281,13 +3334,17 @@ function summaryTitle(dateStr, projName, weather){
   if(wx) parts.push('天氣' + wx);             // 沒填就整段省略（她指定）
   return parts.join('_');
 }
-/* 一筆材料一行，格式與施工明細一致（都用「；」）。數量與單位中間留一個空格。 */
+/* 一筆材料一行，格式與施工明細一致（都用「；」）。數量與單位中間留一個空格。
+   2026-09-09：備註（09-07 新增的 mnote 欄）接在數量後面、填表人前面 ——
+   與施工明細那一行的規則一致（備註說明在描述後，填表人永遠收尾）。
+   沒填就被 filter(Boolean) 濾掉，舊報表的摘要不會多出東西。 */
 function summaryMatLine(m){
   const name = String((m&&m.name)||'').trim();
   const qty  = (m && m.qty !== undefined && m.qty !== null && m.qty !== '') ? m.qty : '';
   const unit = String((m&&m.unit)||'').trim();
   const amount = [qty, unit].filter(v => v !== '' && v !== undefined).join(' ');
-  return [name, amount, (m&&m.owner)||''].filter(Boolean).join('；');
+  const note = String((m&&m.note)||'').trim();
+  return [name, amount, note, (m&&m.owner)||''].filter(Boolean).join('；');
 }
 function summaryFromItems(items, dateStr, projName, mats, notes, weather){
   const rp = projName||'';
@@ -3369,12 +3426,11 @@ function addMatRow(m) {
     <td><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
     <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
     <td><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
-    <td><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
-    <td class="no-print">${mine
-      ? `<button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button>`
-      : (canUn
-        ? `<button type="button" class="lock-btn" onclick="unlockMatRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 加的材料">🔒 ${escHtml(owner)}</button>`
-        : `<span class="owner-cell" title="${escHtml(owner)} 新增的，只有本人能改">🔒 ${escHtml(owner)}</span>`)}</td>`;
+    <td data-label="備註"><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
+    <td data-label="填表人">${canUn
+      ? `<button type="button" class="lock-btn" onclick="unlockMatRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 加的材料">${escHtml(owner)} 🔒</button>`
+      : `<span class="owner-cell${mine?' mine':''}" title="${owner?escHtml(owner)+' 新增的':'舊資料，沒有記錄新增者'}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}</td>
+    <td class="col-del no-print">${mine?`<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>`:''}</td>`;
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
@@ -5034,8 +5090,10 @@ async function exportExcel(){
     /* ⚠️ 材料表**先量、後寫**（2026-09-07）：
        照片區要插在材料前面，而照片的橫向位置得換算欄寬才擺得準，
        欄寬又必須把材料的內容一起算進去 —— 所以順序只能是「量完全部 → 定欄寬 → 才開始寫」。 */
-    const MAT_HEADERS=['#','材料名稱','單位','數量','備註'];
-    const matVals=(r.materials||[]).map((m,i)=>[i+1,m.name||'',m.unit||'',m.qty||0,m.note||'']);
+    /* 2026-09-09：材料也加「填表人」—— 同一個檔案裡工項表有這一欄、材料表沒有，對不起來。
+       材料只有 6 欄，仍遠小於工項的 LASTCOL=13，照片區與備註合併欄都不受影響。 */
+    const MAT_HEADERS=['#','材料名稱','單位','數量','備註','填表人'];
+    const matVals=(r.materials||[]).map((m,i)=>[i+1,m.name||'',m.unit||'',m.qty||0,m.note||'',m.owner||'']);
     if(hasMat){ wtrack(MAT_HEADERS,true); matVals.forEach(v=>wtrack(v)); }
 
     /* 欄寬定案：夾在 6～32 之間 —— 太窄擠成一團，
@@ -5880,15 +5938,11 @@ function init(){
         // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
         // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
         // 本機快照存「現在這台的身分」而非雲端的 user，避免下次 load() 又把舊身分讀回來
-        localStorage.setItem('cdr_pm', JSON.stringify({
-          reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime
-        }));
-        if(S.page) goPage(S.page);
+        _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime });
+        if(S.page) goPage(S.page);   // ⚠️ 這一行以前會被上面那行的 quota 例外跳過 → 日曆點點不出現
         if(_rescuedCount){
           // 撈回來的還沒進雲端 → 立刻補推一次，並且本機快照要含它們（上面那行 setItem 寫的是雲端版）
-          localStorage.setItem('cdr_pm', JSON.stringify({
-            reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now()
-          }));
+          _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now() });
           toast('這台有 '+_rescuedCount+' 筆日報表雲端沒有（上次存檔沒送出去），正在補傳…','s');
           setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
         } else {
@@ -5906,7 +5960,13 @@ function init(){
         console.info('[遷移] cdr_pm/all（舊整包）→ cdr_pm/reports/{id}（per-record），共 '+(mig.reports||[]).length+' 筆');
         pushCloud(mig);
       }
-    }).catch(function(e){ console.warn('Firebase load failed:',e); });
+    }).catch(function(e){
+      console.warn('Firebase load failed:', e);
+      /* 就算同步中途出事，也要用「現在 S 裡的資料」重畫一次 ——
+         2026-09-09 的日曆點點就是被這個 .catch 默默吃掉的（資料換好了、畫面沒重畫）。
+         這裡重畫最多是畫成跟原本一樣，不會有副作用。 */
+      try { if(S.page) goPage(S.page); } catch(e2){ console.warn('重畫失敗：', e2 && e2.message); }
+    });
   }
 
   if (portalLoggedIn() && initPortalUser()) {
