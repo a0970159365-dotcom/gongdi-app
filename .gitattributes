@@ -1,0 +1,20 @@
+# 行尾一律 LF，工作區也不要轉成 CRLF。
+#
+# 為什麼要釘死（2026-09-13 在開發 repo 踩過一次，2026-09-14 這裡也中了一次）：
+#   Windows 的 core.autocrlf=true 會在 checkout 時把檔案轉成 CRLF。
+#   內容明明一模一樣，逐字比對卻說不一樣 —— 於是：
+#     · 開發 repo（2026-09-13）：20 條毫不相干的測試同時變紅，看起來像功能改壞了
+#     · 這個 repo（2026-09-14）：上線後驗證「線上那支 portal 有沒有被覆蓋」，
+#       雜湊對不上，去查才發現內容完全相同，只差這個看不見的記號
+#
+# 沒有這個檔案的話，任何人重新 clone 一次就會再中一次。
+* text=auto eol=lf
+
+# 二進位檔不要被當成文字處理
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.pdf  binary
