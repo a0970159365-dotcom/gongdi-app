@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-09-09.2';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-09-11.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -410,6 +410,7 @@
 <!-- Firebase compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script>
 (function(){
   try {
@@ -423,10 +424,106 @@
       appId:"1:228712770866:web:07634a3df74781419cfb2b"
     });
     var _db = firebase.database();
-    window._sopSet    = function(p,d){ return _db.ref('sop/'+p).set(d); };
-    window._sopGet    = function(p){ return _db.ref('sop/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
-    window._sopRemove = function(p){ return _db.ref('sop/'+p).remove(); };
+    /* ── 匿名驗證（2026-09-11 A 案）────────────────────────────────
+     * 讓 Firebase 知道「這個請求來自一個正常的網頁用戶端」，資料庫規則才有機會
+     * 從「全開」收緊成 auth != null。使用者完全無感：不用註冊、不用密碼、
+     * 不會多一個畫面，入口那套 localStorage 選身分的流程一個字都不會變。
+     *
+     * 🔑 _authReady **永遠不會 reject**：登入失敗就 catch 吞掉、照常往下跑。
+     *    · 規則還全開的期間（現在）→ 失敗也讀寫得到，跟改版前一模一樣
+     *    · 規則收緊之後 → 失敗才會被 Firebase 擋下來，那時才是預期行為
+     *    讓它 reject 的話，規則都還沒收就先把所有讀寫打壞了。
+     *
+     * ⚠️ 上線順序：主控台先開「匿名登入」→ 推這一版 → 等大家換版 → 最後才收規則。 */
+    var _authReady = (function(){
+      try {
+        return firebase.auth().signInAnonymously().catch(function(e){
+          console.warn('匿名登入失敗（規則仍全開時不影響運作）：', e && e.message);
+        });
+      } catch(e){
+        console.warn('匿名登入無法啟動（可能沒載入 firebase-auth）：', e && e.message);
+        return Promise.resolve();
+      }
+    })();
+    window._authReady = _authReady;
+    window._sopSet    = function(p,d){ return _authReady.then(function(){ return _db.ref('sop/'+p).set(d); }); };
+    window._sopGet    = function(p){ return _authReady.then(function(){ return _db.ref('sop/'+p).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._sopRemove = function(p){ return _authReady.then(function(){ return _db.ref('sop/'+p).remove(); }); };
   } catch(e){ console.warn('Firebase init failed:',e); }
+})();
+</script>
+
+<script>
+/* ══════ 雲端連線失敗要「看得見」（2026-09-11）══════════════════════════
+ * 以前雲端讀取失敗只有 console.warn —— 使用者看到的是「畫面正常打開，但資料空了」，
+ * 一個字的錯誤訊息都沒有。看不到錯誤的人第一反應常常是**重填一次**，
+ * 那才是真正會出事的地方。
+ *
+ * 分兩種，對應兩種完全不同的處置：
+ *   🔴 PERMISSION_DENIED（紅、關不掉）
+ *      ＝ 資料庫規則已經收緊，但這台還停在沒有匿名驗證的舊版。
+ *        唯一解法是重新載入拿到新版 → 給一顆強制重載的按鈕。
+ *   🟠 其他（橘、可關閉）
+ *      ＝ 網路不通、Firebase 暫時掛掉。資料還在這台裝置上，等連線恢復會自己同步，
+ *        不需要做任何事 → 講清楚就好，不要嚇人。
+ *
+ * 刻意不重用版本橫幅（#app-update-bar）：那支是比對版本號用的，
+ * 兩者可能同時出現，混在一起會互相蓋掉。 */
+window._cloudErrBar = (function(){
+  var shown = false;                    // 同一次瀏覽只跳一次，不要每次重試都疊一條
+  return function(e){
+    if (shown) return;
+    var raw = String((e && (e.code || e.message)) || e || '');
+    var denied = /permission[_-]?denied/i.test(raw);
+    /* 網路類的錯誤在這裡不跳橫幅 —— 本機優先的設計本來就能離線用，
+       每次訊號差就跳一條紅的只會讓人麻痺，真的出事那次反而被忽略。
+       離線狀態原本就有同步指示燈在表示。 */
+    if (!denied) { console.warn('雲端連線失敗（非權限問題，資料仍在本機）：', raw); return; }
+    shown = true;
+
+    var bar = document.createElement('div');
+    bar.id = 'cloud-err-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;'
+      + 'background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;'
+      + "font:600 14px/1.45 'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;"
+      + 'padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:10px;'
+      + 'flex-wrap:wrap;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+
+    var msg = document.createElement('span');
+    msg.textContent = '⚠️ 無法連線到雲端資料 —— 這個版本太舊了，請重新載入';
+    bar.appendChild(msg);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '重新載入';
+    btn.style.cssText = 'font:inherit;border:0;border-radius:6px;padding:6px 14px;'
+      + 'cursor:pointer;background:#fff;color:#b91c1c';
+    btn.onclick = function(){
+      /* 強制繞過瀏覽器快取 —— 這個情境下的病因十之八九就是快取著舊版 */
+      try { location.replace(location.pathname + '?v=' + Date.now()); }
+      catch (err) { location.reload(); }
+    };
+    bar.appendChild(btn);
+
+    var note = document.createElement('div');
+    note.style.cssText = 'width:100%;font-weight:400;font-size:12px;opacity:.92';
+    note.textContent = '你在這台裝置上填的資料還在，不會不見。請先重新載入再繼續填寫，不要重打一次。';
+    bar.appendChild(note);
+
+    document.body.appendChild(bar);
+
+    /* 橫幅是 fixed top:0，會蓋住 sticky 的導覽列 → 把內容往下推（作法與版本橫幅一致） */
+    try {
+      var h = bar.offsetHeight || 56;
+      document.body.style.paddingTop =
+        ((parseFloat(getComputedStyle(document.body).paddingTop) || 0) + h) + 'px';
+      var navs = document.querySelectorAll('nav');
+      for (var i = 0; i < navs.length; i++) {
+        var pos = getComputedStyle(navs[i]).position;
+        if (pos === 'sticky' || pos === 'fixed') navs[i].style.top = h + 'px';
+      }
+    } catch (err) { /* 推版面失敗不重要，訊息有出來才是重點 */ }
+  };
 })();
 </script>
 
@@ -3088,7 +3185,11 @@ function enforcePortalLogin(){
       saveLS();
       setSyncStatus('saved');
       renderHome();
-    }).catch(function(e){ console.warn('Firebase load err:',e); });
+    }).catch(function(e){
+      console.warn('Firebase load err:',e);
+      /* 2026-09-11：權限被拒要讓使用者看得見（規則收緊後、停在舊版的人就是這一條） */
+      try { window._cloudErrBar && window._cloudErrBar(e); } catch(e3){}
+    });
   }
 
   // bind header buttons

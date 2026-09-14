@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-09.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-14.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -64,7 +64,7 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:600}
 .summary-box{font-family:'Courier New',Consolas,monospace;font-size:13px;line-height:1.9;background:#f8fafc;border-color:#e2e8f0;color:var(--text);cursor:default}
 .tbl-wrap{overflow-x:auto}
-.wtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:1080px}
+.wtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:1160px}
 .wtbl th{background:var(--primary);color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
 .wtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
 .wtbl tbody tr:nth-child(even) td{background:#f8fafc}
@@ -194,6 +194,15 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .tl-sub-empty{font-size:11.5px;color:var(--muted);padding:2px 0 6px}
 .tl-add{display:flex;justify-content:flex-end;margin-top:6px}
 .tl-empty{font-size:12px;color:var(--muted);text-align:center;padding:14px 8px;border:1px dashed var(--border);border-radius:8px}
+/* ── 多人共編：別人建的那一列鎖住（2026-09-11 從 cdr-pm 搬過來，樣式完全一致）── */
+.row-locked{background:#fafbfc}
+.lock-btn{border:1px dashed #94a3b8;background:#fff;color:#475569;border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer;font-family:inherit;line-height:1.5}
+.lock-btn:hover{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+.owner-cell.unlocked{color:#92400e;font-weight:700}
+.row-locked select,.row-locked input{background:#f1f5f9;color:var(--muted);cursor:not-allowed}
+.sub-time{font-size:10.5px;color:var(--muted);line-height:1.4;margin-top:2px;white-space:nowrap}
+.owner-cell{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.owner-cell.mine{color:var(--primary);font-weight:700}
 .proj-checks{display:flex;flex-wrap:wrap;gap:6px}
 .proj-check{display:flex;align-items:center;gap:5px;font-size:12px;background:var(--bg);padding:4px 10px;border-radius:5px;cursor:pointer;user-select:none;border:1px solid var(--border)}
 .proj-check:hover{background:#e2e8f0}
@@ -302,6 +311,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <!-- Firebase compat SDK（跨裝置同步） -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script>
 (function(){
   try {
@@ -315,13 +325,108 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       appId:"1:228712770866:web:07634a3df74781419cfb2b"
     });
     var _db = firebase.database();
+    /* ── 匿名驗證（2026-09-11 A 案）────────────────────────────────
+     * 讓 Firebase 知道「這個請求來自一個正常的網頁用戶端」，資料庫規則才有機會
+     * 從「全開」收緊成 auth != null。使用者完全無感：不用註冊、不用密碼、
+     * 不會多一個畫面，入口那套 localStorage 選身分的流程一個字都不會變。
+     *
+     * 🔑 _authReady **永遠不會 reject**：登入失敗就 catch 吞掉、照常往下跑。
+     *    · 規則還全開的期間（現在）→ 失敗也讀寫得到，跟改版前一模一樣
+     *    · 規則收緊之後 → 失敗才會被 Firebase 擋下來，那時才是預期行為
+     *    讓它 reject 的話，規則都還沒收就先把所有讀寫打壞了。
+     *
+     * ⚠️ 上線順序：主控台先開「匿名登入」→ 推這一版 → 等大家換版 → 最後才收規則。 */
+    var _authReady = (function(){
+      try {
+        return firebase.auth().signInAnonymously().catch(function(e){
+          console.warn('匿名登入失敗（規則仍全開時不影響運作）：', e && e.message);
+        });
+      } catch(e){
+        console.warn('匿名登入無法啟動（可能沒載入 firebase-auth）：', e && e.message);
+        return Promise.resolve();
+      }
+    })();
+    window._authReady = _authReady;
     // 最後一道網：不管誰呼叫、傳什麼進來，寫進 Firebase 前一律再清一次 undefined
-    window._cdrSet    = function(p,d){ return _db.ref('cdr_v3/'+p).set(d === null ? null : _noUndef(d)); };
-    window._cdrGet    = function(p){ return _db.ref('cdr_v3/'+p).once('value').then(function(s){ return s.exists()?s.val():null; }); };
-    window._cdrRemove = function(p){ return _db.ref('cdr_v3/'+p).remove(); };
+    window._cdrSet    = function(p,d){ return _authReady.then(function(){ return _db.ref('cdr_v3/'+p).set(d === null ? null : _noUndef(d)); }); };
+    window._cdrGet    = function(p){ return _authReady.then(function(){ return _db.ref('cdr_v3/'+p).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._cdrRemove = function(p){ return _authReady.then(function(){ return _db.ref('cdr_v3/'+p).remove(); }); };
     // 一次讀回整個 cdr_v3 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
-    window._cdrGetRoot = function(){ return _db.ref('cdr_v3').once('value').then(function(s){ return s.exists()?s.val():null; }); };
+    window._cdrGetRoot = function(){ return _authReady.then(function(){ return _db.ref('cdr_v3').once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
   } catch(e){ console.warn('Firebase init failed:',e); }
+})();
+</script>
+<script>
+/* ══════ 雲端連線失敗要「看得見」（2026-09-11）══════════════════════════
+ * 以前雲端讀取失敗只有 console.warn —— 使用者看到的是「畫面正常打開，但資料空了」，
+ * 一個字的錯誤訊息都沒有。看不到錯誤的人第一反應常常是**重填一次**，
+ * 那才是真正會出事的地方。
+ *
+ * 分兩種，對應兩種完全不同的處置：
+ *   🔴 PERMISSION_DENIED（紅、關不掉）
+ *      ＝ 資料庫規則已經收緊，但這台還停在沒有匿名驗證的舊版。
+ *        唯一解法是重新載入拿到新版 → 給一顆強制重載的按鈕。
+ *   🟠 其他（橘、可關閉）
+ *      ＝ 網路不通、Firebase 暫時掛掉。資料還在這台裝置上，等連線恢復會自己同步，
+ *        不需要做任何事 → 講清楚就好，不要嚇人。
+ *
+ * 刻意不重用版本橫幅（#app-update-bar）：那支是比對版本號用的，
+ * 兩者可能同時出現，混在一起會互相蓋掉。 */
+window._cloudErrBar = (function(){
+  var shown = false;                    // 同一次瀏覽只跳一次，不要每次重試都疊一條
+  return function(e){
+    if (shown) return;
+    var raw = String((e && (e.code || e.message)) || e || '');
+    var denied = /permission[_-]?denied/i.test(raw);
+    /* 網路類的錯誤在這裡不跳橫幅 —— 本機優先的設計本來就能離線用，
+       每次訊號差就跳一條紅的只會讓人麻痺，真的出事那次反而被忽略。
+       離線狀態原本就有同步指示燈在表示。 */
+    if (!denied) { console.warn('雲端連線失敗（非權限問題，資料仍在本機）：', raw); return; }
+    shown = true;
+
+    var bar = document.createElement('div');
+    bar.id = 'cloud-err-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;'
+      + 'background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;'
+      + "font:600 14px/1.45 'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;"
+      + 'padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:10px;'
+      + 'flex-wrap:wrap;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+
+    var msg = document.createElement('span');
+    msg.textContent = '⚠️ 無法連線到雲端資料 —— 這個版本太舊了，請重新載入';
+    bar.appendChild(msg);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '重新載入';
+    btn.style.cssText = 'font:inherit;border:0;border-radius:6px;padding:6px 14px;'
+      + 'cursor:pointer;background:#fff;color:#b91c1c';
+    btn.onclick = function(){
+      /* 強制繞過瀏覽器快取 —— 這個情境下的病因十之八九就是快取著舊版 */
+      try { location.replace(location.pathname + '?v=' + Date.now()); }
+      catch (err) { location.reload(); }
+    };
+    bar.appendChild(btn);
+
+    var note = document.createElement('div');
+    note.style.cssText = 'width:100%;font-weight:400;font-size:12px;opacity:.92';
+    note.textContent = '你在這台裝置上填的資料還在，不會不見。請先重新載入再繼續填寫，不要重打一次。';
+    bar.appendChild(note);
+
+    document.body.appendChild(bar);
+
+    /* 橫幅是 fixed top:0，會蓋住 sticky 的導覽列 → 把內容往下推（作法與版本橫幅一致） */
+    try {
+      var h = bar.offsetHeight || 56;
+      document.body.style.paddingTop =
+        ((parseFloat(getComputedStyle(document.body).paddingTop) || 0) + h) + 'px';
+      var navs = document.querySelectorAll('nav');
+      for (var i = 0; i < navs.length; i++) {
+        var pos = getComputedStyle(navs[i]).position;
+        if (pos === 'sticky' || pos === 'fixed') navs[i].style.top = h + 'px';
+      }
+    } catch (err) { /* 推版面失敗不重要，訊息有出來才是重點 */ }
+  };
 })();
 </script>
 </head>
@@ -479,25 +584,33 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th style="width:28px">#</th>
             <th style="min-width:90px">施作位置</th>
             <th style="min-width:100px">施工項目</th>
+            <!-- 2026-09-13 她指定：新增「施工說明」，擺在施工項目之後、今日廠商之前。
+                 說明緊貼著它在說明的那個工項，也跟今日工作摘要的順序一致。 -->
+            <th style="min-width:130px">施工說明</th>
             <th style="min-width:88px">今日廠商</th>
             <th style="min-width:88px">今日<br>施工人員</th>
-            <th style="width:64px">今日<br>出工</th>
+            <!-- 出工欄只填 0～99，輸入框本身早就限制在 60px → 欄寬 64 縮成 48（她指定） -->
+            <th style="width:48px">今日<br>出工</th>
             <th style="min-width:88px">明日廠商</th>
             <th style="min-width:88px">明日<br>施工人員</th>
-            <th style="width:64px">明日<br>出工</th>
-            <th style="width:76px">完成<br>進度%</th>
-            <th style="min-width:90px">異常類型</th>
-            <th style="min-width:100px">異常說明</th>
+            <th style="width:48px">明日<br>出工</th>
+            <th style="width:64px">完成<br>進度%</th>
+            <th style="min-width:84px">異常類型</th>
+            <!-- 2026-09-13 她指定：這一欄瑪摩本來叫「異常說明」、專案管理叫「備註說明」，
+                 兩支一起改名「備註」，從此一致。 -->
+            <th style="min-width:110px">備註</th>
+            <!-- 2026-09-11：填表人獨立成一欄（比照 cdr-pm），多人共編時看得出哪一列是誰填的 -->
+            <th style="width:76px">填表人</th>
             <th class="no-print" style="width:30px">刪</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
         <tfoot>
           <tr class="tfoot-row">
-            <td colspan="3" style="text-align:right;padding-right:10px">合計</td>
+            <td colspan="4" style="text-align:right;padding-right:10px">合計</td>
             <td></td><td></td><td id="tot-today">0</td>
             <td></td><td></td><td id="tot-tmrw">0</td>
-            <td colspan="4"></td>
+            <td colspan="5"></td>
           </tr>
         </tfoot>
       </table>
@@ -518,6 +631,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
             <th style="min-width:140px">材料名稱</th>
             <th style="width:80px">數量</th>
             <th style="width:80px">單位</th>
+            <!-- 2026-09-11 她指定：材料也要備註與填表人，與專案管理對齊。
+                 備註欄其實早就出現在單張報表的 Excel 匯出裡，但畫面上一直沒得填 → 永遠是空的。 -->
+            <th>備註</th>
+            <th style="width:76px">填表人</th>
             <th class="no-print" style="width:30px">刪</th>
           </tr>
         </thead>
@@ -839,9 +956,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <thead>
           <tr>
             <th>日期</th><th>部門</th><th>專案工務</th><th>案場</th>
-            <th>施作位置</th><th>施工項目</th><th>今日廠商</th><th>今日施工人員</th>
+            <th>施作位置</th><th>施工項目</th><th>施工說明</th><th>今日廠商</th><th>今日施工人員</th>
             <th>今日出工</th><th>明日廠商</th><th>明日施工人員</th><th>明日出工</th>
-            <th>完成進度%</th><th>異常類型</th><th>異常說明</th>
+            <th>完成進度%</th><th>異常類型</th><th>備註</th>
           </tr>
         </thead>
         <tbody id="ex-tbody"></tbody>
@@ -992,11 +1109,11 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="fl" style="margin-bottom:6px">要帶什麼過來？</div>
     <div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;font-size:13px">
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-mat" checked> 材料明細<span style="color:var(--muted)">（數量歸零）</span></label>
+        <input type="checkbox" id="carry-mat" checked> 材料明細<span style="color:var(--muted)">（數量歸零、備註會跟著帶）</span></label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-notes" checked> 注意事項</label>
+        <input type="checkbox" id="carry-notes" checked> 備註事項</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-work" checked> 工項</label>
+        <input type="checkbox" id="carry-work" checked> 施工明細</label>
     </div>
 
     <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
@@ -2128,17 +2245,17 @@ function carryApply(){
   if (wantMat && (src.materials||[]).length) {
     // 數量一律歸零、重編 id，免得跟來源那張共用同一筆
     (src.materials||[]).forEach(m => addMatRow({ ...m, qty:0, id:uid() }));
-    brought.push(`材料 ${src.materials.length} 筆（數量已歸零）`);
+    brought.push(`材料明細 ${src.materials.length} 筆（數量已歸零）`);
   }
   if (wantWork && (src.workItems||[]).length) {
     (src.workItems||[]).forEach(it => addRow({ ...it, id:uid() }));
-    brought.push(`工項 ${src.workItems.length} 筆`);
+    brought.push(`施工明細 ${src.workItems.length} 筆`);
   }
   if (wantNotes) {
     const n = src.notes || {};
     if (n.contact) { $('n-contact').value = n.contact; autoGrow($('n-contact')); }
     if (n.other)   { $('n-other').value   = n.other;   autoGrow($('n-other')); }
-    if (n.contact || n.other) brought.push('注意事項');
+    if (n.contact || n.other) brought.push('備註事項');
   }
 
   const hint = $('mat-carry-hint');
@@ -2312,6 +2429,85 @@ function clearForm() {
   applyPermissions();
 }
 
+/* ── 多人共編：逐列鎖（2026-09-11 從 cdr-pm 搬過來）──────────────────
+ * 每一列記住「是誰新增的」（owner）。你只能改自己那幾列，別人的列整列鎖成唯讀並顯示 🔒。
+ * 例外：(1) 舊資料沒有 owner → 無主，誰都能改，免得歷史報表變成沒人碰得動；
+ *       (2) 管理者（角色有刪除權，或編輯範圍設為「全部」）可以改所有人的列。
+ * ⚠️ 這不只是「怕手滑」——存檔是逐列各存各的，你改了別人的列，
+ *    存檔時會被雲端那一版蓋回去，看起來像「我改了沒反應」，其實是改的東西掉了。
+ * owner 的資料瑪摩本來就有在存（stampSubmission 一直有把 materials 一起蓋章），
+ * 這次補的是畫面與收集端 —— 不是從零開始記。
+ */
+function canEditOthers(){
+  if(portalCanDelete()) return true;
+  try{
+    const p=JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    const u=p.currentUser; if(!u||!u.roleId) return false;
+    const r=(p.roles||[]).find(x=>x.id===u.roleId);
+    return !!(r && r.editLevel==='all');
+  }catch(e){ return false; }
+}
+function canEditRow(owner){
+  if(!owner) return true;
+  return owner===((S.user&&S.user.name)||'') || canEditOthers();
+}
+/* ── 主管解鎖修改 ──────────────────────────────────────────────
+ * 逐列鎖的用意是「不要手一滑就動到別人填的東西」，不是「主管永遠不能改」。
+ * 編輯範圍＝「自己部門」或「跨部門」的角色看到別人的列時，鎖頭是可以點的：
+ * 點下去跳確認 → 按確定「那一列」才解開，沒按就維持唯讀。
+ * 解鎖只存在這次瀏覽（重新整理就恢復鎖住），也只影響被點開的那一列。
+ * 一般同仁（編輯範圍＝只改自己）看到的還是不能點的 🔒。 */
+var _unlockedRows = {};
+function rowUnlocked(id){ return !!(id && _unlockedRows[id]); }
+function canUnlockRow(owner){
+  if(!owner) return false;
+  if(canEditRow(owner)) return false;                    // 本來就改得動 → 不需要解鎖
+  var el = (S.user&&S.user.editLevel)||'self';
+  return el === 'dept' || el === 'cross';
+}
+function _unlockConfirm(owner){
+  return confirm('這一列是 '+owner+' 填的。\n\n確定要修改嗎？修改後會覆蓋他填的內容。');
+}
+function unlockRow(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  var owner = tr.dataset.owner||'', id = tr.dataset.id||'';
+  if(!_unlockConfirm(owner)) return;
+  _unlockedRows[id] = true;
+  tr.classList.remove('row-locked');
+  tr.querySelectorAll('select,input').forEach(function(el){ el.disabled = false; });
+  var cell = tr.querySelector('.lock-btn, .owner-cell');   // 主管看到的是 button，一般欄位是 span
+  if(cell){
+    var span = document.createElement('span');
+    span.className = 'owner-cell unlocked';
+    span.textContent = owner + ' 🔓';
+    span.title = '已解鎖：你正在修改 ' + owner + ' 填的內容';
+    cell.replaceWith(span);
+  }
+  var del = tr.querySelector('.col-del');
+  if(del) del.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button>';
+  toast('已解鎖，這一列現在可以修改');
+}
+function unlockMatRow(btn){
+  var tr = btn.closest('tr'); if(!tr) return;
+  var owner = tr.dataset.owner||'', id = tr.dataset.mid||'';
+  if(!_unlockConfirm(owner)) return;
+  _unlockedRows[id] = true;
+  tr.classList.remove('row-locked');
+  tr.querySelectorAll('select,input').forEach(function(el){ el.disabled = false; });
+  /* 鎖頭在「填表人」格、刪除鈕在最後一格，各自處理，不能靠 lastElementChild 抓 */
+  var cell = tr.querySelector('.lock-btn, .owner-cell');
+  if(cell){
+    var span = document.createElement('span');
+    span.className = 'owner-cell unlocked';
+    span.textContent = owner + ' 🔓';
+    span.title = '已解鎖：你正在修改 ' + owner + ' 加的材料';
+    cell.replaceWith(span);
+  }
+  var del = tr.querySelector('.col-del');
+  if(del) del.innerHTML = '<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>';
+  toast('已解鎖，這一列現在可以修改');
+}
+
 /* ── WORK TABLE ── */
 function addRow(it) {
   const tbody = $('tbody'); const n=++rowN;
@@ -2323,27 +2519,39 @@ function addRow(it) {
   /* 2026-09-02 修：列的 id 一定要寫進畫面。原本沒寫 → collectRows 每次存檔都用 uid() 重生一個，
      於是「逐列合併」永遠對不到同一列（雲端那列被當成別人的留著、我的又是全新的 → 列會愈存愈多），
      多人共編與提交序號也就跟著失效。專案管理那支 8/12 就有寫，瑪摩漏了。 */
-  tr.dataset.id = (it && it.id) || uid();
-  if (it && it.owner) tr.dataset.owner = it.owner;
+  const rowId = (it && it.id) || uid();
+  /* 2026-09-11 逐列鎖：舊資料沒有 owner → 視為無主，任何人都能改（不讓歷史資料變成沒人能碰） */
+  const owner = it ? (it.owner||'') : ((S.user&&S.user.name)||'');
+  const mine  = canEditRow(owner) || rowUnlocked(rowId);   // 解鎖過的列在重繪之後仍然可改
+  const canUn = !mine && canUnlockRow(owner);              // 主管：鎖頭可以點
+  const dis   = mine ? '' : ' disabled';
+  tr.dataset.id = rowId;
+  tr.dataset.owner = owner;
+  if(!mine) tr.classList.add('row-locked');
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum"></td>
-    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)">${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
-    <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)">${selOpts(worksOf(v('loc')),v('work'),'施工項目...')}</select></td>
-    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)">${selOpts(S.cfg.vendors,v('vendor'),'廠商...')}</select></td>
-    <td data-label="今日施工人員"><select class="cs" data-f="staff" onchange="syncReport()">${selOpts(staffOf(v('vendor')),v('staff')||v('lead'),'施工人員...')}</select></td>
-    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
-    <td data-label="明日廠商"><select class="cs" data-f="vendor2" onchange="onRowChange(this)">${selOpts(S.cfg.vendors,v('vendor2'),'廠商...')}</select></td>
-    <td data-label="明日施工人員"><select class="cs" data-f="staff2" onchange="syncReport()">${selOpts(staffOf(v('vendor2')),v('staff2')||v('lead2'),'施工人員...')}</select></td>
-    <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"></td>
+    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
+    <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)"${dis}>${selOpts(worksOf(v('loc')),v('work'),'施工項目...')}</select></td>
+    <td data-label="施工說明"><input class="ci" data-f="wdesc" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." oninput="syncReport()"${dis}></td>
+    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.vendors,v('vendor'),'廠商...')}</select></td>
+    <td data-label="今日施工人員"><select class="cs" data-f="staff" onchange="syncReport()"${dis}>${selOpts(staffOf(v('vendor')),v('staff')||v('lead'),'施工人員...')}</select></td>
+    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
+    <td data-label="明日廠商"><select class="cs" data-f="vendor2" onchange="onRowChange(this)"${dis}>${selOpts(S.cfg.vendors,v('vendor2'),'廠商...')}</select></td>
+    <td data-label="明日施工人員"><select class="cs" data-f="staff2" onchange="syncReport()"${dis}>${selOpts(staffOf(v('vendor2')),v('staff2')||v('lead2'),'施工人員...')}</select></td>
+    <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
     <td data-label="完成進度%">
       <div class="prog-wrap">
-        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center">
+        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center"${dis}>
         <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${prog}%"></div></div>
       </div>
     </td>
-    <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()">${aOpts}</select></td>
-    <td data-label="異常說明" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="說明..." oninput="syncReport()"></td>
-    <td class="col-del no-print"><button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button></td>`;
+    <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()"${dis}>${aOpts}</select></td>
+    <td data-label="備註" class="col-wide"><input class="ci" data-f="anote" value="${escHtml(v('anote'))}" placeholder="備註..." oninput="syncReport()"${dis}></td>
+    <td data-label="填表人">${canUn
+      ? `<button type="button" class="lock-btn" onclick="unlockRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 填的內容">${escHtml(owner)} 🔒</button>`
+      : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}${
+      it&&it.subAt?`<div class="sub-time" title="這一列送出的時間">${subTimeText(it.subAt)}</div>`:''}</td>
+    <td class="col-del no-print">${mine?'<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delRow(this)">✕</button>':''}</td>`;
   tbody.appendChild(tr);
   renum(); recalc(); buildSummary();
 }
@@ -2440,24 +2648,130 @@ function collectRows() {
       w1: parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0,
       progress: parseFloat(tr.querySelector('[data-f="progress"]')?.value)||0,
       atype: tr.querySelector('[data-f="atype"]')?.value||'',
-      anote: tr.querySelector('[data-f="anote"]')?.value||''
+      anote: tr.querySelector('[data-f="anote"]')?.value||'',
+      /* 2026-09-13 新增：施工說明。舊報表沒有這個欄位 → 讀出來是 ''，
+         摘要與匯出都是 filter(Boolean) 過的，舊資料不會憑空多出東西。 */
+      wdesc: tr.querySelector('[data-f="wdesc"]')?.value||''
     });
   });
   return _keepRowMeta(rows, 'workItems');
 }
 
 /* ── SUMMARY ── */
-function buildSummary() {
-  const lines=[];
-  const projName = curProjName();      // C 批：案場是整張報表的，每一行都用同一個
-  $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
-    const loc = tr.querySelector('[data-f="loc"]')?.value||'';
-    const work = tr.querySelector('[data-f="work"]')?.value||'';
-    if (projName||loc||work) {
-      lines.push(`${i+1}. ${[projName,loc,work].filter(Boolean).join(' ｜ ')}`);
-    }
+/* ══════ 今日工作摘要（2026-09-13 她指定：格式與專案管理完全相同）══════
+ * 改版前瑪摩一行只有「案場 ｜ 位置 ｜ 項目」，沒有標題行、天氣、進度、異常、填表人、備註事項。
+ * 她 2026-09-13 拍板 A 案：「瑪摩的日報表就相同於專案管理的」。
+ * 四個必然的副作用她都確認過，改的時候不要「順手優化」回去：
+ *   · 案場名不再逐行重複 —— 只出現在標題那一行
+ *   · 分隔符號從「｜」換成「；」，兩支從此一致
+ *   · 沒填材料的報表，摘要也會多出「［材料］無」（專案管理的規則是段落標題留著、內容寫無）
+ *   · 天氣沒選 → 標題那一段整段省略，不會掛個「天氣—」
+ * 📌 動這段之前要知道的事：她一度要求「案場逐行列出，因為瑪摩一張日報可能多個專案」。
+ *    查證後 —— 歷史上確實有（2025-04-01 那張混了雙橡園 2279／1617／2925，21 個工項），
+ *    但 2026-08-25 的 C1-c 已把瑪摩改成「一報表一案場」（她當天拍板把 3 張拆成 9 張），
+ *    施工明細的案場欄早就移除。現在一張日報只會有一個案場，逐行印只是同一個名字重複 N 次
+ *    → 她因此改選 A。若哪天真的要回到「一張日報多案場」，那是資料結構的事，不是摘要的事。
+ */
+/* 摘要用的純文字標籤（畫面上的選項帶 emoji，貼進 Email 不好看）。
+   認不得的值（舊資料手改過）就原樣顯示，不要吞掉。 */
+const ATYPE_TEXT = {material:'材料未到', weather:'天候影響', previous:'前項未完', other:'其他'};
+function atypeText(v){ return v ? (ATYPE_TEXT[v] || String(v)) : ''; }
+function summaryWeekday(dateStr){
+  const d = new Date(String(dateStr||'') + 'T00:00:00');
+  return isNaN(d) ? '' : ('星期' + DOW[d.getDay()]);
+}
+function summaryTitle(dateStr, projName, weather){
+  const parts = ['工程日報表'];
+  const ymd = String(dateStr||'').replace(/-/g,'');
+  if(ymd) parts.push(ymd);
+  if(projName) parts.push(projName);          // 照設定頁原樣
+  const w = summaryWeekday(dateStr);
+  if(w) parts.push(w);
+  const wx = String(weather||'').trim();
+  if(wx) parts.push('天氣' + wx);             // 沒填就整段省略
+  return parts.join('_');
+}
+/* 一筆材料一行：名稱；數量 單位；備註；填表人（沒填的會被 filter 濾掉） */
+function summaryMatLine(m){
+  const name = String((m&&m.name)||'').trim();
+  const qty  = (m && m.qty !== undefined && m.qty !== null && m.qty !== '') ? m.qty : '';
+  const unit = String((m&&m.unit)||'').trim();
+  const amount = [qty, unit].filter(v => v !== '' && v !== undefined).join(' ');
+  const note = String((m&&m.note)||'').trim();
+  return [name, amount, note, (m&&m.owner)||''].filter(Boolean).join('；');
+}
+/* ［材料已到貨統計］（2026-09-13 她指定）─────────────────────────────
+ * 這個案場「全部歷史」的材料累計，跟管理總表那張「材料統計」是同一個數字
+ * （她拍板：⑩ 範圍＝本案場全部歷史；⑫ 只留「名稱：數量 單位」，不帶筆數與最後使用 ——
+ *  這一段是要貼進 Email 的，欄位越多越難讀）。
+ * ⚠️ 讀的是 S.reports（已存檔的資料），不是畫面上那張材料表 ——
+ *    她拍板 ⑪「今天這張還沒存檔的不算，存檔後才會進統計」。
+ *    這樣同一個數字在摘要與管理總表兩邊永遠對得起來。
+ *    （已知的邊界：同一次開著頁面「存檔過一次」之後，S.reports 裡那筆與 S.report
+ *      是同一個物件，之後再打字會即時反映進來 —— 管理總表本來就是同樣的行為。）
+ * 單位空白的舊資料照設定頁綁的預設單位歸戶，與 getMaterialRows() 同一套規則。 */
+function summaryMatArrival(projName){
+  const pn = String(projName||'').trim();
+  if(!pn) return [];
+  const m = new Map();
+  ((typeof S!=='undefined' && S.reports) || []).forEach(r=>{
+    if((reportProjName(r)||'') !== pn) return;
+    (r.materials||[]).forEach(mt=>{
+      const name = String((mt&&mt.name)||'').trim(); if(!name) return;
+      const unit = String((mt.unit||'')).trim() || matUnitOf(name);
+      const k = name+' '+unit;
+      if(!m.has(k)) m.set(k,{name,unit,qty:0});
+      m.get(k).qty += Number(mt.qty)||0;
+    });
   });
-  const txt = lines.join('\n');
+  return [...m.values()]
+    .sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant',{numeric:true}))
+    .map(o=>o.name+'：'+(o.qty%1===0?o.qty:Number(o.qty.toFixed(1)))+(o.unit?' '+o.unit:''));
+}
+function summaryFromItems(items, dateStr, projName, mats, notes, weather){
+  const rp = projName||'';
+  const out = [summaryTitle(dateStr, rp || ((items||[])[0]||{}).projName || '', weather), ''];
+
+  /* ── 施工明細 ── */
+  const lines = (items||[]).map(wi=>{
+    const pn = rp || wi.projName || '';
+    /* 空白工項照樣產生並佔一個編號；只有「整列都沒有東西」才不算一列 */
+    if(!(pn || wi.loc || wi.work || wi.owner)) return null;
+    /* 施工說明緊接在施工項目後面（2026-09-13）；異常類型與備註仍在進度前面；填表人永遠收尾 */
+    return [wi.loc, wi.work, wi.wdesc, atypeText(wi.atype), wi.anote,
+            `進度${parseFloat(wi.progress)||0}%`, wi.owner]
+           .map(x => String(x == null ? '' : x).trim())
+           .filter(Boolean).join('；');
+  }).filter(v => v !== null);
+  out.push(lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+
+  /* ── 材料 ── */
+  const ml = (mats||[]).map(summaryMatLine).filter(Boolean);
+  out.push('', '［材料］', ml.length ? ml.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+
+  /* ── 材料已到貨統計 ── */
+  const al = summaryMatArrival(rp);
+  out.push('', '［材料已到貨統計］', al.length ? al.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+
+  /* ── 備註事項（原樣照貼，換行保留）── */
+  const nb = notes || {};
+  const c = String(nb.contact||'').trim(), o = String(nb.other||'').trim();
+  out.push('', '［備註事項］');
+  out.push('與工地聯絡事項', c || '無');
+  out.push('', '其他工程配合重點', o || '無');
+
+  return out.join('\n');
+}
+function buildSummary() {
+  /* 材料／備註／天氣一律從畫面現況讀（不從 S.report），
+     這樣不管 buildSummary 是被誰在什麼時候呼叫的，摘要都跟畫面一致。 */
+  const _mats = (typeof collectMatRows === 'function' && $('mat-tbody')) ? collectMatRows() : ((S.report||{}).materials||[]);
+  const _notes = $('n-contact')
+    ? { contact: $('n-contact').value, other: ($('n-other')||{}).value||'' }
+    : ((S.report||{}).notes||{});
+  const _weather = $('f-weather') ? $('f-weather').value : ((S.report||{}).weather||'');
+  const txt = summaryFromItems(collectRows(), $('f-date')?.value || S.report?.date || '', curProjName(),
+                               _mats, _notes, _weather);
   $('f-summary').value = txt;
   $('f-summary-pv').textContent = txt;
   autoGrow($('f-summary'));
@@ -2480,12 +2794,24 @@ function addMatRow(m) {
   const tbody = $('mat-tbody'); const n=++matN;
   const tr = document.createElement('tr');
   tr.dataset.mid = m?.id||uid();
+  /* 2026-09-11：材料也比照施工明細，每一列記住是誰加的。
+     舊資料沒有 owner → 視為無主，誰都能改（不讓歷史報表變成沒人碰得動）。 */
+  const owner = m ? (m.owner||'') : ((S.user&&S.user.name)||'');
+  const mine  = canEditRow(owner) || rowUnlocked(tr.dataset.mid);
+  const canUn = !mine && canUnlockRow(owner);
+  const dis   = mine ? '' : ' disabled';
+  tr.dataset.owner = owner;
+  if(!mine) tr.classList.add('row-locked');
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
-    <td><select class="cs" data-f="mname" onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
-    <td><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center" oninput="syncReport()"></td>
-    <td><select class="cs" data-f="munit">${matUnitOpts(m?.unit||'')}</select></td>
-    <td class="no-print"><button class="btn btn-g btn-icon btn-sm" onclick="delMatRow(this)">✕</button></td>`;
+    <td data-label="材料名稱"><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
+    <td data-label="數量"><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
+    <td data-label="單位"><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
+    <td data-label="備註"><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
+    <td data-label="填表人">${canUn
+      ? `<button type="button" class="lock-btn" onclick="unlockMatRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 加的材料">${escHtml(owner)} 🔒</button>`
+      : `<span class="owner-cell${mine?' mine':''}" title="${owner?escHtml(owner)+' 新增的':'舊資料，沒有記錄新增者'}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}</td>
+    <td class="col-del no-print">${mine?`<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delMatRow(this)">✕</button>`:''}</td>`;
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
@@ -2532,9 +2858,11 @@ function collectMatRows() {
   $('mat-tbody').querySelectorAll('tr').forEach(tr=>{
     rows.push({
       id: tr.dataset.mid||uid(),
+      owner: tr.dataset.owner||'',   // 多人共編：這一列是誰加的（disabled 的欄位 .value 照樣讀得到，資料不會掉）
       name: tr.querySelector('[data-f="mname"]')?.value||'',
       qty: parseFloat(tr.querySelector('[data-f="mq"]')?.value)||0,
-      unit: tr.querySelector('[data-f="munit"]')?.value||''
+      unit: tr.querySelector('[data-f="munit"]')?.value||'',
+      note: tr.querySelector('[data-f="mnote"]')?.value||''   // 2026-09-11 她指定新增
     });
   });
   return _keepRowMeta(rows, 'materials');
@@ -2906,7 +3234,7 @@ function renderHistory() {
   _groupKeys=groups.map(g=>g[0]);
   groups.forEach((g,gi)=>{
     const key=g[0], rows=g[1];
-    const open=force||!_closedG.has(key);
+    const open=force||groupOpen(key);
     const s0=rows.reduce((s,r)=>s+(r.workItems||[]).reduce((x,wi)=>x+(wi.w0||0),0),0);
     const sec=document.createElement('div');
     sec.className='hgrp';
@@ -2955,7 +3283,9 @@ function populateHistFilters() {
     );
     if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;   // 選項還在才保留，否則回「全部」
   };
-  fill('filter-dept',     reports.map(r=>r.dept));
+  /* 2026-09-13 修：與管理總表同一個問題 —— 判斷走 reportHasDept()（含各列的 subDept），
+     選項卻只列報表層的 r.dept。底下的 filter-reporter 本來就是取聯集，這條是漏掉的那個。 */
+  fill('filter-dept',     reports.flatMap(r=>reportDepts(r)));
   fill('filter-proj',     reports.flatMap(r=> r.projName ? [r.projName]
                                               : (r.workItems||[]).map(wi=>wi.projName)));
   // 填表人＝報表的專案工務 ∪ 各列工項的填表人（多人共編時兩者可能不同）
@@ -2999,18 +3329,26 @@ function importData(e){
  * 專案管理：案場當抬頭 → 底下依日期分列；瑪摩：日期當抬頭（新到舊）→ 底下依案場。
  * 兩支共用這一套，只差預設值 GROUP_DEFAULT；使用者可用切換鈕改成另一種看法，
  * 選擇記在瀏覽器裡（不同 App 各記各的）。
- * 展開狀態：預設全開；按「全部收合」才會關起來。有下篩選時一律全開 ——
- * 篩完只看到一排抬頭會以為東西不見了。 */
+ * 展開狀態（2026-09-13 她指定改成**預設全部收合**）：
+ *   進來就是一排抬頭，要看哪一個自己點開。抬頭上的張數與出工合計照舊顯示，
+ *   所以收起來不會少掉資訊，反而一眼看完全部案場。
+ *   有下篩選時一律全開 —— 篩完只看到一排關著的抬頭會以為東西不見了。
+ * 為什麼是「基準 ＋ 例外」而不是單純一個 _openG 集合：
+ *   「全部展開」得先知道所有抬頭的鍵，但管理總表與歷史紀錄的篩選條件各自獨立、
+ *   畫出來的抬頭不一定相同，_groupKeys 只留得住最後一次畫的那一頁。
+ *   （舊版的「全部收合」就有這個瑕疵，這次一併修掉。） */
 const GROUP_DEFAULT='date';
 const GROUP_LSKEY='cdr_v3_group';
 let groupMode=(function(){try{const v=localStorage.getItem(GROUP_LSKEY);return (v==='proj'||v==='date')?v:GROUP_DEFAULT}catch(e){return GROUP_DEFAULT}})();
-let _closedG=new Set();      // 只記「被收起來的」抬頭，預設全開
+let _allOpenG=false;         // 基準：false＝預設收合（她 2026-09-13 指定）
+let _gExc=new Set();         // 例外：相對於基準被點開（或點關）的那些抬頭
+function groupOpen(key){ return _allOpenG ? !_gExc.has(key) : _gExc.has(key); }
 let _groupKeys=[];           // 這次畫出來的抬頭順序，給 onclick 用索引取用（名稱可能有引號）
 
 function setGroupMode(m){
   const v=(m==='date')?'date':'proj';
   if(v===groupMode)return;
-  groupMode=v; _closedG=new Set();
+  groupMode=v; _gExc=new Set();
   try{localStorage.setItem(GROUP_LSKEY,groupMode)}catch(e){}
   renderMgmt(); renderHistory();
 }
@@ -3019,11 +3357,11 @@ function syncGroupButtons(){
     const b=$(id); if(b)b.classList.toggle('on',groupMode===m);
   });
 }
-function expandAllGroups(){ _closedG=new Set(); _closedStat=new Set(); renderMgmt(); renderHistory(); }
-function collapseAllGroups(){ _closedG=new Set(_groupKeys); _closedStat=new Set(_statKeys); renderMgmt(); renderHistory(); }
+function expandAllGroups(){ _allOpenG=true; _gExc=new Set(); _allOpenStat=true; _statExc=new Set(); renderMgmt(); renderHistory(); }
+function collapseAllGroups(){ _allOpenG=false; _gExc=new Set(); _allOpenStat=false; _statExc=new Set(); renderMgmt(); renderHistory(); }
 function toggleGroup(i){
   const k=_groupKeys[i]; if(k===undefined)return;
-  if(_closedG.has(k))_closedG.delete(k); else _closedG.add(k);
+  if(_gExc.has(k))_gExc.delete(k); else _gExc.add(k);
   renderMgmt(); renderHistory();
 }
 function groupKeyOf(r){
@@ -3177,12 +3515,15 @@ function getMaterialRows(){
 /* 三張統計都是「📁 案場當抬頭 → 底下分列」（2026-09-02 用戶指定）。
  * 底下一列代表什麼，每張表不一樣（她拍板的組合）：
  *   位置進度＝一個施作位置｜出工統計＝一天｜材料統計＝一種材料
- * 抬頭可以收合，用的是統計自己的一組狀態（_closedStat），
- * 不跟報表清單的分組狀態混在一起 —— 瑪摩的報表清單是用日期分組，鍵值對不起來。 */
-let _statKeys=[], _closedStat=new Set();
+ * 抬頭可以收合，用的是統計自己的一組狀態（_allOpenStat／_statExc），
+ * 不跟報表清單的分組狀態混在一起 —— 瑪摩的報表清單是用日期分組，鍵值對不起來。
+ * 2026-09-13 她指定：三張統計也一樣預設收合，篩選時一樣自動展開。
+ * 每一種材料底下的「使用紀錄」明細走 _openStatRows，不受這裡影響（本來就預設收合）。 */
+let _statKeys=[], _allOpenStat=false, _statExc=new Set();
+function statOpen(key){ return _allOpenStat ? !_statExc.has(key) : _statExc.has(key); }
 function toggleStatGroup(i){
   const k=_statKeys[i]; if(k===undefined)return;
-  if(_closedStat.has(k))_closedStat.delete(k); else _closedStat.add(k);
+  if(_statExc.has(k))_statExc.delete(k); else _statExc.add(k);
   renderMgmt();
 }
 function statEmptyHtml(){
@@ -3205,7 +3546,7 @@ function statGrouped(rows,headers,cellsOf,summaryOf,footOf){
   rows.forEach(o=>{const k=o.proj||'（未指定案場）'; if(!m.has(k))m.set(k,[]); m.get(k).push(o)});
   _statKeys=[...m.keys()];
   return [...m.entries()].map(([key,list],gi)=>{
-    const open=force||!_closedStat.has(key);
+    const open=force||statOpen(key);
     return '<div class="sgrp">'
       +'<div class="ghead'+(open?'':' closed')+'" onclick="toggleStatGroup('+gi+')">'
       +'<span class="gchev">▼</span><span>📁 '+escHtml(key)+'</span>'
@@ -3274,7 +3615,7 @@ function renderMgmt(){
   const num=v=>v%1===0?v:v.toFixed(1);
   groups.forEach((g,gi)=>{
     const key=g[0], rows=g[1];
-    const open=force||!_closedG.has(key);
+    const open=force||groupOpen(key);
     const s0=rows.reduce((s,r)=>s+(r.workItems||[]).reduce((x,wi)=>x+(wi.w0||0),0),0);
     const head=document.createElement('tr');
     head.className='grp-row';
@@ -3328,7 +3669,11 @@ function populateMgmtFilters(){
   const dSel=$('mg-dept'), pSel=$('mg-proj');
   const cd=dSel.value, cp=pSel.value;
   dSel.innerHTML='<option value="">全部部門</option>';
-  [...new Set(visibleReports().map(r=>r.dept).filter(Boolean))].forEach(d=>
+  /* 2026-09-13 修：選項只列 r.dept（＝開表那個人的部門），但篩選判斷走的是
+     reportHasDept()＝「報表層 ∪ 任一列填表人的部門」（2026-09-02 為跨部門共填加的）。
+     → 別的部門的人來填了幾列，那個部門永遠不會出現在下拉裡，那個篩選從畫面按不到。
+     跟旁邊的「填表人」下拉對齊：判斷比對什麼，選項就列什麼。 */
+  [...new Set(visibleReports().flatMap(r=>reportDepts(r)).filter(Boolean))].sort().forEach(d=>
     dSel.appendChild(Object.assign(document.createElement('option'),{value:d,textContent:d}))
   );
   pSel.innerHTML='<option value="">全部專案</option>';
@@ -3454,40 +3799,73 @@ function setExDateRange(type){
   $('ex-date-to').value=fmt(to);
 }
 function exSelectAll(v){$('ex-proj-checks').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=v);}
+/* ── 匯出篩選條件（2026-09-11 抽出來，與 cdr-pm 同一套）──
+ * 材料改走自己的工作表之後，工項列與材料列必須吃同一組條件。 */
+function exFilters(){
+  return {
+    projIds:new Set([...$('ex-proj-checks').querySelectorAll('input:checked')].map(cb=>cb.value)),
+    from:$('ex-date-from').value,
+    to:$('ex-date-to').value,
+    loc:$('ex-loc').value,
+    lead:$('ex-lead').value,
+    mat:$('ex-mat').value,
+    dept:$('ex-dept').value,
+    wMin:parseFloat($('ex-w-min').value)||0,
+    wMax:parseFloat($('ex-w-max').value)||Infinity
+  };
+}
+/* 報表層的條件（部門、日期區間）—— 工項與材料都要先過這一關 */
+function exReportPass(r,f){
+  if(f.dept&&r.dept!==f.dept)return false;
+  if(f.from&&r.date<f.from)return false;
+  if(f.to&&r.date>f.to)return false;
+  return true;
+}
 function getExRows(){
-  const selProjIds=new Set([...$('ex-proj-checks').querySelectorAll('input:checked')].map(cb=>cb.value));
-  const from=$('ex-date-from').value;
-  const to=$('ex-date-to').value;
-  const locF=$('ex-loc').value;
-  const leadF=$('ex-lead').value;
-  const matF=$('ex-mat').value;
-  const deptF=$('ex-dept').value;
-  const wMin=parseFloat($('ex-w-min').value)||0;
-  const wMax=parseFloat($('ex-w-max').value)||Infinity;
+  const f=exFilters();
   const rows=[];
   visibleReports().forEach(r=>{
-    if(deptF&&r.dept!==deptF)return;
-    if(from&&r.date<from)return;
-    if(to&&r.date>to)return;
+    if(!exReportPass(r,f))return;
     /* C 批：案場改由報表層提供；拆分前的舊報表報表層推不出案場，就沿用工項上的，
        這樣「總表匯出」在拆分前後都不會漏資料 */
     const rpid = reportProjId(r);
     (r.workItems||[]).forEach(wi=>{
       const pid = rpid || wi.projId || '';
       const pnm = rpid ? (r.projName || reportProjName(r)) : (wi.projName || '');
-      if(selProjIds.size>0&&!selProjIds.has(pid))return;
-      if(locF&&wi.loc!==locF)return;
-      if(leadF&&wiVendor(wi)!==leadF&&wiStaff(wi)!==leadF)return;
-      if(wi.w0<wMin||wi.w0>wMax)return;
+      if(f.projIds.size>0&&!f.projIds.has(pid))return;
+      if(f.loc&&wi.loc!==f.loc)return;
+      if(f.lead&&wiVendor(wi)!==f.lead&&wiStaff(wi)!==f.lead)return;
+      if(wi.w0<f.wMin||wi.w0>f.wMax)return;
       rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),...wi,projId:pid,projName:pnm});
     });
-    if(matF){
-      (r.materials||[]).filter(m=>m.name===matF).forEach(m=>{
-        rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:'',projName:'',
-          loc:'',work:'',vendor:'',staff:'',w0:'',vendor2:'',staff2:'',w1:'',progress:'',atype:'',anote:'',
-          _matRow:true,matName:m.name,matQty:m.qty,matUnit:m.unit});
-      });
-    }
+  });
+  return sortExRows(rows);
+}
+/* ── 材料明細列（2026-09-11 她指定「方案 C：材料另開一個工作表」，兩支一起修）──
+ * 一次修掉兩個缺陷：
+ *   ① 舊版把材料塞進第一頁的 rows，但 doExportExcel 只讀工項欄位、
+ *      根本沒讀 matName／matQty／matUnit → 材料列出去是一整列空白。
+ *   ② 舊版整段包在 if(matF) 裡 → 「材料」篩選器停在預設的「全部」時，一列材料都不會出。
+ * 2026-09-11 下午：她指定「瑪摩一起改」→ 材料的填寫畫面補上了備註與填表人，
+ *   所以這裡也跟著帶出來，欄位與 cdr-pm 完全一致（9 欄）。
+ * ⚠️ 施作位置／今日廠商／出工數是**工項層**的條件，材料沒有這些欄位 → 刻意不套用。 */
+function getExMatRows(){
+  const f=exFilters();
+  const rows=[];
+  visibleReports().forEach(r=>{
+    if(!exReportPass(r,f))return;
+    const rpid=reportProjId(r);
+    const pid=rpid||'';
+    if(f.projIds.size>0&&!f.projIds.has(pid))return;
+    /* 案場「顯示」盡量給得出來（舊的混案場報表也印得出名字），
+       但「篩選」只認報表層的 projId —— 跟工項那邊同一套判準。 */
+    const pnm=rpid?(r.projName||reportProjName(r)):(reportProjName(r)||'');
+    (r.materials||[]).forEach(m=>{
+      if(!m||!m.name)return;
+      if(f.mat&&m.name!==f.mat)return;
+      rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:pid,projName:pnm,
+        matName:m.name,matUnit:m.unit||'',matQty:m.qty,matNote:m.note||'',matOwner:m.owner||''});
+    });
   });
   return sortExRows(rows);
 }
@@ -3512,35 +3890,70 @@ function sortExRows(rows){
 }
 function previewExport(){
   const rows=getExRows();
+  const matRows=getExMatRows();
   const tbody=$('ex-tbody'); tbody.innerHTML='';
-  $('ex-count').textContent=`共 ${rows.length} 筆`;
-  if(!rows.length){$('ex-preview-card').style.display='none';toast('無符合條件的資料','e');return;}
+  /* 預覽表＝第一頁（工項）。材料另開分頁，這裡只報筆數、不混進表格 ——
+     混進去就是舊版那個「一整列空白」的長相。 */
+  $('ex-count').textContent=`共 ${rows.length} 筆`+(matRows.length?` · 材料 ${matRows.length} 筆（另開「材料明細」分頁）`:'');
+  if(!rows.length&&!matRows.length){$('ex-preview-card').style.display='none';toast('無符合條件的資料','e');return;}
   $('ex-preview-card').style.display='block';
   rows.slice(0,200).forEach(r=>{
     const tr=document.createElement('tr');
-    tr.innerHTML=[r.date,r.dept,r.reporter,r._matRow?'(材料)':escHtml(r.projName||''),
-      escHtml(r.loc||''),escHtml(r.work||''),escHtml(wiVendor(r)),escHtml(wiStaff(r)),
+    tr.innerHTML=[r.date,r.dept,r.reporter,escHtml(r.projName||''),
+      escHtml(r.loc||''),escHtml(r.work||''),escHtml(r.wdesc||''),escHtml(wiVendor(r)),escHtml(wiStaff(r)),
       r.w0!==''?r.w0:'',escHtml(wiVendor2(r)),escHtml(wiStaff2(r)),r.w1!==''?r.w1:'',
-      r.progress!==''?r.progress+'%':'',escHtml(r.atype||''),escHtml(r.anote||'')]
+      r.progress!==''?r.progress+'%':'',escHtml(atypeText(r.atype)),escHtml(r.anote||'')]
       .map(v=>`<td>${v}</td>`).join('');
     tbody.appendChild(tr);
   });
-  if(rows.length>200) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="15" style="text-align:center;color:var(--muted)">... 僅顯示前 200 筆，匯出 Excel 將包含全部 ${rows.length} 筆</td></tr>`);
+  if(rows.length>200) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="16" style="text-align:center;color:var(--muted)">... 僅顯示前 200 筆，匯出 Excel 將包含全部 ${rows.length} 筆</td></tr>`);
+  /* 只有材料、沒有工項的條件（例如整段期間只進了料）：表格是空的，要講清楚不是壞掉 */
+  if(!rows.length) tbody.insertAdjacentHTML('beforeend',`<tr><td colspan="16" style="text-align:center;color:var(--muted)">這個條件下沒有施工工項，只有 ${matRows.length} 筆材料 —— 匯出後在「材料明細」分頁</td></tr>`);
 }
 function doExport(){
   const rows=getExRows();
-  if(!rows.length){toast('無符合條件的資料','e');return;}
-  doExportExcel(rows);
+  const matRows=getExMatRows();
+  if(!rows.length&&!matRows.length){toast('無符合條件的資料','e');return;}
+  doExportExcel(rows,matRows);
+}
+
+/* ── 材料明細工作表（2026-09-11，總表匯出方案 C）──
+ * 第一頁（工項）完全不動，材料自己一張分頁。
+ * 欄位順序照瑪摩第一頁的習慣（日期在前、案場第四），後面接材料本身的五欄。
+ * 沒有材料就不建這張表：不要留一張只有表頭的空分頁。
+ * 2026-09-11 下午：補上備註與填表人（7 欄 → 9 欄），內容與 cdr-pm 一致，只有前四欄的順序不同。 */
+const EX_MAT_HEADERS=['日期','部門','專案工務','案場','材料名稱','單位','數量','備註','填表人'];
+const EX_MAT_COLW=[12,14,14,20,20,8,9,18,12];
+function addMatSheet(wb, matRows){
+  if(!matRows||!matRows.length) return null;
+  const ws=wb.addWorksheet('材料明細');
+  ws.addRow(EX_MAT_HEADERS);
+  ws.getRow(1).eachCell(cell=>{
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+    cell.font={color:{argb:'FFFFFFFF'},bold:true};
+    cell.alignment={horizontal:'center',vertical:'middle'};
+    cell.border={bottom:{style:'thin',color:{argb:'FF93C5FD'}}};
+  });
+  ws.getRow(1).height=22;
+  matRows.forEach((r,i)=>{
+    const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',
+      r.matName||'',r.matUnit||'',r.matQty,r.matNote||'',r.matOwner||'']);
+    if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
+    row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
+  });
+  ws.columns=EX_MAT_COLW.map(w=>({width:w}));
+  return ws;
 }
 
 /* ── EXCEL EXPORT ── */
-async function doExportExcel(rows){
-  if(!rows||!rows.length){toast('無資料可匯出','e');return;}
+async function doExportExcel(rows, matRows){
+  /* 2026-09-11：材料另開分頁後，「只有材料沒有工項」也是合法的一份 —— 兩邊都空才擋 */
+  if((!rows||!rows.length)&&(!matRows||!matRows.length)){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
     const ws=wb.addWorksheet('日報表-瑪摩工程');
-    const headers=['日期','部門','專案工務','案場','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','異常說明'];
+    const headers=['日期','部門','專案工務','案場','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','備註'];
     ws.addRow(headers);
     ws.getRow(1).eachCell(cell=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
@@ -3549,17 +3962,22 @@ async function doExportExcel(rows){
       cell.border={bottom:{style:'thin',color:{argb:'FF93C5FD'}}};
     });
     ws.getRow(1).height=22;
-    rows.forEach((r,i)=>{
-      const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.loc||'',r.work||'',
-        wiVendor(r),wiStaff(r),r.w0,wiVendor2(r),wiStaff2(r),r.w1,r.progress,r.atype||'',r.anote||'']);
+    (rows||[]).forEach((r,i)=>{
+      const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.loc||'',r.work||'',r.wdesc||'',
+        wiVendor(r),wiStaff(r),r.w0,wiVendor2(r),wiStaff2(r),r.w1,r.progress,atypeText(r.atype),r.anote||'']);
       if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
       row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
     });
-    ws.columns=[110,90,70,160,120,120,90,60,90,60,70,90,160].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
+    /* 2026-09-13：第 7 個寬度是新的「施工說明」欄（會寫字，給寬一點）。
+       這份清單本來就比表頭短（最後兩欄沿用預設寬），維持原樣不動。 */
+    ws.columns=[110,90,70,160,120,120,180,90,60,90,60,70,90,160].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
+    /* 材料明細（2026-09-11 方案 C）—— 第一頁的欄寬設定完才掛，兩張表互不干擾 */
+    addMatSheet(wb, matRows);
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    const dates=rows.map(r=>r.date).filter(Boolean).sort();
+    /* 2026-09-11：日期區間要把材料列一起算，否則「只有材料」的匯出檔名會掉出正確區間 */
+    const dates=(rows||[]).concat(matRows||[]).map(r=>r.date).filter(Boolean).sort();
     const fnDate=dates.length?(dates[0]===dates[dates.length-1]?dates[0]:`${dates[0]}_${dates[dates.length-1]}`):today();
     a.download=`日報表-瑪摩工程_${fnDate}.xlsx`; a.click();
     toast('Excel 已匯出','s');
@@ -3567,9 +3985,10 @@ async function doExportExcel(rows){
 }
 /* 單張報表的欄寬。備註列要合併到最後一欄、還要依整張表寬算列高，所以先定義好再用。
  * C 批：拿掉「專案/工地」欄，11 欄 → 10 欄。 */
-const MM_COLW = [6,18,28,14,10,14,10,10,14,28];
+/* 2026-09-13：第 4 個是新的「施工說明」欄 */
+const MM_COLW = [6,18,28,28,14,10,14,10,10,14,28];
 async function exportExcel(){
-  const COLW = MM_COLW, LASTCOL = MM_COLW.length;   // 工項表共 10 欄（A~J），備註要合併到這一欄
+  const COLW = MM_COLW, LASTCOL = MM_COLW.length;   // 備註列要合併到這一欄（2026-09-13：10 → 11）
   syncReport();
   const r=S.report;
   const hasWork=(r.workItems||[]).length>0;
@@ -3600,10 +4019,10 @@ async function exportExcel(){
     // 工項
     if(hasWork){
       const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','施作位置','施工項目','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','異常說明'];
+      const headers=['#','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','備註'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
-        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wiVendor(wi),wiStaff(wi),wi.w0||0,wiVendor2(wi),wiStaff2(wi),wi.w1||0,wi.progress||0,wi.atype||'',wi.anote||'']);
+        const row=ws.addRow([i+1,wi.loc||'',wi.work||'',wi.wdesc||'',wiVendor(wi),wiStaff(wi),wi.w0||0,wiVendor2(wi),wiStaff2(wi),wi.w1||0,wi.progress||0,atypeText(wi.atype),wi.anote||'']);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -3612,10 +4031,12 @@ async function exportExcel(){
     // 材料
     if(hasMat){
       const tr=ws.addRow(['【材料管制】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
-      const headers=['#','材料名稱','單位','數量','備註'];
+      /* 2026-09-11：備註欄從 09-07 起就印在這裡，但畫面上一直沒得填 → 永遠是空的。
+         今天補了填寫欄位，這一欄才真的有東西。順便比照 cdr-pm 加上「填表人」。 */
+      const headers=['#','材料名稱','單位','數量','備註','填表人'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.materials||[]).forEach((m,i)=>{
-        const row=ws.addRow([i+1,m.name||'',m.unit||'',m.qty||0,m.note||'']);
+        const row=ws.addRow([i+1,m.name||'',m.unit||'',m.qty||0,m.note||'',m.owner||'']);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -4299,6 +4720,8 @@ function init(){
       }
     }).catch(function(e){
       console.warn('Firebase load failed:', e);
+      /* 2026-09-11：權限被拒要讓使用者看得見（規則收緊後、停在舊版的人就是這一條） */
+      try { window._cloudErrBar && window._cloudErrBar(e); } catch(e3){}
       /* 就算同步中途出事，也要用「現在 S 裡的資料」重畫一次（2026-09-09）。
          這裡重畫最多是畫成跟原本一樣，不會有副作用。 */
       try { if(S.page) goPage(S.page); } catch(e2){ console.warn('重畫失敗：', e2 && e2.message); }

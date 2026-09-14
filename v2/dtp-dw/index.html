@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-03.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-09-11.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2642,9 +2642,83 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+<script>
+/* ══════ 雲端連線失敗要「看得見」（2026-09-11）══════════════════════════
+ * 以前雲端讀取失敗只有 console.warn —— 使用者看到的是「畫面正常打開，但資料空了」，
+ * 一個字的錯誤訊息都沒有。看不到錯誤的人第一反應常常是**重填一次**，
+ * 那才是真正會出事的地方。
+ *
+ * 分兩種，對應兩種完全不同的處置：
+ *   🔴 PERMISSION_DENIED（紅、關不掉）
+ *      ＝ 資料庫規則已經收緊，但這台還停在沒有匿名驗證的舊版。
+ *        唯一解法是重新載入拿到新版 → 給一顆強制重載的按鈕。
+ *   🟠 其他（橘、可關閉）
+ *      ＝ 網路不通、Firebase 暫時掛掉。資料還在這台裝置上，等連線恢復會自己同步，
+ *        不需要做任何事 → 講清楚就好，不要嚇人。
+ *
+ * 刻意不重用版本橫幅（#app-update-bar）：那支是比對版本號用的，
+ * 兩者可能同時出現，混在一起會互相蓋掉。 */
+window._cloudErrBar = (function(){
+  var shown = false;                    // 同一次瀏覽只跳一次，不要每次重試都疊一條
+  return function(e){
+    if (shown) return;
+    var raw = String((e && (e.code || e.message)) || e || '');
+    var denied = /permission[_-]?denied/i.test(raw);
+    /* 網路類的錯誤在這裡不跳橫幅 —— 本機優先的設計本來就能離線用，
+       每次訊號差就跳一條紅的只會讓人麻痺，真的出事那次反而被忽略。
+       離線狀態原本就有同步指示燈在表示。 */
+    if (!denied) { console.warn('雲端連線失敗（非權限問題，資料仍在本機）：', raw); return; }
+    shown = true;
+
+    var bar = document.createElement('div');
+    bar.id = 'cloud-err-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;'
+      + 'background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;'
+      + "font:600 14px/1.45 'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;"
+      + 'padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:10px;'
+      + 'flex-wrap:wrap;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+
+    var msg = document.createElement('span');
+    msg.textContent = '⚠️ 無法連線到雲端資料 —— 這個版本太舊了，請重新載入';
+    bar.appendChild(msg);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '重新載入';
+    btn.style.cssText = 'font:inherit;border:0;border-radius:6px;padding:6px 14px;'
+      + 'cursor:pointer;background:#fff;color:#b91c1c';
+    btn.onclick = function(){
+      /* 強制繞過瀏覽器快取 —— 這個情境下的病因十之八九就是快取著舊版 */
+      try { location.replace(location.pathname + '?v=' + Date.now()); }
+      catch (err) { location.reload(); }
+    };
+    bar.appendChild(btn);
+
+    var note = document.createElement('div');
+    note.style.cssText = 'width:100%;font-weight:400;font-size:12px;opacity:.92';
+    note.textContent = '你在這台裝置上填的資料還在，不會不見。請先重新載入再繼續填寫，不要重打一次。';
+    bar.appendChild(note);
+
+    document.body.appendChild(bar);
+
+    /* 橫幅是 fixed top:0，會蓋住 sticky 的導覽列 → 把內容往下推（作法與版本橫幅一致） */
+    try {
+      var h = bar.offsetHeight || 56;
+      document.body.style.paddingTop =
+        ((parseFloat(getComputedStyle(document.body).paddingTop) || 0) + h) + 'px';
+      var navs = document.querySelectorAll('nav');
+      for (var i = 0; i < navs.length; i++) {
+        var pos = getComputedStyle(navs[i]).position;
+        if (pos === 'sticky' || pos === 'fixed') navs[i].style.top = h + 'px';
+      }
+    } catch (err) { /* 推版面失敗不重要，訊息有出來才是重點 */ }
+  };
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
   authDomain: "dailyconstructionreport-dfe1b.firebaseapp.com",
@@ -2656,6 +2730,18 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+/* ── 匿名驗證（2026-09-11 A 案）────────────────────────────────
+ * 讓 Firebase 知道「這個請求來自一個正常的網頁用戶端」，資料庫規則才有機會
+ * 從「全開」收緊成 auth != null。使用者完全無感，不用註冊也不用密碼。
+ *
+ * 🔑 authReady **永遠不會 reject**：登入失敗就 catch 吞掉、照常往下跑。
+ *    規則還全開的期間（現在）失敗也照樣讀寫得到，跟改版前一模一樣；
+ *    規則收緊之後失敗才會被擋，那時才是預期行為。
+ *    讓它 reject 的話，規則都還沒收就先把 圖面進度表 的所有讀寫打壞了。 */
+const authReady = signInAnonymously(getAuth(app)).catch(e => {
+  console.warn('匿名登入失敗（規則仍全開時不影響運作）：', e && e.message);
+});
+window._authReady = authReady;
 // 寫入前把 undefined 清乾淨：Firebase 只要遇到一個 undefined 就退回整筆（2026-08-21 事故）。
 // null 要原樣保留 —— 那是「刪除這一筆」的意思。
 const _noUndef = (v) => {
@@ -2667,12 +2753,17 @@ const _noUndef = (v) => {
   }
   return v;
 };
-window._fbSet = async (data) => { await set(ref(db, 'dtp'), _noUndef(data)); };
-window._fbSetPath = async (path, val) => { await set(ref(db, 'dtp/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
-window._fbGet = async () => { const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
-window._fbGetPath = async (path) => { const s = await get(ref(db, 'dtp/' + path)); return s.exists() ? s.val() : null; };
+window._fbSet = async (data) => { await authReady; await set(ref(db, 'dtp'), _noUndef(data)); };
+window._fbSetPath = async (path, val) => { await authReady; await set(ref(db, 'dtp/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
+window._fbGet = async () => { await authReady; const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
+window._fbGetPath = async (path) => { await authReady; const s = await get(ref(db, 'dtp/' + path)); return s.exists() ? s.val() : null; };
 // 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-13 新增）
-window._fbWatch = (cb) => { onValue(ref(db, 'dtp'), (s) => { try { cb(s.exists() ? s.val() : null); } catch (e) { console.warn('watch callback error:', e); } }); };
+/* onValue 是「掛監聽」不是「拿 Promise」→ 要等驗證完成再掛，否則規則收緊後第一次連線就被拒 */
+/* 2026-09-11：onValue 原本只傳了成功回呼 —— 讀取被拒時整個靜悄悄，
+   畫面停在舊資料、使用者完全不知道。補上錯誤回呼。 */
+window._fbWatch = (cb) => { authReady.then(() => onValue(ref(db, 'dtp'),
+  (s) => { try { cb(s.exists() ? s.val() : null); } catch (e) { console.warn('watch callback error:', e); } },
+  (err) => { console.error('雲端讀取失敗：', err); try { window._cloudErrBar && window._cloudErrBar(err); } catch(e3){} })); };
 </script>
 <!-- ══════ 版本檢查：偵測到新版就跳橫幅，由使用者自己點更新（2026-07-30 新增） ══════ -->
 <script>
