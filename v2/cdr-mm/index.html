@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-14.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-17.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -180,6 +180,8 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .list-num{font-size:11px;color:var(--muted);min-width:18px;text-align:center;font-weight:600}
 /* 兩層設定（2026-08-28 從 cdr-pm 移植）：施作位置→施工項目、廠商→施工人員 */
 .mat-suggest{font-size:10px;color:var(--accent,#b45309);background:#fef3c7;border-radius:3px;padding:1px 5px;flex-shrink:0;font-weight:700}
+/* 修 1（2026-09-17）：雲端還沒抓回來 → 儲存鈕看起來不能按（按了會提示請稍候） */
+body.cloud-syncing [onclick^="saveReport"],body.cloud-syncing [onclick^="saveSettings"]{opacity:.45;cursor:progress}
 .tl-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px}
 .tl-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;overflow:hidden}
 .tl-head{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#f8fafc;border-bottom:1px solid var(--border)}
@@ -353,6 +355,15 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     window._cdrRemove = function(p){ return _authReady.then(function(){ return _db.ref('cdr_v3/'+p).remove(); }); };
     // 一次讀回整個 cdr_v3 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
     window._cdrGetRoot = function(){ return _authReady.then(function(){ return _db.ref('cdr_v3').once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    /* 修 5（2026-09-17）：直接打開檔案（file://）＝本機預覽 → 讀得到雲端、但一律不寫。
+       當天 16:14 就是從 G 槽直接打開檔案，把試跑用的假資料寫進正式資料庫。 */
+    if (location.protocol === 'file:') {
+      window._LOCAL_PREVIEW = true;
+      var _noWrite = function(){ return Promise.resolve(); };
+      window._cdrSet = _noWrite; window._cdrRemove = _noWrite;
+      if (window._phSet) window._phSet = _noWrite;
+      if (window._phRemove) window._phRemove = _noWrite;
+    }
   } catch(e){ console.warn('Firebase init failed:',e); }
 })();
 </script>
@@ -1346,12 +1357,44 @@ function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&
  * 補完會標記，讓呼叫端接著推一次雲端。 */
 var _rescuedCount = 0;
 var _skippedMerged = 0;
+/* ── 刪除墓碑（2026-09-17 修 4，照專案管理 2026-09-03 那套補上）──
+ * 以前瑪摩刪掉一張日報，雲端沒有留任何紀錄 → 別台裝置本機影本還留著那張，
+ * 開頁時的救援機制會當成「沒存成功」補回雲端，刪掉的就復活。
+ * 現在刪除會在 cdr_v3/deleted/{id} 留一筆時間戳，跨裝置都看得到，救援與存檔都會跳過。
+ * ⚠️ 墓碑刻意不做過期清理：誤刪要救回來（從備份）的成本，遠低於「刪不掉、一直復活」。 */
+var _tombstones = {};        // id -> 刪除時間（從雲端讀回來的）
+/* 一報表一案場之後 id 是「案場＋日期」算出來的固定值，刪掉之後同案場同日又建一張 → id 一模一樣。
+ * 報表的 createdAt 比墓碑還新 → 那是新建的，墓碑不算數。 */
+function isDeleted(id, r){
+  var t = id && _tombstones[id];
+  if(!t) return false;
+  if(r){
+    var made = Date.parse(r.createdAt || '') || 0;
+    if(made > t) return false;
+  }
+  return true;
+}
+function clearTombstone(id){
+  if(!id || !_tombstones[id]) return;
+  delete _tombstones[id];
+  try { if(window._cdrRemove) window._cdrRemove('deleted/' + id); } catch(e){}
+}
+function markReportDeleted(id){
+  if(!id) return;
+  _tombstones[id] = Date.now();
+  try { if(window._cdrSet) window._cdrSet('deleted/' + id, _tombstones[id]); } catch(e){}
+}
+function dropDeleted(list){
+  if(!Array.isArray(list)) return list;
+  return list.filter(function(r){ return !(r && isDeleted(r.id, r)); });
+}
 function rescueLocalNewer(localReports){
   _rescuedCount = 0; _skippedMerged = 0;
   if(!Array.isArray(localReports) || !localReports.length) return 0;
   var cloudIds = new Set((S.reports||[]).map(function(r){ return r && r.id; }).filter(Boolean));
   localReports.forEach(function(lr){
     if(!lr || !lr.id || cloudIds.has(lr.id)) return;
+    if(isDeleted(lr.id, lr)) return;   // 2026-09-17：刻意刪掉的不要補回雲端
     /* 2026-09-02 加的防呆：雲端已經有「同案場＋同一天」的報表 →
        本機這筆多半是被合併掉或在別台被刪掉的舊版本，補回去只會讓重複復活。
        真正「存檔沒成功」的情況雲端不會有那一天那個案場的報表，所以照樣救得到。 */
@@ -1475,12 +1518,13 @@ function _cacheLocal(snapshot){
   }
 }
 function save() {
+  if (cloudGuard()) return { cloudOk:false, localOk:false, blocked:true };   // 修 1：雲端還沒抓回來
   const data = {
     reports: S.reports, cfg: S.cfg, user: S.user,
     projSort: S.projSort, updatedAt: Date.now()
   };
   let cloudOk = false, localOk = false;
-  try { if(window._cdrSet){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
+  try { if(window._cdrSet && !_cloudOffline){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
   try { localStorage.setItem('cdr_v3', JSON.stringify(_localCopy(data, cloudOk))); localOk = true; }
   catch(e){
     console.warn('本機儲存失敗（多半是空間不足）：', e && e.message);
@@ -1510,11 +1554,139 @@ var _lastPushed = {};   // id -> 上次推上雲的 JSON 字串
 var _editingLegacy = false;   // 正在編輯的是舊格式（隨機 id）報表 → 存檔時不改鍵
 var _loadingDup = false;      // 防止 checkDeptDateDuplicate ↔ loadReport 互相呼叫成無限迴圈
 var _noAutoLoad = false;      // 帶入流程進行中：不要自動載入既有那張（存檔時才併）
+/* ══ 存檔同步修法（2026-09-17 事故後，她確認「全甲」）══════════════════════════
+ * 事故經過：本機影本（localStorage）裝不下、停在 9/7 左右；開頁後雲端資料還沒抓回來的幾秒內存檔，
+ *           就把舊影本當成最新的送上雲；而且每次存檔都把整份 cfg 蓋上去 → 當天設定與日報被蓋掉五次。
+ * 修 1：_cloudReady —— 雲端第一次載入完成（成功或失敗）之前，任何存檔一律擋下（Q1 甲：擋下並提示）
+ * 修 2：cfg 只送「跟雲端最後已知內容不一樣」的那幾格（第一層是物件的逐項送）；沒改就一個字都不送
+ * 修 3：開頁一律以雲端為準（見 init），本機只撈回「雲端沒有的日報」＋「上次沒送出去的修改」（_pending）
+ * 修 4：送出前排除有刪除紀錄（墓碑）的日報
+ * 修 5：file:// 直接開檔時 Firebase 寫入一律變成空操作（見 Firebase 初始化那段）
+ * Q2 甲：雲端第一次就讀不到（沒網路）→ 可以存在這台、不送雲端，頂端紅條提示，下次開頁自動補傳 */
+var _cloudReady   = !window._cdrGetRoot;   // 沒有雲端（測試環境、Firebase 沒載入）→ 本來就只存本機，直接放行
+var _cloudOffline = false;                 // 雲端第一次就讀不到 → 只存這台，不送雲端
+var _cfgBase = null;                       // 雲端設定「最後已知」的內容；只送跟它不一樣的地方
+var _projSortBase;                         // 同上，給 projSort（undefined＝還不知道）
+var PENDING_KEY = 'cdr_v3_pending';     // 上次沒送出去的修改（只放那幾張，不是整份影本）
+function cloudGuard(silent){
+  if(_cloudReady) return false;
+  if(!silent){ try{ toast('正在同步雲端資料，請稍候幾秒再儲存','e'); }catch(e){} }
+  return true;
+}
+function markCloudReady(offline){
+  _cloudReady = true;
+  _cloudOffline = !!offline;
+  try{ document.body.classList.remove('cloud-syncing'); }catch(e){}
+}
+function _clone(v){ return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+/* 比對前先正規化：Firebase 會丟掉空字串／空陣列／空物件，讀回來的物件 key 也會重新排序。
+   不先處理的話「內容一樣」也會被當成有改，又變回整塊亂送。 */
+function _canon(v){
+  if(Array.isArray(v)){
+    var a = v.map(_canon).filter(function(x){ return x !== undefined; });
+    return a.length ? a : undefined;
+  }
+  if(v && typeof v === 'object'){
+    var o = {};
+    Object.keys(v).sort().forEach(function(k){ var c = _canon(v[k]); if(c !== undefined) o[k] = c; });
+    return Object.keys(o).length ? o : undefined;
+  }
+  if(v === '' || v === null || v === undefined) return undefined;
+  return v;
+}
+function _same(a, b){ return JSON.stringify(_canon(a)) === JSON.stringify(_canon(b)); }
+function _isMap(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+/* 算出設定要寫哪幾個節點：[[路徑, 值], ...]
+ * 第一層是物件（worksByLoc、staffByVendor、scopeByProj、matUnitMap）→ 逐項比，
+ * 兩個人同時改不同廠商的施工人員，各寫各的那一格，不會互相蓋掉。 */
+function cfgWrites(cur, base){
+  var out = []; cur = cur || {}; base = base || {};
+  var keys = {};
+  Object.keys(cur).concat(Object.keys(base)).forEach(function(k){ keys[k] = 1; });
+  Object.keys(keys).forEach(function(k){
+    var a = cur[k], b = base[k];
+    if(_same(a, b)) return;
+    if(_isMap(a) && _isMap(b)){
+      var sk = {};
+      Object.keys(a).concat(Object.keys(b)).forEach(function(s){ sk[s] = 1; });
+      Object.keys(sk).forEach(function(s){
+        if(!_same(a[s], b[s])) out.push(['cfg/' + k + '/' + s, a[s] === undefined ? null : a[s]]);
+      });
+    } else {
+      out.push(['cfg/' + k, a === undefined ? null : a]);
+    }
+  });
+  return out;
+}
+/* ── 上次沒送出去的修改（修 3 的救援，Q2 甲）──
+ * 只記「這台真的改過、還沒確認送上雲」的那幾張，送成功就刪掉。
+ * 跟整份影本分開放，才不會因為影本太大寫不進去而一起丟掉。 */
+function _pendingRead(){
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}') || {}; } catch(e){ return {}; }
+}
+function _pendingWrite(m){
+  try {
+    if(Object.keys(m).length) localStorage.setItem(PENDING_KEY, JSON.stringify(m));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch(e){ console.warn('待補傳清單寫不進去：', e && e.message); }
+}
+function pendingAdd(list){
+  var m = _pendingRead();
+  (list || []).forEach(function(r){ if(r && r.id) m[r.id] = _localCopy({ reports:[r] }, true).reports[0]; });
+  _pendingWrite(m);
+}
+function pendingDrop(ids){
+  var m = _pendingRead(), n = 0;
+  (ids || []).forEach(function(id){ if(m[id]){ delete m[id]; n++; } });
+  if(n) _pendingWrite(m);
+}
+/* 開頁抓完雲端之後：把上次沒送出去的修改疊回去（有刪除紀錄的丟掉） */
+function pendingApply(){
+  var m = _pendingRead(), ids = Object.keys(m), n = 0;
+  if(!ids.length) return 0;
+  var me = (S.user && S.user.name) || '';
+  ids.forEach(function(id){
+    var p = m[id];
+    if(!p) return;
+    if(isDeleted(id, p)){ delete m[id]; return; }
+    var i = S.reports.findIndex(function(r){ return r && r.id === id; });
+    if(i >= 0) S.reports[i] = (typeof mergeReport === 'function') ? mergeReport(p, S.reports[i], me, null) : p;
+    else S.reports.push(p);
+    n++;
+  });
+  _pendingWrite(m);
+  return n;
+}
+/* 開頁時的設定：以雲端為準，只補「雲端沒有的欄位」的預設值 —— 不再疊在本機舊影本上 */
+var _CFG0 = null;
+function cfgFromCloud(c){
+  var out = Object.assign(_clone(_CFG0) || {}, _clone(c) || {});
+  ['projects','users','matNames','matUnits','locs','vendors','depts'].forEach(function(k){ if(!Array.isArray(out[k])) out[k] = (_CFG0 && Array.isArray(_CFG0[k])) ? _clone(_CFG0[k]) : []; });
+  ['worksByLoc','staffByVendor','matUnitMap'].forEach(function(k){ if(!_isMap(out[k])) out[k] = {}; });
+  return out;
+}
+function showOfflineWarn(){
+  showSyncWarn(new Error('沒有連上雲端'));
+  var el = document.getElementById('sync-warn');
+  if(el) el.textContent = '⚠️ 沒有連上雲端：現在存的日報只留在這台裝置，還沒送到雲端。網路恢復後請重新整理頁面，系統會自動補傳。';
+}
+function showLocalPreviewBar(){
+  if(!window._LOCAL_PREVIEW || document.getElementById('local-preview-bar')) return;
+  var el = document.createElement('div');
+  el.id = 'local-preview-bar';
+  el.className = 'no-print';
+  el.style.cssText = 'position:sticky;top:0;z-index:61;background:#7c2d12;color:#fff;'
+    + 'font:700 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:7px 14px;text-align:center';
+  el.textContent = '📁 本機預覽（直接開啟檔案）：可以看、可以操作，但不會存到雲端';
+  document.body.insertBefore(el, document.body.firstChild);
+}
 function _snapshotReports(list){
   var m={}; (list||[]).forEach(function(r){ if(r&&r.id) m[r.id]=JSON.stringify(r); }); return m;
 }
 async function pushCloud(data) {
   if(!window._cdrSet) return;
+  if(!_cloudReady) return;                                                // 修 1：雲端還沒抓回來，不送
+  if(_cloudOffline){ setSyncIcon('☁️❌'); showOfflineWarn(); return; }   // Q2 甲：沒網路只存這台
   setSyncIcon('☁️');
   try {
     var reports = data.reports || [];
@@ -1540,7 +1712,9 @@ async function pushCloud(data) {
       return;
     }
     var jobs = [];
-    var changed = reports.filter(function(r){ return r && r.id && _lastPushed[r.id] !== cur[r.id]; });
+    /* 修 4（2026-09-17）：有刪除紀錄的日報一律不送 —— 當天 8/3、8/5、8/28 三張就是被舊影本送回雲端的 */
+    var changed = reports.filter(function(r){ return r && r.id && _lastPushed[r.id] !== cur[r.id] && !isDeleted(r.id, r); });
+    var _pend = [];
     for (var ci = 0; ci < changed.length; ci++) {
       var r = changed[ci], cloud = null;
       if (window._cdrGet) {
@@ -1549,14 +1723,22 @@ async function pushCloud(data) {
       }
       /* 🚨 這一筆的照片比雲端少就不要推（2026-09-03 事故後） */
       if (!_photoCountGuard(r, cloud)) { continue; }
+      _pend.push(r);
       jobs.push(window._cdrSet('reports/'+r.id, _noUndef(r)));   // 送出前先清 undefined
     }
     dels.forEach(function(id){ jobs.push(window._cdrRemove('reports/'+id)); });
-    jobs.push(window._cdrSet('cfg', data.cfg));
-    jobs.push(window._cdrSet('projSort', data.projSort || null));
+    /* 修 2（2026-09-17）：設定只送改過的那幾格 —— 存日報時設定沒變，一格都不送。
+       還不知道雲端設定長怎樣（_cfgBase 是 null，例如測試環境）才整份送，跟改版前一樣。 */
+    var _cfgNow = _clone(data.cfg);
+    (_cfgBase ? cfgWrites(_cfgNow, _cfgBase) : [['cfg', _cfgNow]]).forEach(function(w){ jobs.push(window._cdrSet(w[0], w[1])); });
+    var _psNow = data.projSort || null;
+    if(_projSortBase === undefined || _psNow !== _projSortBase) jobs.push(window._cdrSet('projSort', _psNow));
     jobs.push(window._cdrSet('updatedAt', data.updatedAt));
+    pendingAdd(_pend);                 // 送出前先記著；確定送成功才刪（下次開頁的救援靠它）
     await Promise.all(jobs);
     _lastPushed = cur;
+    _cfgBase = _cfgNow; _projSortBase = _psNow;
+    pendingDrop(_pend.map(function(r){ return r.id; }));
     setSyncIcon('☁️✅');
   } catch(e) { setSyncIcon('☁️❌'); showSyncWarn(e); }
 }
@@ -1855,6 +2037,7 @@ var _dupAskedFor = '';
 /* 把同案場同日的其他張，全部併進「我正在看的這一張」，然後把它們刪掉。
  * 刪除刻意一筆一筆做：雲端同步有一道「一次刪超過 1 筆就放棄」的防呆（2026-07-21 事故後加的）。 */
 function mergeDupHere(){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   const date = $('f-date').value;
   const projId = $('f-proj') ? ($('f-proj').value||'') : '';
   const dups = S.reports.filter(r=>r && r.date===date && reportProjId(r)===projId && r.id!==S.report.id);
@@ -2363,6 +2546,7 @@ function syncReport() {
   buildSummary();
 }
 function saveReport() {
+  if (cloudGuard()) return;   // 修 1：雲端還沒抓回來，先不給存
   /* 舊格式（一張混多個案場）拆分前不給存 —— 存下去會把其他案場的工項一起歸到同一個案場 */
   if (_legacyMultiProj) { toast('這張是舊格式報表（混了多個案場），拆分前不能存檔','e'); return; }
   syncReport();
@@ -2384,11 +2568,13 @@ function saveReport() {
     if (_exist) { S.report = mergeIntoKeyed(_exist, S.report); _merged = true; }
     else { S.report.id = _key; }
   }
+  clearTombstone(S.report.id);   // 同一個 id 又建回來 → 墓碑失效（2026-09-17）
   const _sid = stampSubmission(S.report);
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
   const st = save();
+  if (_cloudOffline) { pendingAdd([S.report]); toast('沒有連上雲端：這張先存在這台裝置，網路恢復後重新整理，系統會自動補傳','e'); return; }
   if (st.localOk && _merged) toast('已併入這天的日報表（' + (S.report.reporter||'') + ' 建的），你的明細都在裡面','s');
   else if (st.localOk) toast('日報表已儲存','s');
   else if (st.cloudOk) toast('已存到雲端 ✓（這台裝置的離線暫存滿了，但資料都在雲端，換裝置開一樣看得到）','s');
@@ -3298,8 +3484,10 @@ function clearHistFilter(){
   renderHistory();
 }
 function deleteReport(id){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(!requireDelete())return;
   if(!confirm('確定刪除這筆報表？'))return;
+  markReportDeleted(id);            // 先立墓碑，別台才不會又把它補回來（2026-09-17）
   S.reports=S.reports.filter(r=>r.id!==id);
   save(); renderHistory();
 }
@@ -3310,6 +3498,7 @@ function exportAll(){
   a.download='日報表-瑪摩工程_備份_'+today()+'.json'; a.click();
 }
 function importData(e){
+  if(cloudGuard()){ e.target.value=''; return; }   // 修 1（2026-09-17）
   const f=e.target.files[0]; if(!f)return;
   const rd=new FileReader();
   rd.onload=ev=>{
@@ -4233,6 +4422,7 @@ function loadCfgForm(){
   renderProjTable();
 }
 function saveSettings(){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(mngGuard())return;
   /* 材料改回兩張清單（2026-09-03，跟專案管理一致）：名稱（含預設單位）與單位各自讀回來。
      matUnitMap 只收「名稱與單位都有填」的那幾列，沒選單位＝沒有預設單位。 */
@@ -4406,6 +4596,7 @@ function openProjModal(id){
 }
 function closeProjModal(){$('proj-overlay').classList.remove('show');}
 function saveProj(){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(mngGuard())return;
   const name=$('pm-name').value.trim();
   if(!name){toast('請輸入專案名稱','e');return;}
@@ -4418,6 +4609,7 @@ function saveProj(){
   save(); closeProjModal(); renderProjTable(); fillProjSelect(); toast('專案已儲存','s');   // 先存檔，畫面出錯也不賠掉資料
 }
 function deleteProj(id){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(!requireDelete())return;
   if(isProjLocked(id)){toast('此專案已在日報表中使用，無法刪除','e');return;}
   if(!confirm('確定刪除此專案？'))return;
@@ -4464,6 +4656,7 @@ function openUserModal(id){
 }
 function closeUserModal(){$('user-overlay').classList.remove('show');}
 function saveUser(){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(mngGuard())return;
   const name=$('um-name').value.trim();
   const dept=$('um-dept').value;
@@ -4481,6 +4674,7 @@ function saveUser(){
   closeUserModal(); renderUsersTable(); save(); toast('人員已儲存','s');
 }
 function deleteUser(id){
+  if(cloudGuard())return;   // 修 1（2026-09-17）
   if(!requireDelete())return;
   if(!confirm('確定刪除此人員？'))return;
   S.cfg.users=S.cfg.users.filter(u=>u.id!==id);
@@ -4662,15 +4856,25 @@ function backToPortal(){
 
 /* ── INIT ── */
 function init(){
+  if(!_CFG0) _CFG0 = _clone(S.cfg);   // 設定的預設值，要在 load() 疊上本機影本之前記下來（2026-09-17）
   load();  // 1. 先讀本機（快）
 
-  // 2. Firebase 拉雲端，用 updatedAt 判新舊
+  // 2. Firebase 拉雲端 —— 2026-09-17 起一律以雲端為準（修 3），抓回來之前不准存檔（修 1）
+  showLocalPreviewBar();
   if(window._cdrGetRoot){
+    _cloudReady = false; _cloudOffline = false;
+    try { document.body.classList.add('cloud-syncing'); } catch(e){}
+    setSyncIcon('☁️ 同步中…');
     window._cdrGetRoot().then(function(root){
       root = root || {};
       var localData = JSON.parse(localStorage.getItem('cdr_v3')||'{}');
       // 新格式 cdr_v3/reports/{id} 優先；沒有才吃舊格式 cdr_v3/all（整包），並在下面自動遷移
-      var newReports = root.reports ? Object.values(root.reports) : null;
+      /* 先把墓碑收下來（2026-09-03）：後面判斷「要不要補傳／要不要顯示」都靠它 */
+      _tombstones = (root.deleted && typeof root.deleted === 'object') ? root.deleted : {};
+      S.reports = dropDeleted(S.reports);       // 本機殘留的已刪報表先清掉
+      var newReports = root.reports ? Object.values(root.reports).filter(function(r){
+        return !(r && isDeleted(r.id, r));         // 雲端萬一還留著（別台舊版補上去的）也濾掉
+      }) : null;
       var cloud = null, fromLegacy = false;
       if(newReports && newReports.length){
         cloud = { reports:newReports, cfg:root.cfg, projSort:root.projSort, updatedAt:root.updatedAt || 0 };
@@ -4679,50 +4883,62 @@ function init(){
       }
       if(!cloud){
         // 雲端沒資料 → 本機有就推一次（首次同步，走 per-record）
+        _cfgBase = {}; _projSortBase = null;
+        markCloudReady(false); setSyncIcon('☁️✅');
         if((localData.reports||[]).length) pushCloud(localData);
         return;
       }
-      var localTime = localData.updatedAt || 0;
       var cloudTime = cloud.updatedAt || 0;
-      // 讀取端防呆：雲端較新，「或」本機是空的但雲端有資料 → 一律拉雲端。
-      // 後者可救回「本機 updatedAt 被過早 save 汙染成現在、但其實 0 筆」的情況（2026-07-21 修）
-      var localEmptyCloudHas = (localData.reports||[]).length === 0 && (cloud.reports||[]).length > 0;
-      var takeCloud = cloudTime > localTime || localEmptyCloudHas;
-      if(takeCloud){
-        var _localReports = localData.reports || [];
-        S.reports = cloud.reports || [];
-        rescueLocalNewer(_localReports);   // 拉雲端會整包蓋掉本機 → 先把本機獨有的報表撈回來
-        if(cloud.cfg) S.cfg = {...S.cfg, ...cloud.cfg};
-        // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
-        // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
-        // 本機快照存「現在這台的身分」而非雲端的 user，避免下次 load() 又把舊身分讀回來
-        _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime });
-        if(S.page) goPage(S.page);   // ⚠️ 這一行以前會被上面那行的 quota 例外跳過 → 畫面停在舊資料
-        if(_rescuedCount){
-          // 撈回來的還沒進雲端 → 立刻補推一次，並且本機快照要含它們（上面那行 setItem 寫的是雲端版）
-          _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:Date.now() });
-          toast('這台有 '+_rescuedCount+' 筆日報表雲端沒有（上次存檔沒送出去），正在補傳…','s');
-          setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
-        } else {
-          toast('已從雲端同步最新資料 ☁️','s');
-        }
-      }
+      /* 🔴 2026-09-17 修 3：拿掉「本機時間比較新就用本機」。
+         本機影本早就裝不下、內容停在 9/7，時間卻可能是剛剛 —— 用它就是當天筆電一直只看到 9/7 以前、
+         而且一存檔就把舊內容送回雲端的原因。現在一律用雲端；本機只撈回「雲端沒有的那幾張」。 */
+      var takeCloud = true;
+      /* 先記下雲端原樣當同步基準（一定要在下面疊回修改「之前」記）。
+         ⚠️ 以前是 S.reports 直接指向 cloud.reports、疊完才記基準 → 疊回去的內容也被當成「雲端本來就有」，
+            補傳時一筆都沒送（2026-09-17 測試抓到）。 */
+      var _cloudSnap = fromLegacy ? {} : _snapshotReports(cloud.reports);
+      S.reports = (cloud.reports || []).slice();
+      /* 🔴 2026-09-17：不再從整份本機影本撈「雲端沒有的日報」（rescueLocalNewer）。
+         影本停在 9/7，裡面有很多是後來被刪掉的 —— 瑪摩沒有刪除紀錄，一撈就全部復活。
+         改成只疊回「這台存過、但確定沒送到雲端」的那幾張（_pending，送成功就刪）。 */
+      _rescuedCount = 0;
+      var _pendingN = pendingApply();    // 上次沒送出去的修改疊回去
+      S.cfg = cfgFromCloud(cloud.cfg);   // 設定也以雲端為準，不再疊在本機舊影本上
+      if(cloud.projSort) S.projSort = cloud.projSort;
+      // ⚠️ 不再用 cloud.user 蓋掉登入身分：user 是「這台裝置這次登入是誰」，不該跟資料整包同步，
+      // 否則會把入口帶進來的正確權限身分（viewLevel/editLevel/crossDepts）打回雲端存的舊值 → 權限過濾錯亂、畫面被清空（2026-07-21 修）
+      _cacheLocal({ reports:S.reports, cfg:S.cfg, user:S.user, projSort:S.projSort, updatedAt:cloudTime });
       // per-record 同步基準＝雲端目前有哪幾筆。舊格式時留空 → 只會新增不會刪，最安全。
-      _lastPushed = fromLegacy ? {} : _snapshotReports(cloud.reports);
+      _lastPushed = _cloudSnap;
+      _cfgBase = _clone(S.cfg);          // 修 2：之後只送跟這份不一樣的地方
+      _projSortBase = S.projSort || null;
+      markCloudReady(false);             // 修 1：到這裡才放行存檔
+      setSyncIcon('☁️✅');
+      if(S.page) goPage(S.page);   // ⚠️ 這一行以前會被上面那行的 quota 例外跳過 → 畫面停在舊資料
+      if(_rescuedCount || _pendingN){
+        toast('這台有 '+(_rescuedCount+_pendingN)+' 筆日報表上次沒送到雲端，正在補傳…','s');
+        setTimeout(function(){ pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); }, 400);
+      } else {
+        toast('已從雲端同步最新資料 ☁️','s');
+      }
       if(fromLegacy){
         // 一次性遷移：舊 cdr_v3/all → 新 cdr_v3/reports/{id}。
         // cdr_v3/all 刻意保留不刪（當備份，也讓還沒硬刷的舊版裝置繼續運作）
-        var mig = takeCloud
-          ? { reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now() }
-          : { reports:localData.reports||[], cfg:localData.cfg||S.cfg, projSort:localData.projSort, updatedAt:localData.updatedAt||Date.now() };
+        var mig = { reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now() };
         console.info('[遷移] cdr_v3/all（舊整包）→ cdr_v3/reports/{id}（per-record），共 '+(mig.reports||[]).length+' 筆');
         pushCloud(mig);
       }
     }).catch(function(e){
       console.warn('Firebase load failed:', e);
+      /* 雲端其實已經載入成功、是後面重畫畫面時出錯 → 不能當成沒網路 */
+      if(_cloudReady && !_cloudOffline){ try { if(S.page) goPage(S.page); } catch(e5){} return; }
+      /* 2026-09-17 Q2 甲：雲端第一次就讀不到 → 放行存檔，但只存這台、不送雲端，頂端紅條提示 */
+      markCloudReady(true);
+      try { setSyncIcon('☁️❌'); showOfflineWarn(); } catch(e4){}
       /* 2026-09-11：權限被拒要讓使用者看得見（規則收緊後、停在舊版的人就是這一條） */
       try { window._cloudErrBar && window._cloudErrBar(e); } catch(e3){}
-      /* 就算同步中途出事，也要用「現在 S 裡的資料」重畫一次（2026-09-09）。
+      /* 就算同步中途出事，也要用「現在 S 裡的資料」重畫一次 ——
+         2026-09-09 的日曆點點就是被這個 .catch 默默吃掉的（資料換好了、畫面沒重畫）。
          這裡重畫最多是畫成跟原本一樣，不會有副作用。 */
       try { if(S.page) goPage(S.page); } catch(e2){ console.warn('重畫失敗：', e2 && e2.message); }
     });
