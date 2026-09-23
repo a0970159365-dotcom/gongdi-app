@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-09-23.2';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -70,9 +70,10 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .notif-item .meta-app{background:var(--bg);padding:1px 6px;border-radius:8px;font-weight:600;color:var(--primary)}
 .notif-empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:13px}
 .nav-user .avatar{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
-.nav-user .info{display:flex;flex-direction:column;line-height:1.2}
-.nav-user .name{font-weight:700;font-size:12px}
-.nav-user .dept{font-size:10px;opacity:.75}
+/* flex:0 1 auto ＋ 不換行：就算未來又有人寫出同名的 class，這塊也不會被壓成一個字一行 */
+.nav-user .info{display:flex;flex-direction:column;line-height:1.2;flex:0 1 auto;width:auto;height:auto}
+.nav-user .name{font-weight:700;font-size:12px;white-space:nowrap}
+.nav-user .dept{font-size:10px;opacity:.75;white-space:nowrap}
 
 /* ── LAYOUT ── */
 .container{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
@@ -384,10 +385,15 @@ select.fi{cursor:pointer}
 /* ⓘ 浮出說明 */
 .tipwrap{position:relative;display:inline-flex;z-index:1}
 .tipwrap:hover,.tipwrap:focus-within,.tipwrap.pin{z-index:30}
-.info{appearance:none;border:1px solid var(--border);background:#fff;color:var(--muted);
+/* 🚨 一定要寫成 .tipwrap .info，不可以只寫 .info（2026-09-23 事故）──────────────
+   導覽列右上角那塊姓名／部門的 class 剛好也叫 info（.nav-user .info）。
+   這條原本沒限定範圍，等於宣告「只要 class 叫 info 的通通變成 21×21 圓形」，
+   連導覽列那塊一起壓扁 → 「廖學健／專案管理部…」被擠成一個字一行往下排。
+   09-11 就寫壞了，但入口網頁一直沒上線，9/23 六支一起推才爆出來。 */
+.tipwrap .info{appearance:none;border:1px solid var(--border);background:#fff;color:var(--muted);
   width:21px;height:21px;border-radius:50%;font-size:12px;font-weight:700;line-height:1;cursor:pointer;
   display:inline-flex;align-items:center;justify-content:center;flex:none;align-self:center;font-family:inherit}
-.info:hover{border-color:var(--primary);color:var(--primary);background:var(--bg)}
+.tipwrap .info:hover{border-color:var(--primary);color:var(--primary);background:var(--bg)}
 .tipwrap.pin .info{background:var(--primary);border-color:var(--primary);color:#fff}
 .tip{position:absolute;top:calc(100% + 9px);right:-10px;width:min(420px,64vw);
   padding:11px 14px;border-radius:10px;background:#fff;border:1px solid var(--primary);
@@ -1773,9 +1779,10 @@ function updateNavUser() {
     return;
   }
   $('user-name').textContent = u.name;
-  const r = getRole(u.roleId);
-  const roleText = r ? ` · ${r.name}` : '';
-  $('user-dept').textContent = (u.dept || '—') + roleText;
+  /* 導覽列只放「姓名／部門」，不放角色名稱（2026-09-23 她指定：不要權限訊息）。
+     角色在「設定 ＞ 角色管理」看得到，這裡不重複 —— 而且角色名稱可以很長
+     （例如「專管×規設互看（主管）」），掛在導覽列很容易把版面擠爆。 */
+  $('user-dept').textContent = u.dept || '—';
   $('user-avatar').textContent = (u.name||'?').charAt(0);
   updateAppCardLinks();
   updateNavPerms();
