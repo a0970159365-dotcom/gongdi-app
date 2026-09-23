@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-03.12';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -189,8 +189,28 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 }
 .data-card.wide-tbl{overflow-x:auto;overflow-y:hidden}
 .data-card.wide-tbl table{min-width:1040px}
-/* 員工表 8 欄，比角色表窄一些就夠（2026-09-03） */
-.data-card.emp-tbl table{min-width:860px}
+/* 2026-09-11：角色表加了「部門名稱」「職務名稱」變 12 欄。
+   原本的 1040px 不夠 → 瀏覽器會去壓沒設寬度的那一欄，
+   實機上「角色類型」被壓成一個字一行（她截圖回報）。
+   給足最小寬度，寬度不夠就讓整張表左右滑（wide-tbl 本來就有 overflow-x）。 */
+.data-card.role-tbl table{min-width:1500px}
+/* 員工表 2026-09-11 變 9 欄，跟著加寬 */
+.data-card.emp-tbl table{min-width:1080px}
+/* 角色類型那一欄底下還有一行描述文字，要讓它換行而不是把欄位撐開。
+   2026-09-11 第三輪：欄序改成 序號／部門名稱／職務名稱／角色類型 → 它變成第 4 欄。 */
+.data-card.role-tbl td:nth-child(4){white-space:normal}
+/* 姓名與員工編號要突顯（2026-09-11 她指定）—— 這兩格是找人時真正在看的 */
+.emp-name{font-size:15px;font-weight:800;color:var(--primary-d,#0f2440);letter-spacing:.5px}
+/* 編輯角色視窗的職務勾選清單（2026-09-11）。兩組各自一排，看得出主管與員工是分開的。 */
+.jobchk{display:flex;flex-direction:column;gap:10px}
+.jobchk .grp{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.jobchk .glab{font-size:11.5px;font-weight:800;color:var(--muted,#64748b);min-width:52px;letter-spacing:.5px}
+.jobchk label{display:inline-flex;align-items:center;gap:6px;font-size:13px;
+  padding:5px 11px;border:1px solid var(--border);border-radius:20px;cursor:pointer;background:#fff;user-select:none}
+.jobchk label:hover{border-color:var(--primary);background:#f8fafc}
+.jobchk label:has(input:checked){border-color:var(--primary);background:#eef4fb;font-weight:700;color:var(--primary-d,#0f2440)}
+.jobchk input{cursor:pointer;width:14px;height:14px;margin:0}
+.emp-code{font-size:13px;font-weight:800;letter-spacing:.6px;padding:3px 10px}
 table{width:100%;border-collapse:collapse}
 thead{background:var(--bg)}
 th{text-align:left;padding:11px 14px;font-weight:800;font-size:12px;color:var(--primary);letter-spacing:.3px;text-transform:uppercase;border-bottom:2px solid var(--border)}
@@ -200,21 +220,50 @@ tr:hover{background:#fafbfc}
 .tag-pill{display:inline-block;padding:2px 10px;background:var(--bg);color:var(--primary);border-radius:10px;font-size:11px;font-weight:700}
 .seq{display:inline-block;min-width:24px;text-align:center;color:var(--muted);font-weight:700;font-size:12px}
 .code-pill{display:inline-block;padding:2px 8px;background:#eef2f7;color:var(--primary-d);border-radius:4px;font-family:'Consolas','Courier New',monospace;font-size:12px;font-weight:700;letter-spacing:.3px}
+/* ── 顯示密碼的眼睛（2026-09-11 她指定的線條圖案）──────────────────
+   眼睛張開＝正在顯示密碼、眼睛閉上＝遮著。每個欄位各自獨立，不會連動。
+   包裝層與按鈕都是開機時用程式補上去的（見 initPwEyes），
+   這樣以後新增密碼欄位不用再記得手動加一次。 */
+.pw-wrap{position:relative;display:block}
+.pw-wrap>.fi{padding-right:42px}
+.pw-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border:0;background:transparent;border-radius:6px;cursor:pointer;
+  color:var(--muted);padding:0;line-height:0}
+.pw-eye:hover{background:#eef2f7;color:var(--primary)}
+.pw-eye:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.pw-eye .ic-on{display:none}
+.pw-eye[aria-pressed="true"]{color:var(--primary)}
+.pw-eye[aria-pressed="true"] .ic-off{display:none}
+.pw-eye[aria-pressed="true"] .ic-on{display:block}
 
 /* ── LEVEL PILLS ── */
-.level-pill{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:800;letter-spacing:.3px;color:#fff}
+/* ── 權限標籤配色（2026-09-11 她指定的配色表）──────────────────────
+ * 改版前全部是「滿版亮色 ＋ 白字」，而且四個權限欄與「全公司」共用 level-all（亮紅），
+ * 於是「可維護」看起來像危險項目 —— 她回報的就是這件事。
+ * 現在一律改成「淡底 ＋ 深字 ＋ 同色系細框」：看得清楚、彼此分得開，但不會整張表在喊。
+ * ⚠️ 兩套要分開：**資料範圍**（自己／同部門／跨部門／全公司）與
+ *    **權限開關**（可設定／可維護／可排序／可刪除）意義完全不同，不可以再共用 class。 */
+.level-pill{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:800;
+  letter-spacing:.3px;border:1px solid transparent;line-height:1.5;white-space:nowrap}
 .legend-card{margin-top:14px;padding:12px 16px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:0;border:1px solid var(--border)}
 .legend-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;row-gap:8px;padding:8px 0}
 .legend-row + .legend-row{border-top:1px solid var(--border)}
 .legend-row strong{color:var(--text);min-width:60px;font-weight:800;font-size:12px}
 .legend-item{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
-.level-none{background:#cbd5e1;color:#475569}
-.level-self{background:#64748b}
-.level-dept{background:#0ea5e9}
-.level-cross{background:var(--accent)}
-.level-all{background:var(--danger)}
+/* 資料範圍：由小到大 —— 個人藍 → 團隊藍 → 跨區琥珀 → 全公司紫 */
+.level-none{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0}   /* 不可／唯讀：弱化，不干擾 */
+.level-self{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}   /* 自己／本人：基礎個人權限 */
+.level-dept{background:#bfdbfe;color:#1e3a8a;border-color:#60a5fa}   /* 同部門：團隊權限，比個人重一階 */
+.level-cross{background:#fef3c7;color:#b45309;border-color:#fcd34d}  /* 跨部門：跨區，換色系才看得出跨出去了 */
+.level-all{background:#ede9fe;color:#6d28d9;border-color:#c4b5fd}    /* 全部／全公司：最高級別 */
+/* 權限開關：綠＝已開啟／允許，紅＝危險動作。與上面那組刻意不同色系。 */
+.perm-on{background:#dcfce7;color:#15803d;border-color:#86efac}      /* 可設定／可維護／可排序 */
+.perm-del{background:#fee2e2;color:#991b1b;border-color:#fca5a5}     /* 可刪除：醒目但不上火 */
 .app-pill{display:inline-block;padding:2px 7px;margin:0 2px 2px 0;background:var(--bg);color:var(--primary);border-radius:4px;font-size:11px;font-weight:600}
-.dept-pill{display:inline-block;padding:2px 9px;margin:0 3px 3px 0;background:#fff7ed;color:var(--accent);border:1px solid #fed7aa;border-radius:10px;font-size:11px;font-weight:700}
+/* 2026-09-11：與「跨部門」那顆標籤統一色系 —— 它們講的是同一件事 */
+.dept-pill{display:inline-block;padding:3px 10px;margin:0 3px 3px 0;background:#fffbeb;color:#b45309;
+  border:1px solid #fde68a;border-radius:10px;font-size:11px;font-weight:700;line-height:1.5;white-space:nowrap}
 
 /* ── RADIO/CHECKBOX UI ── */
 .level-radio-group{display:flex;flex-direction:column;gap:8px;background:var(--bg);border-radius:8px;padding:10px}
@@ -243,7 +292,15 @@ tr:hover{background:#fafbfc}
 .role-tag-exec{background:#fef3c7;color:#92400e;border-color:#fcd34d}      /* 總經理室 - 金 */
 
 .empty-row{text-align:center;color:var(--muted);padding:40px 14px;font-size:13px}
-.row-actions{display:flex;gap:6px;justify-content:flex-end}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+/* ── 表格列的「編輯」＝那一列唯一的強互動按鈕（2026-09-11 她指定）──
+   改版前是白底灰框的純文字，跟旁邊的「刪除」一樣弱，看不出哪個才是主要動作。
+   ⚠️ 只改表格列裡的，不動視窗底部那些「取消」——那些也是 btn-secondary。 */
+.row-actions .btn-secondary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.row-actions .btn-secondary:hover{background:var(--primary-l);border-color:var(--primary-l)}
+/* 刪除維持安靜：滑過去才變紅，避免整欄都在喊 */
+.row-actions .btn-danger{color:#94a3b8}
+.row-actions .btn-danger:hover{color:var(--danger);background:#fef2f2;border-color:var(--danger)}
 
 /* ── MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,36,64,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;backdrop-filter:blur(4px)}
@@ -266,6 +323,157 @@ tr:hover{background:#fafbfc}
 select.fi{cursor:pointer}
 
 /* ── 登入閘門（未登入時全屏遮蔽，背景完全看不到）── */
+/* ══ 設定頁四步引導（2026-09-04）══ */
+.wiz{display:flex;flex-wrap:wrap;border:1px solid var(--line,#e2e8f0);border-radius:14px;
+  overflow:hidden;background:#fff;margin:0 0 0}
+.wiz-s{flex:1 1 150px;display:flex;gap:9px;align-items:flex-start;padding:12px 14px;
+  border-right:1px solid var(--line,#e2e8f0);min-width:0;background:none;text-align:left;
+  cursor:pointer;font:inherit;color:inherit}
+.wiz-s:last-child{border-right:none}
+.wiz-s.on{background:#1a3a5c;color:#fff}
+.wiz-s.done{background:#ecfdf5}
+.wiz-s .n{flex:0 0 21px;height:21px;border-radius:50%;background:#e2e8f0;color:#64748b;
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.wiz-s.on .n{background:#fff;color:#1a3a5c}
+.wiz-s.done .n{background:#059669;color:#fff}
+.wiz-s .t{min-width:0}
+.wiz-s .t b{display:block;font-size:13.5px;line-height:1.5;overflow-wrap:anywhere}
+.wiz-s .t span{font-size:11.5px;opacity:.78;display:block;line-height:1.5;overflow-wrap:anywhere}
+.cfg-step{border:1px solid var(--line,#e2e8f0);border-top:none;border-radius:0 0 14px 14px;
+  padding:16px;background:#f8fafc}
+.cfg-step .section{margin:0}
+.wiz-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.flex-r{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.autosave-tag{font-size:12.5px;color:#059669;white-space:nowrap}
+
+/* ── 第 ② 步：四組分層選角色 ── */
+/* ── 權限角色編輯視窗 B 版（2026-09-07）───────────────────────────────
+ * 三欄：左 項目（序號＋標題）／中 選項與說明／右 選取。
+ * 白話註解放在中欄第一行，長說明收進 ⓘ —— 游標移過去才浮出來，不佔版面高度，
+ * 所以掃四個權限時每一列的位置從頭到尾不會變。沒有游標的裝置點一下 ⓘ 釘住。 */
+.rb-modal{max-width:780px}
+.rb-body{padding:0!important}
+.rb-hdr{display:grid;grid-template-columns:168px 1fr 88px;padding:9px 18px;
+  border-bottom:1px solid var(--border);background:var(--bg)}
+.rb-hdr span{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.rb-hdr span:last-child{text-align:center}
+.rb-row{display:grid;grid-template-columns:168px 1fr 88px;border-top:1px solid var(--border)}
+.rb-row.rb-split{grid-template-columns:168px 1fr}
+.rb-l{padding:14px 10px 14px 18px;border-right:1px solid var(--border);background:var(--bg);
+  display:flex;flex-direction:column;gap:2px}
+.rb-m{padding:11px 14px;min-width:0}
+.rb-m.rb-pad{padding:13px 14px}
+.rb-r{padding:14px 0;display:flex;align-items:flex-start;justify-content:center}
+/* 序號：她指定「項目請加序號」。7-1 是 7（資料檢視）的附屬，
+   選了跨部門才會出現 —— 用附屬編號，號碼才不會因為它時有時無而跳掉。 */
+.rb-n{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;
+  padding:0 5px;border-radius:6px;background:#dbe4ee;color:#335070;
+  font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;align-self:flex-start}
+.rb-t{font-size:13.5px;font-weight:700;color:var(--text);line-height:1.5}
+.rb-t i{font-style:normal;color:var(--danger)}
+.rb-lead{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:3px}
+.rb-main{font-size:13.5px;color:var(--text);font-weight:500;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rb-inline{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.rb-inline .fi{flex:1;min-width:190px}
+.rb-inline .rb-code{flex:0 0 118px;min-width:0}
+/* 左欄裡的四張職級卡：預設那個尺寸會把「角色名稱」那一列撐得比中欄高一大截 */
+.rb-l .tier{grid-template-columns:1fr;gap:6px;margin:0}
+.rb-l .tier-b{padding:7px 9px;border-width:1.5px}
+.rb-l .tier-b b{font-size:13px}
+.rb-l .tier-b span{font-size:10.5px;line-height:1.4}
+/* ⓘ 浮出說明 */
+.tipwrap{position:relative;display:inline-flex;z-index:1}
+.tipwrap:hover,.tipwrap:focus-within,.tipwrap.pin{z-index:30}
+.info{appearance:none;border:1px solid var(--border);background:#fff;color:var(--muted);
+  width:21px;height:21px;border-radius:50%;font-size:12px;font-weight:700;line-height:1;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;flex:none;align-self:center;font-family:inherit}
+.info:hover{border-color:var(--primary);color:var(--primary);background:var(--bg)}
+.tipwrap.pin .info{background:var(--primary);border-color:var(--primary);color:#fff}
+.tip{position:absolute;top:calc(100% + 9px);right:-10px;width:min(420px,64vw);
+  padding:11px 14px;border-radius:10px;background:#fff;border:1px solid var(--primary);
+  border-left:3px solid var(--primary);box-shadow:var(--shadow-lg);
+  font-size:12px;color:var(--text);line-height:1.7;text-align:left;font-weight:400;
+  opacity:0;visibility:hidden;transform:translateY(-3px);
+  transition:opacity .12s ease,transform .12s ease;pointer-events:none}
+.tipwrap:hover .tip,.tipwrap:focus-within .tip,.tipwrap.pin .tip{opacity:1;visibility:visible;transform:translateY(0)}
+.tip b{display:block;font-size:11px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+@media(max-width:720px){.tip{right:0;width:min(320px,78vw)}}
+/* 右欄的大打勾（還是真的 checkbox，只是放大） */
+.rb-chk{display:inline-flex;cursor:pointer}
+.rb-chk input[type=checkbox]{width:23px;height:23px;margin:0;cursor:pointer;accent-color:var(--primary)}
+/* 資料檢視／資料編輯：選項在左、圈圈在右 */
+.rb-opts{display:flex;flex-direction:column;gap:5px}
+.rb-sub{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:8px 11px;border:1px solid transparent;border-radius:8px;background:#fff;
+  cursor:pointer;font-size:13px;transition:background .12s,border-color .12s}
+.rb-sub:hover{border-color:var(--primary-l)}
+.rb-sub:has(input:checked){background:#eaf0f6;border-color:#1a3a5c}
+.rb-sub em{font-style:normal;color:var(--muted);font-size:12.5px;margin-left:6px}
+.rb-sub input[type=radio]{margin:0;cursor:pointer;accent-color:var(--primary);width:17px;height:17px;flex:none}
+#role-cross-list{display:flex;flex-wrap:wrap;gap:7px}
+#role-cross-list .checkbox-item{border-radius:99px;padding:5px 12px;font-size:12.5px}
+/* 員工視窗（2026-09-07）：跟權限角色同一套骨架，多兩個東西 */
+.rb-two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+@media(max-width:640px){.rb-two{grid-template-columns:1fr}}
+.rb-sub input[type=checkbox]{margin:0;cursor:pointer;accent-color:var(--primary);width:19px;height:19px;flex:none}
+/* 選完角色就把該角色的權限攤出來（唯讀）—— 不然要退回第 ② 步才知道剛才給了什麼 */
+.rb-derived{margin-top:8px;padding:9px 12px;border-radius:9px;background:var(--bg);
+  border:1px solid var(--border);display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.rb-derived .rb-lb{font-size:11px;letter-spacing:.1em;color:var(--muted);font-weight:700}
+/* 底部總結條：「這個角色目前是……」 */
+.rb-tape{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:11px 18px;
+  border-top:1px solid var(--border);background:#eaf0f6}
+.rb-tape .rb-lb{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+.rb-pill{font-size:12px;padding:3px 11px;border-radius:99px;background:#fff;
+  border:1px solid #1a3a5c;color:#1a3a5c}
+.rb-pill.off{border-color:var(--border);color:var(--muted)}
+/* 跟預設不一樣 —— 整個視窗最吵的一個東西，故意用實心橘紅（測試期臨時開的權限要記得關） */
+.rb-pill.alert{background:#c2410c;border-color:#c2410c;color:#fff;font-weight:700;box-shadow:0 0 0 3px #fdeee6}
+@media(max-width:720px){
+  .rb-hdr{display:none}
+  .rb-row,.rb-row.rb-split{grid-template-columns:1fr}
+  .rb-l{border-right:0;border-bottom:1px solid var(--border);flex-direction:row;align-items:center;gap:8px;padding:10px 14px}
+  .rb-r{padding:0 14px 12px;justify-content:flex-start}
+}
+.tier{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 14px}
+.tier-b{border:2px solid var(--line,#e2e8f0);border-radius:10px;padding:11px 12px;text-align:center;
+  background:#fff;cursor:pointer;font:inherit;color:inherit}
+.tier-b.on{border-color:#1a3a5c;background:#eaf0f6}
+.tier-b.sp{border-style:dashed;border-color:#5b4a86;background:#eeebf6}
+.tier-b b{display:block;font-size:14.5px}
+.tier-b span{font-size:11.5px;color:#64748b;display:block;line-height:1.5}
+.rolelist{display:grid;grid-template-columns:1fr;gap:7px;margin:0 0 10px}
+@media(min-width:640px){.rolelist{grid-template-columns:1fr 1fr}}
+.rolelist button{border:1px solid var(--line,#e2e8f0);border-radius:9px;padding:9px 12px;font:inherit;
+  font-size:13.5px;background:#fff;display:flex;gap:9px;align-items:center;cursor:pointer;
+  text-align:left;color:inherit}
+.rolelist button.on{border-color:#1a3a5c;background:#eaf0f6;font-weight:700}
+.rolelist .dot{width:13px;height:13px;border-radius:50%;border:2px solid #c3ccd6;flex:0 0 auto}
+.rolelist button.on .dot{border-color:#1a3a5c;background:#1a3a5c;box-shadow:inset 0 0 0 2.5px #fff}
+.rolelist .cnt{margin-left:auto;font-size:11.5px;color:#64748b;font-weight:400;white-space:nowrap}
+.preset-tag{display:inline-block;font-size:10.5px;font-weight:800;background:#faf1dd;color:#9a6b1f;
+  border-radius:10px;padding:1px 8px;margin-left:6px;vertical-align:1px}
+
+/* ── 第 ④ 步：權限總覽 ── */
+.ov-tabs{display:flex;gap:5px;background:#eef2f7;border-radius:9px;padding:4px}
+.ov-tab{border:0;background:none;font:inherit;font-size:13px;font-weight:700;color:#64748b;
+  padding:6px 14px;border-radius:7px;cursor:pointer}
+.ov-tab.on{background:#fff;color:#1a3a5c;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.ov-dirty{font-size:12.5px;font-weight:700;color:#9a6b1f;white-space:nowrap}
+#ov-table td.ovc{text-align:center;white-space:nowrap}
+.ovbtn{border:1px solid transparent;background:none;font:inherit;font-size:14px;font-weight:800;
+  border-radius:6px;padding:2px 9px;cursor:pointer;min-width:30px}
+.ovbtn.y{background:#e8f1ea;color:#2e6b4a}
+.ovbtn.n{background:#f1f5f9;color:#94a3b8}
+.ovbtn:hover{border-color:#1a3a5c}
+.ovbtn.chg{outline:2px solid #d97706;outline-offset:1px}
+.ovbtn[disabled]{cursor:default;opacity:.55}
+.ov-diff{display:inline-block;width:6px;height:6px;border-radius:50%;background:#d97706;
+  vertical-align:3px;margin-left:4px}
+#ov-table .grp td{background:#eaf0f6;font-weight:800;color:#1a3a5c;font-size:12px}
+#ov-table .grp.sp td{background:#eeebf6;color:#5b4a86}
+.ov-note{font-size:11.5px;color:#64748b;display:block;line-height:1.5;font-weight:400}
+
 .login-gate{position:fixed;inset:0;z-index:500;display:none;align-items:center;justify-content:center;padding:20px;
   background:linear-gradient(135deg,#0f2440 0%,#1a3a5c 55%,#123 100%);overflow-y:auto}
 .login-gate.show{display:flex}
@@ -303,6 +511,17 @@ select.fi{cursor:pointer}
 .sync-indicator .dot{width:6px;height:6px;border-radius:50%;background:var(--text-light)}
 .sync-indicator.ok .dot{background:#22c55e;box-shadow:0 0 6px #22c55e}
 .sync-indicator.err .dot{background:#ef4444}
+/* 六支統一的同步列（2026-09-23 她選 B）—— 一行講完，不佔版面 */
+.sync-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;
+  border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin-top:12px}
+.sync-row-lb{font-size:13px;font-weight:700;color:#374151;white-space:nowrap}
+.sync-row-txt{font-size:13px;color:#6b7280;flex:1;min-width:90px}
+.sync-row-txt.ok{color:#15803d;font-weight:700}
+.sync-row-txt.err{color:#b91c1c;font-weight:700}
+.sync-row-btn{font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  background:#fff;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;padding:5px 13px}
+.sync-row-btn:hover{background:#eff6ff}
+.sync-row-btn:disabled{opacity:.5;cursor:not-allowed}
 
 /* ── FOOTER ── */
 footer{text-align:center;padding:22px 0;color:var(--muted);font-size:12px;border-top:1px solid var(--border);margin-top:30px}
@@ -373,7 +592,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
     🔔
     <span class="nav-bell-dot" id="nav-bell-dot" style="display:none">0</span>
   </button>
-  <div class="sync-indicator" id="sync-ind"><div class="dot"></div><span id="sync-text">本地</span></div>
+  <div class="sync-indicator" id="sync-ind"><span id="sync-icon" title="雲端同步狀態">☁️</span><div class="dot"></div><span id="sync-text">本地</span></div>
   <div class="nav-user" id="nav-user" onclick="openLoginModal()" title="切換登入身分">
     <div class="avatar" id="user-avatar">廖</div>
     <div class="info">
@@ -449,99 +668,163 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
     </div>
 
     <!-- 部門 -->
-    <div class="section">
-      <div class="section-title"><div class="bar"></div><h2>🏢 部門管理</h2></div>
-      <div class="tab-toolbar">
-        <div class="count">共 <strong id="dept-count">0</strong> 個部門</div>
-        <button class="btn btn-accent" onclick="openDeptModal()">+ 新增部門</button>
-      </div>
-      <div class="data-card">
-        <table>
-          <thead><tr>
-            <th style="width:50px">序號</th>
-            <th style="width:110px">部門編號</th>
-            <th>部門名稱</th>
-            <th>備註</th>
-            <th style="text-align:right;width:140px">操作</th>
-          </tr></thead>
-          <tbody id="dept-tbody"></tbody>
-        </table>
-      </div>
-    </div>
 
-    <!-- 員工 -->
-    <div class="section">
-      <div class="section-title"><div class="bar"></div><h2>👤 員工管理</h2></div>
-      <div class="tab-toolbar">
-        <div class="count">共 <strong id="emp-count">0</strong> 位員工</div>
-        <button class="btn btn-accent" onclick="openEmpModal()">+ 新增員工</button>
-      </div>
-      <!-- 2026-09-03 她在手機上回報「滑不到操作欄」：這張 8 欄的表原本沒有橫向捲動容器
-           （角色表 2026-08-17 加過，員工表漏了）→ 窄螢幕會把 8 欄硬擠進去，
-           每個中文字被壓成一行，右邊的「操作」根本看不到也滑不到。 -->
-      <div class="data-card wide-tbl emp-tbl">
-        <table>
-          <thead><tr>
-            <th style="width:50px">序號</th>
-            <th style="width:110px">員工編號</th>
-            <th>姓名</th>
-            <th>部門</th>
-            <th>權限角色</th>
-            <th style="width:120px">可用系統</th>
-            <th>密碼</th>
-            <th style="text-align:right;width:140px">操作</th>
-          </tr></thead>
-          <tbody id="emp-tbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <!-- 四步引導（2026-09-04 她拍板 B 案）：① 部門 ② 權限角色 ③ 員工 ④ 權限總覽
+         角色從原本的第 3 塊搬到第 2 步 —— 員工要選角色，角色得先存在。 -->
+    <div class="wiz" id="cfg-wiz"></div>
 
-    <!-- 權限設定 -->
-    <div class="section">
-      <div class="section-title">
-        <div class="bar"></div><h2>🔑 權限設定</h2>
-        <div class="note" id="role-lock-note" style="display:none;color:var(--accent);font-weight:600">🔒 僅限部門主管 / 副總 / 系統管理員可編輯</div>
-      </div>
-      <div class="tab-toolbar">
-        <div class="count">共 <strong id="role-count">0</strong> 個角色</div>
-        <button class="btn btn-accent" id="btn-add-role" onclick="openRoleModal()">+ 新增角色</button>
-      </div>
-      <div class="data-card wide-tbl">
-        <table>
-          <thead><tr>
-            <th style="width:50px">序號</th>
-            <th style="width:90px">角色編號</th>
-            <th>角色名稱</th>
-            <th style="width:92px">人員權限</th>
-            <th style="width:104px">系統設定刪除</th>
-            <th style="width:112px">系統設定維護</th>
-            <th style="width:96px">資料排序</th>
-            <th style="width:100px">資料檢視</th>
-            <th>跨部門互看</th>
-            <th style="width:100px">資料編輯</th>
-            <th style="text-align:right;width:140px">操作</th>
-          </tr></thead>
-          <tbody id="role-tbody"></tbody>
-        </table>
-      </div>
-      <div class="legend-card">
-        <div class="legend-row">
-          <strong>資料檢視</strong>
-          <span class="legend-item"><span class="level-pill level-self">本人</span> 只看自己</span>
-          <span class="legend-item"><span class="level-pill level-dept">同部門</span> 本部門所有人</span>
-          <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
-          <span class="legend-item"><span class="level-pill level-all">全部</span> 全公司</span>
+      <!-- 步驟 1：部門 -->
+      <div id="cfg-step-1" class="cfg-step">
+      <div class="section">
+        <div class="section-title"><div class="bar"></div><h2>🏢 部門管理</h2></div>
+        <div class="tab-toolbar">
+          <div class="count">共 <strong id="dept-count">0</strong> 個部門</div>
+          <button class="btn btn-accent" onclick="openDeptModal()">+ 新增部門</button>
         </div>
-        <div class="legend-row">
-          <strong>資料編輯</strong>
-          <span class="legend-item"><span class="level-pill level-none">無</span> 唯讀</span>
-          <span class="legend-item"><span class="level-pill level-self">自己</span> 改自己建的</span>
-          <span class="legend-item"><span class="level-pill level-dept">同部門</span> 改本部門</span>
-          <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
-          <span class="legend-item"><span class="level-pill level-all">全部</span> 改全公司</span>
+        <div class="data-card">
+          <table>
+            <thead><tr>
+              <th style="width:50px">序號</th>
+              <th style="width:110px">部門編號</th>
+              <!-- 2026-09-14 她看實機回報欄寬要調：名稱與備註本來都沒給寬度，兩欄平分剩餘空間 →
+                   部門名稱只有 3～7 個字卻佔掉將近一半版面，右邊一大片空白，備註被推到很後面才開始。
+                   照這一頁其他表的做法（角色表 L706～）給名稱固定寬，讓備註吃剩餘空間。 -->
+              <th style="width:240px">部門名稱</th>
+              <th>備註</th>
+              <th style="text-align:right;width:140px">操作</th>
+            </tr></thead>
+            <tbody id="dept-tbody"></tbody>
+          </table>
         </div>
       </div>
-    </div>
+      </div>
+
+      <!-- 步驟 2：權限角色 -->
+      <div id="cfg-step-2" class="cfg-step" style="display:none">
+      <!-- 四組分層的套用狀態：有角色沒歸到組就顯示，全部歸好就自動消失 -->
+      <div id="tier-fix" class="tl-hint" style="display:none"></div>
+      <div class="section">
+        <div class="section-title">
+          <div class="bar"></div><h2>🔑 權限設定</h2>
+          <div class="note" id="role-lock-note" style="display:none;color:var(--accent);font-weight:600">🔒 僅限部門主管 / 副總 / 系統管理員可編輯</div>
+        </div>
+        <div class="tab-toolbar">
+          <div class="count">共 <strong id="role-count">0</strong> 個角色</div>
+          <button class="btn btn-accent" id="btn-add-role" onclick="openRoleModal()">+ 新增角色</button>
+        </div>
+        <div class="data-card wide-tbl role-tbl">
+          <table>
+            <thead><tr>
+              <th style="width:50px">序號</th>
+              <!-- 2026-09-11：角色編號不再顯示（欄位本身留著，R001/R002/R004 有舊資料遷移程式在用）。
+                   「部門名稱」「職務名稱」是唯讀彙總 —— 列出目前有誰在用這個角色，不是角色的屬性。 -->
+              <th style="width:150px">部門名稱</th>
+              <th style="width:120px">職務名稱</th>
+              <th style="width:210px">角色類型</th>
+              <th style="width:92px">人員權限</th>
+              <th style="width:104px">系統設定刪除</th>
+              <th style="width:112px">系統設定維護</th>
+              <th style="width:96px">資料排序</th>
+              <th style="width:100px">資料檢視</th>
+              <th style="width:170px">跨部門互看</th>
+              <th style="width:100px">資料編輯</th>
+              <th style="text-align:right;width:140px">操作</th>
+            </tr></thead>
+            <tbody id="role-tbody"></tbody>
+          </table>
+        </div>
+        <div class="legend-card">
+          <div class="legend-row">
+            <strong>資料檢視</strong>
+            <span class="legend-item"><span class="level-pill level-self">本人</span> 只看自己</span>
+            <span class="legend-item"><span class="level-pill level-dept">同部門</span> 本部門所有人</span>
+            <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
+            <span class="legend-item"><span class="level-pill level-all">全部</span> 全公司</span>
+          </div>
+          <div class="legend-row">
+            <strong>資料編輯</strong>
+            <span class="legend-item"><span class="level-pill level-none">無</span> 唯讀</span>
+            <span class="legend-item"><span class="level-pill level-self">自己</span> 改自己建的</span>
+            <span class="legend-item"><span class="level-pill level-dept">同部門</span> 改本部門</span>
+            <span class="legend-item"><span class="level-pill level-cross">跨部門</span> +指定部門</span>
+            <span class="legend-item"><span class="level-pill level-all">全部</span> 改全公司</span>
+          </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- 步驟 3：員工 -->
+      <div id="cfg-step-3" class="cfg-step" style="display:none">
+      <div class="section">
+        <div class="section-title"><div class="bar"></div><h2>👤 員工管理</h2></div>
+        <div class="tab-toolbar">
+          <div class="count">共 <strong id="emp-count">0</strong> 位員工</div>
+          <button class="btn btn-accent" onclick="openEmpModal()">+ 新增員工</button>
+        </div>
+        <!-- 2026-09-03 她在手機上回報「滑不到操作欄」：這張 8 欄的表原本沒有橫向捲動容器
+             （角色表 2026-08-17 加過，員工表漏了）→ 窄螢幕會把 8 欄硬擠進去，
+             每個中文字被壓成一行，右邊的「操作」根本看不到也滑不到。 -->
+        <div class="data-card wide-tbl emp-tbl">
+          <table>
+            <thead><tr>
+              <!-- 2026-09-04 她指定的順序：先分類（部門／角色／可用系統），再看是誰 -->
+              <th style="width:50px">序號</th>
+              <!-- 2026-09-11：部門→部門名稱、權限角色→角色類型（兩頁統一用「類型」）、新增職務名稱。
+                   欄序照她第二輪指定：序號 → 角色類型 → 部門名稱 → 職務名稱。
+                   姓名與員工編號給足寬度並加粗 —— 這兩格是找人時真正在看的。 -->
+              <th style="width:160px">部門名稱</th>
+              <th style="width:110px">職務名稱</th>
+              <th style="width:200px">角色類型</th>
+              <th style="width:120px">姓名</th>
+              <th style="width:126px">員工編號</th>
+              <th style="width:116px">可用系統</th>
+              <th style="width:104px">密碼</th>
+              <th style="text-align:right;width:140px">操作</th>
+            </tr></thead>
+            <tbody id="emp-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      </div>
+
+      <!-- 步驟 4：權限總覽（2026-09-04 她指定「允許確認和最後修改」）
+           改的是**角色**，會影響所有指派到這個角色的人 —— 所以是「先標成待存、按儲存才生效」。 -->
+      <div id="cfg-step-4" class="cfg-step" style="display:none">
+        <div class="section">
+          <div class="section-title"><div class="bar"></div><h2>📊 權限總覽</h2></div>
+          <div class="tab-toolbar">
+            <div class="ov-tabs">
+              <button class="ov-tab on" id="ov-tab-role" onclick="ovMode('role')">依角色</button>
+              <button class="ov-tab" id="ov-tab-emp" onclick="ovMode('emp')">依員工</button>
+            </div>
+            <div class="flex-r">
+              <span id="ov-dirty" class="ov-dirty" style="display:none"></span>
+              <button class="btn btn-ghost" id="ov-undo" style="display:none" onclick="ovUndo()">↩ 復原這次的修改</button>
+              <button class="btn btn-accent" id="ov-save" style="display:none" onclick="ovSave()">💾 儲存變更</button>
+            </div>
+          </div>
+          <div class="tl-hint" id="ov-hint"></div>
+          <div class="data-card wide-tbl">
+            <table id="ov-table"><thead id="ov-thead"></thead><tbody id="ov-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部：上一步／下一步 ＋ 保險用的手動儲存 -->
+      <div class="wiz-nav">
+        <button class="btn btn-ghost" id="wiz-prev" onclick="cfgStepGo(-1)">‹ 上一步</button>
+        <div class="flex-r">
+          <span id="cfg-autosave" class="autosave-tag"></span>
+          <button class="btn btn-accent" id="wiz-next" onclick="cfgStepGo(1)">下一步 ›</button>
+        </div>
+      </div>
+
+      <!-- 同步狀態（2026-09-23 她選 B：六支一致，一行講完） -->
+      <div id="sync-row" class="sync-row no-print">
+        <span class="sync-row-lb">☁️ 同步狀態</span>
+        <span id="sync-row-text" class="sync-row-txt">— 尚未同步</span>
+        <button type="button" id="sync-row-btn" class="sync-row-btn" onclick="syncNowUnified()">立即同步</button>
+      </div>
   </main>
 
   <footer>
@@ -580,53 +863,122 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
   </div>
 </div>
 
-<!-- ===== 員工 Modal ===== -->
+<!-- ===== 員工 Modal（2026-09-07 改成 B 版，與權限角色同一套骨架）=====
+     左欄放「序號 ＋ 項目名稱」，白話註解在右欄第一行，長說明收進 ⓘ（游標移過去才浮出來）。
+     欄位順序照她 09-04 指定的表格順序：部門 → 權限角色 → 可用系統 → 姓名 → 員工編號 → 密碼。
+     跟權限角色那一版的三個差別（她在示意圖上看過並同意）：
+       · 沒有右邊的「選取」欄 —— 員工欄位大多是打字或下拉，只有「可用系統」要勾，
+         它就照「資料檢視」那一套做（文字在左、勾在右），視覺上仍是同一套
+       · 姓名與員工編號合成一列（4·5）—— 兩個都是短欄位又總是一起填
+       · 多一條「這個角色會給他」，選完角色直接把權限攤出來
+     ⚠️ 所有 input 的 id 一律沿用改版前的（emp-code / emp-dept / emp-app-* …）—— 排版換了，
+        saveEmp() 存出來的形狀一個字都沒動。 -->
 <div class="modal-overlay" id="emp-modal">
-  <div class="modal">
+  <div class="modal rb-modal">
     <div class="modal-header">
       <h3 id="emp-modal-title">新增員工</h3>
       <button class="modal-close" onclick="closeModal('emp-modal')">×</button>
     </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <label>員工編號 <span style="color:var(--danger)">*</span></label>
-        <input class="fi" id="emp-code" placeholder="例：E001" maxlength="20">
-        <div class="hint">建議格式 E001、E002…（編號不可重複）</div>
-      </div>
-      <div class="form-row">
-        <label>姓名 <span style="color:var(--danger)">*</span></label>
-        <input class="fi" id="emp-name" placeholder="例：廖學健" maxlength="20">
-      </div>
-      <div class="form-row">
-        <label>所屬部門 <span style="color:var(--danger)">*</span></label>
-        <select class="fi" id="emp-dept" onchange="onEmpDeptChange()"><option value="">請選擇</option></select>
-        <div class="hint" id="emp-dept-hint" style="display:none;color:var(--accent);font-weight:600">⚠️ 總經理室員工依規則預設為「看全公司資料、唯讀」權限（不能編輯他人資料）</div>
-      </div>
-      <div class="form-row">
-        <label>權限角色 <span style="color:var(--danger)">*</span></label>
-        <select class="fi" id="emp-roleid"><option value="">請選擇</option></select>
-        <div class="hint" id="emp-role-hint">決定該員工可看到哪些資料、可進入哪些子系統</div>
-      </div>
-      <div class="form-row">
-        <label>登入密碼</label>
-        <input class="fi" id="emp-pw" placeholder="留空表示尚未設定" maxlength="30" autocomplete="new-password">
-        <div class="hint">登入畫面會驗證此密碼。<strong>留空＝該員工登入時密碼欄可不填</strong>；設定後即強制驗證</div>
-      </div>
-      <div class="form-row">
-        <label>離職日 <span style="color:var(--muted);font-weight:400">（留空＝在職）</span></label>
-        <input class="fi" id="emp-resign" type="date">
-        <div class="hint">填了離職日後，過了該日期此員工即無法登入 / 進入系統；資料保留不刪除，避免已建報表異常</div>
-      </div>
-      <div class="form-row">
-        <label>可用子系統 <span style="color:var(--muted);font-weight:400">（勾選此員工能進入哪些 App）</span></label>
-        <div class="checkbox-list" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr" checked> 📋 日報表—<span class="dept-mm">瑪摩工程</span></label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-cdr_pm" checked> 📋 日報表—<span class="dept-pm">專案管理</span></label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp" checked> 📊 進度表—<span class="dept-dw">圖面管理</span></label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-dtp_pm" checked> 📊 進度表—<span class="dept-pm">專案管理</span></label>
-          <label class="checkbox-item"><input type="checkbox" id="emp-app-sop" checked> 📐 查檢表—標準作業</label>
+    <!-- onchange 掛在最外層：底下任何一格改變都會冒泡上來，總結條就跟著更新 -->
+    <div class="modal-body rb-body" onchange="empTape()" oninput="empTape()">
+      <div class="rb-hdr" style="grid-template-columns:168px 1fr"><span>項目</span><span>內容與說明</span></div>
+
+      <!-- 1 所屬部門 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">1</span><span class="rb-t">所屬部門 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">他隸屬哪個部門 — 這會決定「同部門」看得到誰
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「所屬部門」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>所屬部門</b>總經理室這類全閱覽部門的員工，依規則會自動套上「看全公司資料、唯讀」的角色。改部門會連帶改變他在各系統看得到的範圍，但不會動到他建過的資料。</span></span>
+          </div>
+          <select class="fi" id="emp-dept" onchange="onEmpDeptChange()"><option value="">請選擇</option></select>
+          <div class="hint" id="emp-dept-hint" style="display:none;color:var(--accent);font-weight:600;margin-top:6px">⚠️ 總經理室員工依規則預設為「看全公司資料、唯讀」權限（不能編輯他人資料）</div>
         </div>
       </div>
+
+      <!-- 2 權限角色 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">2</span><span class="rb-t">權限角色 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead"><span id="emp-role-hint">決定該員工可看到哪些資料、可進入哪些子系統</span>
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「權限角色」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>權限角色</b>員工記住的是角色的編號，不是名稱 —— 角色改名不會讓任何人失去權限。要調整這個角色能做什麼，要回第 ② 步「權限角色」改，那裡一改會影響所有用同一個角色的人。</span></span>
+          </div>
+          <select class="fi" id="emp-roleid" onchange="onEmpRoleChange()"><option value="">請選擇</option></select>
+          <div class="rb-derived" id="emp-derived"></div>
+          <!-- 2026-09-11 她指定：職務名稱。選項跟著角色所在的組別走
+               （主管給主管的五個、員工給員工的兩個），換角色時會重新帶一次。 -->
+          <div style="margin-top:10px">
+            <div class="rb-lead" style="margin-bottom:4px">職務名稱 — 同一個角色底下，不同的人可以有不同職務</div>
+            <select class="fi" id="emp-jobtitle" onchange="empTape()"><option value="">— 未設定 —</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 可用系統 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">3</span><span class="rb-t">可用系統</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">勾了才進得去，沒勾的卡片在入口會變灰
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「可用系統」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>可用系統</b>這是「進不進得去」，跟「進去之後看得到誰的資料」是兩件事 —— 後者由上面的權限角色決定。知道網址直接貼也進不去，各子系統自己會再擋一次。</span></span>
+          </div>
+          <div class="rb-opts">
+            <label class="rb-sub"><span>📋 日報表—<span class="dept-pm">專案管理</span></span><input type="checkbox" id="emp-app-cdr_pm" checked></label>
+            <label class="rb-sub"><span>📋 日報表—<span class="dept-mm">瑪摩工程</span></span><input type="checkbox" id="emp-app-cdr" checked></label>
+            <label class="rb-sub"><span>📊 進度表—<span class="dept-pm">專案管理</span></span><input type="checkbox" id="emp-app-dtp_pm" checked></label>
+            <label class="rb-sub"><span>📊 進度表—<span class="dept-dw">圖面管理</span></span><input type="checkbox" id="emp-app-dtp" checked></label>
+            <label class="rb-sub"><span>📐 查檢表—標準作業</span><input type="checkbox" id="emp-app-sop" checked></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4·5 姓名 ／ 員工編號 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">4·5</span><span class="rb-t">姓名 ／ 員工編號 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">登入畫面會用這兩個認人
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「姓名與員工編號」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>姓名 ／ 員工編號</b>編號建議沿用人事的 P0100xxx，<b>不可重複</b>。姓名會直接印在日報表的「填表人」與「專案工務」欄，也是多人共編時判斷「這一列是誰加的」的依據 —— 改名之後，舊報表上的名字不會跟著變。</span></span>
+          </div>
+          <div class="rb-two">
+            <input class="fi" id="emp-name" placeholder="姓名 例：廖學健" maxlength="20">
+            <input class="fi" id="emp-code" placeholder="員工編號 例：P0100001" maxlength="20">
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 登入密碼 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">6</span><span class="rb-t">登入密碼</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">留空＝登入時密碼欄可以不填
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「登入密碼」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>登入密碼</b>留空的人，在登入畫面選了名字就能進來；一旦填了，之後每次登入都會驗。忘記密碼沒有自助復原，要由有「人員權限」的人回到這裡改。</span></span>
+          </div>
+          <input class="fi" id="emp-pw" placeholder="留空表示尚未設定" maxlength="30" autocomplete="new-password">
+        </div>
+      </div>
+
+      <!-- 7 離職日 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">7</span><span class="rb-t">離職日</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">留空＝在職
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「離職日」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>離職日</b>填了之後，過了那一天此人就登不進來、也進不了任何子系統。<b>資料一律保留不刪除</b> —— 他建過的日報表還掛著他的名字，刪帳號會讓那些報表變成沒有主人。</span></span>
+          </div>
+          <input class="fi" id="emp-resign" type="date" style="max-width:220px">
+        </div>
+      </div>
+
+      <div class="rb-tape" id="emp-tape"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('emp-modal')">取消</button>
@@ -635,101 +987,173 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
   </div>
 </div>
 
-<!-- ===== 權限角色 Modal ===== -->
+<!-- ===== 權限角色 Modal（2026-09-07 改成 B 版）=====
+     左欄只放「序號 ＋ 項目名稱」，白話註解移到中欄第一行，長說明收進 ⓘ（游標移過去才浮出來）。
+     這樣整張表的高度從頭到尾不會變，掃四個權限時位置不會上下亂跳。
+     ⚠️ 所有 input 的 id 與 name 一律沿用改版前的（role-code / role-can-* / role-level …）——
+        排版換了，但資料進出的路徑一條都沒動。
+     項目序號：1～8 是固定會出現的；7-1（跨部門互看）是 7（資料檢視）的附屬，
+     選了跨部門才出現 —— 用附屬編號，號碼才不會因為它時有時無而中間跳號。 -->
 <div class="modal-overlay" id="role-modal">
-  <div class="modal" style="max-width:560px">
+  <div class="modal rb-modal">
     <div class="modal-header">
       <h3 id="role-modal-title">新增角色</h3>
       <button class="modal-close" onclick="closeModal('role-modal')">×</button>
     </div>
-    <div class="modal-body">
-      <div class="form-row" style="display:grid;grid-template-columns:140px 1fr;gap:10px">
-        <div>
-          <label>角色編號 <span style="color:var(--danger)">*</span></label>
-          <input class="fi" id="role-code" placeholder="R001" maxlength="20">
+    <!-- onchange 掛在最外層：底下任何一個打勾／圈選改變都會冒泡上來，總結條就跟著更新 -->
+    <div class="modal-body rb-body" onchange="rbTape()">
+      <div class="rb-hdr"><span>項目</span><span>選項與說明</span><span>選取</span></div>
+
+      <!-- 1 角色編號（＋描述） -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">1</span><span class="rb-t">角色編號 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">只是給人看的編號，跟權限無關 — 重編也不會有人失去角色</div>
+          <div class="rb-inline">
+            <input class="fi rb-code" id="role-code" placeholder="R001" maxlength="20">
+            <input class="fi" id="role-desc" placeholder="描述：說明這個角色的用途（可不填）" maxlength="100">
+          </div>
         </div>
-        <div>
-          <label>角色名稱 <span style="color:var(--danger)">*</span></label>
-          <select class="fi" id="role-name-sel" onchange="onRoleNamePresetChange()">
+      </div>
+
+      <!-- 2 角色類型：左欄放四組分類，中欄放該組的角色
+           2026-09-11 她指定改名（原本叫「角色名稱」）。內部欄位名仍是 name，沒有動資料。
+           職務名稱**不加在這裡** —— 掛在員工身上（Q2 定案），
+           掛角色上的話「部門主管」會被拆成副理／經理／協理／副總／總經理五個角色，
+           權限一模一樣只差稱呼，角色表會從 11 個長到 30 個以上。 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l">
+          <span class="rb-n">2</span><span class="rb-t">角色類型 <i>*</i></span>
+          <!-- 2026-09-04：一層下拉 → 兩段選（先職級、再角色）。
+               選完會自動帶出該角色的預設權限，每一項都還可以再改。 -->
+          <div class="tier" id="role-tier" style="margin:8px 0 0"></div>
+        </div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">先選左邊的分類，再從這裡挑一個角色 — 挑完會自動帶出預設權限，每一項都還可以改</div>
+          <div class="rolelist" id="role-pick"></div>
+          <select class="fi" id="role-name-sel" onchange="onRoleNamePresetChange()" style="display:none">
             <option value="">請選擇</option>
-            <option value="一般員工">一般員工</option>
-            <option value="部門主管">部門主管</option>
-            <option value="跨部門協作">跨部門協作</option>
-            <option value="系統管理員">系統管理員</option>
-            <option value="總經理室">總經理室</option>
             <option value="__custom__">＋ 其他（自訂名稱）</option>
           </select>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="roleUseCustom()">＋ 其他（自訂名稱）</button>
           <input class="fi" id="role-name" placeholder="自訂角色名稱" maxlength="40" style="display:none;margin-top:6px">
         </div>
       </div>
-      <div class="form-row">
-        <label>描述</label>
-        <input class="fi" id="role-desc" placeholder="說明這個角色的用途" maxlength="100">
+
+      <!-- 3 職務名稱（2026-09-11 她指定「可勾選的清單」）────────────────────
+           勾選＝這個角色底下允許出現哪些職務。職務的**值**存在員工身上（Q2 定案），
+           這裡只決定員工那一頁的職務下拉能選到哪幾個。
+           一個都沒勾 ＝ 照角色所屬的組別自動給（主管五個、員工兩個），與改版前相同。 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l">
+          <span class="rb-n">3</span><span class="rb-t">職務名稱</span>
+        </div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">勾選這個角色可以配哪些職務 — 員工那一頁就只會出現勾起來的這幾個</div>
+          <div class="jobchk" id="role-jobtitles"></div>
+          <div class="hint" id="role-jobtitles-hint" style="margin-top:8px"></div>
+        </div>
       </div>
-      <!-- 以下六項的上下順序＝權限角色表的欄位順序（2026-08-18 用戶指定，兩邊必須一致）：
-           人員權限｜系統設定刪除｜系統設定維護｜資料檢視｜跨部門互看｜資料編輯 -->
-      <div class="form-row">
-        <label>人員權限</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-manage-roles">
-          可維護入口的部門、員工、權限角色
-        </label>
-        <div class="hint">不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「系統設定維護」分開，所以可以「能加廠商但不能改別人的權限」。</div>
+
+      <!-- 4～7 四個權限。上下順序＝權限角色表的欄位順序（2026-08-18 用戶指定，兩邊必須一致）：
+           人員權限｜系統設定刪除｜系統設定維護｜資料排序 -->
+      <div class="rb-row">
+        <div class="rb-l"><span class="rb-n">4</span><span class="rb-t">人員權限</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">誰能改別人的權限</div>
+          <div class="rb-main"><span>可維護入口的部門、員工、權限角色</span>
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「人員權限」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>人員權限</b>不勾選的角色，入口最上方的「⚙️ 設定」整個不會出現，也改不了任何人的權限。與「系統設定維護」分開，所以可以「能加廠商但不能改別人的權限」。</span></span>
+          </div>
+        </div>
+        <div class="rb-r"><label class="rb-chk"><input type="checkbox" id="role-can-manage-roles"></label></div>
       </div>
-      <div class="form-row">
-        <label>系統設定刪除</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-delete">
-          可刪除系統設定的各種清單、以及歷史報表／紀錄
-        </label>
-        <div class="hint">不勾選的角色，刪除按鈕直接不會出現，只能新增和修改。用來避免同仁誤刪共用設定與歷史資料。</div>
+
+      <div class="rb-row">
+        <div class="rb-l"><span class="rb-n">5</span><span class="rb-t">系統設定刪除</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">誰能按下刪除</div>
+          <div class="rb-main"><span>可刪除系統設定的各種清單、以及歷史報表／紀錄</span>
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「系統設定刪除」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>系統設定刪除</b>不勾選的角色，刪除按鈕直接不會出現，只能新增和修改。用來避免同仁誤刪共用設定與歷史資料。</span></span>
+          </div>
+        </div>
+        <div class="rb-r"><label class="rb-chk"><input type="checkbox" id="role-can-delete"></label></div>
       </div>
-      <div class="form-row">
-        <label>系統設定維護</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-manage-settings">
-          可維護各 App 的案場、施作位置、施工項目、廠商、材料
-        </label>
-        <div class="hint">不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</div>
+
+      <div class="rb-row">
+        <div class="rb-l"><span class="rb-n">6</span><span class="rb-t">系統設定維護</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">誰能加案場、廠商</div>
+          <div class="rb-main"><span>可維護各 App 的案場、施作位置、施工項目、廠商、材料</span>
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「系統設定維護」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>系統設定維護</b>不勾選的角色，進系統設定頁只看得到目前有哪些案場、廠商、施工項目，但「＋ 新增」與「儲存設定」按鈕不會出現。用來避免同仁誤加共用清單。</span></span>
+          </div>
+        </div>
+        <div class="rb-r"><label class="rb-chk"><input type="checkbox" id="role-can-manage-settings"></label></div>
       </div>
+
       <!-- 資料排序（2026-09-03 用戶指定）：從「系統設定維護」拆出來的獨立權限。
            以前排序跟新增／刪除／改名綁在同一個勾選框，只要開了維護權就連帶能改案場順序。
            案場順序是全公司共用的畫面順序，改動所有人都看得到，所以另外管。 -->
-      <div class="form-row">
-        <label>資料排序</label>
-        <label class="checkbox-item" style="font-weight:600">
-          <input type="checkbox" id="role-can-drag-sort">
-          可調整案場在進度表上的排列順序（拖曳與 ↑↓）
-        </label>
-        <div class="hint">不勾選的角色，進度總表的案場拖不動、↑↓ 不會出現，系統設定頁裡的 ↑↓ 也不會出現（三個入口改的是同一份順序，所以一起管）。這個順序是全公司共用的，改了每個人看到的排列都會變。</div>
+      <div class="rb-row">
+        <div class="rb-l"><span class="rb-n">7</span><span class="rb-t">資料排序</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">誰能改案場排列</div>
+          <div class="rb-main"><span>可調整案場在進度表上的排列順序（拖曳與 ↑↓）</span>
+            <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
+              aria-label="「資料排序」的完整說明" onclick="rbTip(this)">i</button>
+              <span class="tip" role="tooltip"><b>資料排序</b>不勾選的角色，進度總表的案場拖不動、↑↓ 不會出現，系統設定頁裡的 ↑↓ 也不會出現（三個入口改的是同一份順序，所以一起管）。這個順序是全公司共用的，改了每個人看到的排列都會變。</span></span>
+          </div>
+        </div>
+        <div class="rb-r"><label class="rb-chk"><input type="checkbox" id="role-can-drag-sort"></label></div>
       </div>
-      <div class="form-row">
-        <label>資料檢視 <span style="color:var(--danger)">*</span></label>
-        <div class="level-radio-group">
-          <label class="level-radio"><input type="radio" name="role-level" value="self" onchange="onRoleLevelChange()"><span class="level-pill level-self">本人</span> 只看自己</label>
-          <label class="level-radio"><input type="radio" name="role-level" value="dept" onchange="onRoleLevelChange()"><span class="level-pill level-dept">同部門</span> 本部門所有人</label>
-          <label class="level-radio"><input type="radio" name="role-level" value="cross" onchange="onRoleLevelChange()"><span class="level-pill level-cross">跨部門</span> 本部門 + 指定部門</label>
-          <label class="level-radio"><input type="radio" name="role-level" value="all" onchange="onRoleLevelChange()"><span class="level-pill level-all">全部</span> 全公司</label>
+
+      <!-- 7 資料檢視 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">8</span><span class="rb-t">資料檢視 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">看得到誰的資料</div>
+          <div class="rb-opts">
+            <label class="rb-sub"><span><span class="level-pill level-self">本人</span><em>只看自己</em></span><input type="radio" name="role-level" value="self" onchange="onRoleLevelChange()"></label>
+            <label class="rb-sub"><span><span class="level-pill level-dept">同部門</span><em>本部門所有人</em></span><input type="radio" name="role-level" value="dept" onchange="onRoleLevelChange()"></label>
+            <label class="rb-sub"><span><span class="level-pill level-cross">跨部門</span><em>本部門 + 指定部門</em></span><input type="radio" name="role-level" value="cross" onchange="onRoleLevelChange()"></label>
+            <label class="rb-sub"><span><span class="level-pill level-all">全部</span><em>全公司</em></span><input type="radio" name="role-level" value="all" onchange="onRoleLevelChange()"></label>
+          </div>
         </div>
       </div>
-      <!-- 跨部門互看清單：只有「資料檢視」選了跨部門才顯示。
+
+      <!-- 7-1 跨部門互看清單：只有「資料檢視」選了跨部門才顯示。
            2026-08-18 起就排在「資料檢視」正下方（跟表格順序一致），選了跨部門就地展開，
            不會再有「選了卻沒發現要勾部門」的問題。 -->
-      <div class="form-row" id="role-cross-box" style="display:none">
-        <label>跨部門互看清單 <span style="color:var(--muted);font-weight:400">（勾選即互通 — 雙方自動可以看到彼此資料）</span></label>
-        <div id="role-cross-list" class="checkbox-list"></div>
-        <div class="hint">單方勾選即生效，對方不需另外設定 — 例如：規劃設計部勾選工程部 → 兩個部門員工的資料就會互通。</div>
-      </div>
-      <div class="form-row">
-        <label>資料編輯 <span style="color:var(--danger)">*</span></label>
-        <div class="level-radio-group">
-          <label class="level-radio"><input type="radio" name="role-edit-level" value="none"><span class="level-pill level-none">無</span> 唯讀（不能編輯任何資料）</label>
-          <label class="level-radio"><input type="radio" name="role-edit-level" value="self"><span class="level-pill level-self">自己</span> 只能改自己建的</label>
-          <label class="level-radio"><input type="radio" name="role-edit-level" value="dept"><span class="level-pill level-dept">同部門</span> 可改本部門所有資料</label>
-          <label class="level-radio"><input type="radio" name="role-edit-level" value="cross"><span class="level-pill level-cross">跨部門</span> 可改本部門 + 指定部門</label>
-          <label class="level-radio"><input type="radio" name="role-edit-level" value="all"><span class="level-pill level-all">全部</span> 全公司</label>
+      <div class="rb-row rb-split" id="role-cross-box" style="display:none">
+        <div class="rb-l"><span class="rb-n">8-1</span><span class="rb-t">跨部門互看</span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">勾選即互通，對方不用另外設定</div>
+          <div id="role-cross-list" class="checkbox-list"></div>
+          <div class="rb-lead" style="margin:8px 0 0">單方勾選即生效 — 例如規劃設計部勾選工程部，兩個部門員工的資料就會互通。</div>
         </div>
       </div>
+
+      <!-- 8 資料編輯 -->
+      <div class="rb-row rb-split">
+        <div class="rb-l"><span class="rb-n">9</span><span class="rb-t">資料編輯 <i>*</i></span></div>
+        <div class="rb-m rb-pad">
+          <div class="rb-lead">改得動誰的資料</div>
+          <div class="rb-opts">
+            <label class="rb-sub"><span><span class="level-pill level-none">無</span><em>唯讀，不能編輯任何資料</em></span><input type="radio" name="role-edit-level" value="none"></label>
+            <label class="rb-sub"><span><span class="level-pill level-self">自己</span><em>只能改自己建的</em></span><input type="radio" name="role-edit-level" value="self"></label>
+            <label class="rb-sub"><span><span class="level-pill level-dept">同部門</span><em>可改本部門所有資料</em></span><input type="radio" name="role-edit-level" value="dept"></label>
+            <label class="rb-sub"><span><span class="level-pill level-cross">跨部門</span><em>可改本部門 + 指定部門</em></span><input type="radio" name="role-edit-level" value="cross"></label>
+            <label class="rb-sub"><span><span class="level-pill level-all">全部</span><em>可改全公司資料</em></span><input type="radio" name="role-edit-level" value="all"></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="rb-tape" id="role-tape"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('role-modal')">取消</button>
@@ -816,9 +1240,105 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 
 <div class="toast" id="toast"></div>
 
+<script>
+/* ══════ 雲端連線失敗要「看得見」（2026-09-11）══════════════════════════
+ * 以前雲端讀取失敗只有 console.warn —— 使用者看到的是「畫面正常打開，但資料空了」，
+ * 一個字的錯誤訊息都沒有。看不到錯誤的人第一反應常常是**重填一次**，
+ * 那才是真正會出事的地方。
+ *
+ * 分兩種，對應兩種完全不同的處置：
+ *   🔴 PERMISSION_DENIED（紅、關不掉）
+ *      ＝ 資料庫規則已經收緊，但這台還停在沒有匿名驗證的舊版。
+ *        唯一解法是重新載入拿到新版 → 給一顆強制重載的按鈕。
+ *   🟠 其他（橘、可關閉）
+ *      ＝ 網路不通、Firebase 暫時掛掉。資料還在這台裝置上，等連線恢復會自己同步，
+ *        不需要做任何事 → 講清楚就好，不要嚇人。
+ *
+ * 刻意不重用版本橫幅（#app-update-bar）：那支是比對版本號用的，
+ * 兩者可能同時出現，混在一起會互相蓋掉。 */
+window._cloudErrBar = (function(){
+  var shown = false;                    // 同一次瀏覽只跳一次，不要每次重試都疊一條
+  return function(e){
+    if (shown) return;
+    var raw = String((e && (e.code || e.message)) || e || '');
+    var denied = /permission[_-]?denied/i.test(raw);
+    /* 網路類的錯誤在這裡不跳橫幅 —— 本機優先的設計本來就能離線用，
+       每次訊號差就跳一條紅的只會讓人麻痺，真的出事那次反而被忽略。
+       離線狀態原本就有同步指示燈在表示。 */
+    if (!denied) { console.warn('雲端連線失敗（非權限問題，資料仍在本機）：', raw); return; }
+    shown = true;
+
+    var bar = document.createElement('div');
+    bar.id = 'cloud-err-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;'
+      + 'background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;'
+      + "font:600 14px/1.45 'Microsoft JhengHei','Noto Sans TC','PingFang TC',sans-serif;"
+      + 'padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:10px;'
+      + 'flex-wrap:wrap;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+
+    var msg = document.createElement('span');
+    msg.textContent = '⚠️ 無法連線到雲端資料 —— 這個版本太舊了，請重新載入';
+    bar.appendChild(msg);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '重新載入';
+    btn.style.cssText = 'font:inherit;border:0;border-radius:6px;padding:6px 14px;'
+      + 'cursor:pointer;background:#fff;color:#b91c1c';
+    btn.onclick = function(){
+      /* 強制繞過瀏覽器快取 —— 這個情境下的病因十之八九就是快取著舊版 */
+      try { location.replace(location.pathname + '?v=' + Date.now()); }
+      catch (err) { location.reload(); }
+    };
+    bar.appendChild(btn);
+
+    var note = document.createElement('div');
+    note.style.cssText = 'width:100%;font-weight:400;font-size:12px;opacity:.92';
+    note.textContent = '你在這台裝置上填的資料還在，不會不見。請先重新載入再繼續填寫，不要重打一次。';
+    bar.appendChild(note);
+
+    document.body.appendChild(bar);
+
+    /* 橫幅是 fixed top:0，會蓋住 sticky 的導覽列 → 把內容往下推（作法與版本橫幅一致） */
+    try {
+      var h = bar.offsetHeight || 56;
+      document.body.style.paddingTop =
+        ((parseFloat(getComputedStyle(document.body).paddingTop) || 0) + h) + 'px';
+      var navs = document.querySelectorAll('nav');
+      for (var i = 0; i < navs.length; i++) {
+        var pos = getComputedStyle(navs[i]).position;
+        if (pos === 'sticky' || pos === 'fixed') navs[i].style.top = h + 'px';
+      }
+    } catch (err) { /* 推版面失敗不重要，訊息有出來才是重點 */ }
+  };
+})();
+</script>
+<script>
+/* 📁 本機預覽（2026-09-18）──────────────────────────────────────────
+ * 用「直接開啟檔案」（file://）的方式打開時：頂端掛一條提示，並把 window._LOCAL_PREVIEW 打開，
+ * 底下每一支寫入雲端的函式看到它就直接跳過。
+ * 起因：2026-09-17 從 G 槽直接打開日報表，把試跑的假資料寫進了正式資料庫。
+ * ⚠️ 線上是 https，這一段完全不會觸發。 */
+(function(){
+  if (location.protocol !== 'file:') return;
+  window._LOCAL_PREVIEW = true;
+  function bar(){
+    if (document.getElementById('local-preview-bar')) return;
+    var el = document.createElement('div');
+    el.id = 'local-preview-bar';
+    el.className = 'no-print';
+    el.style.cssText = 'position:sticky;top:0;z-index:99999;background:#7c2d12;color:#fff;'
+      + 'font:700 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:7px 14px;text-align:center';
+    el.textContent = '📁 本機預覽（直接開啟檔案）：可以看、可以操作，但不會存到雲端';
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  if (document.body) bar(); else document.addEventListener('DOMContentLoaded', bar);
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
@@ -831,6 +1351,18 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+/* ── 匿名驗證（2026-09-11 A 案）────────────────────────────────
+ * 讓 Firebase 知道「這個請求來自一個正常的網頁用戶端」，資料庫規則才有機會
+ * 從「全開」收緊成 auth != null。使用者完全無感，不用註冊也不用密碼。
+ *
+ * 🔑 authReady **永遠不會 reject**：登入失敗就 catch 吞掉、照常往下跑。
+ *    規則還全開的期間（現在）失敗也照樣讀寫得到，跟改版前一模一樣；
+ *    規則收緊之後失敗才會被擋，那時才是預期行為。
+ *    讓它 reject 的話，規則都還沒收就先把 入口網頁 的所有讀寫打壞了。 */
+const authReady = signInAnonymously(getAuth(app)).catch(e => {
+  console.warn('匿名登入失敗（規則仍全開時不影響運作）：', e && e.message);
+});
+window._authReady = authReady;
 
 /* 🚨 雲端閘門（2026-09-03）：**雲端還沒回覆之前，一律不准寫回雲端。**
  * 全新裝置（例如從 LINE 改用外部瀏覽器開）本機是空的 → 程式會先鋪種子資料。
@@ -839,6 +1371,7 @@ const db = getDatabase(app);
 const _cloudSeen = {};                 // path -> 這個節點的雲端資料已經回來過
 const _pendingWrites = {};             // path -> 閘門開之前最後一次想寫的內容
 window._fbSet = async (path, data) => {
+  if (window._LOCAL_PREVIEW) { setSync('', '本機預覽（不寫雲端）'); return; }   // 2026-09-18
   if (!_cloudSeen[path]) {
     /* 還沒看過雲端 → 先記著，等雲端回來後再寫（避免用本機種子覆蓋雲端） */
     _pendingWrites[path] = data;
@@ -846,33 +1379,68 @@ window._fbSet = async (path, data) => {
     setSync('', '連線中…');
     return;
   }
-  try { await set(ref(db, 'portal/'+path), data); setSync('ok','已同步'); }
+  try { await authReady; await set(ref(db, 'portal/'+path), data); setSync('ok','已同步'); }
   catch(e){ console.error(e); setSync('err','同步失敗'); }
 };
 window._fbWatch = (path, cb) => {
+  /* onValue 是「掛監聽」不是「拿 Promise」，所以要等驗證完成再掛 ——
+     直接掛的話，規則收緊後第一次連線就會被拒，而且不會自己重試。 */
+  authReady.then(() => {
   onValue(ref(db, 'portal/'+path), snap => {
     _cloudSeen[path] = true;           // 這個節點的雲端資料到手了 → 閘門打開
     cb(snap.val());
     /* 閘門開之前被擋下來的那一次寫入：等使用者下一個動作再寫就好，
        這裡刻意不自動補寫 —— 那一份很可能就是種子資料。 */
     if (_pendingWrites[path]) { delete _pendingWrites[path]; }
-  }, err => { console.error(err); setSync('err','讀取失敗'); });
+  }, err => {
+    console.error(err); setSync('err','讀取失敗');
+    /* 2026-09-11：權限被拒要讓使用者看得見（規則收緊後、停在舊版的人就是這一條） */
+    try { window._cloudErrBar && window._cloudErrBar(err); } catch(e3){}
+  });
+  });
 };
 // 通知專用：寫入個別通知（子 App 也透過這個函式 — 直接呼叫 Firebase 即可）
 window._fbSetChild = async (path, key, data) => {
-  try { await set(ref(db, 'portal/'+path+'/'+key), data); }
+  if (window._LOCAL_PREVIEW) return;   // 2026-09-18
+  try { await authReady; await set(ref(db, 'portal/'+path+'/'+key), data); }
   catch(e){ console.error('fbSetChild failed', e); }
 };
 window._fbUpdateChild = async (path, key, partial) => {
-  try { await update(ref(db, 'portal/'+path+'/'+key), partial); }
+  if (window._LOCAL_PREVIEW) return;   // 2026-09-18
+  try { await authReady; await update(ref(db, 'portal/'+path+'/'+key), partial); }
   catch(e){ console.error('fbUpdateChild failed', e); }
 };
+/* ══════ 同步列（2026-09-23 她選 B：六支一致）══════
+ * 狀態文字由既有的 setSync 順手帶過來，不另外追蹤一份狀態。
+ * 「立即同步」走的是它自己既有的 saveAll()（saveLS + syncCloud），不是新寫的覆蓋邏輯。 */
+function syncRowSet(state){
+  var t = document.getElementById('sync-row-text');
+  if(!t) return;
+  t.className = 'sync-row-txt' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : '');
+  t.textContent = state === 'ok'     ? '✓ 已同步'
+                : state === 'saving' ? '⏳ 同步中…'
+                : state === 'err'    ? '⚠️ 連線失敗，資料只存在這台'
+                : '— 尚未同步';
+}
+function syncNowUnified(){
+  var b = document.getElementById('sync-row-btn');
+  syncRowSet('saving');
+  if(b) b.disabled = true;
+  try { saveAll(); setSync('ok','已同步'); } catch(e){ syncRowSet('err'); }
+  setTimeout(function(){ if(b) b.disabled = false; }, 1500);
+}
 function setSync(state,text){
   const el=document.getElementById('sync-ind');
   el.className='sync-indicator '+(state||'');
   document.getElementById('sync-text').textContent=text;
+  syncRowSet(state === 'ok' ? 'ok' : state === 'err' ? 'err' : '');   /* 設定頁那一行跟著走（2026-09-23） */
 }
 window.setSync=setSync;
+/* ⚠️ 這一段整個在 <script type="module"> 裡，裡面宣告的東西外面叫不到。
+   HTML 上的 onclick="syncNowUnified()" 要叫得到，就必須像 setSync 一樣掛到 window。
+   （2026-09-23：第一版漏了這兩行，按鈕完全沒反應。）*/
+window.syncRowSet=syncRowSet;
+window.syncNowUnified=syncNowUnified;
 setSync('','連線中…');
 setTimeout(()=>{ if(document.getElementById('sync-text').textContent==='連線中…') setSync('ok','已連線'); }, 1500);
 </script>
@@ -1314,13 +1882,15 @@ function onGateDeptChange() {
   const dept = $('gate-dept').value;
   const sel  = $('gate-name');
   if (!dept) { sel.innerHTML = '<option value="">請先選擇部門</option>'; return; }
-  const list = S.employees.filter(e => e.dept === dept);
-  if (!list.length) { sel.innerHTML = '<option value="">此部門尚無員工</option>'; return; }
+  /* 2026-09-11 她指定：離職員工**完全不出現**在登入名單裡。
+     改版前是「顯示出來但點不了」（灰掉那種），她要的是整筆不見。
+     ⚠️ 只影響「選誰登入」這份清單 —— 員工資料本身不動，
+     設定頁的員工列表照樣看得到離職的人（要查歷史、要刪除都還在）。 */
+  const list = S.employees.filter(e => e.dept === dept && !isResigned(e));
+  if (!list.length) { sel.innerHTML = '<option value="">此部門尚無在職員工</option>'; return; }
+  /* 2026-09-11 她指定：只顯示姓名，後面的角色與狀態括號全部拿掉 */
   sel.innerHTML = '<option value="">請選擇姓名</option>' +
-    list.map(e => {
-      const off = isResigned(e);
-      return `<option value="${esc(e.name)}"${off?' disabled':''}>${esc(e.name)}${off?'（已離職停用）':''}</option>`;
-    }).join('');
+    list.map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
 }
 function gateError(msg) {
   const box = $('gate-err');
@@ -1444,19 +2014,15 @@ function onLoginDeptChange() {
     sel.innerHTML = '<option value="">請先選擇部門</option>';
     return;
   }
-  const list = S.employees.filter(e => e.dept === dept);
+  /* 2026-09-11 她指定：離職員工完全不出現（改版前是顯示但點不了） */
+  const list = S.employees.filter(e => e.dept === dept && !isResigned(e));
   if (!list.length) {
-    sel.innerHTML = '<option value="">此部門尚無員工</option>';
+    sel.innerHTML = '<option value="">此部門尚無在職員工</option>';
     return;
   }
+  /* 2026-09-11 她指定：只顯示姓名 —— 角色名稱那個括號拿掉 */
   sel.innerHTML = '<option value="">請選擇姓名</option>' +
-    list.map(e => {
-      const r = getRole(e.roleId);
-      const tag = r ? `（${r.name}）` : '';
-      const off = isResigned(e);
-      const offTag = off ? '（已離職停用）' : '';
-      return `<option value="${esc(e.name)}"${off?' disabled':''}>${esc(e.name)}${esc(tag)}${esc(offTag)}</option>`;
-    }).join('');
+    list.map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
 }
 function doLogin() {
   // 與登入閘門共用同一套驗證（部門 / 姓名 / 離職停用 / 密碼）
@@ -1480,8 +2046,12 @@ function doLogin() {
 function showView(v) {
   // 系統設定只開放給「主管 / 副總 / 系統管理員」；一般員工連直接呼叫也進不去
   if (v === 'settings' && !canEditRoles()) { toast('您沒有進入系統設定的權限', 'error'); return; }
+  /* 離開設定頁 → 自動存一次（2026-09-04）。要在切換 active 之前判斷。 */
+  const _wasSettings = !!($('page-settings') && $('page-settings').classList.contains('active'));
+  if (_wasSettings && v !== 'settings' && typeof autoSaveCfg === 'function') autoSaveCfg();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   $('page-'+v).classList.add('active');
+  if (v === 'settings' && typeof applyCfgStep === 'function') applyCfgStep();
   document.querySelectorAll('nav .nav-btn').forEach(b => b.classList.remove('active'));
   $('nav-'+v).classList.add('active');
   window.scrollTo(0,0);
@@ -1507,7 +2077,322 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 /* ============================================================
  * 部門 CRUD
  * ============================================================ */
+/* ══════════ 一鍵套用四組分層（2026-09-04）══════════
+ * 她指定：角色的改名與新增**不要自動執行**，做成一顆鈕，按之前看得到會變成什麼。
+ * 為什麼要這一步：現有的「專管×規設互看（可編兩邊）」名稱不含「（員工）」，
+ * 歸不進四組裡的任何一組，會掉到總覽表最下面的「其他」。
+ *
+ * ⚠️ 改名是安全的：員工記的是 roleId 不是名稱，改名不會讓任何人失去角色。
+ */
+const TIER_RENAMES = [
+  { from:'專管×規設互看（可編兩邊）', to:'專管×規設互看（可編兩邊）（員工）' },
+];
+/* 分組裡列了、但線上還沒建的角色 → 一起補建 */
+function tierMissingRoles() {
+  const have = {};
+  S.roles.forEach(function(r){ have[r.name] = true; });
+  TIER_RENAMES.forEach(function(x){ if (have[x.from]) have[x.to] = true; });
+  const out = [];
+  ROLE_TIERS.forEach(function(t){
+    t.roles.forEach(function(nm){ if (!have[nm]) out.push({ tier:t, name:nm }); });
+  });
+  return out;
+}
+function tierPendingRenames() {
+  return TIER_RENAMES.filter(function(x){
+    return S.roles.some(function(r){ return r.name === x.from; });
+  });
+}
+function renderTierFix() {
+  const el = $('tier-fix'); if (!el) return;
+  const ren = tierPendingRenames(), add = tierMissingRoles();
+  if (!ren.length && !add.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const bits = [];
+  ren.forEach(function(x){
+    const r = S.roles.filter(function(y){ return y.name === x.from; })[0] || {};
+    const n = S.employees.filter(function(e){ return e.roleId === r.id; }).length;
+    bits.push('<li><b>改名</b>：「' + esc(x.from) + '」→「' + esc(x.to) + '」'
+      + '<span style="color:#64748b">（' + n + ' 位員工，改名<b>不會</b>讓他們失去角色）</span></li>');
+  });
+  add.forEach(function(x){
+    bits.push('<li><b>新增</b>：「' + esc(x.name) + '」'
+      + '<span style="color:#64748b">（' + esc(x.tier.label) + '，帶入預設權限，先建起來備用）</span></li>');
+  });
+  /* 改名之後權限**不會跟著變**（那是兩件事）。把差異先講出來，不要讓她以為套用完就對了。 */
+  var noteDiff = '';
+  ren.forEach(function(x){
+    var r = S.roles.filter(function(y){ return y.name === x.from; })[0];
+    if (!r) return;
+    var p = ROLE_NAME_PRESETS[x.to] || {};
+    var d = PERM_KEYS.filter(function(k){ return !!r[k] !== !!p[k]; });
+    if (!d.length) return;
+    var LB = { canManageSettings:'設定維護', canDelete:'刪除', canDragSort:'排序', canManageRoles:'改權限' };
+    noteDiff += '<div style="margin-top:8px;color:#9a6b1f">📌 <b>改名不會動到權限</b>：'
+      + '「' + esc(x.to) + '」目前有 ' + d.length + ' 項跟這一組的預設不同（'
+      + d.map(function(k){ return LB[k]; }).join('、') + '）。'
+      + '要不要調整，到<b>第 ④ 步</b>看橘點標記，逐一決定就好。</div>';
+  });
+  el.innerHTML = '⚠️ <b>有 ' + (ren.length + add.length) + ' 個角色還沒照四組分層整理</b>，'
+    + '整理之前它們會掉在總覽表最下面的「其他」。<ul style="margin:8px 0 10px;padding-left:20px">'
+    + bits.join('') + '</ul>' + noteDiff
+    + '<button class="btn btn-accent btn-sm" onclick="applyTierFix()">一鍵套用</button>'
+    + ' <span style="color:#64748b;font-size:12px">按下去才會改，改完可以在第 ④ 步檢查</span>';
+}
+function applyTierFix() {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  const ren = tierPendingRenames(), add = tierMissingRoles();
+  const lines = ren.map(function(x){ return '· 改名：' + x.from + ' → ' + x.to; })
+    .concat(add.map(function(x){ return '· 新增：' + x.name; }));
+  if (!confirm('要套用四組分層嗎？\n\n' + lines.join('\n')
+    + '\n\n改名不會讓任何員工失去角色（系統記的是編號不是名稱）。')) return;
+  ren.forEach(function(x){
+    const r = S.roles.filter(function(y){ return y.name === x.from; })[0];
+    if (r) r.name = x.to;
+  });
+  add.forEach(function(x){
+    const p = ROLE_NAME_PRESETS[x.name] || {};
+    S.roles.push(Object.assign({
+      id: uid(), code: nextCode(S.roles, 'R'), name: x.name, desc: '',
+      crossDepts: (p.level === 'cross' ? crossDeptsFor(x.name) : []),
+    }, p));
+  });
+  saveAll();
+  /* 員工表要一起重畫：角色改名後那一欄顯示的是舊名字，
+     而且員工是依角色分組排序的，不重畫排序也不會跟著更新。 */
+  renderRoles(); renderEmps(); renderTierFix(); renderCfgWiz();
+  if (_cfgStep === 4) renderOverview();
+  toast('已套用：改名 ' + ren.length + " 個、新增 " + add.length + ' 個', 'success');
+}
+/* 新建的跨部門角色要帶哪兩個部門 —— 從同名系列的既有角色抄，抄不到就留空讓她自己選 */
+function crossDeptsFor(name) {
+  const key = name.replace(/（[^）]*）/g, '');
+  const like = S.roles.filter(function(r){
+    return r.name.replace(/（[^）]*）/g, '') === key && (r.crossDepts||[]).length;
+  })[0];
+  return like ? like.crossDepts.slice() : [];
+}
+
+/* ══════════ 第 ④ 步：權限總覽（2026-09-04 她指定「允許確認和最後修改」）══════════
+ * ⚠️ 這裡改的是**角色**，不是某一個人 —— 點掉一格，用那個角色的人全部一起變。
+ * 所以流程是：點 → 標成待存 → 顯示影響幾位 → 按「儲存變更」才真的寫進去。
+ * 旁邊還有「復原這次的修改」，按錯了不用重來。
+ */
+const OV_COLS = [
+  { key:'canManageSettings', label:'設定維護' },
+  { key:'canDelete',         label:'刪除' },
+  { key:'canDragSort',       label:'排序' },
+  { key:'canManageRoles',    label:'改權限' },
+];
+const OV_LV = { self:'自己建的', dept:'本部門', cross:'兩部門', all:'全公司', none:'唯讀' };
+let _ovMode = 'role';
+let _ovPend = {};        // { roleId: { key: bool } } —— 還沒儲存的修改
+
+function ovMode(m) { _ovMode = m; renderOverview(); }
+
+function ovPendCount() {
+  return Object.keys(_ovPend).reduce(function(a, id){ return a + Object.keys(_ovPend[id]).length; }, 0);
+}
+function ovVal(r, k) {
+  return (_ovPend[r.id] && k in _ovPend[r.id]) ? _ovPend[r.id][k] : !!r[k];
+}
+function ovToggle(roleId, k) {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  const r = S.roles.filter(function(x){ return x.id === roleId; })[0];
+  if (!r) return;
+  const now = ovVal(r, k), next = !now;
+  const who = S.employees.filter(function(e){ return e.roleId === roleId; });
+  /* 影響到人才問 —— 沒人用的角色直接改，不用一直跳確認 */
+  if (who.length) {
+    const names = who.slice(0, 8).map(function(e){ return e.name; }).join('、')
+      + (who.length > 8 ? ' 等 ' + who.length + ' 位' : '');
+    const col = OV_COLS.filter(function(c){ return c.key === k; })[0] || {};
+    if (!confirm((next ? '要開啟' : '要關閉') + '「' + r.name + '」的「' + (col.label||k) + '」。\n\n'
+      + '這會影響 ' + who.length + ' 位員工：\n' + names
+      + '\n\n（先標成待存，按「儲存變更」才真的生效）')) return;
+  }
+  if (!_ovPend[roleId]) _ovPend[roleId] = {};
+  if (!!r[k] === next) delete _ovPend[roleId][k];       // 改回原值 → 不算修改
+  else _ovPend[roleId][k] = next;
+  if (!Object.keys(_ovPend[roleId]).length) delete _ovPend[roleId];
+  renderOverview();
+}
+function ovUndo() { _ovPend = {}; renderOverview(); }
+function ovSave() {
+  if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
+  let n = 0;
+  Object.keys(_ovPend).forEach(function(id){
+    const r = S.roles.filter(function(x){ return x.id === id; })[0];
+    if (!r) return;
+    Object.keys(_ovPend[id]).forEach(function(k){ r[k] = _ovPend[id][k]; n++; });
+  });
+  _ovPend = {};
+  saveAll();
+  renderRoles(); renderOverview(); renderCfgWiz();
+  toast('已儲存 ' + n + ' 項權限變更', 'success');
+}
+
+function renderOverview() {
+  const thead = $('ov-thead'), tbody = $('ov-tbody');
+  if (!thead || !tbody) return;
+  const dirty = ovPendCount();
+  const tabR = $('ov-tab-role'), tabE = $('ov-tab-emp');
+  if (tabR) tabR.className = 'ov-tab' + (_ovMode === 'role' ? ' on' : '');
+  if (tabE) tabE.className = 'ov-tab' + (_ovMode === 'emp'  ? ' on' : '');
+  const dEl = $('ov-dirty'), uEl = $('ov-undo'), sEl = $('ov-save');
+  if (dEl) { dEl.style.display = dirty ? '' : 'none'; dEl.textContent = '● ' + dirty + ' 項待儲存'; }
+  if (uEl) uEl.style.display = dirty ? '' : 'none';
+  if (sEl) sEl.style.display = dirty ? '' : 'none';
+
+  const hint = $('ov-hint');
+  if (hint) hint.innerHTML = _ovMode === 'role'
+    ? '點格子可以直接切換權限。<b>改的是角色</b>，用同一個角色的人會一起變 —— 所以會先問影響幾位，按「儲存變更」才生效。'
+      + '<br>橘點 <span class="ov-diff"></span> 代表<b>目前值跟預設不同</b>（例如測試期間臨時開的），提醒妳測完記得調回來。'
+    : '每位員工能做什麼，由他的<b>角色</b>決定。要改請切到「依角色」，或到第 ③ 步換他的角色。';
+
+  const cols = OV_COLS.map(function(c){ return '<th style="text-align:center">' + c.label + '</th>'; }).join('');
+
+  if (_ovMode === 'role') {
+    thead.innerHTML = '<tr><th>角色</th><th style="text-align:center;width:78px">人數</th>'
+      + '<th style="text-align:center">看得到</th><th style="text-align:center">改得動</th>' + cols + '</tr>';
+    const rows = [];
+    ROLE_TIERS.forEach(function(t){
+      const list = S.roles.filter(function(r){ return t.roles.indexOf(r.name) >= 0; });
+      rows.push('<tr class="grp' + (t.special ? ' sp' : '') + '"><td colspan="' + (4 + OV_COLS.length) + '">'
+        + esc(t.label) + '　·　' + esc(t.hint) + '</td></tr>');
+      if (!list.length) {
+        rows.push('<tr><td colspan="' + (4 + OV_COLS.length)
+          + '" style="color:#94a3b8;font-size:12.5px">這一組還沒有建立任何角色</td></tr>');
+      }
+      list.forEach(function(r){ rows.push(ovRoleRow(r)); });
+    });
+    /* 不屬於任何一組的（自訂名稱）擺最後，不要讓它消失 */
+    const other = S.roles.filter(function(r){ return !roleTierOf(r.name); });
+    if (other.length) {
+      rows.push('<tr class="grp"><td colspan="' + (4 + OV_COLS.length) + '">📌 其他（自訂名稱的角色）</td></tr>');
+      other.forEach(function(r){ rows.push(ovRoleRow(r)); });
+    }
+    tbody.innerHTML = rows.join('');
+  } else {
+    /* 2026-09-11：欄名與員工頁對齊（部門名稱／角色類型），並補上職務名稱 */
+    thead.innerHTML = '<tr><th>姓名</th><th>部門名稱</th><th>角色類型</th><th>職務名稱</th>'
+      + '<th style="text-align:center">看得到</th><th style="text-align:center">改得動</th>' + cols + '</tr>';
+    /* 2026-09-11 她指定：這個模式以前完全沒排序（是資料原本的順序），
+       改成跟員工頁同一套 —— 先分層（員工／主管／管理層／系統管理員）再部門。 */
+    tbody.innerHTML = sortEmpsByTier(S.employees).map(function(e){
+      const r = S.roles.filter(function(x){ return x.id === e.roleId; })[0];
+      const cells = OV_COLS.map(function(c){
+        const on = r ? ovVal(r, c.key) : false;
+        return '<td class="ovc"><span class="ovbtn ' + (on ? 'y' : 'n') + '">' + (on ? '✓' : '✗') + '</span></td>';
+      }).join('');
+      return '<tr><td>' + esc(e.name) + (e.resignDate ? '<span class="ov-note">已離職 ' + esc(e.resignDate) + '</span>' : '')
+        + '</td><td>' + esc(e.dept || '') + '</td><td>' + esc(r ? r.name : '（無角色）') + '</td>'
+        + '<td>' + (e.jobTitle ? esc(e.jobTitle) : '—') + '</td>'
+        + '<td class="ovc">' + esc(r ? (OV_LV[r.level] || r.level || '') : '') + '</td>'
+        + '<td class="ovc">' + esc(r ? (OV_LV[r.editLevel] || r.editLevel || '') : '') + '</td>'
+        + cells + '</tr>';
+    }).join('');
+  }
+}
+
+function ovRoleRow(r) {
+  const n = S.employees.filter(function(e){ return e.roleId === r.id; }).length;
+  const diff = roleDiffFromPreset(r);
+  const cells = OV_COLS.map(function(c){
+    const on = ovVal(r, c.key);
+    const chg = !!(_ovPend[r.id] && c.key in _ovPend[r.id]);
+    const isDiff = diff.indexOf(c.key) >= 0 && !chg;
+    return '<td class="ovc"><button type="button" class="ovbtn ' + (on ? 'y' : 'n') + (chg ? ' chg' : '') + '"'
+      + ' onclick="ovToggle(' + JSON.stringify(r.id) + ',' + JSON.stringify(c.key) + ')"'
+      + ' title="' + (chg ? '待儲存' : (isDiff ? '目前值跟預設不同' : '')) + '">'
+      + (on ? '✓' : '✗') + '</button>'
+      + (isDiff ? '<span class="ov-diff"></span>' : '') + '</td>';
+  }).join('');
+  return '<tr><td>' + esc(r.name)
+    + (diff.length ? '<span class="ov-note">' + diff.length + ' 項與預設不同</span>' : '')
+    + '</td><td class="ovc"' + (n ? '' : ' style="color:#b91c1c"') + '>' + n + '</td>'
+    + '<td class="ovc">' + esc(OV_LV[r.level] || r.level || '') + '</td>'
+    + '<td class="ovc">' + esc(OV_LV[r.editLevel] || r.editLevel || '') + '</td>'
+    + cells + '</tr>';
+}
+
+/* ══════════ 設定頁四步引導（2026-09-04 她拍板 B 案）══════════
+ * ① 部門 → ② 權限角色 → ③ 員工 → ④ 權限總覽
+ * 角色排在員工前面：員工要選角色，角色得先存在。 */
+const CFG_STEPS = [
+  { n:1, title:'部門',     sum:function(){ return S.departments.length + ' 個'; },
+    done:function(){ return S.departments.length > 0; } },
+  { n:2, title:'權限角色', sum:function(){ return S.roles.length + ' 個 · 分四組'; },
+    done:function(){ return S.roles.length > 0; } },
+  { n:3, title:'員工',     sum:function(){
+      const live = S.employees.filter(function(e){ return !e.resignDate; }).length;
+      const out  = S.employees.length - live;
+      return S.employees.length + ' 位' + (out ? ' · ' + out + ' 已離職' : ''); },
+    done:function(){ return S.employees.length > 0; } },
+  { n:4, title:'權限總覽', sum:function(){
+      const d = S.roles.filter(function(r){ return roleDiffFromPreset(r).length; }).length;
+      return d ? (d + ' 個角色與預設不同') : '與預設一致'; },
+    done:function(){ return false; } },   // 總覽是檢查用的，不標「完成」
+];
+let _cfgStep = 1;
+try { _cfgStep = Math.min(4, Math.max(1, parseInt(localStorage.getItem('portal_cfg_step'), 10) || 1)); } catch(e){}
+
+function cfgStepTo(n) {
+  n = Math.min(4, Math.max(1, n | 0));
+  if (n !== _cfgStep) autoSaveCfg();          // 離開這一步 → 自動存
+  _cfgStep = n;
+  try { localStorage.setItem('portal_cfg_step', String(n)); } catch(e){}
+  applyCfgStep();
+  window.scrollTo(0, 0);
+}
+function cfgStepGo(d) { cfgStepTo(_cfgStep + d); }
+
+function renderCfgWiz() {
+  const el = $('cfg-wiz'); if (!el) return;
+  el.innerHTML = CFG_STEPS.map(function(st){
+    const on = (st.n === _cfgStep);
+    const ok = !on && st.done();
+    return '<button type="button" class="wiz-s' + (on?' on':'') + (ok?' done':'') + '"'
+      + ' onclick="cfgStepTo(' + st.n + ')">'
+      + '<span class="n">' + (ok ? '✓' : st.n) + '</span>'
+      + '<span class="t"><b>' + st.n + '. ' + esc(st.title) + '</b>'
+      + '<span>' + esc(st.sum()) + '</span></span></button>';
+  }).join('');
+}
+
+function applyCfgStep() {
+  for (let i = 1; i <= 4; i++) {
+    const el = $('cfg-step-' + i);
+    if (el) el.style.display = (i === _cfgStep) ? '' : 'none';
+  }
+  renderCfgWiz();
+  if (_cfgStep === 2) renderTierFix();
+  if (_cfgStep === 4) renderOverview();
+  const prev = $('wiz-prev'), next = $('wiz-next');
+  if (prev) { prev.style.visibility = (_cfgStep === 1) ? 'hidden' : '';
+              prev.textContent = '‹ 上一步：' + ((CFG_STEPS[_cfgStep-2]||{}).title || ''); }
+  if (next) { next.style.visibility = (_cfgStep === 4) ? 'hidden' : '';
+              next.textContent = '下一步：' + ((CFG_STEPS[_cfgStep]||{}).title || '') + ' ›'; }
+}
+
+/* 自動存：切步驟、離開設定頁各一次，**靜默**不跳提示 */
+function autoSaveCfg() {
+  if (!canEditRoles()) return;      // 沒有維護權就什麼都不做，也不要跳警告
+  saveAll();                        // 本機 ＋ 雲端一起，跟手動存同一條路
+  const tag = $('cfg-autosave');
+  if (tag) {
+    tag.textContent = '✓ 已自動儲存';
+    clearTimeout(window._pAsT);
+    window._pAsT = setTimeout(function(){ if (tag) tag.textContent = ''; }, 2600);
+  }
+}
+
 function renderDepts() {
+  /* 筆數變了 → 步驟列與第 ④ 步的總覽跟著更新（2026-09-04） */
+  setTimeout(function(){
+    if (typeof renderCfgWiz === 'function') renderCfgWiz();
+    if (typeof renderOverview === 'function' && typeof _cfgStep !== 'undefined' && _cfgStep === 4) renderOverview();
+  }, 0);
   const tbody = $('dept-tbody');
   $('dept-count').textContent = S.departments.length;
   if (!S.departments.length) {
@@ -1615,6 +2500,7 @@ function onEmpDeptChange() {
   } else {
     hint.style.display = 'none';
   }
+  if (typeof empTape === 'function') empTape();
 }
 
 function refreshRoleSelect() {
@@ -1626,13 +2512,23 @@ function refreshRoleSelect() {
   sel.value = cur;
 }
 function renderEmps() {
+  /* 筆數變了 → 步驟列與第 ④ 步的總覽跟著更新（2026-09-04） */
+  setTimeout(function(){
+    if (typeof renderCfgWiz === 'function') renderCfgWiz();
+    if (typeof renderOverview === 'function' && typeof _cfgStep !== 'undefined' && _cfgStep === 4) renderOverview();
+  }, 0);
   const tbody = $('emp-tbody');
   $('emp-count').textContent = S.employees.length;
   if (!S.employees.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">尚無員工資料</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">尚無員工資料</td></tr>';
     return;
   }
-  tbody.innerHTML = S.employees.map((e, idx) => {
+  /* 2026-09-11 她指定：排序改成**先分層再部門**（改版前是先部門再分層）。
+     職級優先 —— 全公司的員工排一起、主管排一起，同一層之內才照部門。
+     與權限總覽（依員工）共用 sortEmpsByTier，兩邊不會再各排各的。
+     ⚠️ 只影響顯示，不動 S.employees 本身的順序。 */
+  const _sorted = sortEmpsByTier(S.employees);
+  tbody.innerHTML = _sorted.map((e, idx) => {
     const r = getRole(e.roleId);
     const roleCell = r
       ? `<span class="role-tag ${getRoleTagClass(r.name)}">${esc(r.name)}</span>`
@@ -1647,12 +2543,15 @@ function renderEmps() {
     return `
     <tr>
       <td><span class="seq">${idx+1}</span></td>
-      <td><span class="code-pill">${esc(e.code||'—')}</span></td>
-      <td><strong>${esc(e.name)}</strong>${isResigned(e)
+      <td><span class="tag-pill">${esc(e.dept||'—')}</span></td>
+      <td>${e.jobTitle
+            ? `<span class="tag-pill">${esc(e.jobTitle)}</span>`
+            : '<span style="color:var(--text-light)">— 未設定</span>'}</td>
+      <td>${roleCell}</td>
+      <td><span class="emp-name">${esc(e.name)}</span>${isResigned(e)
           ? ` <span style="display:inline-block;font-size:11px;font-weight:800;color:var(--danger);background:#fee2e2;padding:2px 7px;border-radius:9px;margin-left:4px">🚫 已停用 ${esc(e.resignDate)}</span>`
           : (e.resignDate ? ` <span style="display:inline-block;font-size:11px;font-weight:700;color:var(--muted);background:#f1f5f9;padding:2px 7px;border-radius:9px;margin-left:4px">離職日 ${esc(e.resignDate)}</span>` : '')}</td>
-      <td><span class="tag-pill">${esc(e.dept||'—')}</span></td>
-      <td>${roleCell}</td>
+      <td><span class="code-pill emp-code">${esc(e.code||'—')}</span></td>
       <td>${appsHtml}</td>
       <td>${e.password ? '<span style="color:var(--success);font-weight:700">✓ 已設定</span>' : '<span style="color:var(--text-light)">— 未設定</span>'}</td>
       <td>
@@ -1664,6 +2563,28 @@ function renderEmps() {
     </tr>`;
   }).join('');
 }
+/* ── 職務下拉（2026-09-11）────────────────────────────────────────
+ * 選項跟著「這個員工的角色落在哪一組」走：主管給主管的五個、員工給員工的兩個。
+ * ⚠️ 換角色時要保住已經選好的職務 —— 新的那一組裡如果沒有它，
+ *    就把原值當成額外一項加進去，不要靜靜清掉（她填過的東西不能自己消失）。 */
+function refreshJobTitleSelect(keep){
+  const sel = $('emp-jobtitle');
+  if (!sel) return;
+  const cur = (keep !== undefined && keep !== null) ? keep : sel.value;
+  const list = jobTitlesForRole($('emp-roleid') ? $('emp-roleid').value : '');
+  const extra = (cur && list.indexOf(cur) < 0) ? [cur] : [];
+  sel.innerHTML = '<option value="">— 未設定 —</option>'
+    + extra.concat(list).map(function(t){
+        return '<option value="' + esc(t) + '"' + (t === cur ? ' selected' : '') + '>' + esc(t) + '</option>';
+      }).join('');
+  sel.value = cur || '';
+}
+/* 換角色 → 重建職務選項，然後照舊更新下方那條摘要 */
+function onEmpRoleChange(){
+  refreshJobTitleSelect();
+  empTape();
+}
+
 function openEmpModal() {
   S.editEmpId = null;
   $('emp-modal-title').textContent = '新增員工';
@@ -1673,6 +2594,7 @@ function openEmpModal() {
   $('emp-name').value = '';
   $('emp-dept').value = '';
   $('emp-roleid').value = S.roles[0]?.id || '';
+  refreshJobTitleSelect('');          // 2026-09-11：新增員工，職務留空
   $('emp-pw').value = '';
   $('emp-resign').value = '';
   $('emp-app-cdr').checked = true;
@@ -1681,6 +2603,7 @@ function openEmpModal() {
   $('emp-app-dtp_pm').checked = true;
   $('emp-app-sop').checked = true;
   setRoleFieldLock(false);   // 新增員工：角色可自由選
+  empTape();
   openModal('emp-modal');
   setTimeout(()=>$('emp-name').focus(), 100);
 }
@@ -1703,6 +2626,7 @@ function editEmp(id) {
   $('emp-name').value = e.name;
   $('emp-dept').value = e.dept || '';
   $('emp-roleid').value = e.roleId || '';
+  refreshJobTitleSelect(e.jobTitle || '');   // 2026-09-11：先設角色再建職務選項，順序不能反
   $('emp-pw').value = e.password || '';
   $('emp-resign').value = e.resignDate || '';
   $('emp-app-cdr').checked = !!e.appAccess?.cdr;
@@ -1711,6 +2635,7 @@ function editEmp(id) {
   $('emp-app-dtp_pm').checked = !!e.appAccess?.dtp_pm;
   $('emp-app-sop').checked = !!e.appAccess?.sop;
   setRoleFieldLock(!!(S.currentUser && id === S.currentUser.id));
+  empTape();
   openModal('emp-modal');
 }
 function saveEmp() {
@@ -1720,6 +2645,7 @@ function saveEmp() {
   const dept = $('emp-dept').value;
   const roleId = $('emp-roleid').value;
   const password = $('emp-pw').value.trim();
+  const jobTitle = ($('emp-jobtitle') ? $('emp-jobtitle').value : '') || '';   // 2026-09-11 新增
   const resignDate = $('emp-resign').value || '';
   const appAccess = {
     cdr: $('emp-app-cdr').checked,
@@ -1748,9 +2674,9 @@ function saveEmp() {
   if (dup) { toast(`「${dept}」已存在同名員工`, 'error'); return; }
   if (S.editEmpId) {
     const i = S.employees.findIndex(e => e.id === S.editEmpId);
-    if (i >= 0) S.employees[i] = { ...S.employees[i], code, name, dept, roleId, password, resignDate, appAccess };
+    if (i >= 0) S.employees[i] = { ...S.employees[i], code, name, dept, roleId, jobTitle, password, resignDate, appAccess };
   } else {
-    S.employees.push({ id: uid(), code, name, dept, roleId, password, resignDate, appAccess });
+    S.employees.push({ id: uid(), code, name, dept, roleId, jobTitle, password, resignDate, appAccess });
   }
   saveAll();
   renderEmps();
@@ -1762,6 +2688,11 @@ function saveEmp() {
  * 權限角色 CRUD
  * ============================================================ */
 function renderRoles() {
+  /* 筆數變了 → 步驟列與第 ④ 步的總覽跟著更新（2026-09-04） */
+  setTimeout(function(){
+    if (typeof renderCfgWiz === 'function') renderCfgWiz();
+    if (typeof renderOverview === 'function' && typeof _cfgStep !== 'undefined' && _cfgStep === 4) renderOverview();
+  }, 0);
   const tbody = $('role-tbody');
   $('role-count').textContent = S.roles.length;
   // 依登入者權限切換 UI
@@ -1769,10 +2700,82 @@ function renderRoles() {
   const addBtn = $('btn-add-role'); if (addBtn) addBtn.style.display = canEdit ? '' : 'none';
   const lockNote = $('role-lock-note'); if (lockNote) lockNote.style.display = canEdit ? 'none' : '';
   if (!S.roles.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-row">尚無角色資料</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-row">尚無角色資料</td></tr>';
     return;
   }
-  tbody.innerHTML = S.roles.map((r, idx) => {
+  /* 2026-09-04 她回報「員工和主管排序跳來跳去太混亂」
+     → 照第 ④ 步總覽的做法，先分四組、組內照 ROLE_TIERS 裡列的順序。
+     不屬於任何一組的（自訂名稱）擺最後，不要讓它消失。 */
+  const _rows = [];
+  let _seq = 0;
+  /* 2026-09-11：拿掉角色編號、加上部門名稱與職務名稱 → 11 欄變 12 欄 */
+  const _COLS = 12;                                   // 這張表的欄數，分組標題列要跨這麼多欄
+  const _cell = (r) => { _seq++; return roleRowHtml(r, _seq, canEdit); };
+  ROLE_TIERS.forEach(function(t){
+    const list = t.roles.map(function(nm){
+      return S.roles.filter(function(r){ return r.name === nm; })[0];
+    }).filter(Boolean);
+    _rows.push('<tr class="grp' + (t.special ? ' sp' : '') + '"><td colspan="' + _COLS + '">'
+      + esc(t.label) + '　·　' + esc(t.hint) + '</td></tr>');
+    if (!list.length) {
+      /* 給 class 才分得出「這是提示、不是一筆角色」（統計列數、抓序號時都要排除） */
+      _rows.push('<tr class="grp-empty"><td colspan="' + _COLS
+        + '" style="color:var(--text-light);font-size:12.5px">這一組還沒有建立任何角色</td></tr>');
+    }
+    list.forEach(function(r){ _rows.push(_cell(r)); });
+  });
+  const _other = S.roles.filter(function(r){ return !roleTierOf(r.name); });
+  if (_other.length) {
+    _rows.push('<tr class="grp"><td colspan="' + _COLS + '">📌 其他（自訂名稱的角色）</td></tr>');
+    _other.forEach(function(r){ _rows.push(_cell(r)); });
+  }
+  tbody.innerHTML = _rows.join('');
+}
+/* 一列角色（從原本的 map 拆出來，分組排列才用得到） */
+/* ── 角色的「部門名稱」與「職務名稱」（2026-09-11，Q1 選 A：唯讀彙總）──
+ * 角色在這套系統裡是**全公司共用**的 —— 一個「一般員工」角色，
+ * 專案管理部與規劃設計部的人都在用它，角色本身沒有「屬於哪個部門」這回事。
+ * 所以這兩欄不是角色的屬性，是「目前有誰在用這個角色」的彙總：
+ *   部門名稱 ＝ 有哪些部門的人掛著這個角色
+ *   職務名稱 ＝ 這些人的職務有哪些（職務掛在員工身上，見 Q2）
+ * 都會去掉重複、照設定頁的部門順序排；沒人用就顯示「—」。
+ * ⚠️ 唯讀，改不了 —— 要改是去員工那一頁改某個人的部門或職務。 */
+function roleDeptNames(roleId){
+  const out = [];
+  const order = {};
+  S.departments.forEach(function(d, i){ order[d.name] = i; });
+  S.employees.forEach(function(e){
+    if (e.roleId !== roleId) return;
+    const d = String(e.dept || '').trim();
+    if (d && out.indexOf(d) < 0) out.push(d);
+  });
+  return out.sort(function(a, b){
+    const ia = (a in order) ? order[a] : 999, ib = (b in order) ? order[b] : 999;
+    return ia - ib || String(a).localeCompare(String(b), 'zh-Hant');
+  });
+}
+/* 2026-09-11 第四輪修正：這一欄改成**角色自己勾了哪些職務**（編輯角色頁第 3 項），
+   不再是「從員工資料倒推」。她的原話：「這應該讓使用者勾選後才會顯示出來」。
+   倒推的版本會出現看不懂的組合 —— 例如「一般員工」那一列冒出「經理」，
+   只因為剛好有個掛著這個角色的人被填了那個職務。
+   沒勾 ＝ 顯示「—」，等她去編輯角色頁勾起來才會出現。 */
+function roleTitleNames(roleId){
+  const r = (typeof getRole === 'function') ? getRole(roleId) : null;
+  const picked = (r && Array.isArray(r.jobTitles)) ? r.jobTitles : [];
+  if (!picked.length) return [];
+  /* 勾選的順序不管，一律照職務高低排，跟員工那頁的下拉一致 */
+  return JOB_TITLES.filter(function(t){ return picked.indexOf(t) >= 0; })
+    .concat(picked.filter(function(t){ return JOB_TITLES.indexOf(t) < 0; }));
+}
+/* 彙總欄的共用畫法：空的時候給一個淡色的「—」，不要留一格空白讓人以為壞了 */
+function rolePillCell(list){
+  if (!list.length) return '<span style="color:var(--text-light)">—</span>';
+  return list.map(function(x){ return '<span class="tag-pill">' + esc(x) + '</span>'; }).join(' ');
+}
+
+function roleRowHtml(r, seq, canEdit) {
+  const idx = seq - 1;                 // 樣板裡寫的是 idx+1，這裡接的已經是序號本身
+  {
     const crossHtml = r.level === 'cross'
       ? (r.crossDepts?.length
           ? r.crossDepts.map(d => `<span class="dept-pill">${esc(d)}</span>`).join('')
@@ -1786,30 +2789,127 @@ function renderRoles() {
     return `
       <tr>
         <td><span class="seq">${idx+1}</span></td>
-        <td><span class="code-pill">${esc(r.code||'—')}</span></td>
+        <td>${rolePillCell(roleDeptNames(r.id))}</td>
+        <td>${rolePillCell(roleTitleNames(r.id))}</td>
         <td>
           <strong>${esc(r.name)}</strong>
           ${r.desc ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(r.desc)}</div>` : ''}
         </td>
         <td>${roleCanManageRoles(r)
-              ? '<span class="level-pill level-all">可設定</span>'
+              ? '<span class="level-pill perm-on">可設定</span>'
               : '<span class="level-pill level-none">不可</span>'}</td>
         <td>${r.canDelete
-              ? '<span class="level-pill level-all">可刪除</span>'
+              ? '<span class="level-pill perm-del">可刪除</span>'
               : '<span class="level-pill level-none">不可刪</span>'}</td>
         <td>${r.canManageSettings
-              ? '<span class="level-pill level-all">可維護</span>'
+              ? '<span class="level-pill perm-on">可維護</span>'
               : '<span class="level-pill level-none">唯讀</span>'}</td>
         <td>${roleCanDragSort(r)
-              ? '<span class="level-pill level-all">可排序</span>'
+              ? '<span class="level-pill perm-on">可排序</span>'
               : '<span class="level-pill level-none">不可</span>'}</td>
         <td><span class="level-pill level-${r.level}">${LEVEL_LABEL[r.level]||r.level}</span></td>
         <td>${crossHtml}</td>
         <td><span class="level-pill level-${editLv}">${EDIT_LEVEL_LABEL[editLv]||editLv}</span></td>
         <td><div class="row-actions">${actions}</div></td>
       </tr>`;
+  }
+}
+/* ── 角色編號重編：2026-09-14 整組移除 ──────────────────────────
+ * 2026-09-04 加的那條橫幅（提示編號與排列不一致，附一顆「照現在的順序重編」的按鈕）。
+ * 2026-09-11 角色編號欄已經從清單隱藏 → 使用者看不到編號，卻還被提示「編號對不上」，
+ * 等於在催她修一個她根本看不到的東西。她 2026-09-14 指定移除。
+ * 一起清掉的還有 roleOrderForCode / roleCodeNeedsFix / renderRoleCodeFix / applyRoleCodeFix
+ * —— 那四支只服務這個橫幅，留著就是點不到的死碼。
+ * ⚠️ 角色的 code 欄位本身**沒有動**（R001/R002/R004 有舊資料遷移程式在用，見 L706 註解）。
+ */
+
+/* ── B 版視窗的兩支小東西（2026-09-07）────────────────────────────
+ * rbTip：ⓘ 說明本來就靠 :hover 浮出，這支只負責「點一下釘住」——
+ *        平板手機沒有游標，不釘住就永遠看不到說明。
+ * rbTape：底部總結條，把「這個角色現在到底能做什麼」用一行講完，
+ *         並且跟所選角色的預設值比對，不一樣的項數用橘色標出來
+ *         （測試期臨時開的權限，收工時才記得要關回去）。 */
+function rbTip(btn){
+  const w = btn.parentNode;
+  const on = w.classList.contains('pin');
+  /* 只收自己這個視窗裡釘住的（權限角色與員工兩個視窗共用這一支） */
+  const box = btn.closest('.modal') || document;
+  box.querySelectorAll('.tipwrap.pin').forEach(x => {
+    x.classList.remove('pin');
+    const b = x.querySelector('.info'); if (b) b.setAttribute('aria-expanded','false');
+  });
+  if (!on) { w.classList.add('pin'); btn.setAttribute('aria-expanded','true'); }
+}
+/* [權限 key, checkbox 的 id, 顯示名稱] —— 順序＝視窗裡由上而下的順序 */
+const RB_PERMS = [
+  ['canManageRoles',    'role-can-manage-roles',    '人員權限'],
+  ['canDelete',         'role-can-delete',          '系統設定刪除'],
+  ['canManageSettings', 'role-can-manage-settings', '系統設定維護'],
+  ['canDragSort',       'role-can-drag-sort',       '資料排序'],
+];
+function rbTape(){
+  const box = $('role-tape'); if (!box) return;
+  const lv = (document.querySelector('input[name="role-level"]:checked') || {}).value || '';
+  const ed = (document.querySelector('input[name="role-edit-level"]:checked') || {}).value || '';
+  const name = (typeof readRoleNameFromForm === 'function') ? (readRoleNameFromForm() || '') : '';
+  const preset = ROLE_NAME_PRESETS[name] || null;   // 自訂名稱的角色沒有預設可比，就不標橘色
+  let diff = 0;
+  const pills = [
+    '<span class="rb-pill">✓ 資料檢視：' + esc(LEVEL_LABEL[lv] || '尚未選') + '</span>',
+    '<span class="rb-pill">✓ 資料編輯：' + esc(EDIT_LEVEL_LABEL[ed] || '尚未選') + '</span>',
+  ];
+  RB_PERMS.forEach(function(x){
+    const el = $(x[1]);
+    const on = !!(el && el.checked);
+    if (preset && on !== !!preset[x[0]]) diff++;
+    pills.push('<span class="rb-pill' + (on ? '' : ' off') + '">' + (on ? '✓ ' : '✗ ') + esc(x[2]) + '</span>');
+  });
+  if (preset) { if (lv !== preset.level) diff++; if (ed !== preset.editLevel) diff++; }
+  box.innerHTML = '<span class="rb-lb">這個角色目前是</span>' + pills.join('')
+    + (diff ? '<span class="rb-pill alert">⚠ 有 ' + diff + ' 項跟「' + esc(name) + '」的預設不一樣</span>' : '');
+}
+
+/* ── 員工視窗 B 版的兩支小東西（2026-09-07）────────────────────────
+ * empDerived：選完角色就把該角色的權限攤出來（唯讀）——
+ *             不然要退回第 ② 步才知道自己剛才給了他什麼。
+ * empTape：底部總結條，把「這位員工現在是什麼狀態」用一行講完。
+ *          離職日是唯一一個「填了會讓人登不進來」的欄位，所以標成橘紅。 */
+function empRoleOf(){
+  const id = ($('emp-roleid') || {}).value;
+  return (S.roles || []).filter(function(r){ return r.id === id; })[0] || null;
+}
+const EMP_APPS = [
+  ['cdr_pm', '日報表—專案管理'], ['cdr', '日報表—瑪摩工程'],
+  ['dtp_pm', '進度表—專案管理'], ['dtp', '進度表—圖面管理'], ['sop', '查檢表—標準作業'],
+];
+function empDerived(){
+  const box = $('emp-derived'); if (!box) return;
+  const r = empRoleOf();
+  if (!r) { box.innerHTML = '<span class="rb-lb">先選一個角色</span>'; return; }
+  const items = [['資料檢視：' + (LEVEL_LABEL[r.level] || '—'), 1],
+                 ['資料編輯：' + (EDIT_LEVEL_LABEL[r.editLevel || r.level] || '—'), 1]];
+  RB_PERMS.forEach(function(x){ items.push([x[2], !!r[x[0]]]); });
+  box.innerHTML = '<span class="rb-lb">這個角色會給他</span>' + items.map(function(i){
+    return '<span class="rb-pill' + (i[1] ? '' : ' off') + '">' + (i[1] ? '✓ ' : '✗ ') + esc(i[0]) + '</span>';
   }).join('');
 }
+function empTape(){
+  empDerived();
+  const box = $('emp-tape'); if (!box) return;
+  const r = empRoleOf();
+  const n = EMP_APPS.filter(function(a){ return ($('emp-app-' + a[0]) || {}).checked; }).length;
+  const pills = [
+    esc($('emp-dept').value || '尚未選部門'),
+    esc(r ? r.name : '尚未選角色'),
+    esc(r ? (LEVEL_LABEL[r.level] || '—') : '—'),
+    '可用 ' + n + ' 個系統',
+    ($('emp-pw').value ? '已設密碼' : '未設密碼（選了名字就能進）'),
+  ].map(function(x){ return '<span class="rb-pill">' + x + '</span>'; });
+  const rd = $('emp-resign').value;
+  if (rd) pills.push('<span class="rb-pill alert">⚠ ' + esc(rd) + ' 起停用，登不進來</span>');
+  box.innerHTML = '<span class="rb-lb">這位員工目前是</span>' + pills.join('');
+}
+
 function renderCrossDeptCheckboxes(selectedDepts) {
   const box = $('role-cross-list');
   box.innerHTML = S.departments.map(d => `
@@ -1820,8 +2920,10 @@ function renderCrossDeptCheckboxes(selectedDepts) {
   `).join('') || '<span style="color:var(--muted);padding:6px">尚無可選部門，請先新增部門</span>';
 }
 function onRoleLevelChange() {
+  if (typeof rbTape === 'function') rbTape();
   const level = document.querySelector('input[name="role-level"]:checked')?.value;
-  $('role-cross-box').style.display = (level === 'cross') ? 'block' : 'none';
+  /* 這一列是三欄式的 .rb-row（display:grid），顯示時不能用 block，否則版面塌掉 */
+  $('role-cross-box').style.display = (level === 'cross') ? 'grid' : 'none';
   if (level === 'cross') {
     const cur = (S.editRoleId ? S.roles.find(r=>r.id===S.editRoleId)?.crossDepts : null) || [];
     renderCrossDeptCheckboxes(cur);
@@ -1829,13 +2931,172 @@ function onRoleLevelChange() {
 }
 
 /* ── 角色名稱下拉變更時，同步建議「可看範圍」 ── */
+/* ══════════ 角色四組分層（2026-09-04 她拍板）══════════
+ * 規則很單純，這樣分完就好記：
+ *   👤 員工   四個權限全部關。差別只在「看得到誰」「改得動誰」
+ *   👔 主管   維護設定 ✓、排序 ✓、改權限 ✓，但**不能刪**
+ *   🏛 管理層 跟主管一樣的權限，差在看得到全公司
+ *   🔧 系統管理員  唯一能刪除的，跟職級無關，所以獨立擺
+ *
+ * 她 2026-09-04 的兩個決定（林籃英、楊宗儒、黃惠蘭三位繪圖同仁）：
+ *   ·「編兩邊的資料」是**資料範圍**，給 → editLevel:'cross'
+ *   ·「改別人的權限」是**職級**，不給 → canManageRoles:false
+ *   · 資料排序也不給（那個順序全公司共用，留給主管）
+ * 所以他們留在員工組的「可編兩邊（員工）」。
+ */
+const ROLE_TIERS = [
+  { key:'staff', label:'👤 員工',   hint:'一律不能碰設定與權限',
+    roles:['一般員工','瑪摩一×二互看（員工）','專管×規設互看（員工）','專管×規設互看（可編兩邊）（員工）'] },
+  { key:'mgr',   label:'👔 主管',   hint:'可以維護設定、排序、改權限，但不能刪',
+    roles:['部門主管','專管×規設互看（主管）','瑪摩一×二互看（主管）','專管×規設互看（可編兩邊）（主管）'] },
+  { key:'exec',  label:'🏛 管理層', hint:'看得到全公司',
+    roles:['副總經理（看全部）','總經理室'] },
+  { key:'sys',   label:'🔧 系統管理員', hint:'特殊角色，請勿隨意指派', special:true,
+    roles:['系統管理員'] },
+];
+/* 員工組共用的底：四個權限全關 */
+const _S = { canManageSettings:false, canDragSort:false, canManageRoles:false, canDelete:false };
+/* 主管與管理層共用的底：能維護、能排序、能改權限，但不能刪 */
+const _M = { canManageSettings:true,  canDragSort:true,  canManageRoles:true,  canDelete:false };
 const ROLE_NAME_PRESETS = {
-  '一般員工':   { level:'dept',  editLevel:'self' },
-  '部門主管':   { level:'dept',  editLevel:'dept', canManageSettings:true, canDragSort:true, canManageRoles:true },
-  '跨部門協作': { level:'cross', editLevel:'cross' },
-  '系統管理員': { level:'all',   editLevel:'all',  canManageSettings:true, canDragSort:true, canManageRoles:true, canDelete:true },
-  '總經理室':   { level:'all',   editLevel:'none', canManageSettings:true, canDragSort:true, canManageRoles:true },
+  /* 👤 員工 */
+  '一般員工':                        Object.assign({ level:'dept',  editLevel:'self'  }, _S),
+  '瑪摩一×二互看（員工）':             Object.assign({ level:'cross', editLevel:'self'  }, _S),
+  '專管×規設互看（員工）':             Object.assign({ level:'cross', editLevel:'self'  }, _S),
+  '專管×規設互看（可編兩邊）（員工）':   Object.assign({ level:'cross', editLevel:'cross' }, _S),
+  /* 👔 主管 */
+  '部門主管':                        Object.assign({ level:'dept',  editLevel:'dept'  }, _M),
+  '專管×規設互看（主管）':             Object.assign({ level:'cross', editLevel:'dept'  }, _M),
+  '瑪摩一×二互看（主管）':             Object.assign({ level:'cross', editLevel:'dept'  }, _M),
+  '專管×規設互看（可編兩邊）（主管）':   Object.assign({ level:'cross', editLevel:'cross' }, _M),
+  /* 🏛 管理層 */
+  '副總經理（看全部）':                Object.assign({ level:'all',   editLevel:'self'  }, _M),
+  '總經理室':                        Object.assign({ level:'all',   editLevel:'none'  }, _M),
+  /* 🔧 特殊 */
+  '系統管理員':      { level:'all', editLevel:'all', canManageSettings:true, canDragSort:true,
+                       canManageRoles:true, canDelete:true },
 };
+/* ── 職務名稱（2026-09-11 她指定）────────────────────────────────
+ * 掛在**員工**身上，不是角色上。理由：同樣是「部門主管」，有人是經理、有人是協理，
+ * 權限卻完全一樣 —— 職務本來就是人的屬性。掛角色上的話「部門主管」要拆成五個角色，
+ * 權限一模一樣只差稱呼，角色表會從 11 個長到 30 個以上。
+ * 清單依她指定：主管五個、員工兩個。順序＝由高到低，權限角色頁的彙總欄照這個排。
+ * 選單依員工的角色落在哪一組動態切換（主管給主管的、員工給員工的），
+ * 管理層與系統管理員兩組全部都給 —— 那兩組人數少、頭銜不固定，限制了反而卡住。 */
+const JOB_TITLES_MGR   = ['總經理', '副總', '協理', '經理', '副理'];
+const JOB_TITLES_STAFF = ['主任', '工程師'];
+const JOB_TITLES = JOB_TITLES_MGR.concat(JOB_TITLES_STAFF);
+/* 某個角色底下該給哪些職務選項 */
+function jobTitlesForRole(roleId){
+  const r = (typeof getRole === 'function') ? getRole(roleId) : null;
+  /* 2026-09-11：角色自己勾了的話以它為準（編輯角色頁第 3 項）。
+     勾選的順序不管，一律照 JOB_TITLES 的高低排，兩邊看起來才一致。 */
+  if (r && Array.isArray(r.jobTitles) && r.jobTitles.length) {
+    return JOB_TITLES.filter(function(t){ return r.jobTitles.indexOf(t) >= 0; })
+      .concat(r.jobTitles.filter(function(t){ return JOB_TITLES.indexOf(t) < 0; }));
+  }
+  /* 沒勾 ＝ 不限制 → 照角色所屬的組別自動給 */
+  const t = r ? roleTierOf(r.name) : null;
+  if (t && t.key === 'staff') return JOB_TITLES_STAFF;
+  if (t && t.key === 'mgr')   return JOB_TITLES_MGR;
+  return JOB_TITLES;                       // 管理層／系統管理員／自訂角色：全部都給
+}
+/* ── 員工的排序鍵（2026-09-11 她指定：先分層，再部門）──────────────
+ * 改版前是「先部門、再分層」——同部門的人聚在一起。
+ * 她要的是職級優先：全公司的員工排一起、主管排一起，同層之內才照部門。
+ * 員工頁與權限總覽（依員工）共用這一支，兩邊不會再各排各的。 */
+function empSortKey(e){
+  const r = (typeof getRole === 'function') ? getRole(e.roleId) : null;
+  const t = r ? roleTierOf(r.name) : null;
+  let tier = 99;                                    // 沒有角色／自訂名稱的排最後
+  for (let i = 0; i < ROLE_TIERS.length; i++) if (ROLE_TIERS[i] === t) { tier = i; break; }
+  const dIdx = {};
+  S.departments.forEach(function(d, i){ dIdx[d.name] = i; });
+  return { tier: tier, dept: (e.dept in dIdx) ? dIdx[e.dept] : 999, name: String(e.name || '') };
+}
+function sortEmpsByTier(list){
+  return list.slice().sort(function(a, b){
+    const ka = empSortKey(a), kb = empSortKey(b);
+    return ka.tier - kb.tier
+        || ka.dept - kb.dept
+        || ka.name.localeCompare(kb.name, 'zh-Hant');
+  });
+}
+
+/* 這個角色屬於哪一組（找不到就回 null —— 自訂名稱的角色不強迫歸組） */
+function roleTierOf(name){
+  for (var i = 0; i < ROLE_TIERS.length; i++)
+    if (ROLE_TIERS[i].roles.indexOf(name) >= 0) return ROLE_TIERS[i];
+  return null;
+}
+/* 目前設定跟預設值有沒有不一樣（第 ④ 步用來標記「臨時開的權限」） */
+const PERM_KEYS = ['canManageSettings','canDelete','canDragSort','canManageRoles'];
+function roleDiffFromPreset(r){
+  const p = ROLE_NAME_PRESETS[r && r.name];
+  if (!p) return [];
+  return PERM_KEYS.filter(function(k){ return !!r[k] !== !!p[k]; });
+}
+/* ── 第 ② 步：先選職級，再選角色（2026-09-04）────────────────────
+ * 選了角色就把它的預設權限帶進表單（沿用原本的 onRoleNamePresetChange），
+ * 帶進去之後每一項照樣可以改 —— 她指定「帶出預設的權限，但允許修改」。 */
+let _roleTier = 'staff';
+function renderRoleTier() {
+  const box = $('role-tier'); if (!box) return;
+  box.innerHTML = ROLE_TIERS.map(function(t){
+    const used = S.roles.filter(function(r){ return t.roles.indexOf(r.name) >= 0; }).length;
+    return '<button type="button" class="tier-b' + (t.key === _roleTier ? ' on' : '')
+      + (t.special ? ' sp' : '') + '" onclick="roleTierTo(' + JSON.stringify(t.key) + ')">'
+      + '<b>' + esc(t.label) + '</b><span>' + t.roles.length + ' 個角色'
+      + (used ? ' · 已建 ' + used : '') + '<br>' + esc(t.hint) + '</span></button>';
+  }).join('');
+  renderRolePick();
+}
+function roleTierTo(k) {
+  _roleTier = k;
+  renderRoleTier();
+  /* 2026-09-11：換組別 → 職務清單跟著換（主管五個 ⇄ 員工兩個） */
+  if (typeof refreshRoleJobTitles === 'function') refreshRoleJobTitles();
+}
+
+function renderRolePick() {
+  const box = $('role-pick'); if (!box) return;
+  const tier = ROLE_TIERS.filter(function(t){ return t.key === _roleTier; })[0];
+  if (!tier) { box.innerHTML = ''; return; }
+  const cur = $('role-name-sel').value;
+  box.innerHTML = tier.roles.map(function(nm){
+    /* 這個角色目前有幾位員工在用 —— 建的時候就看得到影響範圍 */
+    const role = S.roles.filter(function(r){ return r.name === nm; })[0];
+    const n = role ? S.employees.filter(function(e){ return e.roleId === role.id; }).length : 0;
+    const exists = !!role;
+    return '<button type="button" class="' + (nm === cur ? 'on' : '') + '"'
+      + ' onclick="rolePickTo(' + JSON.stringify(nm) + ')">'
+      + '<span class="dot"></span><span>' + esc(nm) + '</span>'
+      + '<span class="cnt">' + (exists ? (n + ' 位') : '尚未建立') + '</span></button>';
+  }).join('');
+}
+function rolePickTo(nm) {
+  $('role-name-sel').innerHTML = '<option value="' + esc(nm) + '" selected>' + esc(nm) + '</option>'
+    + '<option value="__custom__">＋ 其他（自訂名稱）</option>';
+  $('role-name').style.display = 'none';
+  $('role-name').value = '';
+  onRoleNamePresetChange();
+  renderRolePick();
+  rbTapeSoon();
+}
+/* 自訂名稱：不套任何預設，讓她自己勾 */
+function roleUseCustom() {
+  $('role-name-sel').innerHTML = '<option value="__custom__" selected>＋ 其他（自訂名稱）</option>';
+  onRoleNamePresetChange();
+  renderRolePick();
+  rbTapeSoon();
+}
+/* 編輯既有角色時，把職級組別切到它所屬的那一組 */
+function syncRoleTierFromName(nm) {
+  const t = roleTierOf(nm);
+  if (t) _roleTier = t.key;
+  renderRoleTier();
+}
+
 function onRoleNamePresetChange() {
   const sel = $('role-name-sel').value;
   const customInput = $('role-name');
@@ -1858,26 +3119,82 @@ function onRoleNamePresetChange() {
       onRoleLevelChange();
     }
   }
+  /* 2026-09-11：挑了角色 → 職務清單也跟著這個角色的組別重畫 */
+  if (typeof refreshRoleJobTitles === 'function') refreshRoleJobTitles();
 }
+function rbTapeSoon(){ if (typeof rbTape === 'function') rbTape(); }
 function readRoleNameFromForm() {
   const sel = $('role-name-sel').value;
   if (sel === '__custom__') return $('role-name').value.trim();
   return sel;
 }
 function setRoleNameInForm(name) {
-  const presetVals = ['一般員工','部門主管','跨部門協作','系統管理員','總經理室'];
   const sel = $('role-name-sel');
   const customInput = $('role-name');
-  if (presetVals.includes(name)) {
-    sel.value = name;
+  /* 2026-09-07：原本比對的是一份寫死的舊清單（只有 5 個名字，2026-06 留下的）。
+     線上 11 個角色裡有 6 個不在裡面 → 編輯它們時一律被當成「自訂名稱」，
+     中欄的角色清單一張卡都不會反白，看起來像「這個角色沒有分類」。
+     改成比對 ROLE_NAME_PRESETS（角色清單本來就是照它畫的），兩邊才會一致。
+     ⚠️ 這裡只換選單的值，**不呼叫 onRoleNamePresetChange()** ——
+        它會把權限重設成預設值，而 editRole 接下來就要填入這個角色真正的權限。 */
+  if (name && ROLE_NAME_PRESETS[name]) {
+    sel.innerHTML = '<option value="' + esc(name) + '" selected>' + esc(name) + '</option>'
+                  + '<option value="__custom__">＋ 其他（自訂名稱）</option>';
     customInput.style.display = 'none';
     customInput.value = '';
   } else {
-    sel.value = '__custom__';
+    sel.innerHTML = '<option value="__custom__" selected>＋ 其他（自訂名稱）</option>';
     customInput.style.display = '';
     customInput.value = name || '';
   }
 }
+/* ── 編輯角色頁的職務勾選清單（2026-09-11 她指定）────────────────────
+ * 兩組分開排，看得出「主管」與「員工」是兩套。
+ * checked 為空＝沒有特別限制，員工那一頁就照角色的組別自動給。 */
+/* 2026-09-11 第四輪修正：清單要照角色所屬的組別鎖住。
+   改版前七個職務全列給所有角色 → 「一般員工」勾得到「總經理」（她抓到的）。
+   她指定的分法：主管＝副理／經理／協理／副總／總經理，員工＝工程師／主任。
+   管理層與系統管理員兩組她沒指定，兩邊都給 —— 那兩組人數少、頭銜不固定，限死反而卡住。 */
+function jobTitleGroupsForTier(key){
+  if (key === 'staff') return [['👤 員工', JOB_TITLES_STAFF]];
+  if (key === 'mgr')   return [['👔 主管', JOB_TITLES_MGR]];
+  return [['👔 主管', JOB_TITLES_MGR], ['👤 員工', JOB_TITLES_STAFF]];
+}
+function renderRoleJobTitles(checked){
+  const box = $('role-jobtitles');
+  if (!box) return;
+  const on = Array.isArray(checked) ? checked : [];
+  /* _roleTier ＝ 第 2 項現在選到哪一組（點左邊的分類鈕會變） */
+  const groups = jobTitleGroupsForTier(typeof _roleTier !== 'undefined' ? _roleTier : '');
+  box.innerHTML = groups.map(function(g){
+    return '<div class="grp"><span class="glab">' + g[0] + '</span>'
+      + g[1].map(function(t){
+          return '<label><input type="checkbox" value="' + esc(t) + '"'
+               + (on.indexOf(t) >= 0 ? ' checked' : '') + ' onchange="onRoleJobTitleChange()">'
+               + esc(t) + '</label>';
+        }).join('') + '</div>';
+  }).join('');
+  onRoleJobTitleChange();
+}
+/* 換組別時要保住還適用的勾選 —— 不適用的那幾個本來就不該留著 */
+function refreshRoleJobTitles(){
+  renderRoleJobTitles(typeof readRoleJobTitles === 'function' ? readRoleJobTitles() : []);
+}
+function readRoleJobTitles(){
+  return [].map.call(
+    document.querySelectorAll('#role-jobtitles input[type=checkbox]:checked'),
+    function(c){ return c.value; });
+}
+/* 一個都沒勾的時候要講清楚會發生什麼 —— 不然看起來像「忘了設定」 */
+function onRoleJobTitleChange(){
+  const hint = $('role-jobtitles-hint');
+  if (!hint) return;
+  const picked = readRoleJobTitles();
+  hint.textContent = picked.length
+    ? '員工那一頁只會出現：' + picked.join('、')
+    : '一個都沒勾 ＝ 權限角色表的「職務名稱」欄會顯示「—」，員工那一頁則照這個角色的組別自動給';
+}
+
 function openRoleModal() {
   if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
   S.editRoleId = null;
@@ -1891,9 +3208,13 @@ function openRoleModal() {
   $('role-can-drag-sort').checked = false;
   $('role-can-manage-roles').checked = false;
   $('role-can-delete').checked = false;
+  renderRoleJobTitles([]);            // 2026-09-11：新增角色 → 都不勾（＝不限制）
   $('role-cross-box').style.display = 'none';
+  /* 表單清好之後才畫分組 —— 放在最前面的話 renderRolePick 會讀到上一次的角色名 */
+  _roleTier = 'staff';
+  renderRoleTier();
+  rbTape();
   openModal('role-modal');
-  setTimeout(()=>$('role-name-sel').focus(), 100);
 }
 function editRole(id) {
   if (!canEditRoles()) { toast('您沒有編輯權限設定的權限', 'error'); return; }
@@ -1903,6 +3224,9 @@ function editRole(id) {
   $('role-modal-title').textContent = '編輯角色';
   $('role-code').value = r.code || '';
   setRoleNameInForm(r.name || '');
+  /* 2026-09-04：把上面的職級分組切到這個角色所屬的那一組，
+     不然編輯舊角色時分組永遠停在「員工」，看起來像分錯組。 */
+  if (typeof syncRoleTierFromName === 'function') syncRoleTierFromName(r.name || '');
   $('role-desc').value = r.desc || '';
   document.querySelectorAll('input[name="role-level"]').forEach(x => x.checked = (x.value === r.level));
   const editLv = r.editLevel || r.level || 'self';
@@ -1911,12 +3235,14 @@ function editRole(id) {
   $('role-can-drag-sort').checked = roleCanDragSort(r);
   $('role-can-manage-roles').checked = roleCanManageRoles(r);
   $('role-can-delete').checked = !!r.canDelete;
+  renderRoleJobTitles(r.jobTitles || []);   // 2026-09-11：帶入這個角色允許的職務
   if (r.level === 'cross') {
-    $('role-cross-box').style.display = 'block';
+    $('role-cross-box').style.display = 'grid';
     renderCrossDeptCheckboxes(r.crossDepts || []);
   } else {
     $('role-cross-box').style.display = 'none';
   }
+  rbTape();
   openModal('role-modal');
 }
 function saveRole() {
@@ -1929,6 +3255,7 @@ function saveRole() {
   const canDragSort = $('role-can-drag-sort').checked;
   const canManageRoles = $('role-can-manage-roles').checked;
   const canDelete = $('role-can-delete').checked;
+  const jobTitles = readRoleJobTitles();      // 2026-09-11：這個角色允許配的職務（空陣列＝不限制）
   let crossDepts = [];
   if (level === 'cross') {
     crossDepts = [...document.querySelectorAll('#role-cross-list input[type=checkbox]:checked')].map(c => c.value);
@@ -1951,9 +3278,9 @@ function saveRole() {
 
   if (S.editRoleId) {
     const i = S.roles.findIndex(r => r.id === S.editRoleId);
-    if (i >= 0) S.roles[i] = { ...S.roles[i], code, name, desc, level, editLevel, canManageSettings, canDragSort, canManageRoles, canDelete, crossDepts };
+    if (i >= 0) S.roles[i] = { ...S.roles[i], code, name, desc, level, editLevel, canManageSettings, canDragSort, canManageRoles, canDelete, jobTitles, crossDepts };
   } else {
-    S.roles.push({ id: uid(), code, name, desc, level, editLevel, canManageSettings, canDragSort, canManageRoles, canDelete, crossDepts });
+    S.roles.push({ id: uid(), code, name, desc, level, editLevel, canManageSettings, canDragSort, canManageRoles, canDelete, jobTitles, crossDepts });
   }
   // 對稱模式：crossDepts 由子 App 的資料過濾邏輯雙向解讀，這邊不需動其他角色的設定
 
@@ -2500,5 +3827,186 @@ console.log('[Portal] ' + (window.APP_VERSION || '?') + ' booted ·',
 })();
 </script>
 
+
+<script>
+/* ══════ 顯示密碼的眼睛（2026-09-11 她指定）══════════════════════════
+ * 眼睛張開＝正在顯示密碼；眼睛閉上＝遮著。圖案照她給的樣式畫成 SVG
+ * （閉眼＝弧線加三根睫毛、開眼＝弧線加實心瞳孔與反光點），不是 emoji ——
+ * emoji 在不同裝置上長得不一樣，工地的手機跟辦公室的電腦會對不起來。
+ *
+ * 做法：開機時掃描所有 type="password" 的欄位，自動包一層並補上按鈕。
+ * 這樣以後新增密碼欄位不用再記得手動加一次，也不會漏掉。
+ * ⚠️ 設定頁那個「幫員工設密碼」的欄位（emp-pw）本來就是明文 text，
+ *    不在掃描範圍內 —— 那是管理者在設別人的密碼，本來就該看得見。
+ */
+(function(){
+  var SVG_OFF = '<svg class="ic-off" width="20" height="20" viewBox="0 0 24 24" fill="none"'
+    + ' stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">'
+    + '<path d="M3.5 9.6c2.6 3.9 5.6 5.9 8.5 5.9s5.9-2 8.5-5.9"/>'
+    + '<path d="M5.3 14.2 3.6 17.2"/><path d="M12 16.5v3.3"/><path d="M18.7 14.2 20.4 17.2"/></svg>';
+  var SVG_ON = '<svg class="ic-on" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M2.6 14.4C5.6 8.8 8.7 6 12 6s6.4 2.8 9.4 8.4" fill="none" stroke="currentColor"'
+    + ' stroke-width="2.2" stroke-linecap="round"/>'
+    /* 瞳孔用 evenodd 挖一個洞當反光點 —— 這樣不管底色是什麼都不會露餡 */
+    + '<path fill="currentColor" fill-rule="evenodd"'
+    + ' d="M12 9.85a4.4 4.4 0 1 0 .01 0zM13.9 11.95a1.15 1.15 0 1 0 .01 0z"/></svg>';
+
+  function enhance(inp){
+    if (!inp || inp.dataset.pwEye === '1') return;      // 同一個欄位不要加兩次
+    inp.dataset.pwEye = '1';
+    var wrap = document.createElement('div');
+    wrap.className = 'pw-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+
+    var btn = document.createElement('button');
+    btn.type = 'button';                                 // 不加的話在表單裡會變成送出鈕
+    btn.className = 'pw-eye';
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', '顯示密碼');
+    btn.title = '顯示密碼';
+    btn.innerHTML = SVG_OFF + SVG_ON;
+    btn.addEventListener('click', function(){
+      var showing = inp.type === 'text';
+      inp.type = showing ? 'password' : 'text';
+      btn.setAttribute('aria-pressed', showing ? 'false' : 'true');
+      btn.setAttribute('aria-label', showing ? '顯示密碼' : '隱藏密碼');
+      btn.title = showing ? '顯示密碼' : '隱藏密碼';
+      /* 按完把游標還給輸入格，接著打字不用再點一次 */
+      try { inp.focus(); var v = inp.value; inp.setSelectionRange(v.length, v.length); } catch(e){}
+    });
+    wrap.appendChild(btn);
+  }
+
+  function initPwEyes(){
+    var list = document.querySelectorAll('input[type="password"]');
+    for (var i = 0; i < list.length; i++) enhance(list[i]);
+  }
+  window.initPwEyes = initPwEyes;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPwEyes);
+  else initPwEyes();
+})();
+</script>
+
+<script>
+/* ══════════ 自製確認對話框（取代瀏覽器內建的 confirm）══════════
+ * 2026-09-23 她指定：確認視窗要有「取消／確認」兩顆按鈕，樣式跟系統一致。
+ *
+ * 為什麼要繞這一圈：
+ *   confirm() 是**同步**的 —— 程式寫的是 `if(!confirm(...)) return;`，它會停在那裡等 true／false。
+ *   自製對話框有按鈕，是非同步的，回不了值。
+ * 解法：**重放**
+ *   ① 在捕捉階段記下「是哪個元素觸發的」（pointerdown / mousedown / click 都記）
+ *   ② confirm() 被呼叫 → 先回 false（等同取消），同時把對話框叫出來
+ *   ③ 使用者按「確認」→ 把那個元素**整組重放**（mousedown → mouseup → click），
+ *      這一次 confirm() 直接回 true
+ *   ④ 按「取消」→ 什麼都不做
+ *
+ * ⚠️ 為什麼要重放整組而不是只 click()：
+ *    設定頁有幾顆刪除鈕掛的是 **onmousedown**（locMatDel、tlDelParent），
+ *    只補一個 click 事件它們不會被觸發。
+ * ⚠️ 找不到觸發元素時（例如從 console 呼叫）→ **退回瀏覽器原本的 confirm**，
+ *    絕對不會讓一個動作變成「按了沒反應」。
+ */
+(function () {
+  var W = window;
+  if (W.__cfmDlg) return;
+  W.__cfmDlg = true;
+
+  var NATIVE = W.confirm;            // 退路：找不到觸發元素時用原本的
+  var curEl = null;                  // 現在正在處理的那個元素
+  var armed = null;                  // 已按過「確認」、等著重放的那一次
+
+  ['pointerdown', 'mousedown', 'click'].forEach(function (evt) {
+    document.addEventListener(evt, function (e) {
+      var t = e.target;
+      curEl = (t && t.closest)
+        ? (t.closest('button,a,[onclick],[onmousedown],[role="button"]') || t)
+        : t;
+    }, true);
+  });
+
+  var ov = null;
+  function build() {
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.id = '__cfm';
+    ov.className = 'no-print';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
+      'background:rgba(15,23,42,.55);padding:20px;' +
+      'font-family:"Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:16px;max-width:360px;width:100%;' +
+        'box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden">' +
+      '<div style="padding:22px 22px 18px">' +
+        '<div style="font-size:26px;text-align:center;margin-bottom:10px">⚠️</div>' +
+        '<div id="__cfm-msg" style="font-size:15px;line-height:1.8;color:#15202b;text-align:center;' +
+          'font-weight:700;word-break:break-word;white-space:pre-wrap"></div>' +
+      '</div>' +
+      '<div style="display:flex;border-top:1px solid #e5e7eb">' +
+        '<button type="button" id="__cfm-no" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#374151;font:700 15px/1 inherit;cursor:pointer;border-right:1px solid #e5e7eb">取消</button>' +
+        '<button type="button" id="__cfm-yes" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#dc2626;font:700 15px/1 inherit;cursor:pointer">確認</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function close() {
+    if (!ov) return;
+    ov.style.display = 'none';
+    document.removeEventListener('keydown', onKey, true);
+  }
+  var onYesFn = null;
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'Enter') { e.preventDefault(); close(); if (onYesFn) onYesFn(); }
+  }
+
+  function ask(msg, onYes) {
+    var o = build();
+    o.querySelector('#__cfm-msg').textContent = msg;
+    o.style.display = 'flex';
+    onYesFn = onYes;
+    var yes = o.querySelector('#__cfm-yes'), no = o.querySelector('#__cfm-no');
+    /* 換成新節點，舊的事件不會疊上來 */
+    var y = yes.cloneNode(true), n = no.cloneNode(true);
+    yes.parentNode.replaceChild(y, yes);
+    no.parentNode.replaceChild(n, no);
+    y.addEventListener('click', function (e) { e.stopPropagation(); close(); onYes(); });
+    n.addEventListener('click', function (e) { e.stopPropagation(); close(); });
+    document.addEventListener('keydown', onKey, true);
+    try { n.focus(); } catch (e) {}
+  }
+
+  /* 整組重放：有些刪除鈕掛的是 onmousedown，只發 click 不會動 */
+  function replay(el) {
+    var opt = { bubbles: true, cancelable: true, view: W };
+    ['mousedown', 'mouseup'].forEach(function (t) {
+      try { el.dispatchEvent(new MouseEvent(t, opt)); } catch (e) {}
+    });
+    try { el.click(); } catch (e) {}
+  }
+
+  W.confirm = function (msg) {
+    var m = String(msg == null ? '' : msg);
+    if (armed && armed.msg === m && armed.el === curEl) { armed = null; return true; }
+    var el = curEl;
+    /* 不是使用者按出來的（console、計時器…）→ 退回瀏覽器原本的，不能讓動作卡住 */
+    if (!el || !el.dispatchEvent) return NATIVE.call(W, m);
+    ask(m, function () {
+      armed = { msg: m, el: el };
+      replay(el);
+      armed = null;
+    });
+    return false;
+  };
+  W.__cfmNative = NATIVE;            // 測試／除錯用得到
+})();
+</script>
 </body>
 </html>

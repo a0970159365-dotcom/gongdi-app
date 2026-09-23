@@ -1,15 +1,15 @@
 {
-  "version": "2026-09-17.1",
-  "updated": "2026-09-18",
+  "version": "2026-09-23.1",
+  "updated": "2026-09-23",
   "critical": [
     "cdr",
-    "cdr_pm"
+    "cdr_pm",
+    "dtp",
+    "dtp_pm"
   ],
   "note": "v2（5 App 版）自己的公告板 — 與根目錄 version.json 完全獨立，兩套各自跳各自的更新橫幅。各 App 開機時抓 ../version.json 比對自己的 APP_VERSION，不一致就跳「系統已更新」橫幅。critical 陣列裡列到的 App 會跳紅色「重要更新」橫幅且不給關閉——只有改到「資料怎麼寫進 Firebase」的更新才列進去；純畫面／文字／單頁修正不要列。paths 欄位給 000_Agent/scripts/check-version.js 用（有 paths 就照它檢查，沒有就用內建的 4 支舊版路徑）。",
   "pendingNote": "🚨 pending ＝『本機檔案已經改成這個版本，但還沒推上線』。apps 那一區永遠只能是**線上那支檔案裡**的版本號，先改的話所有人會跳假的『系統已更新』橫幅、按了更新又拿到同一份舊版。推上線時才把 pending 的值搬到 apps、並把該項從 pending 移除。這一區也讓『哪幾支還沒推』變成程式讀得到、測試查得到的狀態，不再只存在記憶檔裡（2026-09-04 的 portal 就是因為只有記憶檔記著，差點推錯）。",
-  "pending": {
-    "portal": "2026-09-14.1"
-  },
+  "pending": {},
   "paths": {
     "portal": "portal/index.html",
     "cdr": "cdr-mm/index.html",
@@ -19,11 +19,11 @@
     "sop": "sop/index.html"
   },
   "apps": {
-    "portal": "2026-09-03.12",
-    "cdr": "2026-09-17.1",
-    "cdr_pm": "2026-09-17.1",
-    "dtp": "2026-09-11.1",
-    "dtp_pm": "2026-09-11.1",
-    "sop": "2026-09-11.1"
+    "portal": "2026-09-23.1",
+    "cdr": "2026-09-23.1",
+    "cdr_pm": "2026-09-23.1",
+    "dtp": "2026-09-23.1",
+    "dtp_pm": "2026-09-23.1",
+    "sop": "2026-09-23.1"
   }
 }

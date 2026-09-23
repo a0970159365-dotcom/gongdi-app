@@ -7,8 +7,10 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-17.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<!-- 照片「下載全部」用（2026-09-17 從專案管理搬過來）：檔名＝施作位置_施工項目_YYMMDD_序號，不分資料夾。載不到時只是該按鈕停用，不影響其他功能。 -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{--primary:#14532d;--primary-l:#15803d;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f0f7f2;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -31,6 +33,38 @@ nav{background:var(--primary);min-height:54px;display:flex;align-items:center;pa
 .set-tab.on{background:#fff;color:var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .set-2col{display:grid;gap:18px}
 @media(min-width:900px){.set-2col{grid-template-columns:1fr 1fr;align-items:start}}
+/* ── 設定頁四步引導（2026-09-18 她選甲，跟 cdr-pm 同一套樣式）── */
+.wiz{display:flex;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:0}
+.wiz-s{flex:1 1 150px;min-width:0;padding:9px 12px;background:var(--bg);border-right:1px solid var(--border);
+  display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-family:inherit;text-align:left;border-top:none;border-bottom:none;border-left:none}
+.wiz-s:last-child{border-right:none}
+.wiz-s:hover:not(.on){background:#e8edf3}
+.wiz-s.on{background:var(--primary);color:#fff}
+.wiz-s.done{background:#e3f0e8}
+.wiz-s .n{flex:0 0 20px;height:20px;border-radius:50%;background:#fff;color:var(--muted);
+  font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.wiz-s.on .n{background:#fff;color:var(--primary)}
+.wiz-s.done .n{background:#2e6b4a;color:#fff}
+.wiz-s .t{min-width:0}
+.wiz-s .t b{display:block;font-size:13px;font-weight:700;line-height:1.4}
+.wiz-s .t span{font-size:11.5px;opacity:.75}
+.wiz-s.on .t span{color:#fff;opacity:.85}
+.cfg-step{border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:15px;background:#fff}
+.wiz-nav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:14px;
+  padding-top:14px;border-top:1px solid var(--border)}
+/* 六支統一的同步列（2026-09-23 她選 B）—— 一行講完，不佔版面 */
+.sync-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;
+  border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin-top:12px}
+.sync-row-lb{font-size:13px;font-weight:700;color:#374151;white-space:nowrap}
+.sync-row-txt{font-size:13px;color:#6b7280;flex:1;min-width:90px}
+.sync-row-txt.ok{color:#15803d;font-weight:700}
+.sync-row-txt.err{color:#b91c1c;font-weight:700}
+.sync-row-btn{font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  background:#fff;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;padding:5px 13px}
+.sync-row-btn:hover{background:#eff6ff}
+.sync-row-btn:disabled{opacity:.5;cursor:not-allowed}
+.autosave-tag{font-size:12px;color:var(--muted);align-self:center;white-space:nowrap}
+.autosave-tag.on{color:#2e6b4a;font-weight:700}
 .page{display:none}.page.active{display:block}
 .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px}
 .card-header{padding:12px 16px;border-bottom:1px solid var(--bg);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -149,6 +183,10 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .carry-noneS{background:#fef3c7;border:1.5px solid var(--warning);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;font-weight:700;color:#92400e;text-align:center}
 .carry-noneS-sub{font-weight:400;font-size:12px;margin-top:4px;color:#92400e}
 @media(max-width:560px){.cal-cell{min-height:34px;font-size:13px}.cal-n{font-size:9px}}
+/* 電腦版日曆壓扁（2026-09-17 她指定）：正方形格子在寬螢幕上一格快 100px 高，
+   整個月曆被撐到約 520px，下方當天的日報被擠出畫面。改成固定高度，同一個畫面看得到日報。
+   只動日曆頁的 #cal-grid —— 手機版（≤560px）維持正方形，帶入視窗的小月曆也不受影響。 */
+@media(min-width:561px){#cal-grid .cal-cell{aspect-ratio:auto;height:52px;min-height:0}}
 /* 分組抬頭（2026-09-02 用戶指定：專案管理案場當抬頭、瑪摩日期當抬頭）*/
 .grp-bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .grp-bar .sp{flex:1 1 auto}
@@ -182,7 +220,86 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .mat-suggest{font-size:10px;color:var(--accent,#b45309);background:#fef3c7;border-radius:3px;padding:1px 5px;flex-shrink:0;font-weight:700}
 /* 修 1（2026-09-17）：雲端還沒抓回來 → 儲存鈕看起來不能按（按了會提示請稍候） */
 body.cloud-syncing [onclick^="saveReport"],body.cloud-syncing [onclick^="saveSettings"]{opacity:.45;cursor:progress}
+/* ── 案件明細（2026-09-18）── 狀態徽章沿用「進度表—圖面管理」那 9 種顏色，兩支看起來一致 */
+.det-sec{font-size:12px;font-weight:800;color:var(--primary);margin:6px 0 4px}
+.st-chip{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.w0-split{font-weight:400;color:var(--muted);font-size:11px;margin-left:3px}
+.who-tag{font-size:11px;font-weight:700;color:#fff;background:var(--primary-l);border-radius:99px;padding:1px 8px;margin-left:7px;vertical-align:2px}
+.ctbl select[data-f="status"]{font-weight:700}
+.st-pick{border-radius:5px}
+.st-進行中{background:#dbeafe;color:#1d4ed8}
+.st-送審中{background:#fef3c7;color:#b45309}
+.st-已下單{background:#fed7aa;color:#c2410c}
+.st-報價中{background:#cffafe;color:#0e7490}
+.st-已完成{background:#dcfce7;color:#15803d}
+.st-待確認{background:#f1f5f9;color:#475569}
+.st-已定案{background:#166534;color:#fff}
+.st-暫停卡關{background:#fecaca;color:#991b1b}
+.st-恢復啟動{background:#bbf7d0;color:#15803d}
 .tl-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+/* 設定頁「3. 材料」的兩欄（2026-09-20 她指定：兩邊清單要在同一條水平線上，
+   右欄上方留白沒關係）。左欄標題底下有一段說明，右欄沒有 → 清單會高低不齊。
+   作法：右欄放一份**一模一樣的文字但隱藏起來**當墊片，不管視窗多寬、文字折幾行，
+   兩邊的清單一定對齊（用 visibility 不是 display，才佔得住高度）。
+   欄寬 3:2 —— 左欄每列多一個單位下拉，本來就需要比較寬。 */
+/* ── 設定頁第 2 步：左邊施作位置，右邊三個分頁（2026-09-20 她指定的版面）──
+   分頁順序：① 施工項目 → ② 材料單位（全公司共用） → ③ 材料名稱。
+   所有標題列固定同高（--cfgh），左右視線才在同一條線上 —— 她回報「擺放不協調」就是這裡。 */
+:root{--cfgh:34px}
+.loc-lay{display:grid;gap:12px;align-items:start}
+@media(min-width:820px){.loc-lay{grid-template-columns:225px 1fr}}
+.loc-rail{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+.loc-rail .rh{display:flex;justify-content:space-between;align-items:center;gap:8px;height:var(--cfgh);
+  padding:0 10px;background:var(--bg);border-bottom:1px solid var(--border);font-size:12.5px;font-weight:700;color:var(--muted)}
+.loc-rail .rlist{max-height:268px;overflow:auto}
+.loc-rail button.loc-i{display:block;width:100%;text-align:left;border:none;border-top:1px solid var(--border);
+  background:#fff;color:var(--text);font:inherit;font-size:12.5px;padding:7px 10px;cursor:pointer}
+.loc-rail button.loc-i:first-child{border-top:none}
+.loc-rail button.loc-i:hover:not(.on){background:#e8edf3}
+.loc-rail button.loc-i.on{background:var(--primary);color:#fff}
+.loc-rail button.loc-i b{display:block;font-weight:700;line-height:1.45;overflow-wrap:anywhere}
+.loc-rail button.loc-i em{font-style:normal;font-size:10.5px;opacity:.75;display:flex;gap:5px;margin-top:1px}
+.loc-rail button.loc-i em i{font-style:normal;background:rgba(0,0,0,.06);border-radius:5px;padding:0 5px}
+.loc-rail button.loc-i.on em i{background:rgba(255,255,255,.22)}
+.loc-rail .empty-rail{padding:12px 10px;font-size:12px;color:var(--muted);line-height:1.6}
+.loc-main{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;min-width:0}
+.loc-head{display:flex;gap:8px;align-items:center;height:var(--cfgh);padding:0 10px;
+  background:var(--bg);border-bottom:1px solid var(--border)}
+.loc-head input{flex:1;min-width:0;font:inherit;font-size:13.5px;font-weight:700;padding:4px 8px;
+  border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--text)}
+.loc-tabs{display:flex;background:var(--bg);border-bottom:1px solid var(--border)}
+.loc-tabs button{flex:1;height:var(--cfgh);border:none;border-right:1px solid var(--border);background:transparent;
+  font:inherit;font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;min-width:0}
+.loc-tabs button:last-child{border-right:none}
+.loc-tabs button.on{background:var(--primary);color:#fff}
+.loc-tabs button .b{font-size:10.5px;background:rgba(0,0,0,.07);border-radius:999px;padding:0 6px}
+.loc-tabs button.on .b{background:rgba(255,255,255,.25)}
+.loc-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;
+  border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted)}
+.loc-pane{padding:10px 11px}
+.loc-row{display:grid;grid-template-columns:18px 1fr 30px;gap:6px;align-items:center;margin-bottom:5px}
+.loc-row.mat{grid-template-columns:18px 1fr 84px 30px}
+.loc-row .list-num{font-size:10.5px;color:var(--muted);text-align:center;background:none;width:auto;height:auto;border-radius:0}
+.loc-row input[type=text]{font:inherit;font-size:12.5px;padding:4px 8px;border:1px solid var(--border);
+  border-radius:6px;background:#fff;color:var(--text);min-width:0;width:100%}
+.loc-sub{display:grid;grid-template-columns:18px 1fr 84px 30px;gap:6px;align-items:center;
+  margin-bottom:6px;font-size:11.5px;color:var(--muted);font-weight:700}
+.loc-none{font-size:12px;color:var(--muted);padding:4px 0 8px}
+/* 材料那一列的單位：按下去跳出共用單位清單讓她挑（2026-09-20 她選甲） */
+.unit-pick{position:relative}
+.unit-pick .u{display:block;width:100%;font:inherit;font-size:12px;border:1px solid var(--border);border-radius:6px;
+  padding:4px 6px;text-align:center;background:var(--bg);color:var(--text);cursor:pointer;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 2026-09-21：單位選單改成就地展開的一列（原本是絕對定位，會被 .loc-main 的 overflow 裁掉） */
+.unit-open{border:1px dashed var(--border);border-radius:8px;background:var(--bg);padding:8px 9px;margin:-1px 0 8px 24px}
+.unit-open b{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:700}
+.scope-arw{border:none;background:none;font:inherit;cursor:pointer;padding:0 2px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips .chip{border:1px solid var(--border);background:#fff;border-radius:999px;padding:2px 10px;
+  font-size:11.5px;cursor:pointer;color:var(--text)}
+.chips .chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.chips .chip.none{color:var(--muted)}
 .tl-group{border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#fff;overflow:hidden}
 .tl-head{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#f8fafc;border-bottom:1px solid var(--border)}
 .tl-group.collapsed .tl-head{border-bottom:none}
@@ -190,6 +307,15 @@ body.cloud-syncing [onclick^="saveReport"],body.cloud-syncing [onclick^="saveSet
 .tl-head>input:focus{outline:2px solid var(--primary-l);border-color:var(--primary-l)}
 .tl-toggle{background:none;border:none;cursor:pointer;font-size:12px;color:var(--muted);padding:3px 5px;line-height:1}
 .tl-count{font-size:11px;color:var(--muted);white-space:nowrap;font-weight:600}
+/* ③ 廠商：卡片並排（2026-09-20 她回報「頁面拉太長」，指定三欄）──
+   一家廠商一張卡片，視窗寬就三欄、中等兩欄、手機一欄；人員多的卡片自己捲。 */
+#vendor-groups{display:grid;gap:10px;align-items:start}
+@media(min-width:620px){#vendor-groups{grid-template-columns:1fr 1fr}}
+@media(min-width:900px){#vendor-groups{grid-template-columns:1fr 1fr 1fr}}
+#vendor-groups .tl-group{margin-bottom:0;min-width:0}
+#vendor-groups .tl-body{max-height:260px;overflow:auto}
+.tl-no{flex:0 0 18px;height:18px;border-radius:50%;background:var(--primary);color:#fff;
+  font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .tl-body{padding:8px 9px 9px}
 .tl-group.collapsed .tl-body{display:none}
 .tl-body .list-row{margin-bottom:4px}
@@ -228,6 +354,8 @@ body.cloud-syncing [onclick^="saveReport"],body.cloud-syncing [onclick^="saveSet
 .toast{background:#0f172a;color:#fff;padding:9px 15px;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:7px;max-width:300px;animation:ti .25s ease}
 .toast-s{background:var(--success)}.toast-e{background:var(--danger)}
 @keyframes ti{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
+.empty-t{font-size:15px;font-weight:700;color:var(--text);line-height:1.7;margin-bottom:6px}
+.empty-s{font-size:13px;color:var(--muted);line-height:1.85;max-width:44em;margin:0 auto}
 .empty{text-align:center;padding:36px 20px;color:var(--muted)}
 .empty-icon{font-size:44px;margin-bottom:10px}
 .empty h3{font-size:15px;color:var(--text);margin-bottom:5px}
@@ -301,6 +429,16 @@ input[type="file"]{display:none}
   @media print{#pv-bar{display:none!important}}
 /* ==PRINT-PREVIEW-END== */
 @media screen{.print-header{display:none}.pv{display:none}}
+/* 摘要段落開關與材料挑選（2026-09-22 她交辦）—— 掛 .no-print，列印與列印預覽都不出現 */
+.sum-seg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:9px 11px;background:var(--bg);border-radius:8px;margin-bottom:8px}
+.sum-seg-lb{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin-right:2px}
+.sum-pill{font-family:inherit;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#fff;color:var(--muted);border:1.5px solid var(--border);border-radius:999px;padding:5px 12px;transition:border-color .13s,color .13s}
+.sum-pill:hover{border-color:var(--primary-l);color:var(--text)}
+.sum-pill:focus-visible{outline:2px solid var(--primary-l);outline-offset:2px}
+.sum-pill[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+.sum-mk{font-size:10px;opacity:.9}
+.mat-seg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 8px 18px;padding:6px 11px;border-left:2px solid var(--border)}
+.mat-pill[aria-pressed="true"]{background:#166534;border-color:#166534;color:#fff;font-weight:700}
 /* ── 設定維護權（2026-08-17）──
  * 角色沒勾「維護設定」時，body 掛上 .no-mng：設定頁的新增／儲存鈕（data-mng）收起來，
  * 欄位也改不動。用 CSS 而非逐一 style.display 是因為清單會重繪，重繪後規則自動生效。*/
@@ -576,16 +714,64 @@ window._cloudErrBar = (function(){
       <button class="btn btn-o btn-sm no-print" onclick="copySummary()">📋 複製</button>
     </div>
     <div class="card-body">
+      <!-- 摘要段落開關（2026-09-22 她交辦）：目前只有「材料已到貨統計」一顆，其餘固定顯示 -->
+      <div class="sum-seg no-print" id="sum-seg" role="group" aria-label="要顯示哪些段落">
+        <span class="sum-seg-lb">顯示段落</span>
+      </div>
+      <!-- 統計要列哪些材料：那顆關掉時整排收起來 -->
+      <div class="mat-seg no-print" id="mat-seg" role="group" aria-label="材料已到貨統計要列哪些材料">
+        <span class="sum-seg-lb">要列哪些材料</span>
+      </div>
       <textarea id="f-summary" class="fi summary-box" rows="4" readonly placeholder="— 請先在下方施工明細新增工項，摘要將自動生成 —"></textarea>
       <p style="font-size:11px;color:var(--muted);margin-top:5px">* 自動從施工明細生成，點「複製」後可直接貼入電子郵件</p>
       <div class="pv" id="f-summary-pv"></div>
     </div>
   </div>
 
-  <!-- 施工明細 -->
+  <!-- 案件明細（內部同仁）：2026-09-18 她交辦。放在施工明細（廠商）上方（她指定）。
+       欄位照她列的：# 狀態 施作位置 施工項目 施工說明 今日廠商 施工人員 今日出工 完成進度% 備註，
+       另加「填表人」（逐列鎖靠它判斷誰能改，她確認要加）。
+       跟施工明細的差別：多了狀態，沒有明日廠商／明日施工人員／明日出工／異常類型。 -->
   <div class="card">
     <div class="card-header">
-      <span class="card-title">施工明細</span>
+      <span class="card-title">案件明細<span class="who-tag">內部同仁</span></span>
+      <button id="add-case-btn" class="btn btn-a btn-sm no-print" onclick="addCaseBtn()">＋ 新增案件</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="wtbl ctbl">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th style="min-width:104px">狀態</th>
+            <th style="min-width:90px">施作位置</th>
+            <th style="min-width:100px">施工項目</th>
+            <th style="min-width:130px">施工說明</th>
+            <th style="min-width:88px">今日廠商</th>
+            <th style="min-width:88px">施工人員</th>
+            <th style="width:48px">今日<br>出工</th>
+            <th style="width:64px">完成<br>進度%</th>
+            <th style="min-width:110px">備註</th>
+            <th style="width:76px">填表人</th>
+            <th class="no-print" style="width:30px">刪</th>
+          </tr>
+        </thead>
+        <tbody id="case-tbody"></tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="7" style="text-align:right;padding-right:10px">合計</td>
+            <td id="case-tot-today">0</td>
+            <td colspan="4"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="case-empty" class="tl-empty no-print" style="margin:10px 14px">還沒有案件明細，點右上角「＋ 新增案件」</div>
+  </div>
+
+  <!-- 施工明細（廠商）-->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">施工明細<span class="who-tag">廠商</span></span>
       <button id="add-row-btn" class="btn btn-a btn-sm no-print" onclick="addRowBtn()">＋ 新增工項</button>
     </div>
     <div class="tbl-wrap">
@@ -639,6 +825,8 @@ window._cloudErrBar = (function(){
         <thead>
           <tr>
             <th style="width:28px">#</th>
+            <!-- 2026-09-20 她拍板：材料掛在施作位置底下 → 先選位置，材料下拉只剩這個位置的 -->
+            <th style="width:130px">施作位置</th>
             <th style="min-width:140px">材料名稱</th>
             <th style="width:80px">數量</th>
             <th style="width:80px">單位</th>
@@ -681,22 +869,21 @@ window._cloudErrBar = (function(){
   <div class="card">
     <div class="card-header">
       <span class="card-title">施工照片</span>
-      <div class="flex gap2 no-print">
-        <select id="ph-phase" class="fi" style="max-width:90px;padding:5px 7px;font-size:12px">
-          <option value="before">施工前</option>
-          <option value="during">施工中</option>
-          <option value="after">施工後</option>
+      <!-- 2026-09-17 她指定：「施工前／中／後」換成「位置｜項目」，與專案管理同一套
+           （線上 29 張全是預設的「施工前」＝沒人在用）。舊照片的 phase 欄位留在資料裡不刪，只是不再顯示。 -->
+      <div class="flex gap2 no-print" style="flex-wrap:wrap;justify-content:flex-end">
+        <select id="ph-work" class="fi" style="max-width:250px;padding:5px 7px;font-size:12px" title="照片要掛在哪一項施工項目底下">
+          <option value="">— 請先在上方新增工項 —</option>
         </select>
         <button class="btn btn-o btn-sm" onclick="$('ph-input').click()">📷 上傳</button>
+        <button class="btn btn-o btn-sm" onclick="downloadPhotosZip()">⬇️ 下載全部</button>
       </div>
     </div>
     <div class="card-body">
       <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
-      <div class="photo-grid" id="ph-grid">
-        <div class="upload-btn no-print" onclick="$('ph-input').click()">
-          <span style="font-size:22px">📷</span><span>點擊上傳照片</span>
-        </div>
-      </div>
+      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／日期」四層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_日期_序號」。</div>
+      <div id="ph-tree"></div>
+      <div id="ph-empty" class="tl-empty no-print" style="margin-top:6px">尚無照片，選好工項後點「📷 上傳」</div>
     </div>
   </div>
 
@@ -991,17 +1178,14 @@ window._cloudErrBar = (function(){
     </div>
     <div class="card-body">
 
-      <!-- 兩大部份（2026-08-30 用戶指定：原本四個群組一路往下堆太長，比照查檢表設定頁的作法）。
-           順序：案場與材料在左（預設），施工與廠商在右（2026-08-30 用戶第二次指定）。
-           每個群組原本各掛一顆「儲存」（連頂部底部共 6 顆）→ 收成頂部＋底部各一顆。 -->
-      <div class="set-tabs" data-set-tabs>
-        <button id="set-tab-base" class="set-tab on" onclick="setCfgPart('base')">🏗️ 案場與材料</button>
-        <button id="set-tab-work" class="set-tab" onclick="setCfgPart('work')">🔧 施工與廠商</button>
-      </div>
+      <!-- 四步引導（2026-09-18 她看過示意圖後選「甲」，跟專案管理同一套）。
+           原本是「案場與材料」／「施工與廠商」兩個頁籤 —— 案場和材料沒關係卻並排在一起，
+           也看不出「還有哪一步沒設」。順序：① 案場 → ② 施工與廠商 → ③ 材料 → ④ 狀態。
+           前三步是「建資料庫」，第四步是案件明細要用的狀態清單。 -->
+      <div class="wiz" id="cfg-wiz"></div>
 
-      <!-- 第 1 部份：案場與材料 -->
-      <div id="set-part-base">
-        <div class="set-2col">
+      <!-- ① 案場 -->
+      <div id="cfg-step-1" class="cfg-step">
           <div class="fg">
             <div class="flex-b mb2">
               <label class="fl" style="margin:0">案場（專案／工地）</label>
@@ -1026,59 +1210,80 @@ window._cloudErrBar = (function(){
               <h3 style="font-size:13px">尚無案場，點「＋ 新增」建立</h3>
             </div>
           </div>
-          <div class="fg">
-            <!-- 材料名稱（每列一個預設單位）＋ 單位清單
-                 2026-09-03 用戶指定：「瑪摩工程的材料區設定，改成和專案管理一樣」。
-                 專案管理那支同一天已改回 09-02.2 的做法（兩層太多工）。 -->
-            <div class="g g2" style="gap:16px;align-items:start">
-              <div class="fg">
-                <div class="flex-b mb2"><label class="fl" style="margin:0">材料名稱</label><button class="btn btn-a btn-sm" data-mng onclick="addMatNameRow()">＋ 新增</button></div>
-                <p class="tl-hint" style="margin-bottom:6px">右邊選這個材料的<b>預設單位</b>：填日報時選了名稱，單位會自動帶入；沒填單位的舊資料，材料統計也會照這個歸戶。標「建議」的是照過去用最多的單位先選好，按「💾 儲存設定」才會生效。</p>
-                <div class="list-field" id="lf-matnames"></div>
-              </div>
-              <div class="fg">
-                <div class="flex-b mb2"><label class="fl" style="margin:0">單位</label><button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-matunits')">＋ 新增</button></div>
-                <div class="list-field" id="lf-matunits"></div>
-              </div>
+          <!-- 部門與使用者改由入口網頁集中管理（原本掛在「③ 材料」那一步，
+               2026-09-20 材料併進第 2 步之後，改放在第 1 步「案場」底下） -->
+          <div id="portal-note" style="margin-top:18px;background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
+            ℹ️ <strong>部門與使用者管理已移至入口網頁集中管理</strong><br>
+            如需新增/編輯部門、員工、權限角色，請至
+            <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
+          </div>
+      </div><!-- /#cfg-step-1 -->
+
+      <!-- ② 施作位置：一個位置一頁設完（2026-09-20 她拍板，兩支同一套）
+           左邊挑位置，右邊左欄是它的施工項目、右欄是它的材料與單位。 -->
+      <div id="cfg-step-2" class="cfg-step" style="display:none">
+        <div class="tl-hint">左邊選一個施作位置，右邊三個分頁設定它的內容：① 施工項目 → ② 材料單位（全公司共用） → ③ 材料名稱。日報填寫時選了施作位置，施工項目與材料就只會出現這個位置底下的選項。</div>
+        <div class="loc-lay">
+          <div class="loc-rail">
+            <div class="rh"><span id="loc-rail-title">施作位置</span>
+              <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增</button></div>
+            <div class="rlist" id="loc-rail"></div>
+          </div>
+          <div class="loc-main">
+            <div class="loc-head" id="loc-head"></div>
+            <div class="loc-tabs" id="loc-tabs"></div>
+            <div class="loc-bar" id="loc-bar"></div>
+            <!-- 三個分頁的內容。單位那一頁是全公司共用的清單，
+                 ⚠️ 它一定要一直留在 DOM 裡（只是隱藏）—— 存檔時 readListField 要讀得到，
+                    不然切到別的分頁按儲存就會把單位清單清空。 -->
+            <div class="loc-pane" id="loc-pane-work"></div>
+            <div class="loc-pane" id="loc-pane-unit" style="display:none">
+              <div class="list-field" id="lf-matunits"></div>
+              <p class="tl-hint" style="margin:8px 0 0">這些單位會出現在「③ 材料名稱」那一頁的選單裡；改動全公司共用，在哪個施作位置編輯都一樣。</p>
             </div>
-            <!-- 部門與使用者改由入口網頁集中管理 -->
-            <div style="margin-top:18px;background:#eef6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;color:#1e40af;font-size:13px;line-height:1.6">
-              ℹ️ <strong>部門與使用者管理已移至入口網頁集中管理</strong><br>
-              如需新增/編輯部門、員工、權限角色，請至
-              <a href="../portal/index.html" style="color:#1d4ed8;font-weight:700;text-decoration:underline">石御石材工程管理系統入口</a> → ⚙️ 設定
-            </div>
+            <div class="loc-pane" id="loc-pane-mat" style="display:none"></div>
           </div>
         </div>
-      </div>
+      </div><!-- /#cfg-step-2 -->
 
-      <!-- 第 2 部份：施工與廠商 —— 日報填寫時那兩組連動下拉的來源 -->
-      <div id="set-part-work" style="display:none">
-        <div class="set-2col">
-          <!-- 施作位置 → 施工項目（兩層） -->
-          <div class="fg">
-            <div class="flex-b mb2">
-              <label class="fl" style="margin:0">施作位置 ／ 施工項目</label>
-              <button class="btn btn-a btn-sm" data-mng onclick="addLocGroup()">＋ 新增施作位置</button>
-            </div>
-            <div class="tl-hint">先建立施作位置，再點開它加入底下的施工項目。日報填寫時選了施作位置，施工項目就只會出現該位置底下的選項。</div>
-            <div id="loc-groups"></div>
+      <!-- ③ 廠商 ／ 施工人員（2026-09-20 從第 2 步獨立出來） -->
+      <div id="cfg-step-3" class="cfg-step" style="display:none">
+        <div class="flex-b mb2">
+          <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
+          <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
+        </div>
+        <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
+        <div id="vendor-groups"></div>
+      </div><!-- /#cfg-step-3 -->
+
+      <!-- ④ 狀態（案件明細用，2026-09-18 她交辦）：預設沿用進度表—圖面管理那 9 種，
+           但兩邊各管各的（她選甲）—— 在這裡新增或刪除，不會影響進度表。 -->
+      <div id="cfg-step-4" class="cfg-step" style="display:none">
+        <div class="fg">
+          <div class="flex-b mb2">
+            <label class="fl" style="margin:0">🏷️ 狀態（案件明細用）</label>
+            <button class="btn btn-a btn-sm" data-mng onclick="addListRow('lf-statuses')">＋ 新增</button>
           </div>
-          <!-- 廠商 → 施工人員（兩層） -->
-          <div class="fg">
-            <div class="flex-b mb2">
-              <label class="fl" style="margin:0">廠商 ／ 施工人員</label>
-              <button class="btn btn-a btn-sm" data-mng onclick="addVendorGroup()">＋ 新增廠商</button>
-            </div>
-            <div class="tl-hint">先建立廠商，再點開它加入該廠商的施工人員。日報填寫時選了廠商，施工人員就只會出現該廠商底下的人。</div>
-            <div id="vendor-groups"></div>
-          </div>
+          <div class="tl-hint">案件明細那張表的「狀態」下拉會列出這裡的項目。第一次打開就是進度表那 9 種；
+            自己新增的狀態沒有預設顏色，會顯示成灰色。刪掉某個狀態，舊日報上已經選過的字照樣保留。</div>
+          <div id="lf-statuses" class="list-field"></div>
+        </div>
+      </div><!-- /#cfg-step-4 -->
+
+      <!-- 底部：上一步／下一步 ＋ 保險用的手動儲存（切換步驟本來就會自動存） -->
+      <div class="wiz-nav">
+        <button class="btn btn-o" id="wiz-prev" onclick="cfgStepGo(-1)">‹ 上一步</button>
+        <div class="flex gap2">
+          <span id="cfg-autosave" class="autosave-tag"></span>
+          <button class="btn btn-p btn-sm" data-mng onclick="saveSettings()">💾 儲存設定</button>
+          <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
+          <button class="btn btn-a" id="wiz-next" onclick="cfgStepGo(1)">下一步 ›</button>
         </div>
       </div>
-
-      <!-- 底部按鈕 -->
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <button class="btn btn-p" data-mng onclick="saveSettings()">💾 儲存設定</button>
-        <button class="btn btn-o" style="margin-left:8px" onclick="backToPortal()">🏠 返回主系統</button>
+      <div id="sync-row" class="sync-row no-print">
+        <span class="sync-row-lb">☁️ 同步狀態</span>
+        <span id="sync-row-text" class="sync-row-txt">— 尚未同步</span>
+        <button type="button" id="sync-row-btn" class="sync-row-btn" onclick="syncNowUnified()">立即同步</button>
       </div>
 
     </div>
@@ -1124,7 +1329,9 @@ window._cloudErrBar = (function(){
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
         <input type="checkbox" id="carry-notes" checked> 備註事項</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-work" checked> 施工明細</label>
+        <input type="checkbox" id="carry-case" checked> 案件明細（內部同仁）<span style="color:var(--muted)">（出工歸零）</span></label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-work" checked> 施工明細（廠商）<span style="color:var(--muted)">（出工歸零）</span></label>
     </div>
 
     <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
@@ -1211,7 +1418,7 @@ const ymd = (d) => {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 };
 const today = () => ymd();
-let rowN = 0, matN = 0;
+let rowN = 0, matN = 0, caseN = 0;
 let editProjId = null, editUserId = null, viewPhIdx = -1;
 
 const S = {
@@ -1231,6 +1438,7 @@ const S = {
     staffByVendor: {},
     matNames: [],
     matUnits: [],
+    statuses: [],        // 案件明細的狀態清單（空的＝用 CASE_STATUS_DEFAULT）
     matUnitMap: {},      // { 材料名稱: 預設單位 }（2026-09-03，跟專案管理一致）
     users: []
   },
@@ -1263,7 +1471,7 @@ function newSubmissionId(){
 function stampSubmission(rep){
   const me = (S.user && S.user.name) || '', dept = (S.user && S.user.dept) || '';
   const sid = newSubmissionId(), at = new Date().toISOString();
-  ['workItems','materials'].forEach(k => {
+  ['workItems','caseItems','materials'].forEach(k => {
     (rep[k]||[]).forEach(row => {
       if(!row) return;
       if(!row.owner) row.owner = me;      // 沒主人的舊列＝我現在填的
@@ -1282,6 +1490,7 @@ function reportDepts(r){
   const push = d => { d = String(d||'').trim(); if(d && out.indexOf(d) < 0) out.push(d); };
   push(r && r.dept);
   ((r && r.workItems)||[]).forEach(wi => push(wi && wi.subDept));
+  ((r && r.caseItems)||[]).forEach(ci => push(ci && ci.subDept));
   ((r && r.materials)||[]).forEach(m => push(m && m.subDept));
   return out;
 }
@@ -1300,7 +1509,7 @@ function reportHasDept(r, dept){ return !dept || reportDepts(r).indexOf(dept) >=
  * 不覆蓋別人已經填好的天氣／注意事項。 */
 function mergeIntoKeyed(target, mine){
   const out = JSON.parse(JSON.stringify(target));
-  ['workItems','materials'].forEach(k => {
+  ['workItems','caseItems','materials'].forEach(k => {
     const have = new Set((out[k]||[]).map(x => x && x.id).filter(Boolean));
     out[k] = out[k] || [];
     (mine[k]||[]).forEach(row => {
@@ -1327,7 +1536,7 @@ function blankReport() {
   return {
     id: uid(), date: today(), dept:'', reporter:'', weather:'',
     projId:'', projName:'',                       // C 批：案場升到報表層
-    workItems: [], materials: [],
+    workItems: [], caseItems: [], materials: [],
     notes: { contact:'', other:'' },
     photos: [], createdAt: new Date().toISOString()
   };
@@ -1663,6 +1872,10 @@ function cfgFromCloud(c){
   var out = Object.assign(_clone(_CFG0) || {}, _clone(c) || {});
   ['projects','users','matNames','matUnits','locs','vendors','depts'].forEach(function(k){ if(!Array.isArray(out[k])) out[k] = (_CFG0 && Array.isArray(_CFG0[k])) ? _clone(_CFG0[k]) : []; });
   ['worksByLoc','staffByVendor','matUnitMap'].forEach(function(k){ if(!_isMap(out[k])) out[k] = {}; });
+  /* 2026-09-20：材料改掛在施作位置底下。雲端還是舊形狀（只有 matNames）時，
+     在這裡就地轉成 matsByLoc，整批放進「未分類」—— 一種材料都不會掉。 */
+  if(!_isMap(out.matsByLoc)) delete out.matsByLoc;
+  migrateMatsByLoc(out);
   return out;
 }
 function showOfflineWarn(){
@@ -1763,8 +1976,30 @@ function hideSyncWarn() {
   var el = document.getElementById('sync-warn');
   if (el) el.style.display = 'none';
 }
+
+/* ══════ 同步列（2026-09-23 她選 B：六支一致）══════
+ * 狀態文字由這支 App 既有的狀態函式順手帶過來，不另外追蹤一份狀態。
+ * 「立即同步」走的是它自己既有、帶防呆的路徑 —— 不是新寫的覆蓋邏輯。 */
+function syncRowSet(state){
+  var t = document.getElementById('sync-row-text');
+  if(!t) return;
+  t.className = 'sync-row-txt' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : '');
+  t.textContent = state === 'ok'     ? '✓ 已同步'
+                : state === 'saving' ? '⏳ 同步中…'
+                : state === 'err'    ? '⚠️ 連線失敗，資料只存在這台'
+                : '— 尚未同步';
+}
+function syncNowUnified(){
+  var b = document.getElementById('sync-row-btn');
+  syncRowSet('saving');
+  if(b) b.disabled = true;
+  try { pushCloud({reports:S.reports, cfg:S.cfg, projSort:S.projSort, updatedAt:Date.now()}); } catch(e){ syncRowSet('err'); }
+  setTimeout(function(){ if(b) b.disabled = false; }, 1500);
+}
 function setSyncIcon(s) {
-  if (s === '☁️✅') hideSyncWarn();          // 只有真的同步成功才把警示條收起來
+  if (s === '☁️✅') hideSyncWarn();
+  /* 設定頁那一行跟著走（2026-09-23） */
+  syncRowSet(s === '☁️✅' ? 'ok' : (String(s).indexOf('❌') > -1 ? 'err' : (String(s).indexOf('同步中') > -1 ? 'saving' : '')));          // 只有真的同步成功才把警示條收起來
   const el=$('sync-icon'); if(el) el.textContent=s;
 }
 
@@ -1888,26 +2123,81 @@ function goPage(p) {
  * 原本四個群組一路往下堆，筆電上要捲很久才看得完，而且每個群組各掛一顆「儲存」
  * （連頂部底部共 6 顆）。改成上方兩顆分頁，一次只看一邊；儲存收成頂部＋底部各一顆。
  * 停在哪一邊記在 localStorage，下次進來維持上次選的。 */
-var _cfgPart = (function(){
-  /* 預設停在左邊那顆「案場與材料」（2026-08-30 用戶指定的順序）；
-     使用者自己切過就記住他的選擇 */
-  try{ var v=localStorage.getItem('cdr_mm_cfg_part'); return (v==='work')?'work':'base'; }
-  catch(e){ return 'base'; }
-})();
-function setCfgPart(p){
-  _cfgPart = (p==='base') ? 'base' : 'work';
-  try{ localStorage.setItem('cdr_mm_cfg_part', _cfgPart); }catch(e){}
+/* ══════ 2026-09-18 改成四步引導（她看過示意圖後選「甲」）══════
+ * 兩個頁籤的問題：案場和材料沒關係卻並排在同一頁，而且看不出「還有哪一步沒設」。
+ * 現在四步 —— ① 案場 → ② 施工與廠商 → ③ 材料 → ④ 狀態，跟專案管理同一套。
+ * 步驟上會顯示目前的數量，設好的那一步打勾；切換步驟會先自動存一次。 */
+var CFG_STEPS = [
+  { n:1, key:'proj',   title:'案場',      sum:function(){ return (S.cfg.projects||[]).length + ' 個'; } },
+  /* 2026-09-20 她拍板：材料併進施作位置（位置 ＞ 施工項目｜材料），廠商獨立一步 */
+  { n:2, key:'loc',    title:'施作位置',   sum:function(){
+      var w=0; (S.cfg.locs||[]).forEach(function(l){ w += ((S.cfg.worksByLoc||{})[l]||[]).length; });
+      return (S.cfg.locs||[]).length + ' 位置 · ' + w + ' 項目 · ' + matAllNames().length + ' 材料'; } },
+  { n:3, key:'vendor', title:'廠商',      sum:function(){
+      var p=0; (S.cfg.vendors||[]).forEach(function(v){ p += ((S.cfg.staffByVendor||{})[v]||[]).length; });
+      return (S.cfg.vendors||[]).length + ' 家 · ' + p + ' 人'; } },
+  { n:4, key:'status', title:'狀態',      sum:function(){ return statusList().length + ' 種'; } },
+];
+var _cfgStep = 1;
+try { _cfgStep = Number(localStorage.getItem('cdr_mm_cfg_step')) || 1; } catch(e){}
+if(!(_cfgStep>=1 && _cfgStep<=4)) _cfgStep = 1;
+
+/* 這一步「算不算已經建好了」—— 給步驟列打勾用 */
+function cfgStepDone(n){
+  if(n===1) return (S.cfg.projects||[]).length > 0;
+  if(n===2) return (S.cfg.locs||[]).length > 0;
+  if(n===3) return (S.cfg.vendors||[]).length > 0;
+  if(n===4) return statusList().length > 0;
+  return false;
+}
+function renderCfgWiz(){
+  var host = $('cfg-wiz'); if(!host) return;
+  host.innerHTML = CFG_STEPS.map(function(st){
+    var on = (st.n === _cfgStep), done = !on && cfgStepDone(st.n);
+    return '<button type="button" class="wiz-s' + (on?' on':'') + (done?' done':'') + '"'
+      + ' onclick="cfgStepTo(' + st.n + ')">'
+      + '<span class="n">' + (done ? '✓' : st.n) + '</span>'
+      + '<span class="t"><b>' + st.n + '. ' + st.title + '</b><span>' + escHtml(st.sum()) + '</span></span>'
+      + '</button>';
+  }).join('');
+}
+/* 切到第 n 步。**離開前先自動存**（跟專案管理一致，免得忘了按儲存） */
+function cfgStepTo(n){
+  if(!(n>=1 && n<=4)) return;
+  if(n !== _cfgStep) autoSaveSettings();
+  _cfgStep = n;
+  try { localStorage.setItem('cdr_mm_cfg_step', String(n)); } catch(e){}
   applyCfgPart();
   window.scrollTo(0,0);
 }
+function cfgStepGo(d){ cfgStepTo(Math.min(4, Math.max(1, _cfgStep + d))); }
 function applyCfgPart(){
-  var isWork = (_cfgPart!=='base');
-  var a=$('set-part-work'), b=$('set-part-base');
-  if(a) a.style.display = isWork ? '' : 'none';
-  if(b) b.style.display = isWork ? 'none' : '';
-  var ta=$('set-tab-work'), tb=$('set-tab-base');
-  if(ta) ta.className = 'set-tab' + (isWork ? ' on' : '');
-  if(tb) tb.className = 'set-tab' + (isWork ? '' : ' on');
+  for(var i=1;i<=4;i++){
+    var el = $('cfg-step-' + i);
+    if(el) el.style.display = (i === _cfgStep) ? '' : 'none';
+  }
+  renderCfgWiz();
+  if(_cfgStep === 1 && typeof renderProjTable === 'function') renderProjTable();
+  var prev = $('wiz-prev'), next = $('wiz-next');
+  if(prev){ prev.style.visibility = (_cfgStep===1) ? 'hidden' : '';
+            prev.textContent = '‹ 上一步：' + ((CFG_STEPS[_cfgStep-2]||{}).title || ''); }
+  if(next){ next.style.visibility = (_cfgStep===4) ? 'hidden' : '';
+            next.textContent = '下一步：' + ((CFG_STEPS[_cfgStep]||{}).title || '') + ' ›'; }
+}
+/* 舊的呼叫端（記憶體裡可能還留著舊版畫面）不要壞掉 */
+function setCfgPart(p){ cfgStepTo(p==='work' ? 2 : 1); }
+/* 切換步驟時安靜地存一次；沒有維護權限、雲端還沒回來、系統上鎖時都跳過不吵人 */
+function autoSaveSettings(){
+  if(cloudGuard(true)) return;
+  if(typeof appLockGuard === 'function' && appLockGuard()) return;
+  if(typeof portalCanManageSettings === 'function' && !portalCanManageSettings()) return;
+  saveSettings(false);
+  var tag = $('cfg-autosave');
+  if(tag){
+    tag.textContent = '✓ 已自動儲存';
+    tag.className = 'autosave-tag on';
+    setTimeout(function(){ if(tag) tag.className = 'autosave-tag'; }, 2500);
+  }
 }
 
 /* ── DATE ── */
@@ -2418,6 +2708,7 @@ function carryApply(){
   const wantMat   = $('carry-mat').checked;
   const wantNotes = $('carry-notes').checked;
   const wantWork  = $('carry-work').checked;
+  const wantCase  = $('carry-case') ? $('carry-case').checked : false;
   closeCarryModal();
 
   _noAutoLoad = true;            // 帶入期間先不要自動載入既有那張（見檔案上方說明）
@@ -2430,9 +2721,17 @@ function carryApply(){
     (src.materials||[]).forEach(m => addMatRow({ ...m, qty:0, id:uid() }));
     brought.push(`材料明細 ${src.materials.length} 筆（數量已歸零）`);
   }
+  /* 2026-09-18 她指定：帶入時今日／明日出工都歸零，填表人換成帶入的人自己
+     （以前整列照抄 → 出工沿用昨天的數字，而且列還是「別人的」，帶入的人自己改不了）。 */
+  if (wantCase && caseItemsOf(src).length) {
+    caseItemsOf(src).forEach(it => addCaseRow({ ...it, id:uid(), w0:0,
+      owner:(S.user&&S.user.name)||'', subId:undefined, subAt:undefined, subDept:undefined }));
+    brought.push(`案件明細（內部同仁）${caseItemsOf(src).length} 筆（出工已歸零）`);
+  }
   if (wantWork && (src.workItems||[]).length) {
-    (src.workItems||[]).forEach(it => addRow({ ...it, id:uid() }));
-    brought.push(`施工明細 ${src.workItems.length} 筆`);
+    (src.workItems||[]).forEach(it => addRow({ ...it, id:uid(), w0:0, w1:0,
+      owner:(S.user&&S.user.name)||'', subId:undefined, subAt:undefined, subDept:undefined }));
+    brought.push(`施工明細（廠商）${src.workItems.length} 筆（出工已歸零）`);
   }
   if (wantNotes) {
     const n = src.notes || {};
@@ -2510,12 +2809,15 @@ function renderReport() {
   refreshReporterField();
   $('n-contact').value = S.report.notes?.contact||'';
   $('n-other').value = S.report.notes?.other||'';
+  $('case-tbody') && ($('case-tbody').innerHTML=''); caseN=0;
+  caseItemsOf(S.report).forEach(it=>addCaseRow(it));
+  toggleCaseEmpty();
   $('tbody').innerHTML=''; rowN=0;
   (S.report.workItems||[]).forEach(it=>addRow(it));
   $('mat-tbody').innerHTML=''; matN=0;
   (S.report.materials||[]).forEach(m=>addMatRow(m));
   renderPhotos();
-  recalc(); buildSummary();
+  recalc(); recalcCase(); buildSummary();
   autoGrowAll();
   toggleMatEmpty();
 }
@@ -2541,6 +2843,7 @@ function syncReport() {
     other: $('n-other').value
   };
   S.report.workItems = collectRows();
+  S.report.caseItems = collectCaseRows();
   refreshReporterField();
   S.report.materials = collectMatRows();
   buildSummary();
@@ -2574,10 +2877,19 @@ function saveReport() {
   if (idx>=0) S.reports[idx]=S.report;
   else S.reports.push(S.report);
   const st = save();
+  /* 本機預覽（file://）：_cdrSet 已經被換成空函式，其實一個字都沒上傳。
+     原本的訊息照 st.cloudOk 講「已存到雲端 ✓」，跟頂端的預覽提示條自相矛盾
+     —— 2026-09-18 她在預覽裡遇到，說會造成誤解。要排在離線判斷前面
+     （預覽本來就不上傳，講「網路恢復後會自動補傳」也是錯的）。 */
+  if (window._LOCAL_PREVIEW) {
+    if (st.localOk) toast('已存（本機預覽，不會上傳雲端）','s');
+    else toast('本機預覽：這台裝置暫存已滿，沒存成功（不影響線上資料）','e');
+    return;
+  }
   if (_cloudOffline) { pendingAdd([S.report]); toast('沒有連上雲端：這張先存在這台裝置，網路恢復後重新整理，系統會自動補傳','e'); return; }
   if (st.localOk && _merged) toast('已併入這天的日報表（' + (S.report.reporter||'') + ' 建的），你的明細都在裡面','s');
   else if (st.localOk) toast('日報表已儲存','s');
-  else if (st.cloudOk) toast('已存到雲端 ✓（這台裝置的離線暫存滿了，但資料都在雲端，換裝置開一樣看得到）','s');
+  else if (st.cloudOk) toast('已存到雲端 ✓（這台裝置暫存空間不足，不影響雲端資料）','s');
   else toast('儲存失敗：本機空間不足，雲端也沒連上 — 請確認網路後重試','e');
 }
 function loadReport(r) {
@@ -2843,6 +3155,126 @@ function collectRows() {
   return _keepRowMeta(rows, 'workItems');
 }
 
+/* ══════ 案件明細（內部同仁）2026-09-18 ══════════════════════════════
+ * 她交辦：施工明細是外部廠商填的、案件明細是內部同仁填的，兩張表分開。
+ * 欄位：狀態／施作位置／施工項目／施工說明／今日廠商／施工人員／今日出工／完成進度%／備註／填表人
+ * 狀態那 9 種沿用「進度表—圖面管理」的清單與顏色，但兩邊各管各的（她選甲）：
+ *   瑪摩自己存在 S.cfg.statuses，設定頁可以增刪；沒設定過就用下面這份預設。
+ * 出工：兩張表各自合計（管理總表另外處理，見 renderMaster）。 */
+var CASE_STATUS_DEFAULT = ['進行中','送審中','已下單','報價中','已完成','待確認','已定案','暫停/卡關','恢復啟動'];
+function statusList(){
+  var l = (S.cfg && S.cfg.statuses) || [];
+  return (Array.isArray(l) && l.length) ? l : CASE_STATUS_DEFAULT.slice();
+}
+/* 「暫停/卡關」裡的斜線不能當 class 名 → 跟進度表一樣拿掉 */
+function stClassName(s){ return 'st-' + String(s||'').replace(/[\/\s]/g,''); }
+function caseItemsOf(r){ return (r && Array.isArray(r.caseItems)) ? r.caseItems : []; }
+
+function addCaseBtn(){ if (!requireStarted()) return; addCaseRow(); }
+function addCaseRow(it){
+  const tbody = $('case-tbody'); if(!tbody) return;
+  const n = ++caseN;
+  const v = f => it ? (it[f] ?? '') : '';
+  const prog = it ? Math.min(100, Math.max(0, parseFloat(it.progress) || 0)) : 0;
+  const rowId = (it && it.id) || uid();
+  const owner = it ? (it.owner || '') : ((S.user && S.user.name) || '');
+  const mine  = canEditRow(owner) || rowUnlocked(rowId);
+  const canUn = !mine && canUnlockRow(owner);
+  const dis   = mine ? '' : ' disabled';
+  const cur   = v('status');
+  const stOpts = ['<option value="">狀態...</option>'].concat(
+    statusList().concat(cur && statusList().indexOf(cur) < 0 ? [cur] : [])
+      .map(s => '<option value="' + escHtml(s) + '"' + (cur === s ? ' selected' : '') + '>' + escHtml(s) + '</option>')).join('');
+  const tr = document.createElement('tr');
+  tr.dataset.id = rowId;
+  tr.dataset.owner = owner;
+  if(!mine) tr.classList.add('row-locked');
+  tr.innerHTML = `
+    <td style="text-align:center;color:var(--muted);font-size:11px" class="crnum"></td>
+    <td data-label="狀態"><select class="cs st-pick ${escHtml(stClassName(cur))}" data-f="status" onchange="onCaseRowChange(this)"${dis}>${stOpts}</select></td>
+    <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onCaseRowChange(this)"${dis}>${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
+    <td data-label="施工項目"><select class="cs" data-f="work" onchange="syncReport()"${dis}>${selOpts(worksOf(v('loc')),v('work'),'施工項目...')}</select></td>
+    <td data-label="施工說明"><input class="ci" data-f="wdesc" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." oninput="syncReport()"${dis}></td>
+    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onCaseRowChange(this)"${dis}>${selOpts(S.cfg.vendors,v('vendor'),'廠商...')}</select></td>
+    <td data-label="施工人員"><select class="cs" data-f="staff" onchange="syncReport()"${dis}>${selOpts(staffOf(v('vendor')),v('staff'),'施工人員...')}</select></td>
+    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalcCase();syncReport()" style="max-width:60px"${dis}></td>
+    <td data-label="完成進度%">
+      <div class="prog-wrap">
+        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center"${dis}>
+        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${prog}%"></div></div>
+      </div>
+    </td>
+    <td data-label="備註" class="col-wide"><input class="ci" data-f="note" value="${escHtml(v('note'))}" placeholder="備註..." oninput="syncReport()"${dis}></td>
+    <td data-label="填表人">${canUn
+      ? `<button type="button" class="lock-btn" onclick="unlockRow(this)" title="點一下可以解鎖修改 ${escHtml(owner)} 填的內容">${escHtml(owner)} 🔒</button>`
+      : `<span class="owner-cell${mine?' mine':''}">${owner?escHtml(owner):'—'}${mine?'':' 🔒'}</span>`}${
+      it&&it.subAt?`<div class="sub-time" title="這一列送出的時間">${subTimeText(it.subAt)}</div>`:''}</td>
+    <td class="col-del no-print">${mine?'<button class="btn btn-g btn-icon btn-sm" type="button" onclick="delCaseRow(this)">✕</button>':''}</td>`;
+  tbody.appendChild(tr);
+  renumCase(); recalcCase(); toggleCaseEmpty(); buildSummary();
+}
+function onCaseRowChange(el){
+  const tr = el.closest('tr'), f = el.dataset && el.dataset.f;
+  if(tr){
+    if(f === 'loc'){
+      const list = worksOf(el.value), sel = tr.querySelector('[data-f="work"]');
+      if(sel) sel.innerHTML = selOpts(list, list.includes(sel.value) ? sel.value : '', '施工項目...');
+    } else if(f === 'vendor'){
+      const list = staffOf(el.value), sel = tr.querySelector('[data-f="staff"]');
+      if(sel) sel.innerHTML = selOpts(list, list.includes(sel.value) ? sel.value : '', '施工人員...');
+    } else if(f === 'status'){
+      el.className = 'cs st-pick ' + stClassName(el.value);   // 選了哪個狀態就換哪個顏色
+    }
+  }
+  syncReport();
+}
+function delCaseRow(btn){
+  /* 跟施工明細的 delRow 一樣：瑪摩沒有「逐列合併」那套（那是專案管理的），
+     所以刪掉就是刪掉，不需要另外留刪除記號。 */
+  btn.closest('tr').remove();
+  renumCase(); recalcCase(); toggleCaseEmpty(); buildSummary(); syncReport();
+}
+function renumCase(){ $('case-tbody') && $('case-tbody').querySelectorAll('.crnum').forEach((td,i)=>td.textContent=i+1); }
+function recalcCase(){
+  let t0 = 0;
+  const tb = $('case-tbody'); if(!tb) return;
+  tb.querySelectorAll('tr').forEach(tr => { t0 += parseFloat(tr.querySelector('[data-f="w0"]')?.value) || 0; });
+  const el = $('case-tot-today'); if(el) el.textContent = t0;
+}
+function toggleCaseEmpty(){
+  const e = $('case-empty'), tb = $('case-tbody');
+  if(e && tb) e.style.display = tb.children.length ? 'none' : '';
+}
+function collectCaseRows(){
+  const rows = [];
+  const tb = $('case-tbody'); if(!tb) return rows;
+  tb.querySelectorAll('tr').forEach(tr => {
+    rows.push({
+      id: tr.dataset.id || uid(),
+      owner: tr.dataset.owner || '',
+      status: tr.querySelector('[data-f="status"]')?.value || '',
+      loc: tr.querySelector('[data-f="loc"]')?.value || '',
+      work: tr.querySelector('[data-f="work"]')?.value || '',
+      wdesc: tr.querySelector('[data-f="wdesc"]')?.value || '',
+      vendor: tr.querySelector('[data-f="vendor"]')?.value || '',
+      staff: tr.querySelector('[data-f="staff"]')?.value || '',
+      w0: parseFloat(tr.querySelector('[data-f="w0"]')?.value) || 0,
+      progress: parseFloat(tr.querySelector('[data-f="progress"]')?.value) || 0,
+      note: tr.querySelector('[data-f="note"]')?.value || ''
+    });
+  });
+  return _keepRowMeta(rows, 'caseItems');
+}
+/* 摘要用：一列一行，格式跟施工明細一致，狀態擺最前面用【】框起來 */
+function caseSummaryLine(ci){
+  if(!ci) return null;
+  if(!(ci.status || ci.loc || ci.work || ci.owner)) return null;
+  const head = ci.status ? '【' + String(ci.status).trim() + '】' : '';
+  const rest = [ci.loc, ci.work, ci.wdesc, ci.note, '進度' + (parseFloat(ci.progress)||0) + '%', ci.owner]
+    .map(x => String(x == null ? '' : x).trim()).filter(Boolean).join('；');
+  return head + rest;
+}
+
 /* ── SUMMARY ── */
 /* ══════ 今日工作摘要（2026-09-13 她指定：格式與專案管理完全相同）══════
  * 改版前瑪摩一行只有「案場 ｜ 位置 ｜ 項目」，沒有標題行、天氣、進度、異常、填表人、備註事項。
@@ -2879,12 +3311,13 @@ function summaryTitle(dateStr, projName, weather){
 }
 /* 一筆材料一行：名稱；數量 單位；備註；填表人（沒填的會被 filter 濾掉） */
 function summaryMatLine(m){
+  const loc  = String((m&&m.loc)||'').trim();     // 施作位置（2026-09-20，排在材料名稱前面）
   const name = String((m&&m.name)||'').trim();
   const qty  = (m && m.qty !== undefined && m.qty !== null && m.qty !== '') ? m.qty : '';
   const unit = String((m&&m.unit)||'').trim();
   const amount = [qty, unit].filter(v => v !== '' && v !== undefined).join(' ');
   const note = String((m&&m.note)||'').trim();
-  return [name, amount, note, (m&&m.owner)||''].filter(Boolean).join('；');
+  return [loc, name, amount, note, (m&&m.owner)||''].filter(Boolean).join('；');
 }
 /* ［材料已到貨統計］（2026-09-13 她指定）─────────────────────────────
  * 這個案場「全部歷史」的材料累計，跟管理總表那張「材料統計」是同一個數字
@@ -2910,13 +3343,131 @@ function summaryMatArrival(projName){
       m.get(k).qty += Number(mt.qty)||0;
     });
   });
+  /* 2026-09-22：改回傳「帶名稱的列」，才有辦法依材料名稱過濾（舊版只回字串）。
+     line 就是原本那一行，格式一個字都沒變。 */
   return [...m.values()]
     .sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant',{numeric:true}))
-    .map(o=>o.name+'：'+(o.qty%1===0?o.qty:Number(o.qty.toFixed(1)))+(o.unit?' '+o.unit:''));
+    .map(o=>({ name:o.name, unit:o.unit, qty:o.qty,
+               line:o.name+'：'+(o.qty%1===0?o.qty:Number(o.qty.toFixed(1)))+(o.unit?' '+o.unit:'') }));
 }
-function summaryFromItems(items, dateStr, projName, mats, notes, weather){
+
+/* ══════ 摘要段落開關 ＋ 材料挑選（2026-09-22 她交辦，設計同日-專）══════
+ * 她確認過的四條：每個人自己（localStorage）／每個案場各一份／記「取消掉哪幾樣」／
+ * **只影響畫面與「複製」**（列印 #f-summary-pv 與存檔 S.report.summary 永遠完整）。
+ * 記黑名單而不是白名單：新到貨的材料會自動出現，不會默默不見。
+ * 「顯示段落」目前只畫「材料已到貨統計」一顆，其餘段落固定顯示 ——
+ * 要開回來把名字加進 SUM_PARTS_SHOWN 就好，不是死程式。 */
+var SUM_PARTS_KEY = 'cdr_v3_sum_parts';
+var SUM_PARTS_DEF = { title:true, cases:true, items:true, mats:true, stat:true, notes:true };
+var SUM_PARTS_LB  = { title:'標題行', cases:'案件明細', items:'施工明細', mats:'材料明細',
+                      stat:'材料已到貨統計', notes:'備註事項' };
+var SUM_PARTS_SHOWN = ['stat'];
+var sumParts = (function(){
+  var out = {}; Object.keys(SUM_PARTS_DEF).forEach(function(k){ out[k] = SUM_PARTS_DEF[k]; });
+  try{
+    var o = JSON.parse(localStorage.getItem(SUM_PARTS_KEY) || 'null');
+    if(o && typeof o === 'object'){
+      Object.keys(SUM_PARTS_DEF).forEach(function(k){ if(typeof o[k] === 'boolean') out[k] = o[k]; });
+    }
+  }catch(e){}
+  /* 沒畫成藥丸的段落一律強制打開，舊設定裡關掉的也一併還原 */
+  Object.keys(SUM_PARTS_DEF).forEach(function(k){
+    if(SUM_PARTS_SHOWN.indexOf(k) < 0) out[k] = true;
+  });
+  return out;
+})();
+function sumPartsAllOn(){ return Object.keys(SUM_PARTS_DEF).every(function(k){ return sumParts[k]; }); }
+function renderSumParts(){
+  var bar = $('sum-seg'); if(!bar) return;
+  bar.querySelectorAll('.sum-pill').forEach(function(b){ b.remove(); });
+  SUM_PARTS_SHOWN.forEach(function(k){
+    var on = !!sumParts[k];
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'sum-pill';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.setAttribute('data-k', k);
+    b.innerHTML = '<span class="sum-mk">' + (on ? '✓' : '＋') + '</span>' + escHtml(SUM_PARTS_LB[k]);
+    bar.appendChild(b);
+  });
+}
+function sumPartToggle(k){
+  if(SUM_PARTS_SHOWN.indexOf(k) < 0) return;
+  sumParts[k] = !sumParts[k];
+  try{ localStorage.setItem(SUM_PARTS_KEY, JSON.stringify(sumParts)); }catch(e){}
+  renderSumParts(); renderMatSeg(); buildSummary();
+}
+/* 材料黑名單：{ 案場名: { 材料名: true } } */
+var MAT_OFF_KEY = 'cdr_v3_mat_off';
+var matOff = (function(){
+  try{
+    var o = JSON.parse(localStorage.getItem(MAT_OFF_KEY) || 'null');
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  }catch(e){ return {}; }
+})();
+function matOffOf(proj){
+  var p = String(proj||'');
+  var m = matOff[p];
+  return (m && typeof m === 'object') ? m : {};
+}
+function matOffToggle(proj, name){
+  var p = String(proj||''); if(!p || !name) return;
+  if(!matOff[p] || typeof matOff[p] !== 'object') matOff[p] = {};
+  if(matOff[p][name]) delete matOff[p][name]; else matOff[p][name] = true;
+  if(!Object.keys(matOff[p]).length) delete matOff[p];
+  try{ localStorage.setItem(MAT_OFF_KEY, JSON.stringify(matOff)); }catch(e){}
+  renderMatSeg(); buildSummary();
+}
+/* ⚠️ 名字一律走 data-n ＋ 事件委派，不用 inline onclick 帶參數 */
+function renderMatSeg(){
+  var bar = $('mat-seg'); if(!bar) return;
+  bar.querySelectorAll('.sum-pill').forEach(function(b){ b.remove(); });
+  if(!sumParts.stat){ bar.style.display = 'none'; return; }
+  var proj = curProjName();
+  var rows = summaryMatArrival(proj);
+  if(!rows.length){ bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  var off = matOffOf(proj);
+  rows.forEach(function(r){
+    var on = !off[r.name];
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'sum-pill mat-pill';
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.setAttribute('data-n', r.name);
+    b.title = r.line;
+    b.innerHTML = '<span class="sum-mk">' + (on ? '✓' : '＋') + '</span>' + escHtml(r.name);
+    bar.appendChild(b);
+  });
+}
+document.addEventListener('click', function(e){
+  if(!e.target || !e.target.closest) return;
+  var m = e.target.closest('#mat-seg .mat-pill');
+  if(m){ matOffToggle(curProjName(), m.getAttribute('data-n')); return; }
+  var k = e.target.closest('#sum-seg .sum-pill');
+  if(k) sumPartToggle(k.getAttribute('data-k'));
+});
+function summaryFromItems(items, dateStr, projName, mats, notes, weather, cases, parts, matOffSet){
+  const P = parts || SUM_PARTS_DEF;       // 沒給＝整份都要（存檔／列印）
+  const MO = matOffSet || {};             // 沒給＝材料一樣都不濾（存檔／列印）
   const rp = projName||'';
-  const out = [summaryTitle(dateStr, rp || ((items||[])[0]||{}).projName || '', weather), ''];
+  const out = [];
+  if(P.title){ out.push(summaryTitle(dateStr, rp || ((items||[])[0]||{}).projName || '', weather)); out.push(''); }
+
+  /* ── 案件明細（內部同仁）2026-09-18：放在施工明細前面（她指定「案件明細在上方」）。
+     整張沒有案件明細時整段不出現 —— 舊報表的摘要跟改版前一模一樣。 ── */
+  /* 2026-09-22 她交辦：［案件明細（內部同仁）］標題也**一律出現**，
+     沒資料就「標題留著、內容寫無」—— 跟材料明細／材料已到貨統計／備註事項同一個規則。
+     （舊做法是整段不出現，所以沒填案件明細的日報看不到這個標題。） */
+  const cl = (cases||[]).map(caseSummaryLine).filter(Boolean);
+  if(P.cases){
+    out.push('［案件明細（內部同仁）］');
+    out.push(cl.length ? cl.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+    out.push('');
+  }
+  /* 2026-09-22 她交辦：［施工明細（廠商）］**一律出現**。
+     舊做法是只有「這張有案件明細」時才 push，所以沒有案件明細的日報那一段沒有標題
+     —— 跟其他三段（材料明細／材料已到貨統計／備註事項）不一致。
+     名稱沿用「（廠商）」是刻意的：要跟上面的［案件明細（內部同仁）］分清楚是誰做的。 */
+  if(P.items) out.push('［施工明細（廠商）］');
 
   /* ── 施工明細 ── */
   const lines = (items||[]).map(wi=>{
@@ -2929,26 +3480,36 @@ function summaryFromItems(items, dateStr, projName, mats, notes, weather){
            .map(x => String(x == null ? '' : x).trim())
            .filter(Boolean).join('；');
   }).filter(v => v !== null);
-  out.push(lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+  if(P.items) out.push(lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
 
   /* ── 材料 ── */
-  const ml = (mats||[]).map(summaryMatLine).filter(Boolean);
-  out.push('', '［材料］', ml.length ? ml.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+  if(P.mats){
+    const ml = (mats||[]).map(summaryMatLine).filter(Boolean);
+    out.push('', '［材料明細］', ml.length ? ml.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+  }
 
   /* ── 材料已到貨統計 ── */
-  const al = summaryMatArrival(rp);
-  out.push('', '［材料已到貨統計］', al.length ? al.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+  if(P.stat){
+    /* 畫面版會把「取消掉的材料」濾掉；存檔／列印沒帶 matOffSet，所以一樣都不濾 */
+    const al = summaryMatArrival(rp).filter(r => !MO[r.name]);
+    out.push('', '［材料已到貨統計］', al.length ? al.map((r,i)=>(i+1)+'. '+r.line).join('\n') : '無');
+  }
 
   /* ── 備註事項（原樣照貼，換行保留）── */
-  const nb = notes || {};
-  const c = String(nb.contact||'').trim(), o = String(nb.other||'').trim();
-  out.push('', '［備註事項］');
-  out.push('與工地聯絡事項', c || '無');
-  out.push('', '其他工程配合重點', o || '無');
+  if(P.notes){
+    const nb = notes || {};
+    const c = String(nb.contact||'').trim(), o = String(nb.other||'').trim();
+    out.push('', '［備註事項］');
+    out.push('與工地聯絡事項', c || '無');
+    out.push('', '其他工程配合重點', o || '無');
+  }
 
+  /* 關掉標題時開頭會多一個空行，去掉；全開時這一行不會動到任何東西 */
+  while(out.length && out[0] === '') out.shift();
   return out.join('\n');
 }
 function buildSummary() {
+  refreshPhWorkOptions();   // 工項一變，照片要掛哪一項的下拉也跟著更新（2026-09-17，與專案管理同）
   /* 材料／備註／天氣一律從畫面現況讀（不從 S.report），
      這樣不管 buildSummary 是被誰在什麼時候呼叫的，摘要都跟畫面一致。 */
   const _mats = (typeof collectMatRows === 'function' && $('mat-tbody')) ? collectMatRows() : ((S.report||{}).materials||[]);
@@ -2956,12 +3517,22 @@ function buildSummary() {
     ? { contact: $('n-contact').value, other: ($('n-other')||{}).value||'' }
     : ((S.report||{}).notes||{});
   const _weather = $('f-weather') ? $('f-weather').value : ((S.report||{}).weather||'');
-  const txt = summaryFromItems(collectRows(), $('f-date')?.value || S.report?.date || '', curProjName(),
-                               _mats, _notes, _weather);
-  $('f-summary').value = txt;
-  $('f-summary-pv').textContent = txt;
+  const _cases = ($('case-tbody') && typeof collectCaseRows === 'function') ? collectCaseRows() : caseItemsOf(S.report);
+  { const _sg = $('sum-seg'); if(_sg && !_sg.querySelector('.sum-pill')) renderSumParts(); }
+  renderMatSeg();
+  const _rows = collectRows();
+  const _date = $('f-date')?.value || S.report?.date || '';
+  const _proj = curProjName();
+  /* 完整版：列印（#f-summary-pv）與存檔（S.report.summary）都用這份 */
+  const txt = summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather, _cases);
+  /* 畫面版：段落全開**而且**沒有取消任何材料時就是同一份，不必重算 */
+  const _mo = matOffOf(_proj);
+  const vis = (sumPartsAllOn() && !Object.keys(_mo).length) ? txt
+            : summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather, _cases, sumParts, _mo);
+  $('f-summary').value = vis;            // 螢幕＋複製（copySummary 讀的就是這格）
+  $('f-summary-pv').textContent = txt;   // 列印一律完整（她拍板：紙本是存檔憑證）
   autoGrow($('f-summary'));
-  if (S.report) S.report.summary = txt;
+  if (S.report) S.report.summary = txt;  // 存檔一律完整
 }
 function copySummary() {
   const txt = $('f-summary').value;
@@ -2990,7 +3561,8 @@ function addMatRow(m) {
   if(!mine) tr.classList.add('row-locked');
   tr.innerHTML = `
     <td style="text-align:center;color:var(--muted);font-size:11px" class="mnum"></td>
-    <td data-label="材料名稱"><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'')}</select></td>
+    <td data-label="施作位置"><select class="cs" data-f="mloc"${dis} onchange="onMatLocChange(this)">${matLocOpts(m?.loc||'')}</select></td>
+    <td data-label="材料名稱"><select class="cs" data-f="mname"${dis} onchange="onMatNameChange(this)">${matNameOpts(m?.name||'', m?.loc||'')}</select></td>
     <td data-label="數量"><input class="ci" type="number" data-f="mq" value="${m?.qty??0}" min="0" step="0.1" style="max-width:72px;text-align:center"${dis} oninput="syncReport()"></td>
     <td data-label="單位"><select class="cs" data-f="munit"${dis}>${matUnitOpts(m?.unit||'')}</select></td>
     <td data-label="備註"><input class="ci" data-f="mnote" value="${escHtml(m?.note||'')}" placeholder="備註..."${dis} oninput="syncReport()"></td>
@@ -3001,17 +3573,115 @@ function addMatRow(m) {
   tbody.appendChild(tr);
   mnumAll(); toggleMatEmpty();
 }
-function matNameOpts(cur) {
-  const list = S.cfg.matNames||[];
+/* 材料列的「施作位置」下拉（2026-09-20）。用施工明細那一組的同一份位置清單，
+ * 再加上「未分類」（舊材料暫放的一組）與這張報表已經用過的值。 */
+function matLocOpts(cur){
+  const base = (S.cfg.locs || []).slice();
+  if(matsOfLoc(MAT_NO_LOC).length && base.indexOf(MAT_NO_LOC) < 0) base.push(MAT_NO_LOC);
+  const extra = cur && base.indexOf(cur) < 0 ? [cur] : [];
+  return `<option value="">— 選擇位置 —</option>`+[...extra,...base]
+    .map(o=>`<option value="${escHtml(o)}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
+}
+/* 有指定位置 → 只列那個位置底下的材料；沒指定 → 全部（舊報表、還沒選位置的新列）。
+ * 這張報表已經用過的名稱一律留著，舊報表打開不會變空白。 */
+function matListOf(loc){
+  const all = loc ? matNamesOfLoc(loc) : matAllNames();
+  const out = all.slice();
+  ((S.report && S.report.materials) || []).forEach(function(m){
+    var n = m && String(m.name || '').trim();
+    if(n && out.indexOf(n) < 0) out.push(n);
+  });
+  return out;
+}
+function matNameOpts(cur, loc) {
+  const list = matListOf(loc);
   const extra = cur&&!list.includes(cur)?[cur]:[];
   return `<option value="">— 選擇材料 —</option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
-/* 這個材料的預設單位（2026-09-03，跟專案管理一致：一個材料一個單位）。
- * 材料統計也拿它把「沒填單位」的舊資料歸戶，否則同一種材料會被拆成兩列。 */
-function matUnitOf(name){
-  const m=S.cfg.matUnitMap||{};
-  return (m[String(name||'').trim()]||'').trim();
+/* ══════ 材料掛在施作位置底下（2026-09-20 她拍板，兩支同一套作法）══════
+ * 形狀：cfg.matsByLoc = { '基座': [{name:'澳洲膠', unit:'桶'}, …] }
+ * 同一種材料好幾個位置都用得到 → 各位置各列一次（她選甲）；統計照名稱歸戶，重複不影響數字。
+ * cfg.matNames / cfg.matUnitMap 仍然照寫（由 matsByLoc 推導），統計與舊版裝置才不會壞。 */
+var MAT_NO_LOC = '未分類';
+function matsMap(){
+  var m = S.cfg.matsByLoc;
+  if(!m || typeof m !== 'object' || Array.isArray(m)) { migrateMatsByLoc(S.cfg); m = S.cfg.matsByLoc; }
+  return m;
+}
+function migrateMatsByLoc(cfg){
+  if(!cfg || typeof cfg !== 'object') return cfg;
+  if(cfg.matsByLoc && typeof cfg.matsByLoc === 'object' && !Array.isArray(cfg.matsByLoc)) return cfg;
+  var um = cfg.matUnitMap || {};
+  var list = (cfg.matNames || []).map(function(n){
+    var nm = String(n || '').trim();
+    return nm ? { name: nm, unit: String(um[nm] || '').trim() } : null;
+  }).filter(Boolean);
+  cfg.matsByLoc = {};
+  if(list.length) cfg.matsByLoc[MAT_NO_LOC] = list;
+  return cfg;
+}
+function matLocOrder(){
+  var locs = (S.cfg.locs || []).slice();
+  Object.keys(matsMap()).forEach(function(k){ if(locs.indexOf(k) < 0) locs.push(k); });
+  return locs;
+}
+function matsOfLoc(loc){
+  var arr = matsMap()[loc];
+  return Array.isArray(arr) ? arr.filter(Boolean) : [];
+}
+function matNamesOfLoc(loc){
+  return matsOfLoc(loc).map(function(m){ return String(m.name || '').trim(); }).filter(Boolean);
+}
+function matAllNames(){
+  var out = [], seen = {};
+  matLocOrder().forEach(function(loc){
+    matNamesOfLoc(loc).forEach(function(n){ if(!seen[n]){ seen[n] = 1; out.push(n); } });
+  });
+  return out;
+}
+/* 存檔前清乾淨：沒有名稱的空白列丟掉，整個位置都空了就把那一組也拿掉 */
+function matTidy(applySuggest){
+  var m = matsMap();
+  Object.keys(m).forEach(function(loc){
+    var arr = (m[loc] || []).filter(function(x){ return x && String(x.name || '').trim(); })
+      .map(function(x){
+        var name = String(x.name).trim();
+        /* 還沒綁單位的，按下「💾 儲存設定」時把畫面上標「建議」的那個值收下來
+           （2026-09-03 她定的規則：建議值先選好，按儲存才生效）。 */
+        var unit = String(x.unit || "").trim() || (applySuggest ? (matUnitSuggest(name) || "") : "");
+        return { name: name, unit: unit };
+      });
+    if(arr.length) m[loc] = arr; else delete m[loc];
+  });
+}
+function syncMatMirror(){
+  var map = {};
+  matLocOrder().forEach(function(loc){
+    matsOfLoc(loc).forEach(function(m){
+      var n = String(m.name || '').trim(), u = String(m.unit || '').trim();
+      if(n && u && !map[n]) map[n] = u;
+    });
+  });
+  S.cfg.matNames = matAllNames();
+  S.cfg.matUnitMap = map;
+}
+/* 這個材料的預設單位。有指定位置就先看那個位置底下那一列，找不到再退回名稱對照表。 */
+function matUnitOf(name, loc){
+  var n = String(name || '').trim(); if(!n) return '';
+  if(loc){
+    var hit = matsOfLoc(loc).filter(function(m){ return String(m.name || '').trim() === n; })[0];
+    if(hit && hit.unit) return String(hit.unit).trim();
+  }
+  var m = S.cfg.matUnitMap || {};
+  if(m[n]) return String(m[n]).trim();
+  var found = '';
+  matLocOrder().some(function(L){
+    var h = matsOfLoc(L).filter(function(x){ return String(x.name || '').trim() === n; })[0];
+    if(h && h.unit){ found = String(h.unit).trim(); return true; }
+    return false;
+  });
+  return found;
 }
 function matUnitOpts(cur) {
   const list = S.cfg.matUnits||[];
@@ -3019,10 +3689,28 @@ function matUnitOpts(cur) {
   return `<option value=""></option>`+[...extra,...list]
     .map(o=>`<option value="${o}"${cur===o?' selected':''}>${escHtml(o)}</option>`).join('');
 }
+/* 換了施作位置 → 材料下拉整個換成那個位置底下的清單（2026-09-20）。
+ * 原本選的材料如果那個位置也有（或這張報表已經用過），就留著；沒有就清空重選。 */
+function onMatLocChange(sel){
+  const tr = sel.closest('tr');
+  const ms = tr && tr.querySelector('[data-f="mname"]');
+  if(!ms) { syncReport(); return; }
+  const loc = sel.value, keep = ms.value;
+  const names = matListOf(loc);
+  ms.innerHTML = matNameOpts(names.indexOf(keep) >= 0 ? keep : '', loc);
+  if(names.indexOf(keep) >= 0){
+    const u = matUnitOf(keep, loc);
+    const us = tr.querySelector('[data-f="munit"]');
+    if(u && us){ if(![...us.options].some(o=>o.value===u)) us.add(new Option(u,u),1); us.value=u; }
+  }
+  syncReport();
+}
 function onMatNameChange(sel) {
   /* 選了材料名稱 → 單位自動帶入設定頁綁的預設單位。
      沒綁預設的維持原樣（不會把使用者已經選好的單位清掉）。 */
-  const u=matUnitOf(sel.value);
+  const _tr0 = sel.closest('tr');
+  const _loc0 = (_tr0 && (_tr0.querySelector('[data-f="mloc"]')||{}).value) || '';
+  const u=matUnitOf(sel.value, _loc0);
   if(u){
     const row=sel.closest('tr');
     const us=row&&row.querySelector('[data-f="munit"]');
@@ -3045,6 +3733,7 @@ function collectMatRows() {
     rows.push({
       id: tr.dataset.mid||uid(),
       owner: tr.dataset.owner||'',   // 多人共編：這一列是誰加的（disabled 的欄位 .value 照樣讀得到，資料不會掉）
+      loc: tr.querySelector('[data-f="mloc"]')?.value||'',   // 施作位置（2026-09-20）
       name: tr.querySelector('[data-f="mname"]')?.value||'',
       qty: parseFloat(tr.querySelector('[data-f="mq"]')?.value)||0,
       unit: tr.querySelector('[data-f="munit"]')?.value||'',
@@ -3115,7 +3804,7 @@ function uploadPhotos(e) {
   catch(err){ toast('照片上傳失敗：' + ((err && err.message) || err), 'e'); }
 }
 function _uploadPhotos(e) {
-  const phase=$('ph-phase').value;
+  const tgt=phTargetFromSelect();
   /* 2026-09-03：這一段原本有三條「靜默失敗」的路，使用者按了完全沒反應也沒訊息 ——
      她與客戶回報的「無法上傳照片」多半就是踩到其中一條。每一條都要講話。 */
   const picked = Array.from(e.target.files||[]);
@@ -3126,6 +3815,8 @@ function _uploadPhotos(e) {
   const files = picked.filter(looksImage);
   e.target.value='';
   if(!picked.length) return;                       // 使用者自己取消，不用吵他
+  /* 「還沒選工項」排在取消之後：使用者按了取消（沒選檔）不該跳任何訊息 */
+  if(!tgt){ toast('照片要掛在某一個工項底下：請先在「施工明細」新增一列，再回到這裡右上角選那一項','e'); return; }
   if(!files.length){ toast('選到的檔案不是圖片，請重新選擇','e'); return; }
   toast('照片處理中…（' + files.length + ' 張）');
   Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
@@ -3139,8 +3830,9 @@ function _uploadPhotos(e) {
       /* 保險：雲端讀回來的報表可能沒有 photos 欄位（Firebase 不存空陣列） */
       if(!Array.isArray(S.report.photos)) S.report.photos = [];
       S.report.photos.push({
-        id:uid(), data:r.data, phase:phase, name:f.name, ts:Date.now(),
-        origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h
+        id:uid(), data:r.data, name:f.name, ts:Date.now(),
+        origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
+        projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
       });
       n++;
     });
@@ -3156,26 +3848,85 @@ function _uploadPhotos(e) {
     toast('照片處理失敗：' + ((err && err.message) || err), 'e');
   });
 }
-function renderPhotos() {
-  const grid=$('ph-grid');
-  grid.innerHTML='<div class="upload-btn no-print" onclick="$(\'ph-input\').click()"><span style="font-size:22px">📷</span><span>點擊上傳照片</span></div>';
-  (S.report.photos||[]).forEach((p,i)=>{
-    const phaseMap={before:'施工前',during:'施工中',after:'施工後'};
-    const cls={before:'ph-b',during:'ph-d',after:'ph-a'}[p.phase]||'ph-d';
-    const div=document.createElement('div');
-    div.className='photo-thumb';
-    div.onclick=()=>openPh(i);
-    div.innerHTML=`<img src="${p.data}" alt="${escHtml(p.name)}"><div class="photo-thumb-info"><span class="phase-tag ${cls}">${phaseMap[p.phase]||p.phase}</span><br>${escHtml(p.name)}</div>`;
-    grid.appendChild(div);
+/* ── 照片四層分類（2026-09-17 從專案管理搬過來）──
+ * 每張照片記住 案場(projName) / 施作位置(loc) / 施工項目(work) / 日期(date)。
+ * 上傳前先在右上的下拉挑一項「目前這張日報上的工項」，前三層自動帶入，日期用報表日期。
+ * 瑪摩的照片仍整張存在報表裡（沒有專案管理那套縮圖／原圖分離），所以原圖就是 p.data。
+ * ⚠️ 這一段與 cdr-pm 同名函式是同一套規則，改一邊要記得改另一邊。 */
+const PH_UNSET='（未指定）';
+function phPath(p){
+  const d=(p.date||S.report?.date||'').trim();
+  return [p.projName||PH_UNSET, p.loc||PH_UNSET, p.work||PH_UNSET, d||PH_UNSET];
+}
+/* 檔名不能有這些字元，一律換成底線 */
+function safeName(s){ return String(s||'').replace(/[\\/:*?"<>|]/g,'_').trim()||PH_UNSET; }
+function phExt(p, src){
+  const m=/^data:image\/([a-z0-9+.-]+);/i.exec(src||p.data||'');
+  const t=(m?m[1]:'jpeg').toLowerCase();
+  return t==='jpeg'?'jpg':t;
+}
+/* 右上下拉：列出這張日報目前有的工項，值是 tr 的序號 */
+function refreshPhWorkOptions(){
+  const sel=$('ph-work'); if(!sel) return;
+  const cur=sel.value;
+  const opts=[];
+  $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
+    const loc=tr.querySelector('[data-f="loc"]')?.value||'';
+    const work=tr.querySelector('[data-f="work"]')?.value||'';
+    if(loc||work) opts.push({v:String(i),label:[loc,work].filter(Boolean).join('｜')});
   });
+  sel.innerHTML = opts.length
+    ? opts.map(o=>`<option value="${o.v}">${escHtml(o.label)}</option>`).join('')
+    : '<option value="">— 請先在上方新增工項 —</option>';
+  if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;
+}
+function phTargetFromSelect(){
+  const sel=$('ph-work'); const idx=sel?sel.value:'';
+  if(idx==='') return null;
+  const tr=$('tbody').querySelectorAll('tr')[Number(idx)];
+  if(!tr) return null;
+  return {
+    projName: curProjName(),
+    loc: tr.querySelector('[data-f="loc"]')?.value||'',
+    work: tr.querySelector('[data-f="work"]')?.value||''
+  };
+}
+/* 依 案場 → 施作位置 → 施工項目 → 日期 分組列出（沒選過的舊照片歸到「（未指定）」那組） */
+function renderPhotos() {
+  refreshPhWorkOptions();
+  const host=$('ph-tree'); if(!host) return;
+  const list=S.report?.photos||[];
+  const empty=$('ph-empty'); if(empty) empty.style.display=list.length?'none':'';
+  if(!list.length){ host.innerHTML=''; return; }
+  const groups=new Map();
+  list.forEach((p,i)=>{
+    const key=phPath(p).join(' / ');
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push({p,i});
+  });
+  host.innerHTML=[...groups.entries()].map(([key,items])=>`
+    <div class="tl-group">
+      <div class="tl-head">
+        <span style="flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary);overflow-wrap:anywhere">📁 ${escHtml(key)}</span>
+        <span class="tl-count">${items.length} 張</span>
+      </div>
+      <div class="tl-body">
+        <div class="photo-grid">
+          ${items.map(({p,i})=>`
+            <div class="photo-thumb" onclick="openPh(${i})">
+              <img src="${p.data}" alt="${escHtml(p.name)}" loading="lazy">
+              <div class="photo-thumb-info">${escHtml(p.name)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`).join('');
 }
 function openPh(i) {
   viewPhIdx=i;
   const p=S.report.photos[i];
   $('ph-img').src=p.data; $('ph-cap').textContent=p.name;
-  const cls={before:'ph-b',during:'ph-d',after:'ph-a'}[p.phase]||'ph-d';
-  $('ph-phase-lbl').className='phase-tag '+cls;
-  $('ph-phase-lbl').textContent={before:'施工前',during:'施工中',after:'施工後'}[p.phase]||p.phase;
+  const lbl=$('ph-phase-lbl');
+  if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=phPath(p).join(' / '); }
   $('ph-overlay').classList.add('show');
 }
 function closePh(e){if(e.target===$('ph-overlay'))$('ph-overlay').classList.remove('show');}
@@ -3183,8 +3934,53 @@ function deletePhoto(){
   if(viewPhIdx<0)return;
   if(!Array.isArray(S.report.photos)) S.report.photos = [];
   S.report.photos.splice(viewPhIdx,1);
+  /* 🔴 2026-09-17 修既有 bug：少了這一行，_photoCountGuard 會把「本機照片比雲端少」當成照片遺失，
+     整張日報跳過不推 —— 而且 _lastPushed 照樣更新、圖示照樣 ☁️✅。
+     結果：刪過照片的那張日報，之後再怎麼改都上不了雲，其他裝置永遠看不到，也沒有任何提示。
+     專案管理 09-03 就有（走 markRowDeleted），瑪摩當時沒跟上。 */
+  markPhotoDelete(S.report && S.report.id);
   $('ph-overlay').classList.remove('show');
   renderPhotos();
+}
+
+/* 下載檔名：施作位置_施工項目_YYMMDD_序號（與 cdr-pm 同一套，見那邊的註解）
+ *   · 序號每組「位置＋項目」各自從 001 起，照上傳時間排
+ *   · 位置或項目沒選的舊照片 → 只留有的那段；兩段都沒有 → 「未分類」
+ *   · 用組好的前綴當 key，safeName 把 A/B 與 A_B 變成同名時序號會接下去，不會互蓋 */
+function phYmd(d){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||'')); return m ? m[1].slice(2)+m[2]+m[3] : ''; }
+function phFileNames(list, fulls){
+  const order=list.map((p,i)=>i).sort((a,b)=>((list[a].ts||0)-(list[b].ts||0))||(a-b));
+  const seq={}, out=new Array(list.length);
+  order.forEach(i=>{
+    const p=list[i];
+    const head=[p.loc,p.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
+    const ymd=phYmd(p.date||S.report?.date);
+    const prefix=(head.length?head:['未分類']).concat(ymd?[ymd]:[]).join('_');
+    seq[prefix]=(seq[prefix]||0)+1;
+    out[i]=prefix+'_'+String(seq[prefix]).padStart(3,'0')+'.'+phExt(p,(fulls&&fulls[i])||'');
+  });
+  return out;
+}
+async function downloadPhotosZip(){
+  const list=S.report?.photos||[];
+  if(!list.length){ toast('這張日報還沒有照片','e'); return; }
+  if(typeof JSZip==='undefined'){ toast('打包元件載入失敗，請確認網路後重新整理','e'); return; }
+  toast('打包中…');
+  try{
+    const zip=new JSZip();
+    const fulls=list.map(p=>p.data||'');
+    const names=phFileNames(list, fulls);
+    list.forEach((p,i)=>{
+      const b64=String(fulls[i]||'').split(',')[1]||'';
+      if(b64) zip.file(names[i],b64,{base64:true});
+    });
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`施工照片_${safeName(S.report?.date||today())}.zip`;
+    a.click();
+    toast('照片已下載','s');
+  }catch(err){ toast('打包失敗：'+err.message,'e'); }
 }
 
 /* ── NOTES PV ── */
@@ -3413,6 +4209,7 @@ function renderHistory() {
   const el=$('hist-list');
   el.innerHTML='';
   $('hist-empty').style.display=list.length?'none':'block';
+  if(!list.length)$('hist-empty').innerHTML=emptyWhyHtml('hist');   /* 0 筆要講出原因（2026-09-22） */
   syncGroupButtons();
   const byProj=groupMode==='proj';
   const force=histFilterActive();          // 篩選後一律展開
@@ -3590,6 +4387,22 @@ function histFilterActive(){
     .some(id=>$(id)&&$(id).value);
 }
 /* 表頭：分組用掉的那一欄不用再出現在每一列 */
+/* ══ 出工怎麼算（2026-09-18 她指定）══
+ * 案件明細＝內部同仁、施工明細＝廠商，兩邊填的是不同的人 → 今日出工「加在一起」，
+ * 但要看得出各幾個人，所以管理總表顯示「6（內部 3／廠商 3）」。
+ * 明日預估只有施工明細（廠商）有填，維持只算它。 */
+function sumW0(list, f){ return (list||[]).reduce((s,x)=>s+(Number(x&&x[f||'w0'])||0),0); }
+function repW0Vendor(r){ return sumW0(r&&r.workItems); }              // 廠商（施工明細）
+function repW0Inner(r){ return sumW0(caseItemsOf(r)); }               // 內部同仁（案件明細）
+function repW0Total(r){ return repW0Vendor(r)+repW0Inner(r); }
+function repW1(r){ return sumW0(r&&r.workItems,'w1'); }               // 明日預估：只算廠商
+/* 「6（內部 3／廠商 3）」；沒有案件明細時就只顯示數字，跟改版前一樣 */
+function w0Text(r, numFn){
+  const n = numFn || (v=>v);
+  const inner = repW0Inner(r), vend = repW0Vendor(r);
+  if(!inner) return String(n(vend));
+  return n(inner+vend) + '<span class="w0-split">（內部 ' + n(inner) + '／廠商 ' + n(vend) + '）</span>';
+}
 function renderMgmtHead(){
   const th=$('master-thead'); if(!th)return;
   th.innerHTML='<tr><th style="width:36px"></th>'
@@ -3619,6 +4432,75 @@ function setMgRange(type){
 }
 /* 篩選判準集中在這裡：畫面、統計、匯出全部走同一個函式，
    才不會再出現「畫面 3 列、Excel 卻是全部」那種事（2026-08-30 的教訓）。 */
+/* ══════ 「0 筆」要講出原因（2026-09-22 她交辦）══════════════════════════
+ * 起因：她回報進度表看不到資料，畫面只寫「尚無符合條件的報表」。
+ *       實際上資料都在，只是她的身分部門對不上。我查了半小時才發現。
+ *       四支表一起補：指出**第一個**把資料擋光的原因，數字都是現算的。
+ * 判斷順序：① 一張都沒有 → ② 權限擋掉 → ③ 篩選濾光。 */
+function _viewLevelWord(){
+  const u=S.user||{}, lv=u.viewLevel||'dept';
+  if(lv==='self')return '只看得到自己填的報表';
+  if(lv==='cross'){
+    const d=[u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    return '只看得到「'+escHtml(d.join('、'))+'」的報表';
+  }
+  return '只看得到自己部門的報表';
+}
+function clearMgFilters(){
+  ['mg-from','mg-to','mg-dept','mg-proj'].forEach(function(id){ const e=$(id); if(e)e.value=''; });
+  renderMgmt();
+}
+function clearHistFilters(){
+  ['filter-month','filter-date','filter-dept','filter-proj','filter-reporter']
+    .forEach(function(id){ const e=$(id); if(e)e.value=''; });
+  renderHistory();
+}
+/* scope：'mgmt'（管理總表）或 'hist'（歷史資料）—— 兩邊的篩選欄位不同，分開列 */
+function emptyWhyHtml(scope){
+  const all=((S.reports)||[]).length;
+  if(!all){
+    return '<div class="empty-icon">📭</div>'
+      + '<div class="empty-t">目前還沒有任何報表。</div>'
+      + '<div class="empty-s">如果你剛打開，可能還在跟雲端拿資料，等一兩秒。</div>';
+  }
+  const vis=visibleReports();
+  if(!vis.length){
+    const u=S.user||{};
+    const depts=[...new Set((S.reports||[]).map(function(r){
+      return (r&&r.dept)||((r&&r.workItems||[]).map(function(w){return w&&w.dept}).filter(Boolean)[0])||'';
+    }).filter(Boolean))];
+    return '<div class="empty-icon">🔒</div>'
+      + '<div class="empty-t">目前有 <b>'+all+' 張報表</b>，但你的身分看不到。</div>'
+      + '<div class="empty-s">你的身分是「<b>'+escHtml(u.dept||'（沒有部門）')+'</b>」，'+_viewLevelWord()+'——'
+      + (depts.length ? '而這些報表都屬於「'+escHtml(depts.join('、'))+'」。' : '而這些報表不在你的範圍內。')
+      + '<br>要看全部，請從入口網頁換身分，或找系統管理員調整權限。</div>';
+  }
+  const conds=[];
+  let clearFn='clearMgFilters()';
+  if(scope==='hist'){
+    clearFn='clearHistFilters()';
+    const g=function(id){ const e=$(id); return e&&e.value?e.value:''; };
+    if(g('filter-month'))conds.push('月份 '+escHtml(g('filter-month')));
+    if(g('filter-date'))conds.push('日期 '+escHtml(g('filter-date')));
+    if(g('filter-dept'))conds.push('部門「'+escHtml(g('filter-dept'))+'」');
+    if(g('filter-proj'))conds.push('案場「'+escHtml(g('filter-proj'))+'」');
+    if(g('filter-reporter'))conds.push('填表人「'+escHtml(g('filter-reporter'))+'」');
+  }else{
+    const f=mgFilter();
+    if(f.from||f.to)conds.push('日期 '+(f.from||'不限')+' ～ '+(f.to||'不限'));
+    if(f.dept)conds.push('部門「'+escHtml(f.dept)+'」');
+    /* cdr-pm 的案場篩選存的是 id，要換回名字；cdr-mm 沒有這個函式，所以先檢查再用 */
+    if(f.proj)conds.push('案場「'+escHtml((typeof projNameById==='function'&&projNameById(f.proj))||f.proj)+'」');
+  }
+  if(conds.length){
+    return '<div class="empty-icon">🗂️</div>'
+      + '<div class="empty-t">你看得到 <b>'+vis.length+' 張報表</b>，但目前的篩選一張都對不上。</div>'
+      + '<div class="empty-s">正在生效：'+conds.join('・')
+      + '<br><button type="button" class="btn btn-o btn-sm" id="empty-clear" style="margin-top:8px" '
+      + 'onclick="'+clearFn+'">清除全部篩選</button></div>';
+  }
+  return '<div class="empty-icon">📭</div><div class="empty-t">尚無符合條件的報表</div>';
+}
 function mgFilter(){
   return { from:($('mg-from')||{}).value||'', to:($('mg-to')||{}).value||'',
            dept:($('mg-dept')||{}).value||'', proj:($('mg-proj')||{}).value||'' };
@@ -3795,6 +4677,7 @@ function renderMgmt(){
   list=sortReports(list);
   const tbody=$('master-tbody'); tbody.innerHTML='';
   $('mgmt-empty').style.display=list.length?'none':'block';
+  if(!list.length)$('mgmt-empty').innerHTML=emptyWhyHtml('mgmt');   /* 0 筆要講出原因（2026-09-22） */
   renderMgmtHead(); syncGroupButtons();
   const byProj=groupMode==='proj';
   const force=mgmtFilterActive();          // 篩選後一律展開
@@ -3805,17 +4688,18 @@ function renderMgmt(){
   groups.forEach((g,gi)=>{
     const key=g[0], rows=g[1];
     const open=force||groupOpen(key);
-    const s0=rows.reduce((s,r)=>s+(r.workItems||[]).reduce((x,wi)=>x+(wi.w0||0),0),0);
+    const s0=rows.reduce((s,r)=>s+repW0Total(r),0);          // 2026-09-18：內部＋廠商
+    const s0i=rows.reduce((s,r)=>s+repW0Inner(r),0);
     const head=document.createElement('tr');
     head.className='grp-row';
     head.innerHTML=`<td colspan="${COLS}"><div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
       <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
-      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}</span></div></td>`;
+      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}${s0i?`（內部 ${num(s0i)}／廠商 ${num(s0-s0i)}）`:''}</span></div></td>`;
     tbody.appendChild(head);
     if(!open)return;
     rows.forEach(r=>{
-      const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
-      const t1=(r.workItems||[]).reduce((s,wi)=>s+(wi.w1||0),0);
+      const t0=repW0Total(r);        // 2026-09-18：內部同仁＋廠商
+      const t1=repW1(r);             // 明日預估只有施工明細（廠商）有
       const tr=document.createElement('tr');
       tr.className='master-row';
       tr.innerHTML=`
@@ -3823,7 +4707,7 @@ function renderMgmt(){
         <td${byProj?'':' style="font-weight:700"'}>${byProj?r.date:escHtml(reportProjName(r)||'（未指定案場）')}</td>
         <td>${escHtml(reportDeptText(r))}</td>
         <td>${escHtml(reportReporterText(r))}</td>
-        <td style="text-align:center;font-weight:700">${num(t0)}</td>
+        <td style="text-align:center;font-weight:700">${w0Text(r,num)}</td>
         <td style="text-align:center">${num(t1)}</td>`;
       tbody.appendChild(tr);
       const det=document.createElement('tr');
@@ -3842,12 +4726,24 @@ function toggleDetail(btn,id){
   if(!open){
     const r=S.reports.find(x=>x.id===id); if(!r)return;
     const inner=$('det-inner-'+id);
+    /* 2026-09-18 她指定：展開後先列案件明細（內部同仁），再列施工明細（廠商） */
+    const caseRows=caseItemsOf(r).map((ci,i)=>`
+      <tr><td>${i+1}</td><td><span class="st-chip ${escHtml(stClassName(ci.status))}">${escHtml(ci.status||'—')}</span></td>
+      <td>${escHtml(ci.loc||'—')}</td><td>${escHtml(ci.work||'—')}</td>
+      <td>${escHtml(ci.vendor||'—')}</td><td>${escHtml(ci.staff||'—')}</td>
+      <td style="text-align:center">${ci.w0||0}</td><td>${ci.progress||0}%</td>
+      <td>${escHtml(ci.owner||'—')}</td><td>${subTimeText(ci.subAt)||'—'}</td></tr>`).join('');
     const rows=(r.workItems||[]).map((wi,i)=>`
       <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
       <td>${escHtml(wi.work||'—')}</td><td>${escHtml(wiVendor(wi)||'—')}</td><td>${escHtml(wiStaff(wi)||'—')}</td>
       <td style="text-align:center">${wi.w0||0}</td><td>${wi.progress||0}%</td>
       <td>${escHtml(wi.owner||'—')}</td><td>${subTimeText(wi.subAt)||'—'}</td></tr>`).join('');
     inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
+      ${caseRows?`<div class="det-sec">案件明細（內部同仁）</div>
+      <table class="stbl" style="font-size:12px;margin-bottom:10px">
+      <thead><tr><th>#</th><th>狀態</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
+      <tbody>${caseRows}</tbody></table>
+      <div class="det-sec">施工明細（廠商）</div>`:''}
       <table class="stbl" style="font-size:12px">
       <thead><tr><th>#</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--muted)">無明細</td></tr>'}</tbody></table>
@@ -3886,13 +4782,55 @@ function getMgmtRows(){
   }));
   return sortExRows(rows);
 }
+/* 管理總表要匯出的「案件明細」列（2026-09-18）——
+ * 判準跟 getMgmtRows 同一套（都走 mgReports／mg-* 那組篩選條件），
+ * 這樣畫面上看到哪幾張，Excel 裡的案件明細就是那幾張的。 */
+/* 管理總表要匯出的材料列（2026-09-18）——條件與 getMgmtCaseRows 同一套 */
+function getMgmtMatRows(){
+  const f=mgFilter();
+  const rows=[];
+  mgReports().forEach(r=>{
+    const rpid=reportProjId(r);
+    if(f.proj && rpid!==f.proj) return;
+    const pnm=rpid?(r.projName||reportProjName(r)):(reportProjName(r)||'');
+    (r.materials||[]).forEach(m=>{
+      if(!m||!m.name)return;
+      rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:rpid||'',projName:pnm,
+        matLoc:m.loc||"",   // 施作位置（2026-09-20）
+        matName:m.name,matUnit:m.unit||"",matQty:m.qty,matNote:m.note||"",matOwner:m.owner||""});
+    });
+  });
+  return sortExRows(rows);
+}
+function getMgmtCaseRows(){
+  const f=mgFilter();
+  const rows=[];
+  mgReports().forEach(r=>{
+    const rpid=reportProjId(r);
+    if(f.proj && rpid!==f.proj) return;
+    const pnm=rpid?(r.projName||reportProjName(r)):(reportProjName(r)||'');
+    caseItemsOf(r).forEach(ci=>{
+      if(!ci) return;
+      rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:rpid||'',projName:pnm,
+        status:ci.status||'',loc:ci.loc||'',work:ci.work||'',wdesc:ci.wdesc||'',
+        vendor:ci.vendor||'',staff:ci.staff||'',w0:ci.w0||0,progress:ci.progress||0,
+        note:ci.note||'',owner:ci.owner||''});
+    });
+  });
+  return sortExRows(rows);
+}
 function exportMgmtExcel(){
   /* 匯出的是「畫面上這個檢視」的內容（2026-09-02）：
      報表清單走原本的工項格式，三張統計各自輸出自己的表 —— 看到什麼就匯出什麼。 */
   if(mgView==='list'){
     const rows=getMgmtRows();
-    if(!rows.length){toast('無符合條件的資料','e');return;}
-    doExportExcel(rows);
+    /* 2026-09-18：案件明細也要跟著出（她在管理總表按匯出、卻沒看到那個分頁）。
+       只有案件明細、沒有施工明細的日報也要匯得出來 → 兩邊都空才擋。 */
+    const caseRows=getMgmtCaseRows();
+    /* 2026-09-18：這裡原本沒送材料 → 匯出少了「材料明細」分頁（報表下載那條路一直都有） */
+    const matRows=getMgmtMatRows();
+    if(!rows.length&&!caseRows.length&&!matRows.length){toast('無符合條件的資料','e');return;}
+    doExportExcel(rows,matRows,caseRows,'管理總表');
     return;
   }
   /* Excel 是平的表，沒有抬頭可用 → 案場放第一欄（2026-09-02 用戶指定「案場移至最前面」） */
@@ -3936,8 +4874,8 @@ async function exportStatExcel(title,headers,body){
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     const f=mgFilter();
-    const span=(f.from||f.to)?('_'+(f.from||'起')+'_'+(f.to||'訖')):'';
-    a.download="日報表-瑪摩工程"+'-'+title+span+'.xlsx'; a.click();
+    const span=(f.from||f.to)?('_'+spanText(f.from||'起',f.to||'訖')):'';
+    a.download='瑪摩工程_管理總表_'+title+span+'.xlsx'; a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
@@ -4038,6 +4976,51 @@ function getExRows(){
  * 2026-09-11 下午：她指定「瑪摩一起改」→ 材料的填寫畫面補上了備註與填表人，
  *   所以這裡也跟著帶出來，欄位與 cdr-pm 完全一致（9 欄）。
  * ⚠️ 施作位置／今日廠商／出工數是**工項層**的條件，材料沒有這些欄位 → 刻意不套用。 */
+/* 案件明細（內部同仁）的匯出列（2026-09-18）——
+   條件跟工項那邊同一套（exReportPass、案場篩選），欄位就是畫面上那張表。 */
+function getExCaseRows(){
+  const f=exFilters();
+  const rows=[];
+  visibleReports().forEach(r=>{
+    if(!exReportPass(r,f))return;
+    const rpid=reportProjId(r);
+    const pid=rpid||'';
+    if(f.projIds.size>0&&!f.projIds.has(pid))return;
+    const pnm=rpid?(r.projName||reportProjName(r)):(reportProjName(r)||'');
+    caseItemsOf(r).forEach(ci=>{
+      if(!ci)return;
+      if(f.loc&&ci.loc!==f.loc)return;
+      rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:pid,projName:pnm,
+        status:ci.status||'',loc:ci.loc||'',work:ci.work||'',wdesc:ci.wdesc||'',
+        vendor:ci.vendor||'',staff:ci.staff||'',w0:ci.w0||0,progress:ci.progress||0,
+        note:ci.note||'',owner:ci.owner||''});
+    });
+  });
+  return sortExRows(rows);
+}
+const EX_CASE_HEADERS=['日期','部門','專案工務','案場','狀態','施作位置','施工項目','施工說明','今日廠商','施工人員','今日出工','完成進度%','備註','填表人'];
+const EX_CASE_COLW=[13,12,14,24,12,16,16,28,14,12,10,11,24,12];
+/* 比照材料明細分頁（2026-09-11 方案 C）：第一頁完全不動，案件明細自己一張分頁 */
+function addCaseSheet(wb, caseRows){
+  if(!caseRows||!caseRows.length) return null;
+  const ws=wb.addWorksheet('案件明細');
+  ws.addRow(EX_CASE_HEADERS);
+  ws.getRow(1).eachCell(cell=>{
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+    cell.font={color:{argb:'FFFFFFFF'},bold:true};
+    cell.alignment={horizontal:'center',vertical:'middle'};
+    cell.border={bottom:{style:'thin',color:{argb:'FF93C5FD'}}};
+  });
+  ws.getRow(1).height=22;
+  caseRows.forEach((r,i)=>{
+    const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.status||'',r.loc||'',r.work||'',
+      r.wdesc||'',r.vendor||'',r.staff||'',r.w0,r.progress,r.note||'',r.owner||'']);
+    if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
+    row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
+  });
+  ws.columns=EX_CASE_COLW.map(w=>({width:w}));
+  return ws;
+}
 function getExMatRows(){
   const f=exFilters();
   const rows=[];
@@ -4053,7 +5036,8 @@ function getExMatRows(){
       if(!m||!m.name)return;
       if(f.mat&&m.name!==f.mat)return;
       rows.push({date:r.date,dept:r.dept,reporter:reportReporterText(r),projId:pid,projName:pnm,
-        matName:m.name,matUnit:m.unit||'',matQty:m.qty,matNote:m.note||'',matOwner:m.owner||''});
+        matLoc:m.loc||"",   // 施作位置（2026-09-20）
+        matName:m.name,matUnit:m.unit||"",matQty:m.qty,matNote:m.note||"",matOwner:m.owner||""});
     });
   });
   return sortExRows(rows);
@@ -4102,8 +5086,9 @@ function previewExport(){
 function doExport(){
   const rows=getExRows();
   const matRows=getExMatRows();
-  if(!rows.length&&!matRows.length){toast('無符合條件的資料','e');return;}
-  doExportExcel(rows,matRows);
+  const caseRows=getExCaseRows();          // 2026-09-18 案件明細分頁
+  if(!rows.length&&!matRows.length&&!caseRows.length){toast('無符合條件的資料','e');return;}
+  doExportExcel(rows,matRows,caseRows);
 }
 
 /* ── 材料明細工作表（2026-09-11，總表匯出方案 C）──
@@ -4111,8 +5096,9 @@ function doExport(){
  * 欄位順序照瑪摩第一頁的習慣（日期在前、案場第四），後面接材料本身的五欄。
  * 沒有材料就不建這張表：不要留一張只有表頭的空分頁。
  * 2026-09-11 下午：補上備註與填表人（7 欄 → 9 欄），內容與 cdr-pm 一致，只有前四欄的順序不同。 */
-const EX_MAT_HEADERS=['日期','部門','專案工務','案場','材料名稱','單位','數量','備註','填表人'];
-const EX_MAT_COLW=[12,14,14,20,20,8,9,18,12];
+/* 2026-09-20：材料掛在施作位置底下 → 多一欄「施作位置」，排在材料名稱前面（跟畫面同順序） */
+const EX_MAT_HEADERS=['日期','部門','專案工務','案場','施作位置','材料名稱','單位','數量','備註','填表人'];
+const EX_MAT_COLW=[12,14,14,20,16,20,8,9,18,12];
 function addMatSheet(wb, matRows){
   if(!matRows||!matRows.length) return null;
   const ws=wb.addWorksheet('材料明細');
@@ -4126,7 +5112,7 @@ function addMatSheet(wb, matRows){
   ws.getRow(1).height=22;
   matRows.forEach((r,i)=>{
     const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',
-      r.matName||'',r.matUnit||'',r.matQty,r.matNote||'',r.matOwner||'']);
+      r.matLoc||'',r.matName||'',r.matUnit||'',r.matQty,r.matNote||'',r.matOwner||'']);
     if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
     row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
   });
@@ -4135,14 +5121,34 @@ function addMatSheet(wb, matRows){
 }
 
 /* ── EXCEL EXPORT ── */
-async function doExportExcel(rows, matRows){
-  /* 2026-09-11：材料另開分頁後，「只有材料沒有工項」也是合法的一份 —— 兩邊都空才擋 */
-  if((!rows||!rows.length)&&(!matRows||!matRows.length)){toast('無資料可匯出','e');return;}
+
+/* ── 匯出檔名（2026-09-18 她指定）────────────────────────────────
+ * 格式：<系統>_<來源>_<案場>_<日期>.xlsx
+ *   · 拿掉開頭重複的「日報表-」，系統名本身就分得出是哪一支
+ *   · 來源＝日報填寫／管理總表／報表下載 —— 照名稱排序時會自動分堆
+ *   · 案場：單張就是那張的案場；區間匯出有多個案場就寫「多案場」
+ *   · 日期放最後，同一類裡照日期排 */
+/* 2026-09-18 她指定：日期區間中間用「～」，不要再用底線 ——
+ * 底線固定當「系統_來源_案場_日期」的欄位分隔；區間也用底線，看起來就多一段（她誤會成兩個案場）。
+ * 同一年就不重複寫年份：2026-09-17～09-18。單日、或只有一邊有值時照原樣。 */
+function spanText(from, to){
+  if(!from || !to) return from || to || '';
+  if(from === to) return from;
+  return from + '～' + (String(from).slice(0, 4) === String(to).slice(0, 4) ? String(to).slice(5) : to);
+}
+function exFileName(source, projName, dateSpan){
+  const pn = projName ? safeName(projName).replace(/\s+/g, '') : '';
+  return '瑪摩工程_' + source + (pn ? '_' + pn : '') + '_' + (dateSpan || today()) + '.xlsx';
+}
+async function doExportExcel(rows, matRows, caseRows, source){
+  /* 2026-09-11：材料另開分頁後，「只有材料沒有工項」也是合法的一份 —— 三邊都空才擋
+     （2026-09-18 再加上案件明細）*/
+  if((!rows||!rows.length)&&(!matRows||!matRows.length)&&(!caseRows||!caseRows.length)){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
-    const ws=wb.addWorksheet('日報表-瑪摩工程');
-    const headers=['日期','部門','專案工務','案場','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','備註'];
+    const ws=wb.addWorksheet('施工明細');   // 2026-09-18 她指定（原本叫「日報表-瑪摩工程」）
+    const headers=['日期','部門','專案工務','案場','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成進度%','異常類型','備註','填表人'];   // 2026-09-18 補填表人（專案管理本來就有）
     ws.addRow(headers);
     ws.getRow(1).eachCell(cell=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
@@ -4153,22 +5159,26 @@ async function doExportExcel(rows, matRows){
     ws.getRow(1).height=22;
     (rows||[]).forEach((r,i)=>{
       const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.loc||'',r.work||'',r.wdesc||'',
-        wiVendor(r),wiStaff(r),r.w0,wiVendor2(r),wiStaff2(r),r.w1,r.progress,atypeText(r.atype),r.anote||'']);
+        wiVendor(r),wiStaff(r),r.w0,wiVendor2(r),wiStaff2(r),r.w1,r.progress,atypeText(r.atype),r.anote||'',r.owner||'']);
       if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
       row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
     });
     /* 2026-09-13：第 7 個寬度是新的「施工說明」欄（會寫字，給寬一點）。
        這份清單本來就比表頭短（最後兩欄沿用預設寬），維持原樣不動。 */
-    ws.columns=[110,90,70,160,120,120,180,90,60,90,60,70,90,160].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
+    ws.columns=[110,90,70,160,120,120,180,90,60,90,60,70,90,160,90].map((w,i)=>({header:headers[i],key:i,width:Math.round(w/6)}));
     /* 材料明細（2026-09-11 方案 C）—— 第一頁的欄寬設定完才掛，兩張表互不干擾 */
     addMatSheet(wb, matRows);
+    addCaseSheet(wb, caseRows);   // 案件明細（2026-09-18，同一套做法）
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     /* 2026-09-11：日期區間要把材料列一起算，否則「只有材料」的匯出檔名會掉出正確區間 */
-    const dates=(rows||[]).concat(matRows||[]).map(r=>r.date).filter(Boolean).sort();
-    const fnDate=dates.length?(dates[0]===dates[dates.length-1]?dates[0]:`${dates[0]}_${dates[dates.length-1]}`):today();
-    a.download=`日報表-瑪摩工程_${fnDate}.xlsx`; a.click();
+    const _all=(rows||[]).concat(matRows||[]).concat(caseRows||[]);
+    const dates=_all.map(r=>r.date).filter(Boolean).sort();
+    const fnDate=dates.length?spanText(dates[0],dates[dates.length-1]):today();
+    /* 檔名也要看得出案場（2026-09-18 她指定，跟專案管理一致）；跨多個案場就標「多案場」 */
+    const _pns=[...new Set(_all.map(r=>r.projName).filter(Boolean))];
+    a.download=exFileName(source||'報表下載', _pns.length===1 ? _pns[0] : (_pns.length>1 ? '多案場' : ''), fnDate); a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
@@ -4181,9 +5191,10 @@ async function exportExcel(){
   syncReport();
   const r=S.report;
   const hasWork=(r.workItems||[]).length>0;
+  const hasCase=caseItemsOf(r).length>0;          // 2026-09-18 案件明細
   const hasMat=(r.materials||[]).length>0;
   const hasNote=!!(r.notes?.contact||r.notes?.other);
-  if(!hasWork&&!hasMat&&!hasNote){toast('無資料可匯出','e');return;}
+  if(!hasWork&&!hasCase&&!hasMat&&!hasNote){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
@@ -4205,9 +5216,23 @@ async function exportExcel(){
     const info=ws.addRow(['日期',r.date||'','部門',r.dept||'','填報人',r.reporter||'','天氣',r.weather||'']);
     [1,3,5,7].forEach(c=>{const cell=info.getCell(c);cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};});
     ws.addRow([]);
-    // 工項
+    /* 案件明細（內部同仁）2026-09-18 —— 她指定排在施工明細上面。
+       欄位跟畫面上那張表一致；沒有明日出工與異常類型。 */
+    if(hasCase){
+      const tr=ws.addRow(['【案件明細（內部同仁）】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      const headers=['#','狀態','施作位置','施工項目','施工說明','今日廠商','施工人員','今日出工','完成%','備註','填表人'];
+      const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
+      caseItemsOf(r).forEach((ci,i)=>{
+        const row=ws.addRow([i+1,ci.status||'',ci.loc||'',ci.work||'',ci.wdesc||'',ci.vendor||'',ci.staff||'',
+                             ci.w0||0,ci.progress||0,ci.note||'',ci.owner||'']);
+        if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
+        row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
+      });
+      ws.addRow([]);
+    }
+    // 工項（＝施工明細（廠商））
     if(hasWork){
-      const tr=ws.addRow(['【今日工項】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      const tr=ws.addRow(['【施工明細（廠商）】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
       const headers=['#','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','備註'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.workItems||[]).forEach((wi,i)=>{
@@ -4219,13 +5244,14 @@ async function exportExcel(){
     }
     // 材料
     if(hasMat){
-      const tr=ws.addRow(['【材料管制】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+      const tr=ws.addRow(['【材料明細】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
       /* 2026-09-11：備註欄從 09-07 起就印在這裡，但畫面上一直沒得填 → 永遠是空的。
          今天補了填寫欄位，這一欄才真的有東西。順便比照 cdr-pm 加上「填表人」。 */
-      const headers=['#','材料名稱','單位','數量','備註','填表人'];
+      /* 2026-09-20：材料掛在施作位置底下 → 多一欄「施作位置」，排在材料名稱前面 */
+      const headers=['#','施作位置','材料名稱','單位','數量','備註','填表人'];
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
       (r.materials||[]).forEach((m,i)=>{
-        const row=ws.addRow([i+1,m.name||'',m.unit||'',m.qty||0,m.note||'',m.owner||'']);
+        const row=ws.addRow([i+1,m.loc||'',m.name||'',m.unit||'',m.qty||0,m.note||'',m.owner||'']);
         if(i%2===1) row.eachCell(c=>c.fill={type:'pattern',pattern:'solid',fgColor:ALT});
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
@@ -4241,7 +5267,7 @@ async function exportExcel(){
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download=`日報表-瑪摩工程_${r.date||today()}.xlsx`; a.click();
+    a.download=exFileName('日報填寫', reportProjName(r), r.date||today()); a.click();
     toast('Excel 已匯出','s');
   }catch(e){toast('匯出失敗：'+e.message,'e');}
 }
@@ -4289,6 +5315,9 @@ const TL_DEFS = {
 const tlCollapsed = { loc:{}, vendor:{} };   // 記住哪些群組收合中，重繪後維持原狀
 
 function renderTwoLevel(kind){
+  /* 2026-09-20：施作位置改成第 2 步的新版面（左邊位置、右邊施工項目與材料），
+     但新增／改名／刪除仍沿用下面那幾支 tl*，所以在這裡轉給新的渲染器。 */
+  if(kind === 'loc'){ renderLocStep(); return; }
   const def=TL_DEFS[kind], host=$(def.host);
   if(!host) return;
   const parents=S.cfg[def.parentKey]||[], map=S.cfg[def.childKey]||{}, canDel=portalCanDelete();
@@ -4309,6 +5338,7 @@ function renderTwoLevel(kind){
     return `<div class="tl-group${collapsed}">
         <div class="tl-head">
           <button class="tl-toggle" onmousedown="event.preventDefault();tlToggle('${kind}',${pi})" title="展開／收合">${collapsed?'▶':'▼'}</button>
+          <span class="tl-no">${pi+1}</span>
           <input type="text" value="${escHtml(p)}" placeholder="${def.parentName}名稱" onblur="tlRenameParent('${kind}',${pi},this.value)">
           <span class="tl-count">${kids.length} 項</span>
           ${canDel?`<button class="btn btn-g btn-icon btn-sm" onmousedown="event.preventDefault();tlDelParent('${kind}',${pi})" title="刪除整個${def.parentName}">✕</button>`:''}
@@ -4325,6 +5355,183 @@ function tlToggle(kind,pi){
   tlCollapsed[kind][p]=!tlCollapsed[kind][p];
   renderTwoLevel(kind);
 }
+
+/* ══════ 第 2 步：左邊施作位置，右邊三個分頁（2026-09-20 她指定的版面）══════
+ * 分頁順序是她排的：① 施工項目 → ② 材料單位（全公司共用） → ③ 材料名稱。
+ * 材料的單位不是下拉，是按一下跳出共用單位清單讓她挑（她選甲）。
+ * 跟兩層編輯器一樣：改到什麼當下就寫進 S.cfg，按「💾 儲存設定」才真的存檔＋推雲端。
+ * ⚠️ 刪除鈕一律 onmousedown + preventDefault（input 的 onblur 會先重繪，onclick 會按不動）。 */
+var _locSel = '';
+var _locTab = 0;        // 0 施工項目 ／ 1 材料單位 ／ 2 材料名稱
+var _matPick = -1;      // 正在挑單位的那一列（-1 ＝ 沒有）
+var LOC_TABS = [
+  { t:'🔧 施工項目', pane:'loc-pane-work', add:'＋ 新增施工項目',
+    hint:'這個施作位置底下的施工項目' },
+  { t:'📐 材料單位', pane:'loc-pane-unit', add:'＋ 新增單位',
+    hint:'全公司共用的一份清單 —— 在哪個施作位置編輯都一樣' },
+  { t:'📦 材料名稱', pane:'loc-pane-mat', add:'＋ 新增材料',
+    hint:'這個位置會用到的材料；單位從第 ② 頁的清單挑' },
+];
+function locSelName(){
+  var order = matLocOrder();
+  if(order.indexOf(_locSel) < 0) _locSel = order[0] || '';
+  return _locSel;
+}
+function locTabTo(n){
+  if(!(n >= 0 && n <= 2)) return;
+  _locTab = n; _matPick = -1;
+  renderLocStep();
+}
+function locAddCurrent(){
+  if(_locTab === 0) return locWorkAdd();
+  if(_locTab === 1) return addListRow('lf-matunits');
+  return locMatAdd();
+}
+function renderLocStep(){
+  var rail = $('loc-rail'), head = $('loc-head'), tabs = $('loc-tabs'), bar = $('loc-bar');
+  if(!rail || !head) return;
+  var order = matLocOrder(), cur = locSelName();
+  var works = S.cfg.worksByLoc || {}, canDel = portalCanDelete();
+  var title = $('loc-rail-title');
+  if(title) title.textContent = '施作位置（' + order.length + '）';
+
+  if(!order.length){
+    rail.innerHTML = '<div class="empty-rail">還沒有施作位置<br>點右上「＋ 新增」開始建立</div>';
+    head.innerHTML = '<span style="font-size:12.5px;color:var(--muted)">建立施作位置之後，就可以在這裡設定它的施工項目與材料</span>';
+    if(tabs) tabs.innerHTML = '';
+    if(bar) bar.innerHTML = '';
+    ['loc-pane-work','loc-pane-mat'].forEach(function(id){ var e = $(id); if(e) e.innerHTML = ''; });
+    LOC_TABS.forEach(function(T, i){ var e = $(T.pane); if(e) e.style.display = (i === 1) ? '' : 'none'; });
+    return;
+  }
+
+  /* 左邊：位置清單（名稱一行，數量做成底下的小標籤 —— 長名稱才不會被擠） */
+  rail.innerHTML = order.map(function(name){
+    var w = (works[name] || []).length, m = matsOfLoc(name).length;
+    return '<button type="button" class="loc-i' + (name === cur ? ' on' : '') + '"'
+      + ' onclick="locPick(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">'
+      + '<b>' + escHtml(name) + '</b>'
+      + '<em><i>' + w + ' 項</i><i>' + m + ' 材</i></em></button>';
+  }).join('');
+
+  /* 右邊：位置名稱 ＋ 刪除 */
+  var li = (S.cfg.locs || []).indexOf(cur);
+  head.innerHTML = (li >= 0
+      ? '<input type="text" value="' + escHtml(cur) + '" placeholder="施作位置名稱" onblur="tlRenameParent(\'loc\',' + li + ',this.value)">'
+      : '<input type="text" value="' + escHtml(cur) + '" disabled title="這是舊材料自動歸的一組，要改名請先新增正式的施作位置">')
+    + (canDel && li >= 0
+      ? '<button class="btn btn-g btn-sm" onmousedown="event.preventDefault();tlDelParent(\'loc\',' + li + ')" title="刪除整個施作位置">✕ 刪除</button>'
+      : '');
+
+  /* 分頁列（帶數量） */
+  var kids = works[cur] || [], mats = matsOfLoc(cur), units = S.cfg.matUnits || [];
+  var counts = [kids.length, units.length, mats.length];
+  if(tabs) tabs.innerHTML = LOC_TABS.map(function(T, i){
+    return '<button type="button" class="' + (i === _locTab ? 'on' : '') + '" onclick="locTabTo(' + i + ')">'
+      + T.t + '<span class="b">' + counts[i] + '</span></button>';
+  }).join('');
+  if(bar) bar.innerHTML = '<span>' + LOC_TABS[_locTab].hint + '</span>'
+    + '<button class="btn btn-a btn-sm" data-mng onclick="locAddCurrent()">' + LOC_TABS[_locTab].add + '</button>';
+
+  /* 分頁內容：① 施工項目 */
+  var wp = $('loc-pane-work');
+  if(wp) wp.innerHTML = kids.length
+    ? kids.map(function(k, ki){
+        return '<div class="loc-row"><span class="list-num">' + (ki + 1) + '</span>'
+          + '<input type="text" value="' + escHtml(k) + '" placeholder="施工項目名稱"'
+          + ' onblur="tlRenameChild(\'loc\',' + li + ',' + ki + ',this.value)"' + (li < 0 ? ' disabled' : '') + '>'
+          + (canDel && li >= 0 ? '<button class="btn btn-g btn-icon btn-sm" onmousedown="event.preventDefault();tlDelChild(\'loc\',' + li + ',' + ki + ')" title="刪除">✕</button>' : '<span></span>')
+          + '</div>';
+      }).join('')
+    : '<div class="loc-none">這個位置底下還沒有施工項目</div>';
+
+  /* 分頁內容：③ 材料名稱（單位是按鈕，點了跳共用清單挑） */
+  var mp = $('loc-pane-mat');
+  if(mp) mp.innerHTML = '<div class="loc-sub"><span></span><span>材料名稱</span><span style="text-align:center">單位</span><span></span></div>'
+    + (mats.length
+      ? mats.map(function(m, mi){
+          var unit = String(m.unit || '').trim();
+          var sug = unit ? '' : matUnitSuggest(m.name);
+          var shown = unit || (sug ? sug + '（建議）' : '選擇');
+          /* 2026-09-21：原本是絕對定位的小視窗，被 .loc-main 的 overflow:hidden 裁掉
+             （她回報「第 3 個品項時整個框被遮住」）→ 改成就地展開的一整列，不會被裁到 */
+          var pop = (_matPick === mi)
+            ? '<div class="unit-open"><b>選一個單位</b><div class="chips">'
+              + (units.length ? units.map(function(u){
+                  return '<span class="chip' + (u === unit ? ' on' : '') + '"'
+                    + ' onmousedown="event.preventDefault();locMatUnit(' + mi + ',' + JSON.stringify(u).replace(/"/g, '&quot;') + ')">'
+                    + escHtml(u) + '</span>';
+                }).join('') : '<span class="chip none">第 ② 頁「材料單位」還沒有單位，先去那一頁新增</span>')
+              + '<span class="chip none" onmousedown="event.preventDefault();locMatUnit(' + mi + ',\'\')">清除</span>'
+              + '</div></div>'
+            : '';
+          return '<div class="loc-row mat"><span class="list-num">' + (mi + 1) + '</span>'
+            + '<input type="text" value="' + escHtml(m.name || '') + '" placeholder="材料名稱" onblur="locMatRename(' + mi + ',this.value)">'
+            + '<span class="unit-pick"><button type="button" class="u" data-mng onclick="locPickUnit(' + mi + ')">'
+            + escHtml(shown) + ' ▾</button></span>'
+            + (canDel ? '<button class="btn btn-g btn-icon btn-sm" onmousedown="event.preventDefault();locMatDel(' + mi + ')" title="刪除">✕</button>' : '<span></span>')
+            + '</div>' + pop;
+        }).join('')
+      : '<div class="loc-none">這個位置底下還沒有材料</div>');
+
+  /* 只顯示目前那一頁（單位那一頁一定要留在 DOM 裡，存檔才讀得到） */
+  LOC_TABS.forEach(function(T, i){ var e = $(T.pane); if(e) e.style.display = (i === _locTab) ? '' : 'none'; });
+}
+function locPick(name){ _locSel = name; _matPick = -1; renderLocStep(); }
+function locPickUnit(mi){ _matPick = (_matPick === mi) ? -1 : mi; renderLocStep(); }
+/* 材料那幾支：全部直接改 S.cfg.matsByLoc[目前位置] */
+function locMatsArr(){
+  var cur = locSelName(); if(!cur) return null;
+  var m = matsMap();
+  if(!Array.isArray(m[cur])) m[cur] = [];
+  return m[cur];
+}
+function locMatAdd(){
+  if(mngGuard())return;
+  var arr = locMatsArr(); if(!arr) return;
+  arr.push({ name:'', unit:'' });
+  _locTab = 2; _matPick = -1;
+  renderLocStep();
+  var inputs = $('loc-pane-mat') ? $('loc-pane-mat').querySelectorAll('.loc-row input[type=text]') : [];
+  var last = inputs[inputs.length - 1];
+  if(last) last.focus();
+}
+function locMatRename(mi, val){
+  if(mngGuard()){ renderLocStep(); return; }
+  var arr = locMatsArr(); if(!arr || !arr[mi]) return;
+  var name = String(val || '').trim();
+  if(name && arr.some(function(x, i){ return i !== mi && String(x.name || '').trim() === name; })){
+    toast('這個位置底下已經有「' + name + '」','e'); renderLocStep(); return;
+  }
+  if(arr[mi].name === name) return;        // 沒改就不重繪，否則會把接著的按鈕點擊吃掉
+  arr[mi].name = name;
+  renderLocStep();
+}
+function locMatUnit(mi, val){
+  if(mngGuard()){ renderLocStep(); return; }
+  var arr = locMatsArr(); if(!arr || !arr[mi]) return;
+  arr[mi].unit = String(val || '').trim();
+  _matPick = -1;
+  renderLocStep();
+}
+function locMatDel(mi){
+  if(mngGuard())return;
+  if(!requireDelete()) return;
+  var arr = locMatsArr(); if(!arr || !arr[mi]) return;
+  var name = String(arr[mi].name || '').trim();
+  if(name && !confirm('確定刪除材料「' + name + '」？\n（只從這個施作位置底下移除，其他位置的同名材料不受影響）')) return;
+  arr.splice(mi, 1);
+  _matPick = -1;
+  renderLocStep();
+}
+/* 施工項目沿用兩層編輯器那幾支，只是畫在新的版面上 */
+function locWorkAdd(){
+  var li = (S.cfg.locs || []).indexOf(locSelName());
+  if(li < 0){ toast('「' + MAT_NO_LOC + '」是舊材料暫放的一組，請先新增正式的施作位置','e'); return; }
+  _locTab = 0;
+  tlAddChild('loc', li);
+}
+
 function tlAddParent(kind){
   if(mngGuard())return;
   const def=TL_DEFS[kind], arr=S.cfg[def.parentKey];
@@ -4333,9 +5540,15 @@ function tlAddParent(kind){
   arr.push(name);
   S.cfg[def.childKey][name]=[];
   tlCollapsed[kind][name]=false;
+  if(kind==='loc') _locSel = name;          // 新增的位置直接選起來（2026-09-20 新版面）
   renderTwoLevel(kind);
-  const inp=$(def.host).querySelectorAll('.tl-head > input')[arr.length-1];
+  const host=$(def.host);
+  const inp=host && host.querySelectorAll('.tl-head > input')[arr.length-1];
   if(inp){ inp.focus(); inp.select(); }
+  else if(kind==='loc'){
+    const li=$('loc-main') && $('loc-main').querySelector('.loc-head input');
+    if(li && !li.disabled){ li.focus(); li.select(); }
+  }
 }
 function addLocGroup(){ tlAddParent('loc'); }
 function addVendorGroup(){ tlAddParent('vendor'); }
@@ -4349,6 +5562,11 @@ function tlRenameParent(kind,pi,val){
   arr[pi]=name;
   map[name]=map[old]||[];
   delete map[old];
+  if(kind==='loc'){                      // 位置改名 → 掛在它底下的材料跟著搬（2026-09-20）
+    const mm=matsMap();
+    if(mm[old]){ mm[name]=mm[old]; delete mm[old]; }
+    if(_locSel===old) _locSel=name;
+  }
   if(tlCollapsed[kind][old]){ tlCollapsed[kind][name]=true; delete tlCollapsed[kind][old]; }
   renderTwoLevel(kind);
 }
@@ -4357,9 +5575,13 @@ function tlDelParent(kind,pi){
   if(!requireDelete()) return;
   const def=TL_DEFS[kind], arr=S.cfg[def.parentKey], map=S.cfg[def.childKey];
   const name=arr[pi], kids=(map[name]||[]).length;
-  if(!confirm(`確定刪除${def.parentName}「${name}」？`+(kids?`\n底下的 ${kids} 個${def.childName}會一併刪除。`:''))) return;
+  const nmat=(kind==='loc') ? matsOfLoc(name).length : 0;   // 位置底下還掛著材料（2026-09-20）
+  if(!confirm(`確定刪除${def.parentName}「${name}」？`
+      +(kids?`\n底下的 ${kids} 個${def.childName}會一併刪除。`:'')
+      +(nmat?`\n底下的 ${nmat} 種材料也會一併刪除（其他位置的同名材料不受影響）。`:''))) return;
   arr.splice(pi,1);
   delete map[name];
+  if(kind==='loc'){ delete matsMap()[name]; if(_locSel===name) _locSel=''; }
   delete tlCollapsed[kind][name];
   renderTwoLevel(kind);
 }
@@ -4371,8 +5593,12 @@ function tlAddChild(kind,pi){
   map[p].push('');                       // 先放空白列，使用者輸入後 onblur 才寫回；留空＝自動取消
   tlCollapsed[kind][p]=false;
   renderTwoLevel(kind);
-  const grp=$(def.host).querySelectorAll('.tl-group')[pi];
-  const inps=grp?grp.querySelectorAll('.tl-body input'):[];
+  /* 2026-09-20：施作位置改用新版面，已經沒有 def.host 那個容器 → 兩種版面各自找輸入格 */
+  const host = $(def.host);
+  const grp = host ? host.querySelectorAll('.tl-group')[pi] : null;
+  const locMain = (kind === 'loc') ? $('loc-main') : null;
+  const inps = grp ? grp.querySelectorAll('.tl-body input')
+             : (locMain ? locMain.querySelectorAll('.loc-box:first-child .loc-row input[type=text]') : []);
   if(inps.length) inps[inps.length-1].focus();
 }
 function tlRenameChild(kind,pi,ki,val){
@@ -4414,25 +5640,28 @@ function tlCleanup(){
 function loadCfgForm(){
 
 
-  renderTwoLevel('loc');
+  renderTwoLevel('loc');       // → renderLocStep()：位置 ＞ 施工項目｜材料（2026-09-20）
   renderTwoLevel('vendor');
-  /* 材料改回「名稱清單＋每列一個預設單位」＋ 獨立的單位清單（2026-09-03，跟專案管理一致） */
-  loadMatNameField();
-  loadListField('lf-matunits', S.cfg.matUnits);
+  loadListField('lf-matunits', S.cfg.matUnits);   // 單位仍是全公司共用的一份（她選甲）
+  loadListField('lf-statuses', (S.cfg.statuses && S.cfg.statuses.length) ? S.cfg.statuses : CASE_STATUS_DEFAULT);
   renderProjTable();
+  applyCfgPart();
 }
-function saveSettings(){
+/* manual !== false → 使用者自己按的，才跳「設定已儲存」；
+   切換步驟時的自動存會傳 false，安靜存檔（2026-09-18 四步引導）。 */
+function saveSettings(manual){
   if(cloudGuard())return;   // 修 1（2026-09-17）
   if(mngGuard())return;
-  /* 材料改回兩張清單（2026-09-03，跟專案管理一致）：名稱（含預設單位）與單位各自讀回來。
-     matUnitMap 只收「名稱與單位都有填」的那幾列，沒選單位＝沒有預設單位。 */
-  S.cfg.matNames   = readMatNameField();
-  S.cfg.matUnitMap = readMatUnitMap();
+  /* 材料在第 2 步就直接寫進 S.cfg.matsByLoc 了（跟施作位置／廠商一樣），
+     這裡只要讀回共用的單位清單，再把舊欄位（matNames／matUnitMap）推導出來。 */
   S.cfg.matUnits   = readListField('lf-matunits');
+  matTidy(manual !== false);   // 清掉空白列；「建議」單位只有她自己按儲存時才收下來
+  syncMatMirror();    // matsByLoc → matNames / matUnitMap（統計與舊版裝置吃這兩個）
+  S.cfg.statuses   = readListField('lf-statuses');   // 案件明細的狀態（2026-09-18）
   delete S.cfg.unitsByMat;   // 兩層那份不再使用，也不要留在雲端誤導下一個人
 
   tlCleanup();   // 施作位置／廠商那兩組在編輯當下已寫進 S.cfg，這裡只清空白
-  save(); toast('設定已儲存','s');
+  save(); if(manual !== false) toast('設定已儲存','s');
   // Refresh form dropdowns
   if(S.page==='report') renderReport();
 }
@@ -4856,6 +6085,9 @@ function backToPortal(){
 
 /* ── INIT ── */
 function init(){
+  /* 那兩排藥丸不依賴任何資料，開機就畫（日-專 2026-09-22 漏了這行，她打開只看到一行標籤） */
+  renderSumParts();
+  renderMatSeg();
   if(!_CFG0) _CFG0 = _clone(S.cfg);   // 設定的預設值，要在 load() 疊上本機影本之前記下來（2026-09-17）
   load();  // 1. 先讀本機（快）
 
@@ -5088,6 +6320,127 @@ init();
   else boot();
   setInterval(check, 15 * 60 * 1000);        // 長時間開著的分頁也會發現新版
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) check(); });
+})();
+</script>
+
+<script>
+/* ══════════ 自製確認對話框（取代瀏覽器內建的 confirm）══════════
+ * 2026-09-23 她指定：確認視窗要有「取消／確認」兩顆按鈕，樣式跟系統一致。
+ *
+ * 為什麼要繞這一圈：
+ *   confirm() 是**同步**的 —— 程式寫的是 `if(!confirm(...)) return;`，它會停在那裡等 true／false。
+ *   自製對話框有按鈕，是非同步的，回不了值。
+ * 解法：**重放**
+ *   ① 在捕捉階段記下「是哪個元素觸發的」（pointerdown / mousedown / click 都記）
+ *   ② confirm() 被呼叫 → 先回 false（等同取消），同時把對話框叫出來
+ *   ③ 使用者按「確認」→ 把那個元素**整組重放**（mousedown → mouseup → click），
+ *      這一次 confirm() 直接回 true
+ *   ④ 按「取消」→ 什麼都不做
+ *
+ * ⚠️ 為什麼要重放整組而不是只 click()：
+ *    設定頁有幾顆刪除鈕掛的是 **onmousedown**（locMatDel、tlDelParent），
+ *    只補一個 click 事件它們不會被觸發。
+ * ⚠️ 找不到觸發元素時（例如從 console 呼叫）→ **退回瀏覽器原本的 confirm**，
+ *    絕對不會讓一個動作變成「按了沒反應」。
+ */
+(function () {
+  var W = window;
+  if (W.__cfmDlg) return;
+  W.__cfmDlg = true;
+
+  var NATIVE = W.confirm;            // 退路：找不到觸發元素時用原本的
+  var curEl = null;                  // 現在正在處理的那個元素
+  var armed = null;                  // 已按過「確認」、等著重放的那一次
+
+  ['pointerdown', 'mousedown', 'click'].forEach(function (evt) {
+    document.addEventListener(evt, function (e) {
+      var t = e.target;
+      curEl = (t && t.closest)
+        ? (t.closest('button,a,[onclick],[onmousedown],[role="button"]') || t)
+        : t;
+    }, true);
+  });
+
+  var ov = null;
+  function build() {
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.id = '__cfm';
+    ov.className = 'no-print';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
+      'background:rgba(15,23,42,.55);padding:20px;' +
+      'font-family:"Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:16px;max-width:360px;width:100%;' +
+        'box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden">' +
+      '<div style="padding:22px 22px 18px">' +
+        '<div style="font-size:26px;text-align:center;margin-bottom:10px">⚠️</div>' +
+        '<div id="__cfm-msg" style="font-size:15px;line-height:1.8;color:#15202b;text-align:center;' +
+          'font-weight:700;word-break:break-word;white-space:pre-wrap"></div>' +
+      '</div>' +
+      '<div style="display:flex;border-top:1px solid #e5e7eb">' +
+        '<button type="button" id="__cfm-no" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#374151;font:700 15px/1 inherit;cursor:pointer;border-right:1px solid #e5e7eb">取消</button>' +
+        '<button type="button" id="__cfm-yes" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#dc2626;font:700 15px/1 inherit;cursor:pointer">確認</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function close() {
+    if (!ov) return;
+    ov.style.display = 'none';
+    document.removeEventListener('keydown', onKey, true);
+  }
+  var onYesFn = null;
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'Enter') { e.preventDefault(); close(); if (onYesFn) onYesFn(); }
+  }
+
+  function ask(msg, onYes) {
+    var o = build();
+    o.querySelector('#__cfm-msg').textContent = msg;
+    o.style.display = 'flex';
+    onYesFn = onYes;
+    var yes = o.querySelector('#__cfm-yes'), no = o.querySelector('#__cfm-no');
+    /* 換成新節點，舊的事件不會疊上來 */
+    var y = yes.cloneNode(true), n = no.cloneNode(true);
+    yes.parentNode.replaceChild(y, yes);
+    no.parentNode.replaceChild(n, no);
+    y.addEventListener('click', function (e) { e.stopPropagation(); close(); onYes(); });
+    n.addEventListener('click', function (e) { e.stopPropagation(); close(); });
+    document.addEventListener('keydown', onKey, true);
+    try { n.focus(); } catch (e) {}
+  }
+
+  /* 整組重放：有些刪除鈕掛的是 onmousedown，只發 click 不會動 */
+  function replay(el) {
+    var opt = { bubbles: true, cancelable: true, view: W };
+    ['mousedown', 'mouseup'].forEach(function (t) {
+      try { el.dispatchEvent(new MouseEvent(t, opt)); } catch (e) {}
+    });
+    try { el.click(); } catch (e) {}
+  }
+
+  W.confirm = function (msg) {
+    var m = String(msg == null ? '' : msg);
+    if (armed && armed.msg === m && armed.el === curEl) { armed = null; return true; }
+    var el = curEl;
+    /* 不是使用者按出來的（console、計時器…）→ 退回瀏覽器原本的，不能讓動作卡住 */
+    if (!el || !el.dispatchEvent) return NATIVE.call(W, m);
+    ask(m, function () {
+      armed = { msg: m, el: el };
+      replay(el);
+      armed = null;
+    });
+    return false;
+  };
+  W.__cfmNative = NATIVE;            // 測試／除錯用得到
 })();
 </script>
 </body>

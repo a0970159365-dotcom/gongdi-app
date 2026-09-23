@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-11.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -41,6 +41,30 @@ nav{background:var(--primary);min-height:52px;display:flex;align-items:center;pa
 .fi{border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;transition:border-color .15s;width:100%}
 .fi:focus{outline:none;border-color:var(--primary-l);box-shadow:0 0 0 3px rgba(37,99,170,.1)}
 textarea.fi{resize:vertical;min-height:60px}
+/* 執行者「可點的名字排」（2026-09-22）——「、」後面 datalist 就沒建議了，用這排補 */
+.ep-hint{font-size:11px;color:var(--muted);letter-spacing:.3px}
+/* 執行者標籤後面那句提醒（2026-09-22 她交辦）——
+   欄位已經有內容時，瀏覽器的建議清單比對不到東西、根本不會掉下來，
+   所以要明講「點下面」。唯讀時名字排會收起來，這句也要跟著收。 */
+.fl-tip{font-weight:400;color:var(--primary-l);text-transform:none;letter-spacing:0;font-size:11px;margin-left:4px}
+/* ── 編輯框自己的排版（2026-09-22 她交辦，示意圖「甲＋手機整列」）────────────
+ * ⚠️ 不能改共用的 .g2（兩欄等寬）—— 日報表兩支各有 2 處在用，會被一起改到。
+ *    所以編輯框改用自己的 .g-edit，其他地方完全不受影響。
+ * 部門 1／執行者 2：部門只放一個短短的部門名，執行者要塞好幾個人名。
+ * ⚠️ 表單裡那 5 處 inline 的 grid-column:span 2（案場／施作位置／進度記錄／備註等）
+ *    在 1fr 2fr 底下仍然是整列，**一處都不用動**（實機量過：案場 600 / 部門 196 / 執行者 392）。
+ *    但若改成單欄，span 2 會長出隱形的第 2 欄、把版面擠爛 —— 所以不要把 .g-edit 改成一欄。 */
+.g-edit{grid-template-columns:1fr 2fr}
+.g-edit #exec-pick-wrap{grid-column:2}          /* 名字排貼在執行者那一欄底下 */
+@media(max-width:640px){
+  .g-edit #exec-pick-wrap{grid-column:1/-1}     /* 窄畫面：名字排改整列，才排得開 */
+}
+.ep-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.ep-chip{font-family:inherit;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#fff;color:var(--muted);border:1.5px solid var(--border);border-radius:999px;padding:5px 12px;transition:border-color .15s,color .15s}
+.ep-chip:hover{border-color:var(--primary-l);color:var(--text)}
+.ep-chip:focus-visible{outline:2px solid var(--primary-l);outline-offset:2px}
+.ep-chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+.ep-mk{font-size:10px;opacity:.9}
 
 .g{display:grid;gap:12px}
 .g2{grid-template-columns:repeat(2,1fr)}
@@ -65,6 +89,21 @@ textarea.fi{resize:vertical;min-height:60px}
 /* 黏住時上下各補一塊同色底，免得捲過去的內容從圓角與間距的縫隙露出來（2026-08-20） */
 .filter-bar::before,.filter-bar::after{content:"";position:absolute;left:-16px;right:-16px;height:16px;background:var(--bg)}
 .filter-bar::before{top:-16px}
+/* 進度記錄日期區間那一排（2026-09-20 她交辦）：跟上面的篩選列同一張卡片感，但不黏頂 */
+.date-bar{position:static;margin-top:-10px;padding-top:8px;border-top:1px dashed #e2e8f0;border-radius:0 0 10px 10px}
+/* ── 2026-09-21 她回報：筆電放大 125%〜200%，畫面中間出現一條色帶，底下的字被切掉 ──
+ * 實測（Chrome 真的跑起來量）：篩選列黏在導覽列下方，放大後它自己換行（51px→84px），
+ *   加上日期區間那排，黏住的總高度 100%=103px、150%=149px、200%=231px，
+ *   可視高度卻是 704 / 437 / 304px —— 放大後黏住的東西吃掉大半個畫面，
+ *   而 .filter-bar::before/::after 那兩片 var(--bg) 遮片就懸在畫面正中央，
+ *   內容從底下捲過去被切掉半行（進-圖是紫、進-專是白，正好各自的 --bg）。
+ * 修法：畫面矮的時候（放大必然變矮）篩選列與日期列不要黏，高度全讓給資料，遮片一起關。
+ *   導覽列只有 52px，繼續黏著不影響。
+ */
+@media(max-height:820px){
+  .filter-bar,.date-bar{position:static}
+  .filter-bar::before,.filter-bar::after{display:none}
+}
 .filter-bar::after{bottom:-15px;height:15px}
 
 /* ── 複選篩選器（2026-08-20 新增）── */
@@ -83,6 +122,26 @@ textarea.fi{resize:vertical;min-height:60px}
 
 /* STATUS BADGES */
 .st-badge{display:inline-block;border-radius:4px;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap;background:#e2e8f0;color:#475569}
+/* 狀態依品項（2026-09-20）：一行一個品項，左邊品項名、右邊狀態徽章 */
+.st-item{display:grid;grid-template-columns:1fr auto;gap:4px 6px;align-items:center;padding:2px 0;border-bottom:1px dashed #e2e8f0}
+.st-item:last-child{border-bottom:none}
+.st-item b{font-size:11px;font-weight:700;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.st-item .st-badge{padding:1px 7px;font-size:11px}
+/* 項目列拖曳（2026-09-20）：抓手那一欄 ＋ 手機用的 ↑↓ */
+.row-handle{width:26px;color:#94a3b8;cursor:grab;user-select:none;text-align:center;font-size:13px;white-space:nowrap}
+.row-handle:active{cursor:grabbing}
+.row-mv{display:block;line-height:1}
+.row-mv button{border:none;background:none;color:#94a3b8;font-size:10px;cursor:pointer;padding:0 1px}
+.row-mv button:disabled{opacity:.25;cursor:default}
+tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
+@media(min-width:900px){.row-mv{display:none}}   /* 桌機用拖的就好，箭頭留給手機 */
+/* 匯出框的三個條件（2026-09-20） */
+.xp-grp{border-top:1px dashed #e2e8f0;padding-top:8px;margin-top:8px}
+.xp-grp>b{display:block;font-size:12px;color:#475569;margin-bottom:5px}
+.xp-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.xp-chip{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:3px 11px;
+  font-size:11.5px;font-family:inherit;color:#475569;cursor:pointer}
+.xp-chip.on{background:var(--primary,#1a3a5c);color:#fff;border-color:var(--primary,#1a3a5c)}
 .st-進行中{background:#dbeafe;color:#1d4ed8}
 .st-送審中{background:#fef3c7;color:#b45309}
 .st-已下單{background:#fed7aa;color:#c2410c}
@@ -148,7 +207,13 @@ textarea.fi{resize:vertical;min-height:60px}
 .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .ptbl{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 .ptbl th{background:#f8fafc;color:var(--primary);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap;font-size:12px}
-.ptbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:top}
+.ptbl td{border-bottom:1px solid #f1f5f9;padding:8px 10px;vertical-align:top;
+  overflow-wrap:anywhere;word-break:break-word}
+/* 2026-09-21 她回報：筆電放大到 125%／150% 有些字會不見 ——
+   視窗可用寬度變小 → 欄位被壓縮到放不下。給整張表一個最小寬度，
+   不夠寬就由外層 .tbl-scroll 左右捲，寧可捲也不要把字吃掉。 */
+.ptbl{min-width:900px}
+.st-badge.st-none{background:#f1f5f9;color:#94a3b8;font-weight:400}
 .ptbl tbody tr:hover td{background:#f8fafc}
 
 .log-stat{font-size:11px;color:var(--muted);padding:2px 0 5px;border-bottom:1px dashed #e2e8f0;margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -163,6 +228,15 @@ textarea.fi{resize:vertical;min-height:60px}
 .log-li:last-child{border-bottom:none}
 .log-dt{background:#e2e8f0;color:#475569;border-radius:3px;padding:1px 6px;font-size:11px;white-space:nowrap;flex-shrink:0;margin-top:2px}
 .log-tx{flex:1;line-height:1.5;color:var(--text)}
+/* ── 2026-09-21 她選「方案乙」：狀態改成一筆一格，跟那一筆排在同一行 ──
+ * 原本右邊是「一個品項一列」的彙總（左邊 5 筆、右邊 3 列），兩邊行數不同卻上下貼著，
+ * 一律被看成一一對應。現在把「進度記錄」和「狀態」兩欄合併成一格（td colspan=2），
+ * 內部每一筆自己分左右 —— 同一個 flex 列，左邊換幾行右邊就跟著多高，永遠不會錯位。
+ * 30% 正好等於表頭的 18%÷(42%+18%)，所以跟上面的「狀態」欄標題對得齊。
+ */
+.log-st{flex:0 0 30%;min-width:82px;padding-left:8px;display:flex;align-items:flex-start;margin-top:1px}
+.log-st .log-status{margin-right:0}
+.log-st-none{color:#94a3b8;font-size:12px;padding:1px 2px}
 .log-plain{color:var(--muted);font-size:12px}
 
 .hist-item{background:#fff;border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);border-left:4px solid var(--primary-l);transition:all .15s;cursor:pointer}
@@ -220,6 +294,17 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 .modal-box{background:#fff;border-radius:12px;padding:24px;width:100%;max-width:680px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .modal-title{font-size:16px;font-weight:800;color:var(--primary);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
 .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:0 4px}
+/* 編輯框：手機滿版（2026-09-17 她指定），三選項的按鈕在窄畫面排成一直行 */
+@media(max-width:560px){
+  #edit-overlay .modal-box{max-width:none;width:100%;min-height:100%;border-radius:0;padding:16px;margin:0}
+  #edit-overlay{padding:0}
+}
+/* 詢問框要疊在編輯框「上面」—— 兩個都是 .overlay（z-index:200），
+   而 #close-ask 在 DOM 裡排在前面，不提高層級就會被編輯框整個蓋住
+   （2026-09-20 她回報「按 ✕ 沒出現任何訊息」就是這個）。 */
+#close-ask{z-index:300}
+.close-ask-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:560px){.close-ask-btns{flex-direction:column}.close-ask-btns .btn{width:100%}}
 .modal-close:hover{color:var(--danger)}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--bg)}
 /* 匯出前挑案場（2026-08-26） */
@@ -238,6 +323,20 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
 .toast-s{background:var(--success)}.toast-e{background:var(--danger)}
 @keyframes ti{from{transform:translateX(18px);opacity:0}to{transform:translateX(0);opacity:1}}
 .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+/* 六支統一的同步列（2026-09-23 她選 B）—— 一行講完，不佔版面 */
+.sync-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;
+  border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;margin-top:12px}
+.sync-row-lb{font-size:13px;font-weight:700;color:#374151;white-space:nowrap}
+.sync-row-txt{font-size:13px;color:#6b7280;flex:1;min-width:90px}
+.sync-row-txt.ok{color:#15803d;font-weight:700}
+.sync-row-txt.err{color:#b91c1c;font-weight:700}
+.sync-row-btn{font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+  background:#fff;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;padding:5px 13px}
+.sync-row-btn:hover{background:#eff6ff}
+.sync-row-btn:disabled{opacity:.5;cursor:not-allowed}
+/* 空狀態的標題與說明（2026-09-22：0 筆要講出原因，不能只寫「沒有符合的資料」） */
+.empty-t{font-size:15px;font-weight:700;color:var(--text);line-height:1.7;margin-bottom:6px}
+.empty-s{font-size:13px;color:var(--muted);line-height:1.85;max-width:44em;margin:0 auto}
 .empty-icon{font-size:44px;margin-bottom:10px}
 
 /* LOGIN MODAL */
@@ -359,6 +458,18 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <button type="button" class="btn btn-g btn-sm" onclick="expandAll(false)">全部收合</button>
     <span id="result-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
   </div>
+  <!-- 進度記錄日期區間（2026-09-20 她交辦）：區間外的記錄不顯示，整筆沒記錄就不出現 -->
+  <div class="filter-bar date-bar">
+    <b style="font-size:12px;color:var(--ink,#334155)">進度記錄日期</b>
+    <input type="date" id="dr-from" class="fi" style="max-width:150px" onchange="renderMain()">
+    <span style="color:var(--muted)">～</span>
+    <input type="date" id="dr-to" class="fi" style="max-width:150px" onchange="renderMain()">
+    <button type="button" class="btn btn-g btn-sm" onclick="drQuick('week')">本週</button>
+    <button type="button" class="btn btn-g btn-sm" onclick="drQuick('lastweek')">上週</button>
+    <button type="button" class="btn btn-g btn-sm" onclick="drQuick('month')">本月</button>
+    <button type="button" class="btn btn-g btn-sm" onclick="drQuick('clear')">清除</button>
+    <span id="dr-hint" style="font-size:11.5px;color:var(--muted)"></span>
+  </div>
   <div id="main-table"></div>
 </div>
 
@@ -404,6 +515,11 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存設定</button>
       <button class="btn btn-o btn-sm" onclick="backToPortal()">🏠 返回主系統</button>
     </div>
+      <div id="sync-row" class="sync-row no-print">
+        <span class="sync-row-lb">☁️ 同步狀態</span>
+        <span id="sync-row-text" class="sync-row-txt">— 尚未同步</span>
+        <button type="button" id="sync-row-btn" class="sync-row-btn" onclick="syncNowUnified()">立即同步</button>
+      </div>
     <div class="card-body">
 
       <!-- 群組一已移除：部門、執行者、權限設定改由入口網頁集中管理 -->
@@ -487,11 +603,24 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 </div>
 
 <!-- ===== EDIT MODAL ===== -->
+
+<!-- 還沒儲存就要關掉時跳的三選項（2026-09-20 她指定的三顆按鈕） -->
+<div id="close-ask" class="overlay">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-title" style="color:#a4620d">⚠️ 還沒儲存，要離開嗎？</div>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 16px">這個編輯框裡有還沒存的內容。</p>
+    <div class="close-ask-btns">
+      <button class="btn btn-p" onclick="closeAskPick('stay')">繼續編輯</button>
+      <button class="btn btn-o" onclick="closeAskPick('save')">儲存後關閉</button>
+      <button class="btn btn-g" onclick="closeAskPick('drop')" style="color:#991b1b;border-color:#fecaca">不儲存離開</button>
+    </div>
+  </div>
+</div>
 <div id="edit-overlay" class="overlay" onclick="overlayClick(event)">
   <div class="modal-box">
     <div class="modal-title">
       <span id="modal-title-text">新增紀錄</span>
-      <button class="modal-close" onclick="closeEdit()">✕</button>
+      <button class="modal-close" onclick="askCloseEdit()">✕</button>
     </div>
     <input type="hidden" id="edit-id">
 
@@ -502,18 +631,23 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <datalist id="dl-施作位置"></datalist>
     <datalist id="dl-位置"></datalist>
 
-    <div class="g g2" style="gap:12px;margin-bottom:12px">
+    <div class="g g-edit" style="gap:12px;margin-bottom:12px">
       <div class="fg" style="grid-column:span 2">
         <label class="fl">案場 *</label>
         <input type="text" id="e-proj" class="fi" list="dl-案場" placeholder="選擇或輸入案場名稱">
       </div>
       <div class="fg">
         <label class="fl">部門</label>
-        <input type="text" id="e-dept" class="fi" list="dl-部門" placeholder="選擇或輸入部門">
+        <input type="text" id="e-dept" class="fi" list="dl-部門" placeholder="選擇或輸入部門" oninput="execDeptChanged()">
       </div>
       <div class="fg">
-        <label class="fl">執行者</label>
-        <input type="text" id="e-exec" class="fi" list="dl-執行者" placeholder="多人可用、分隔">
+        <label class="fl">執行者<span class="fl-tip" id="exec-tip">2人以上，請直接複選下方名字</span></label>
+        <input type="text" id="e-exec" class="fi" list="dl-執行者" placeholder="多人可用、分隔" oninput="renderExecPicker()">
+      </div>
+      <!-- 可點的同仁名字（2026-09-22 她交辦）：點一下接進執行者欄、再點一下拿掉，自動補「、」 -->
+      <div class="fg" id="exec-pick-wrap">
+        <div class="ep-hint" id="exec-pick-hint"></div>
+        <div class="ep-chips" id="exec-pick"></div>
       </div>
       <div class="fg" style="grid-column:span 2">
         <label class="fl">施作位置／工作項目</label>
@@ -521,7 +655,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       </div>
       <div class="fg" style="grid-column:span 2">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
-          <label class="fl" style="margin-bottom:0">進度記錄（最後一筆狀態 = 主狀態徽章）</label>
+          <label class="fl" style="margin-bottom:0">進度記錄</label>
           <button type="button" class="btn btn-a btn-sm" onclick="addLogRow()">＋ 新增一筆</button>
         </div>
         <div id="log-editor" class="log-edit-wrap"></div>
@@ -534,7 +668,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 
     <div class="modal-footer">
       <button id="del-btn" class="btn btn-d btn-sm" onclick="delRecord()" style="margin-right:auto;display:none">🗑️ 刪除</button>
-      <button class="btn btn-o btn-sm" onclick="closeEdit()">取消</button>
+      <button class="btn btn-o btn-sm" onclick="askCloseEdit()">取消</button>
       <button id="save-btn" class="btn btn-p btn-sm" onclick="saveRecord()">💾 儲存</button>
     </div>
   </div>
@@ -550,6 +684,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div id="xp-hint" class="xp-hint"></div>
     <label class="xp-all"><input type="checkbox" id="xp-all" onchange="xpToggleAll(this.checked)"><span id="xp-all-label">全選</span></label>
     <div id="xp-list" class="xp-list"></div>
+    <!-- 2026-09-20 她交辦：部門／日期區間／工作狀態 -->
+    <div id="xp-extra"></div>
     <div class="modal-footer">
       <span id="xp-sum" class="xp-sum"></span>
       <button class="btn btn-o" onclick="closeExportPicker()">取消</button>
@@ -764,6 +900,35 @@ function normalizeRecord(r){
   r.進度記錄=sortLogs(r.進度記錄);   // 3-1（2026-08-20）：一律依日期排好，沒日期的排最後
   return r;
 }
+/* ══════ 狀態依「個別品項」（2026-09-20 她交辦）══════
+ * 她的原話：「景觀和室內有卡關也有施作和完成的項目，最後的狀態要分開」。
+ * 一筆記錄（案場＋施作位置）底下的每條進度記錄可以標品項（1F大廳、2F泳池…），
+ * 原本狀態欄只顯示**最後一筆**記錄的狀態 → 早就完成的、卡關的都被蓋掉看不見。
+ * 現在：每個品項各取「它自己最後一筆有狀態的記錄」，一行一個品項。
+ *   · 沒有標品項的記錄，歸成一組「（未分品項）」
+ *   · 整筆只要**任一品項卡關**，那一列就標紅（原本只看最後一筆）
+ *   · 上方的狀態篩選：**任一品項符合**就顯示這一列 */
+var NO_ITEM = '（未分品項）';
+function statusByItem(r){
+  var logs = (r && r.進度記錄) || [];
+  if(typeof logs === 'string') logs = parseProgressString(logs);
+  var order = [], map = {};
+  logs.forEach(function(l){
+    if(!l) return;
+    var k = String(l.location || '').trim() || NO_ITEM;
+    if(!(k in map)){ map[k] = ''; order.push(k); }
+    if(l.status) map[k] = l.status;       // 後面的蓋前面的 ＝ 這個品項最後的狀態
+  });
+  /* 2026-09-21：這個品項底下一條有狀態的記錄都沒有 → 狀態留空（畫面顯示「—」）。
+     原本會退回記錄層的預設值「進行中」，看起來就像「狀態沒對應到品項」。 */
+  var out = order.map(function(k){ return { item:k, status:map[k] || '' }; });
+  if(!out.length) out = [{ item:NO_ITEM, status:(r && r.狀態) || '進行中' }];
+  return out;
+}
+/* 這一筆記錄出現過的所有狀態（篩選、卡關判斷都吃這個） */
+/* 沒填狀態的品項不要進篩選／卡關判斷（2026-09-21） */
+function statusesOf(r){ return statusByItem(r).map(function(x){ return x.status; }).filter(Boolean); }
+function hasStatus(r, s){ return statusesOf(r).indexOf(s) >= 0; }
 function getMainStatus(r){
   const logs=r.進度記錄||[];
   for(let i=logs.length-1;i>=0;i--){
@@ -771,7 +936,8 @@ function getMainStatus(r){
   }
   return r.狀態||'進行中';
 }
-function isStuck(r){return getMainStatus(r)==='暫停/卡關'}
+/* 2026-09-20：任一品項卡關，整列就標紅（原本只看最後一筆記錄） */
+function isStuck(r){return hasStatus(r,'暫停/卡關')}
 
 // 工作天數計算（總曆時 − 暫停區間總和）
 function calcWorkDays(logs){
@@ -858,8 +1024,29 @@ function hideSyncWarn(){
   const el=document.getElementById('sync-warn');
   if(el)el.style.display='none';
 }
+
+/* ══════ 同步列（2026-09-23 她選 B：六支一致）══════
+ * 狀態文字由這支 App 既有的狀態函式順手帶過來，不另外追蹤一份狀態。
+ * 「立即同步」走的是它自己既有、帶防呆的路徑 —— 不是新寫的覆蓋邏輯。 */
+function syncRowSet(state){
+  var t = document.getElementById('sync-row-text');
+  if(!t) return;
+  t.className = 'sync-row-txt' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : '');
+  t.textContent = state === 'ok'     ? '✓ 已同步'
+                : state === 'saving' ? '⏳ 同步中…'
+                : state === 'err'    ? '⚠️ 連線失敗，資料只存在這台'
+                : '— 尚未同步';
+}
+function syncNowUnified(){
+  var b = document.getElementById('sync-row-btn');
+  syncRowSet('saving');
+  if(b) b.disabled = true;
+  try { fbSave(); } catch(e){ syncRowSet('err'); }
+  setTimeout(function(){ if(b) b.disabled = false; }, 1500);
+}
 function setSyncIcon(s){
   if(s==='ok')hideSyncWarn();
+  syncRowSet(s==='ok'?'ok':s==='err'?'err':'');   /* 設定頁那一行跟著走（2026-09-23） */
   const el=document.getElementById('sync-icon');
   el.textContent=s==='ok'?'☁️✅':s==='err'?'☁️❌':'☁️';
   el.title=s==='ok'?'已同步':s==='err'?'連線失敗':'本機模式';
@@ -1227,11 +1414,97 @@ function portalDepts(){
   }catch(e){}
   return cfg['部門']||[];
 }
+
+/* ── 執行者建議清單也一律以入口網頁為準（2026-09-22 她交辦）──────────
+ * 舊做法：讀 App 自己的 cfg.執行者。那份是 2026-08「執行者維護搬到入口」之前留下的，
+ *         搬走之後設定頁就沒有地方可以新增了 → 清單永遠凍結在舊資料：
+ *         dtp-dw 只剩 6 個規劃設計部的人、dtp-pm 只剩 4 個，**專案管理部整個部門選不到**。
+ *         2026-09-22 雙橡園-4117 的「黃惠蘭」被打成「黃寭蘭」就是這樣來的。
+ * 新做法：讀入口的官方員工名冊，依編輯視窗「部門」欄過濾，離職的不列。
+ *         沒選部門／那個部門沒人 → 列全公司，不讓清單變成選不到東西的死路。
+ *         讀不到入口資料（舊分頁）才退回 cfg.執行者，比照 portalDepts() 的退路。
+ * ⚠️ 這只影響「建議清單」。執行者欄仍然是自由輸入，名冊上沒有的人（離職同仁、
+ *    外部協力）照樣填得進去，存進去的格式也完全沒變。 */
+function _empResigned(e){
+  if(!e||!e.resignDate)return false;
+  const d=new Date(),pad=n=>(n<10?'0':'')+n;
+  const today=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  return today>e.resignDate;
+}
+function _portalEmps(){
+  try{
+    const p=JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    return (p.employees||[]).filter(e=>e&&e.name&&!_empResigned(e));
+  }catch(e){return []}
+}
+function portalExecs(dept){
+  const all=_portalEmps();
+  const hit=dept?all.filter(e=>e.dept===dept):[];
+  const list=hit.length?hit:all;                       // 沒選部門／該部門沒人 → 全公司
+  if(list.length)return [...new Set(list.map(e=>e.name))].sort();
+  return cfg['執行者']||[];                            // 讀不到入口資料 → 退回舊清單
+}
+/* 編輯視窗「部門」欄目前的值（沒開視窗時回空字串） */
+function execDeptNow(){
+  const el=document.getElementById('e-dept');
+  return el?el.value.trim():'';
+}
+
+/* ── 執行者「可點的名字排」（2026-09-22 她交辦，方案甲-1）────────────
+ * 執行者欄多人用「、」分隔，但瀏覽器的 datalist 是拿**整格內容**去比對的 →
+ * 打完「蘇芸加、」之後就再也沒有任何建議，第二個人只能自己打完，第三個也一樣。
+ * 這排名字就是補這一段：點一下接在後面（自動補「、」）、再點一下拿掉。
+ * ⚠️ 名字一律走 data-n ＋ 事件委派，**不用 inline onclick 帶名字** ——
+ *    名字裡只要出現引號就會把 onclick 屬性提早結束、整顆鈕在瀏覽器裡沒有事件
+ *    （2026-09-21 適用品項就是這樣全綠卻是壞的）。 */
+function execList(v){
+  return String(v||'').split(/[、,，\n]/).map(s=>s.trim()).filter(Boolean);
+}
+function renderExecPicker(){
+  const box=document.getElementById('exec-pick');
+  if(!box)return;
+  const input=document.getElementById('e-exec');
+  const cur=execList(input?input.value:'');
+  const dept=execDeptNow();
+  const names=portalExecs(dept);
+  const hint=document.getElementById('exec-pick-hint');
+  if(hint){
+    const own=dept&&_portalEmps().some(e=>e.dept===dept);
+    hint.textContent=names.length?((own?dept:'全公司')+' · 點名字加入，再點一下拿掉'):'';
+  }
+  box.innerHTML=names.map(n=>{
+    const on=cur.indexOf(n)>=0;
+    return '<button type="button" class="ep-chip" aria-pressed="'+on+'" data-n="'+esc(n)+'">'
+         + '<span class="ep-mk">'+(on?'✓':'＋')+'</span>'+esc(n)+'</button>';
+  }).join('');
+}
+function execPickToggle(name){
+  const input=document.getElementById('e-exec');
+  if(!input||input.disabled||!name)return;
+  const cur=execList(input.value);
+  const i=cur.indexOf(name);
+  if(i>=0)cur.splice(i,1);else cur.push(name);
+  input.value=cur.join('、');
+  renderExecPicker();
+}
+/* 換部門 → 建議清單與名字排都要跟著換（只重畫這兩樣，不整包跑 updateDataLists） */
+function execDeptChanged(){
+  const el=document.getElementById('dl-執行者');
+  if(el)el.innerHTML=portalExecs(execDeptNow()).map(v=>`<option value="${esc(v)}">`).join('');
+  renderExecPicker();
+}
+document.addEventListener('click',function(e){
+  const b=(e.target&&e.target.closest)?e.target.closest('#exec-pick .ep-chip'):null;
+  if(b)execPickToggle(b.getAttribute('data-n'));
+});
+
 function updateDataLists(){
   // datalists for text inputs
   ['案場','部門','執行者','施作位置'].forEach(k=>{
     const el=document.getElementById('dl-'+k);
-    const src=(k==='部門')?portalDepts():(cfg[k]||[]);   // 部門走入口，其餘照 App 自己的設定
+    const src=(k==='部門')?portalDepts()
+             :(k==='執行者')?portalExecs(execDeptNow())   // 執行者也走入口，依部門過濾
+             :(cfg[k]||[]);                               // 其餘照 App 自己的設定
     if(el)el.innerHTML=src.map(v=>`<option value="${esc(v)}">`).join('');
   });
   // 位置 datalist（從所有歷史紀錄自動收集）
@@ -1618,9 +1891,83 @@ window.addEventListener('load',syncNavHeight);
 document.addEventListener('DOMContentLoaded',syncNavHeight);
 syncNavHeight();
 
+/* ══════ 「共 0 筆」要講出原因（2026-09-22 她交辦）══════════════════════
+ * 起因：她回報「進度表-專案沒資料」，畫面只寫一句「沒有符合的資料」。
+ *       實際上雲端有 9 筆，只是她的身分部門是規劃設計部、而這支表全是專案管理部的。
+ *       我查了半小時，最後靠她截圖裡的網址才看出來 —— 畫面上直接寫出來的話三秒就解決。
+ * 判斷順序：① 完全沒資料 → ② 權限擋掉 → ③ 篩選濾光 → ④ 只有搜尋。
+ *          指出**第一個**把資料擋光的原因，數字都是現算的。 */
+function _viewLevelWord(){
+  const u=currentUser||{}, lv=u.viewLevel||'dept';
+  if(lv==='self')return '只看得到自己是執行者的紀錄';
+  if(lv==='cross'){
+    const d=[u.dept].concat(u.crossDepts||[]).filter(Boolean);
+    return '只看得到「'+esc(d.join('、'))+'」的資料';
+  }
+  return '只看得到自己部門的資料';
+}
+/* 一次清掉搜尋＋三個複選＋日期區間 */
+function clearAllFilters(){
+  const q=document.getElementById('q'); if(q)q.value='';
+  ['proj','exec','status'].forEach(function(k){
+    msSel[k].clear(); msLabel(k);
+    if(typeof _msOpts!=='undefined'&&_msOpts[k])msPanel(k,_msOpts[k]);
+  });
+  const a=document.getElementById('dr-from'), b=document.getElementById('dr-to');
+  if(a)a.value=''; if(b)b.value='';
+  renderMain();
+}
+function emptyReasonHtml(){
+  const all=(records||[]).length;
+  /* ① 一筆都沒有（或雲端還沒回來） */
+  if(!all){
+    return '<div class="empty" data-why="none"><div class="empty-icon">📭</div>'
+      + '<div class="empty-t">目前還沒有任何紀錄。</div>'
+      + '<div class="empty-s">如果你剛打開，可能還在跟雲端拿資料，等一兩秒。</div></div>';
+  }
+  /* ② 權限擋掉 —— 有資料，但這個身分一筆都看不到 */
+  const vis=visibleRecords();
+  if(!vis.length){
+    const u=currentUser||{};
+    const depts=[...new Set((records||[]).map(normalizeRecord)
+      .map(function(r){return r.部門}).filter(Boolean))];
+    return '<div class="empty" data-why="perm"><div class="empty-icon">🔒</div>'
+      + '<div class="empty-t">這支表目前有 <b>'+all+' 筆</b>，但你的身分看不到。</div>'
+      + '<div class="empty-s">你的身分是「<b>'+esc(u.dept||'（沒有部門）')+'</b>」，'+_viewLevelWord()+'——'
+      + (depts.length
+          ? '而這 '+all+' 筆都屬於「'+esc(depts.join('、'))+'」。'
+          : '而這些紀錄不在你的範圍內。')
+      + '<br>要看全部，請從入口網頁換身分，或找系統管理員調整權限。</div></div>';
+  }
+  /* ③④ 篩選／搜尋 */
+  const q=(document.getElementById('q')||{value:''}).value.trim();
+  const conds=[];
+  if(msSel.proj.size)conds.push('案場「'+esc([...msSel.proj].join('、'))+'」');
+  if(msSel.exec.size)conds.push('執行者「'+esc([...msSel.exec].join('、'))+'」');
+  if(msSel.status.size)conds.push('狀態「'+esc([...msSel.status].join('、'))+'」');
+  if(drActive())conds.push('進度記錄日期 '+(drVal('dr-from')||'不限')+' ～ '+(drVal('dr-to')||'不限'));
+  const btn=function(t){
+    return '<button type="button" class="btn btn-o btn-sm" id="empty-clear" '
+         + 'style="margin-top:8px" onclick="clearAllFilters()">'+t+'</button>';
+  };
+  if(q&&!conds.length){
+    return '<div class="empty" data-why="search"><div class="empty-icon">🔍</div>'
+      + '<div class="empty-t">找不到含「<b>'+esc(q)+'</b>」的紀錄。</div>'
+      + '<div class="empty-s">你看得到的共 '+vis.length+' 筆。<br>'+btn('清除搜尋')+'</div></div>';
+  }
+  if(q)conds.push('搜尋「'+esc(q)+'」');
+  if(conds.length){
+    return '<div class="empty" data-why="filter"><div class="empty-icon">🗂️</div>'
+      + '<div class="empty-t">你看得到 <b>'+vis.length+' 筆</b>，但目前的篩選一筆都對不上。</div>'
+      + '<div class="empty-s">正在生效：'+conds.join('・')+'<br>'+btn('清除全部篩選')+'</div></div>';
+  }
+  /* 保底：理論上到不了（沒篩選、看得到、卻還是 0 筆） */
+  return '<div class="empty" data-why="other"><div class="empty-icon">📭</div>'
+       + '<div class="empty-t">沒有符合的資料</div></div>';
+}
 function hasActiveFilter(){
   const q=(document.getElementById('q')||{value:''}).value.trim();
-  return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0;
+  return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0||drActive();
 }
 document.addEventListener('click',function(e){
   if(e.target&&e.target.closest&&e.target.closest('.ms'))return;
@@ -1643,8 +1990,75 @@ function openExportPicker(){
     ? '（畫面上其他篩選也還在生效）' : '';
   document.getElementById('xp-hint').textContent=
     '目前畫面上共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
+  xpDept=new Set(); xpStatus=new Set();
   renderExportPicker();
+  renderExportExtra();      /* 部門／日期區間／工作狀態（2026-09-20） */
   document.getElementById('xp-overlay').classList.add('show');
+}
+/* ══════ 匯出框多三個條件（2026-09-20 她交辦）══════
+ * 原本只能勾案場；現在再加「部門」「日期區間」「工作狀態」。
+ * 三個都是**沒選＝不限**，跟畫面上的篩選同一套邏輯。 */
+var xpDept = new Set(), xpStatus = new Set();
+function xpOptions(){
+  var data = getFiltered();
+  var depts = [], sts = [];
+  data.forEach(function(r){
+    var d = String(r.部門 || '').trim();
+    if(d && depts.indexOf(d) < 0) depts.push(d);
+    statusesOf(r).forEach(function(s){ if(s && sts.indexOf(s) < 0) sts.push(s); });
+  });
+  depts.sort();
+  var order = (cfg && cfg['狀態']) || [];
+  sts.sort(function(a, b){
+    var ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'zh-Hant');
+  });
+  return { depts: depts, sts: sts };
+}
+function xpChip(kind, v, on){
+  return '<button type="button" class="xp-chip' + (on ? ' on' : '') + '"'
+    + ' onclick="xpPick(' + JSON.stringify(kind) + ',' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">'
+    + esc(v) + '</button>';
+}
+function xpPick(kind, v){
+  var set = (kind === 'dept') ? xpDept : xpStatus;
+  if(v === ''){ set.clear(); }
+  else if(set.has(v)) set.delete(v); else set.add(v);
+  renderExportExtra();
+}
+function renderExportExtra(){
+  var host = document.getElementById('xp-extra'); if(!host) return;
+  var o = xpOptions();
+  host.innerHTML =
+    '<div class="xp-grp"><b>部門</b><div class="xp-chips">'
+    + xpChip('dept', '', xpDept.size === 0).replace('>' + '<', '>全部<')
+    + o.depts.map(function(d){ return xpChip('dept', d, xpDept.has(d)); }).join('')
+    + '</div></div>'
+    + '<div class="xp-grp"><b>日期區間</b><div class="xp-chips">'
+    + '<input type="date" id="xp-from" class="fi" style="max-width:145px">'
+    + '<span style="color:var(--muted)">～</span>'
+    + '<input type="date" id="xp-to" class="fi" style="max-width:145px">'
+    + '<button type="button" class="xp-chip" onclick="xpDateFromScreen()">帶入畫面上的區間</button>'
+    + '<button type="button" class="xp-chip" onclick="xpDateClear()">清除</button>'
+    + '</div></div>'
+    + '<div class="xp-grp"><b>工作狀態</b><div class="xp-chips">'
+    + xpChip('status', '', xpStatus.size === 0).replace('>' + '<', '>全部<')
+    + o.sts.map(function(s){ return xpChip('status', s, xpStatus.has(s)); }).join('')
+    + '</div></div>';
+}
+function xpDateFromScreen(){
+  var a = document.getElementById('xp-from'), b = document.getElementById('xp-to');
+  if(a) a.value = drVal('dr-from');
+  if(b) b.value = drVal('dr-to');
+}
+function xpDateClear(){
+  var a = document.getElementById('xp-from'), b = document.getElementById('xp-to');
+  if(a) a.value = ''; if(b) b.value = '';
+}
+/* 匯出時真正套用的條件（exportExcel 會讀這一包） */
+function xpFilters(){
+  var g = function(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+  return { depts:[...xpDept], statuses:[...xpStatus], from:g('xp-from'), to:g('xp-to') };
 }
 function renderExportPicker(){
   const names=[...xpGroups.keys()].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
@@ -1666,8 +2080,9 @@ function closeExportPicker(){ document.getElementById('xp-overlay').classList.re
 function runExport(){
   if(!xpSel.size){toast('請至少選一個案場','e');return}
   const picked=[...xpSel];
+  const opt=xpFilters();       /* 部門／日期區間／工作狀態（2026-09-20） */
   closeExportPicker();
-  exportExcel(picked);
+  exportExcel(picked, opt);
 }
 /* 檔名用的日期（2026-08-26 統一）：本地時間、月日補零，例 2026-08-06。
  * 原本用 toLocaleDateString('zh-TW') 會得到「2026-8-6」—— 月日沒補零，
@@ -1691,18 +2106,65 @@ function sortByProjOrder(list){
     .sort((a,b)=>(projOrderIdx(a.r.案場)-projOrderIdx(b.r.案場))||(a.i-b.i))
     .map(x=>x.r);
 }
+/* ══════ 進度記錄日期區間（2026-09-20 她交辦）══════
+ * 搜尋列下方多一排「進度記錄日期 ○○ ～ ○○」＋ 本週／上週／本月 快捷。
+ * 她 09-17 選的甲：**區間外的進度記錄不顯示**；一整筆在區間內都沒有記錄，那一列就不出現。
+ * 作法：getFiltered() 回傳的是「複本」（只換掉進度記錄），編輯／儲存仍然對原始那一筆。 */
+function drVal(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+function drActive(){ return !!(drVal('dr-from') || drVal('dr-to')); }
+function logsInRange(logs){
+  var f = drVal('dr-from'), t = drVal('dr-to');
+  if(!f && !t) return logs || [];
+  return (logs || []).filter(function(l){
+    if(!l) return false;
+    var d = String(l.date || '').slice(0, 10);
+    if(!d) return false;                       // 沒有日期的記錄，有設區間時就不算
+    if(f && d < f) return false;
+    if(t && d > t) return false;
+    return true;
+  });
+}
+function drQuick(kind){
+  var now = new Date(), from = new Date(now), to = new Date(now);
+  if(kind === 'clear'){
+    var a = document.getElementById('dr-from'), b = document.getElementById('dr-to');
+    if(a) a.value = ''; if(b) b.value = '';
+    renderMain(); return;
+  }
+  if(kind === 'week' || kind === 'lastweek'){
+    var day = (now.getDay() + 6) % 7;          // 週一當一週的開始
+    from.setDate(now.getDate() - day);
+    to = new Date(from); to.setDate(from.getDate() + 6);
+    if(kind === 'lastweek'){ from.setDate(from.getDate() - 7); to.setDate(to.getDate() - 7); }
+  } else if(kind === 'month'){
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  }
+  var fmt = function(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  var ef = document.getElementById('dr-from'), et = document.getElementById('dr-to');
+  if(ef) ef.value = fmt(from);
+  if(et) et.value = fmt(to);
+  renderMain();
+}
 function getFiltered(){
   const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
   // 2026-08-20：三個篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
   return sortByProjOrder(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
     if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
     if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
-    if(msSel.status.size&&!msSel.status.has(getMainStatus(r)))return false;
+    /* 2026-09-20：狀態依品項之後，任一品項符合就算（原本只比最後一筆） */
+    if(msSel.status.size&&!statusesOf(r).some(s=>msSel.status.has(s)))return false;
     if(q){
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
       if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
     }
+    if(drActive() && !logsInRange(r.進度記錄).length) return false;   /* 區間內沒有記錄 → 這一列不出現（2026-09-20） */
     return true;
+  }).map(function(r){
+    /* 有設區間 → 回傳複本，只保留區間內的記錄；編輯／儲存仍然對原始那一筆（靠 id） */
+    return drActive() ? Object.assign({}, r, { 進度記錄: logsInRange(r.進度記錄) }) : r;
   }));
 }
 
@@ -1727,10 +2189,18 @@ function renderMain(){
   const _forceOpen=hasActiveFilter();
   const filtered=getFiltered();
   document.getElementById('result-count').textContent='共 '+filtered.length+' 筆';
+  var _drh=document.getElementById('dr-hint');
+  if(_drh) _drh.textContent = drActive() ? '（只看這個區間內的進度記錄）' : '';
   const groups={};
   filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
+  /* 2026-09-20：同一個案場底下照「順序」欄位排（沒有順序的排在後面，維持原本的相對位置） */
+  Object.keys(groups).forEach(function(k){
+    groups[k]=groups[k].map(function(r,i){return {r:r,i:i}})
+      .sort(function(a,b){return (rowOrderIdx(a.r)-rowOrderIdx(b.r))||(a.i-b.i)})
+      .map(function(x){return x.r});
+  });
   const el=document.getElementById('main-table');
-  if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有符合的資料</div>';return}
+  if(!filtered.length){el.innerHTML=emptyReasonHtml();return}   /* 0 筆要講出原因（2026-09-22） */
   const _groupCount=Object.keys(groups).length;
   el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
     const sid=secId(proj);
@@ -1754,38 +2224,125 @@ function renderMain(){
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
         <table class="ptbl">
           <thead><tr>
+            <th style="width:26px"></th>
             <th style="width:10%">執行者</th>
-            <th style="width:14%">施作位置／工作項目</th>
-            <th style="width:57%">進度記錄</th>
-            <th style="width:8%">狀態</th>
-            <th style="width:8%">備註</th>
+            <th style="width:12%">施作位置／工作項目</th>
+            <th style="width:42%">進度記錄</th>
+            <th style="width:18%">狀態</th>
+            <th style="width:15%">備註</th>
             <th style="width:3%"></th>
           </tr></thead>
-          <tbody>${rows.map(renderRow).join('')}</tbody>
+          <tbody>${rows.map((r,ri)=>renderRow(r,ri,rows.length)).join('')}</tbody>
         </table>
       </div>
     </div><div style="height:2px"></div>`;
   }).join('');
 }
 
-function renderRow(r){
+/* ══════ 項目列手動拖曳（2026-09-20 她交辦）══════
+ * 原本只有「案場」那一條可以拖，底下的施作位置／工作項目固定照建立順序。
+ * 現在每一列前面有抓手可以拖；手機／平板不支援 HTML5 拖放 → 保留 ↑↓ 兩顆鈕。
+ * 排序寫進記錄的「順序」欄位（新欄位，會推上雲端 → 上線要紅色強制更新）。
+ * 權限沿用「資料排序」（portalCanDragSort）。 */
+function rowOrderIdx(r){
+  var v = Number(r && r.順序);
+  return isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
+}
+/* 同一個案場底下、目前畫面上的那幾列（順序＝畫面順序） */
+function rowsOfProj(proj){
+  return getFiltered().filter(function(r){ return (r.案場 || '') === proj; });
+}
+/* 把整個案場底下的記錄重新編號：10、20、30…（中間插入才有空間） */
+function renumberProj(proj, orderedIds){
+  var seq = 10;
+  orderedIds.forEach(function(id){
+    var rec = records.find(function(x){ return x && x.id === id; });
+    if(rec){ rec.順序 = seq; seq += 10; }
+  });
+  /* 畫面上沒顯示到的（被篩選掉的）接在後面，維持相對順序 */
+  records.forEach(function(rec){
+    if(rec && (rec.案場 || '') === proj && orderedIds.indexOf(rec.id) < 0){ rec.順序 = seq; seq += 10; }
+  });
+}
+function rowPlaceAt(fromId, toId){
+  if(!portalCanDragSort()){ toast('你沒有資料排序的權限','e'); return; }
+  if(!fromId || !toId || fromId === toId) return;
+  var from = records.find(function(x){ return x && x.id === fromId; });
+  var to = records.find(function(x){ return x && x.id === toId; });
+  if(!from || !to) return;
+  var proj = from.案場 || '';
+  if((to.案場 || '') !== proj){ toast('只能在同一個案場底下調整順序','e'); return; }
+  var ids = rowsOfProj(proj).map(function(r){ return r.id; });
+  var fi = ids.indexOf(fromId), ti = ids.indexOf(toId);
+  if(fi < 0 || ti < 0) return;
+  ids.splice(fi, 1);
+  ids.splice(ids.indexOf(toId) + (fi < ti ? 1 : 0), 0, fromId);   // 往下搬＝插在目標後面
+  renumberProj(proj, ids);
+  fbSave(); renderMain();
+}
+function rowMove(id, dir){
+  if(!portalCanDragSort()){ toast('你沒有資料排序的權限','e'); return; }
+  var rec = records.find(function(x){ return x && x.id === id; });
+  if(!rec) return;
+  var ids = rowsOfProj(rec.案場 || '').map(function(r){ return r.id; });
+  var at = ids.indexOf(id);
+  var nb = ids[at + dir];
+  if(at < 0 || nb === undefined) return;      // 已經在最上／最下
+  rowPlaceAt(id, nb);
+}
+var _dragRow = null;
+function rowDragStart(e, id){
+  if(!portalCanDragSort()){ e.preventDefault(); return; }
+  _dragRow = id;
+  try{ e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); }catch(err){}
+}
+function rowDragOver(e, id){
+  if(!_dragRow || _dragRow === id) return;
+  e.preventDefault();
+  var tr = e.currentTarget; if(tr) tr.classList.add('row-drop');
+}
+function rowDragLeave(e){ var tr = e.currentTarget; if(tr) tr.classList.remove('row-drop'); }
+function rowDrop(e, id){
+  e.preventDefault();
+  var tr = e.currentTarget; if(tr) tr.classList.remove('row-drop');
+  var from = _dragRow; _dragRow = null;
+  if(from) rowPlaceAt(from, id);
+}
+function rowDragEnd(){
+  _dragRow = null;
+  [].forEach.call(document.querySelectorAll('.row-drop'), function(el){ el.classList.remove('row-drop'); });
+}
+/* ri／total／proj 是 2026-09-20 加的：畫拖曳抓手與 ↑↓ 要知道自己排第幾 */
+function renderRow(r, ri, total){
   normalizeRecord(r);
   const exs=(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean).map(e=>`<span class="ex-tag">${esc(e)}</span>`).join('');
   const loc=r.施作位置?`<span class="loc-tag">${esc(r.施作位置)}</span>`:'';
   const log=renderLog(r.進度記錄);
   const note=r.備註?`<div style="font-size:12px;color:var(--muted);line-height:1.5">${esc(r.備註).replace(/\n/g,'<br>')}</div>`:'';
-  const st=getMainStatus(r);
-  const stCls='st-badge '+stClassName(st);
+  /* 2026-09-21 她選「方案乙」：狀態改成「一筆記錄一格」，由 renderLog 跟每一筆排在同一行。
+     原本是「一個品項一列」的彙總 —— 左邊 5 筆、右邊 3 列，上下貼著就被看成一一對應
+     （真實資料裡 31 列有 22 列會這樣）。statusByItem 仍留著給篩選、卡關判斷與匯出用，
+     那三個要的是「這個品項目前到哪」，不是逐筆。 */
   const trCls=isStuck(r)?' class="tr-stuck"':'';
   const editable=canEditRecord(r);
   const actionCell=editable
     ?`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="編輯">✏️</button>`
     :`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="檢視（唯讀）">👁️</button>`;
-  return`<tr${trCls}>
+  /* 2026-09-20：每一列可以拖曳換順序（沿用「資料排序」權；手機用 ↑↓） */
+  const canMvRow=portalCanDragSort();
+  const rid=esc(r.id);
+  const dragRow=canMvRow?` draggable="true" ondragstart="rowDragStart(event,'${rid}')" ondragover="rowDragOver(event,'${rid}')" ondragleave="rowDragLeave(event)" ondrop="rowDrop(event,'${rid}')" ondragend="rowDragEnd()"`:'';
+  const handleCell=canMvRow
+    ?`<td class="row-handle" title="按住這裡拖曳可以換順序">⠿<span class="row-mv">`
+      +`<button type="button" onclick="rowMove('${rid}',-1)" title="往上移"${ri===0?' disabled':''}>↑</button>`
+      +`<button type="button" onclick="rowMove('${rid}',1)" title="往下移"${ri===total-1?' disabled':''}>↓</button>`
+      +`</span></td>`
+    :'<td class="row-handle"></td>';
+  return`<tr${trCls}${dragRow}>
+    ${handleCell}
     <td>${exs}${r.部門?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
     <td>${loc}</td>
-    <td>${log}</td>
-    <td><span class="${stCls}">${esc(st)}</span></td>
+    <td colspan="2" class="log-cell">${log}</td>
     <td>${note}</td>
     <td>${actionCell}</td>
   </tr>`;
@@ -1800,9 +2357,13 @@ function renderLog(logs){
     const dt=fmtLogDate(item.date);
     const dtHtml=dt?`<span class="log-dt">${esc(dt)}</span>`:'';
     const locHtml=item.location?`<span class="log-loc">${esc(item.location)}</span>`:'';
-    const stHtml=item.status?`<span class="log-status ${stClassName(item.status)}">${esc(item.status)}</span>`:'';
+    /* 2026-09-21 方案乙：狀態從文字前面移到這一行最右邊那格，沒填就顯示「—」 */
+    const stHtml=item.status
+      ?`<span class="log-status ${stClassName(item.status)}">${esc(item.status)}</span>`
+      :'<span class="log-st-none" title="這一筆沒有選狀態">—</span>';
     const stuckCls=item.status==='暫停/卡關'?' log-li-stuck':'';
-    return`<li class="log-li${stuckCls}">${dtHtml}<span class="log-tx">${locHtml}${stHtml}${esc(item.text||'')}</span></li>`;
+    return`<li class="log-li${stuckCls}">${dtHtml}<span class="log-tx">${locHtml}${esc(item.text||'')}</span>`
+      +`<span class="log-st">${stHtml}</span></li>`;
   }).join('')+'</ul>';
 }
 
@@ -2231,15 +2792,59 @@ function openEdit(id){
     }
     addLogRow();
   }
+  /* 執行者清單要等「部門」欄填好才算得準 —— 上面那次 updateDataLists() 跑在填值之前，
+     那時候 e-dept 還是空的／還留著上一筆的值（2026-09-22）。 */
+  execDeptChanged();
+  const _epw=document.getElementById('exec-pick-wrap');
+  if(_epw)_epw.style.display=readonly?'none':'';
+  const _etip=document.getElementById('exec-tip');      // 唯讀沒有名字排 → 這句提醒也收起來
+  if(_etip)_etip.style.display=readonly?'none':'';
   // 唯讀模式：所有 input 設為 disabled
   ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
   document.querySelectorAll('#log-editor .fi').forEach(el=>el.disabled=readonly);
   document.querySelectorAll('#log-editor .log-del').forEach(el=>el.style.display=readonly?'none':'');
   document.querySelector('button[onclick="addLogRow()"]').style.display=readonly?'none':'';
   document.getElementById('edit-overlay').classList.add('show');
+  _editSnap = editFormSnapshot();   // 拍快照：關閉前比對才知道有沒有改過（2026-09-20）
 }
-function closeEdit(){document.getElementById('edit-overlay').classList.remove('show');flushPendingRemote()}
-function overlayClick(e){if(e.target===e.currentTarget)closeEdit()}
+/* ══════ 編輯框不會再誤關（2026-09-20 她交辦）══════
+ * 她的原話：「編輯框容易不小心跳出去（未存檔但跳走，資料都不見）」
+ *   ① 點外面**不關**（原本 overlayClick 點背景就 closeEdit，沒存的直接消失）
+ *   ② 按 ✕／取消／Esc：有改過 → 跳三個選項（繼續編輯／儲存後關閉／不儲存離開）；沒改過就直接關
+ * 判斷「有沒有改過」：開啟當下把整張表單拍一張快照，關閉前比對。 */
+var _editSnap = '';
+function editFormSnapshot(){
+  var v = ['e-proj','e-dept','e-exec','e-loc','e-note'].map(function(id){
+    var el = document.getElementById(id); return el ? el.value : '';
+  });
+  var logs = [].map.call(document.querySelectorAll('#log-editor .log-edit-row'), function(row){
+    return [].map.call(row.querySelectorAll('input,select,textarea'), function(el){ return el.value; }).join('\u0001');
+  });
+  return JSON.stringify([v, logs]);
+}
+function editIsDirty(){ return _editSnap !== '' && editFormSnapshot() !== _editSnap; }
+/* 按 ✕／取消／Esc 都走這裡 */
+function askCloseEdit(){
+  if(!editIsDirty()){ closeEdit(true); return; }
+  var box = document.getElementById('close-ask');
+  if(!box){ closeEdit(true); return; }          // 沒有這個框就照舊關掉，不要卡住使用者
+  box.classList.add('show');
+}
+function closeAskPick(ans){
+  var box = document.getElementById('close-ask');
+  if(box) box.classList.remove('show');
+  if(ans === 'stay') return;                     // 繼續編輯：什麼都不做
+  if(ans === 'save'){ saveRecord(); return; }    // 儲存後關閉：saveRecord 自己會關
+  closeEdit(true);                               // 不儲存離開
+}
+function closeEdit(force){
+  if(force !== true && editIsDirty()){ askCloseEdit(); return; }
+  _editSnap = '';
+  document.getElementById('edit-overlay').classList.remove('show');
+  flushPendingRemote();
+}
+/* 點背景一律不關（2026-09-20 她指定）—— 原本這裡會直接 closeEdit() */
+function overlayClick(e){ /* 點外面不關，避免沒存到的內容消失 */ }
 
 function saveRecord(){
   const proj=document.getElementById('e-proj').value.trim();
@@ -2257,7 +2862,7 @@ function saveRecord(){
   };
   if(id){const i=records.findIndex(x=>x.id===id);if(i>=0)records[i]=r;else records.push(r)}
   else records.push(r);
-  fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit();
+  fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit(true);   // 已存檔 → 直接關（2026-09-20）
   toast('已儲存 ✓','s');
 }
 function delRecord(){
@@ -2265,7 +2870,7 @@ function delRecord(){
   const id=document.getElementById('edit-id').value;
   if(!id||!confirm('確定刪除這筆紀錄？'))return;
   records=records.filter(r=>r.id!==id);
-  fbSave();renderMain();renderHistory();updateFilters();closeEdit();
+  fbSave();renderMain();renderHistory();updateFilters();closeEdit(true);   // 已存檔／已刪除 → 直接關（2026-09-20）
   toast('已刪除','s');
 }
 
@@ -2283,9 +2888,22 @@ function logsToExcelText(logs){
   }).join('\n');
 }
 /* projs：要匯出的案場名清單。不給＝全部（直接呼叫仍是舊行為，不會壞） */
-async function exportExcel(projs){
+async function exportExcel(projs,opt){
   let data=getFiltered();
   if(projs&&projs.length) data=data.filter(r=>projs.indexOf(r.案場||'（未填案場）')>=0);
+  /* 2026-09-20 她交辦：匯出框裡的部門／日期區間／工作狀態 —— 沒選＝不限 */
+  if(opt){
+    if(opt.depts&&opt.depts.length) data=data.filter(r=>opt.depts.indexOf(String(r.部門||'').trim())>=0);
+    if(opt.statuses&&opt.statuses.length) data=data.filter(r=>statusesOf(r).some(s=>opt.statuses.indexOf(s)>=0));
+    if(opt.from||opt.to){
+      const inR=l=>{const d=String((l&&l.date)||'').slice(0,10); if(!d)return false;
+        if(opt.from&&d<opt.from)return false; if(opt.to&&d>opt.to)return false; return true;};
+      data=data.map(r=>{let logs=r.進度記錄||[]; if(typeof logs==='string')logs=parseProgressString(logs);
+          return Object.assign({},r,{進度記錄:logs.filter(inR)});})
+        .filter(r=>(r.進度記錄||[]).length);
+    }
+    if(!data.length){toast('這些條件之下沒有資料可匯出','e');return}
+  }
   if(!data.length){toast('沒有資料可匯出','e');return}
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('進度表-圖面管理');
@@ -2294,14 +2912,33 @@ async function exportExcel(projs){
   // 估算單格在指定欄寬下會佔幾行（可用寬度扣 padding ≈ 2）
   const estLines=(s,cw)=>{if(!s)return 1;return String(s).split('\n').reduce((a,ln)=>a+Math.max(1,Math.ceil(visW(ln)/Math.max(6,cw-2))),0);};
   // 預設欄寬（最小值）與上限
-  const headers=['案場','部門','執行者','施作位置／工作項目','進度記錄','目前狀態','工作天','暫停天','備註'];
-  const minW=[22,14,18,20,60,12,8,8,26];
-  const maxW=[40,20,24,40,80,16,12,12,50];
-  const rowsData=data.map(r=>{
-    const st=getMainStatus(r);
-    const stat=calcWorkDays(r.進度記錄);
-    return [r.案場,r.部門,r.執行者,r.施作位置,logsToExcelText(r.進度記錄),st,stat?stat.work:'',stat?stat.paused:'',r.備註];
+  /* 2026-09-21 她拍板「方案乙」：一筆記錄一列，跟畫面一致。
+     日期、品項、狀態各自獨立一欄 —— 在 Excel 裡才排序得動、篩選得到。
+     （2026-09-20 的舊版是「一個品項一列」，同品項的好幾筆記錄全被擠在同一格裡，
+      日期和狀態變成那一格裡的文字。）
+     「工作天／暫停天」兩欄與「卡關明細」分頁維持拿掉 —— 她指定隱藏。 */
+  const headers=['案場','部門','執行者','施作位置／工作項目','日期','品項','進度記錄','狀態','備註'];
+  const minW=[22,14,18,20,12,16,54,12,26];
+  const maxW=[40,20,24,40,14,28,80,16,50];
+  const expanded=[];
+  data.forEach(r=>{
+    let logs=r.進度記錄||[];
+    if(typeof logs==='string')logs=parseProgressString(logs);
+    if(!logs.length){
+      /* 一筆進度記錄都沒有的，也要留一列 —— 不然這筆資料在 Excel 裡整個不見 */
+      expanded.push({r:r,item:'',status:'',
+        vals:[r.案場,r.部門,r.執行者,r.施作位置,'','','','',r.備註]});
+      return;
+    }
+    logs.forEach(l=>{
+      if(!l)return;
+      const it=String(l.location||'').trim();
+      expanded.push({r:r,item:it,status:l.status||'',
+        vals:[r.案場,r.部門,r.執行者,r.施作位置,String(l.date||'').slice(0,10),
+              it,String(l.text||''),l.status||'',r.備註]});
+    });
   });
+  const rowsData=expanded.map(x=>x.vals);
   // 依實際內容算欄寬：取每欄最長一行的視覺寬 +2，夾在 [minW, maxW]
   const colW=headers.map((h,ci)=>{
     let maxLine=visW(h);
@@ -2319,89 +2956,33 @@ async function exportExcel(projs){
   });
   const SBG={'進行中':'FFDBEAFE','送審中':'FFFEF3C7','已下單':'FFFED7AA','報價中':'FFCFFAFE','已完成':'FFDCFCE7','待確認':'FFF1F5F9','已定案':'FF166534','暫停/卡關':'FFFECACA','恢復啟動':'FFBBF7D0'};
   const SFG={'已定案':'FFFFFFFF','暫停/卡關':'FF991B1B'};
-  data.forEach((r,i)=>{
-    const st=getMainStatus(r);
-    const rd=rowsData[i];
+  expanded.forEach((x,i)=>{
+    const st=x.status;
+    const rd=x.vals;
     const row=ws.addRow(rd);
     // 取全列各儲存格估算行數的最大值來定列高（每行 20pt + 6pt buffer）
     const maxLines=Math.max(...rd.map((v,ci)=>estLines(v,colW[ci])));
     row.height=Math.max(24,maxLines*20+6);
-    const stuck=isStuck(r);
+    const stuck=(st==='暫停/卡關');      /* 逐筆判斷（2026-09-21） */
     row.eachCell(c=>{
       c.alignment={vertical:'top',wrapText:true};
       c.fill={type:'pattern',pattern:'solid',fgColor:{argb:stuck?'FFFEF2F2':(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
       if(stuck)c.font={color:{argb:'FF991B1B'}};
     });
-    const sc=row.getCell(6);
+    /* 2026-09-21 逐筆之後欄位各往後移一格：日期第 5、品項第 6、狀態第 8 */
+    row.getCell(5).alignment={vertical:'middle',horizontal:'center',wrapText:false};
+    const ic=row.getCell(6);
+    ic.alignment={vertical:'middle',horizontal:'center',wrapText:false};
+    const sc=row.getCell(8);
     if(SBG[st])sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:SBG[st]}};
     if(SFG[st])sc.font={bold:true,color:{argb:SFG[st]}};
     sc.alignment={vertical:'middle',horizontal:'center',wrapText:false};
-    // 工作天/暫停天：置中、粗體
-    [7,8].forEach(idx=>{
-      const c=row.getCell(idx);
-      c.alignment={vertical:'middle',horizontal:'center',wrapText:false};
-      c.font={...(c.font||{}),bold:true};
-    });
   });
-  // ===== Sheet 2：卡關明細 =====
-  const stuckRows=[];
-  data.forEach(r=>{
-    const info=getCurrentStuckInfo(r.進度記錄);
-    if(info)stuckRows.push({
-      案場:r.案場||'',
-      執行者:r.執行者||'',
-      施作位置:info.location||r.施作位置||'',
-      卡關起始日:info.startDate,
-      卡關天數:info.days,
-      卡關原因:info.reason,
-      備註:r.備註||''
-    });
-  });
-  const ws2=wb.addWorksheet('卡關明細');
-  const h2=['#','案場','執行者','施作位置','卡關起始日','卡關天數','卡關原因','備註'];
-  const minW2=[5,22,18,20,14,10,40,26];
-  const maxW2=[5,40,24,40,14,12,80,50];
-  const colW2=h2.map((h,ci)=>{
-    let maxLine=visW(h);
-    stuckRows.forEach(rd=>{
-      const cells=[ci+1,rd.案場,rd.執行者,rd.施作位置,rd.卡關起始日,String(rd.卡關天數),rd.卡關原因,rd.備註];
-      String(cells[ci]||'').split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);});
-    });
-    return Math.min(maxW2[ci],Math.max(minW2[ci],Math.ceil(maxLine+2)));
-  });
-  ws2.columns=h2.map((h,i)=>({header:h,width:colW2[i]}));
-  const hr2=ws2.getRow(1);hr2.height=26;
-  hr2.eachCell(c=>{
-    c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF991B1B'}};
-    c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
-    c.alignment={vertical:'middle',horizontal:'center'};
-  });
-  if(stuckRows.length===0){
-    const row=ws2.addRow(['','','','✅ 目前無卡關工項','','','','']);
-    row.height=28;
-    row.eachCell(c=>{c.alignment={vertical:'middle',horizontal:'center'};c.font={color:{argb:'FF166534'},bold:true};});
-  }else{
-    stuckRows.forEach((rd,i)=>{
-      const arr=[i+1,rd.案場,rd.執行者,rd.施作位置,rd.卡關起始日,rd.卡關天數,rd.卡關原因,rd.備註];
-      const row=ws2.addRow(arr);
-      const maxLines=Math.max(...arr.map((v,ci)=>estLines(String(v||''),colW2[ci])));
-      row.height=Math.max(24,maxLines*20+6);
-      row.eachCell(c=>{
-        c.alignment={vertical:'top',wrapText:true};
-        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:i%2===0?'FFFEF2F2':'FFFFFFFF'}};
-        c.font={color:{argb:'FF991B1B'}};
-      });
-      // 序號/起始日/天數 置中
-      [1,5,6].forEach(idx=>{const c=row.getCell(idx);c.alignment={vertical:'middle',horizontal:'center',wrapText:false}});
-      // 卡關天數 highlight
-      const dc=row.getCell(6);dc.font={...(dc.font||{}),bold:true,size:13};
-    });
-  }
 
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const a=document.createElement('a');a.href=url;a.download='進度表-圖面管理_'+fnDate()+(projs&&projs.length===1?'_'+fnSafe(projs[0]):'')+'.xlsx';a.click();
-  URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（含卡關明細 ${stuckRows.length} 筆）`,'s');
+  URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（${expanded.length} 列，一筆記錄一列）`,'s');
 }
 
 // JSON 備份
@@ -2715,6 +3296,28 @@ window._cloudErrBar = (function(){
   };
 })();
 </script>
+<script>
+/* 📁 本機預覽（2026-09-18）──────────────────────────────────────────
+ * 用「直接開啟檔案」（file://）的方式打開時：頂端掛一條提示，並把 window._LOCAL_PREVIEW 打開，
+ * 底下每一支寫入雲端的函式看到它就直接跳過。
+ * 起因：2026-09-17 從 G 槽直接打開日報表，把試跑的假資料寫進了正式資料庫。
+ * ⚠️ 線上是 https，這一段完全不會觸發。 */
+(function(){
+  if (location.protocol !== 'file:') return;
+  window._LOCAL_PREVIEW = true;
+  function bar(){
+    if (document.getElementById('local-preview-bar')) return;
+    var el = document.createElement('div');
+    el.id = 'local-preview-bar';
+    el.className = 'no-print';
+    el.style.cssText = 'position:sticky;top:0;z-index:99999;background:#7c2d12;color:#fff;'
+      + 'font:700 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:7px 14px;text-align:center';
+    el.textContent = '📁 本機預覽（直接開啟檔案）：可以看、可以操作，但不會存到雲端';
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  if (document.body) bar(); else document.addEventListener('DOMContentLoaded', bar);
+})();
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
@@ -2753,8 +3356,8 @@ const _noUndef = (v) => {
   }
   return v;
 };
-window._fbSet = async (data) => { await authReady; await set(ref(db, 'dtp'), _noUndef(data)); };
-window._fbSetPath = async (path, val) => { await authReady; await set(ref(db, 'dtp/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
+window._fbSet = async (data) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, 'dtp'), _noUndef(data)); };
+window._fbSetPath = async (path, val) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, 'dtp/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { await authReady; const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
 window._fbGetPath = async (path) => { await authReady; const s = await get(ref(db, 'dtp/' + path)); return s.exists() ? s.val() : null; };
 // 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-13 新增）
@@ -2893,6 +3496,127 @@ window._fbWatch = (cb) => { authReady.then(() => onValue(ref(db, 'dtp'),
   else boot();
   setInterval(check, 15 * 60 * 1000);        // 長時間開著的分頁也會發現新版
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) check(); });
+})();
+</script>
+
+<script>
+/* ══════════ 自製確認對話框（取代瀏覽器內建的 confirm）══════════
+ * 2026-09-23 她指定：確認視窗要有「取消／確認」兩顆按鈕，樣式跟系統一致。
+ *
+ * 為什麼要繞這一圈：
+ *   confirm() 是**同步**的 —— 程式寫的是 `if(!confirm(...)) return;`，它會停在那裡等 true／false。
+ *   自製對話框有按鈕，是非同步的，回不了值。
+ * 解法：**重放**
+ *   ① 在捕捉階段記下「是哪個元素觸發的」（pointerdown / mousedown / click 都記）
+ *   ② confirm() 被呼叫 → 先回 false（等同取消），同時把對話框叫出來
+ *   ③ 使用者按「確認」→ 把那個元素**整組重放**（mousedown → mouseup → click），
+ *      這一次 confirm() 直接回 true
+ *   ④ 按「取消」→ 什麼都不做
+ *
+ * ⚠️ 為什麼要重放整組而不是只 click()：
+ *    設定頁有幾顆刪除鈕掛的是 **onmousedown**（locMatDel、tlDelParent），
+ *    只補一個 click 事件它們不會被觸發。
+ * ⚠️ 找不到觸發元素時（例如從 console 呼叫）→ **退回瀏覽器原本的 confirm**，
+ *    絕對不會讓一個動作變成「按了沒反應」。
+ */
+(function () {
+  var W = window;
+  if (W.__cfmDlg) return;
+  W.__cfmDlg = true;
+
+  var NATIVE = W.confirm;            // 退路：找不到觸發元素時用原本的
+  var curEl = null;                  // 現在正在處理的那個元素
+  var armed = null;                  // 已按過「確認」、等著重放的那一次
+
+  ['pointerdown', 'mousedown', 'click'].forEach(function (evt) {
+    document.addEventListener(evt, function (e) {
+      var t = e.target;
+      curEl = (t && t.closest)
+        ? (t.closest('button,a,[onclick],[onmousedown],[role="button"]') || t)
+        : t;
+    }, true);
+  });
+
+  var ov = null;
+  function build() {
+    if (ov) return ov;
+    ov = document.createElement('div');
+    ov.id = '__cfm';
+    ov.className = 'no-print';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
+      'background:rgba(15,23,42,.55);padding:20px;' +
+      'font-family:"Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:16px;max-width:360px;width:100%;' +
+        'box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden">' +
+      '<div style="padding:22px 22px 18px">' +
+        '<div style="font-size:26px;text-align:center;margin-bottom:10px">⚠️</div>' +
+        '<div id="__cfm-msg" style="font-size:15px;line-height:1.8;color:#15202b;text-align:center;' +
+          'font-weight:700;word-break:break-word;white-space:pre-wrap"></div>' +
+      '</div>' +
+      '<div style="display:flex;border-top:1px solid #e5e7eb">' +
+        '<button type="button" id="__cfm-no" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#374151;font:700 15px/1 inherit;cursor:pointer;border-right:1px solid #e5e7eb">取消</button>' +
+        '<button type="button" id="__cfm-yes" style="flex:1;padding:14px;border:none;background:#fff;' +
+          'color:#dc2626;font:700 15px/1 inherit;cursor:pointer">確認</button>' +
+      '</div></div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  function close() {
+    if (!ov) return;
+    ov.style.display = 'none';
+    document.removeEventListener('keydown', onKey, true);
+  }
+  var onYesFn = null;
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'Enter') { e.preventDefault(); close(); if (onYesFn) onYesFn(); }
+  }
+
+  function ask(msg, onYes) {
+    var o = build();
+    o.querySelector('#__cfm-msg').textContent = msg;
+    o.style.display = 'flex';
+    onYesFn = onYes;
+    var yes = o.querySelector('#__cfm-yes'), no = o.querySelector('#__cfm-no');
+    /* 換成新節點，舊的事件不會疊上來 */
+    var y = yes.cloneNode(true), n = no.cloneNode(true);
+    yes.parentNode.replaceChild(y, yes);
+    no.parentNode.replaceChild(n, no);
+    y.addEventListener('click', function (e) { e.stopPropagation(); close(); onYes(); });
+    n.addEventListener('click', function (e) { e.stopPropagation(); close(); });
+    document.addEventListener('keydown', onKey, true);
+    try { n.focus(); } catch (e) {}
+  }
+
+  /* 整組重放：有些刪除鈕掛的是 onmousedown，只發 click 不會動 */
+  function replay(el) {
+    var opt = { bubbles: true, cancelable: true, view: W };
+    ['mousedown', 'mouseup'].forEach(function (t) {
+      try { el.dispatchEvent(new MouseEvent(t, opt)); } catch (e) {}
+    });
+    try { el.click(); } catch (e) {}
+  }
+
+  W.confirm = function (msg) {
+    var m = String(msg == null ? '' : msg);
+    if (armed && armed.msg === m && armed.el === curEl) { armed = null; return true; }
+    var el = curEl;
+    /* 不是使用者按出來的（console、計時器…）→ 退回瀏覽器原本的，不能讓動作卡住 */
+    if (!el || !el.dispatchEvent) return NATIVE.call(W, m);
+    ask(m, function () {
+      armed = { msg: m, el: el };
+      replay(el);
+      armed = null;
+    });
+    return false;
+  };
+  W.__cfmNative = NATIVE;            // 測試／除錯用得到
 })();
 </script>
 </body>
