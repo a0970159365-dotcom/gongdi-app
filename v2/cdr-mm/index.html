@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-30.2';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用（2026-09-17 從專案管理搬過來）：檔名＝施作位置_施工項目_YYMMDD_序號，不分資料夾。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -878,16 +878,19 @@ window._cloudErrBar = (function(){
       <!-- 2026-09-17 她指定：「施工前／中／後」換成「位置｜項目」，與專案管理同一套
            （線上 29 張全是預設的「施工前」＝沒人在用）。舊照片的 phase 欄位留在資料裡不刪，只是不再顯示。 -->
       <div class="flex gap2 no-print" style="flex-wrap:wrap;justify-content:flex-end">
-        <select id="ph-work" class="fi" style="max-width:250px;padding:5px 7px;font-size:12px" title="照片要掛在哪一項施工項目底下">
-          <option value="">— 請先在上方新增工項 —</option>
-        </select>
-        <button class="btn btn-o btn-sm" onclick="$('ph-input').click()">📷 上傳</button>
         <button class="btn btn-o btn-sm" onclick="downloadPhotosZip()">⬇️ 下載全部</button>
       </div>
     </div>
+    <!-- 2026-09-30 她選甲：下拉多了施工說明後變長 → 下拉＋上傳獨佔一整行（規則同 cdr-pm） -->
+    <div id="ph-pick-row" class="no-print" style="display:flex;gap:8px;align-items:center;padding:10px 16px 0">
+      <select id="ph-work" class="fi" style="flex:1 1 auto;min-width:0;width:auto;padding:5px 7px;font-size:12px" title="照片要掛在哪一項施工項目底下">
+        <option value="">— 請先在上方新增工項 —</option>
+      </select>
+      <button class="btn btn-o btn-sm" style="flex:none" onclick="$('ph-input').click()">📷 上傳</button>
+    </div>
     <div class="card-body">
       <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
-      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／施工說明／日期」五層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_施工說明_日期_序號」。</div>
+      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／施工說明／日期」五層分類存放。上傳前先在上方選一項工項，下載時檔名會自動改成「施作位置_施工項目_施工說明_日期_序號」。</div>
       <div id="ph-tree"></div>
       <div id="ph-empty" class="tl-empty no-print" style="margin-top:6px">尚無照片，選好工項後點「📷 上傳」</div>
     </div>
@@ -3946,7 +3949,7 @@ function _uploadPhotos(e) {
   e.target.value='';
   if(!picked.length) return;                       // 使用者自己取消，不用吵他
   /* 「還沒選工項」排在取消之後：使用者按了取消（沒選檔）不該跳任何訊息 */
-  if(!tgt){ toast('照片要掛在某一個工項底下：請先在「施工明細」新增一列，再回到這裡右上角選那一項','e'); return; }
+  if(!tgt){ toast('照片要掛在某一個工項底下：請先在「施工明細」新增一列，再回到這裡上方選那一項','e'); return; }
   if(!files.length){ toast('選到的檔案不是圖片，請重新選擇','e'); return; }
   toast('照片處理中…（' + files.length + ' 張）');
   Promise.all(files.map(f => compressImage(f).then(r => ({ r, f })))).then(list => {
@@ -3994,14 +3997,14 @@ function _uploadPhotos(e) {
 }
 /* ── 照片四層分類（2026-09-17 從專案管理搬過來）──
  * 每張照片記住 案場(projName) / 施作位置(loc) / 施工項目(work) / 日期(date)。
- * 上傳前先在右上的下拉挑一項「目前這張日報上的工項」，前三層自動帶入，日期用報表日期。
+ * 上傳前先在上方的下拉挑一項「目前這張日報上的工項」，前三層自動帶入，日期用報表日期。
  * 2026-09-28 起瑪摩也有縮圖／大圖分離（同專案管理）：舊照片大圖在 p.data，新照片在 cdr_v3_photos，
  * 一律透過 photoSrc()／photoThumb()／photoFull() 取圖，不要再直接讀 p.data。
  * ⚠️ 這一段與 cdr-pm 同名函式是同一套規則，改一邊要記得改另一邊。 */
 const PH_UNSET='（未指定）';
 /* ── 照片的「施工說明」（2026-09-30 她交辦，兩支一起改；規則見 cdr-pm 同名函式的註解）──
  * 新照片上傳時記住 rowId → 一定對得到；舊照片同位置＋項目只有一種說明才用它，否則空白 →「（未指定）」。
- * 對的是「施工明細（廠商）」那張表（workItems，照片右上角選的就是那一列），不是案件明細。 */
+ * 對的是「施工明細（廠商）」那張表（workItems，照片上方下拉選的就是那一列），不是案件明細。 */
 const PH_DESC_MAX=30;   // 檔名只取前 30 字（她 09-30 定）
 function phRowDesc(p, r){
   if(!p) return '';
@@ -4045,7 +4048,7 @@ function phExt(p, src){
   const t=(m?m[1]:'jpeg').toLowerCase();
   return t==='jpeg'?'jpg':t;
 }
-/* 右上下拉：列出這張日報目前有的工項，值是 tr 的序號 */
+/* 照片上方的下拉：列出這張日報目前有的工項，值是 tr 的序號 */
 function refreshPhWorkOptions(){
   const sel=$('ph-work'); if(!sel) return;
   const cur=sel.value;
