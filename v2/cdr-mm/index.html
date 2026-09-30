@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用（2026-09-17 從專案管理搬過來）：檔名＝施作位置_施工項目_YYMMDD_序號，不分資料夾。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -493,6 +493,16 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     window._cdrRemove = function(p){ return _authReady.then(function(){ return _db.ref('cdr_v3/'+p).remove(); }); };
     // 一次讀回整個 cdr_v3 根節點（新格式 reports/{id} 與舊格式 all 都在裡面，省一趟往返）
     window._cdrGetRoot = function(){ return _authReady.then(function(){ return _db.ref('cdr_v3').once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    /* 照片大圖、縮圖放在 cdr_v3 **之外**的獨立節點（2026-09-28，照日報表-專案管理那一套）——
+       這樣 _cdrGetRoot() 開頁抓整包時，照片根本不會被下載到。
+       日報裡只留標記（th=1），列表要顯示時才抓那一張縮圖，點開才抓大圖。
+       ⚠️ 既有照片的大圖還在日報的 data 裡，程式永遠優先用那一份，不會來這裡找。 */
+    window._phGet = function(id){ return _authReady.then(function(){ return _db.ref('cdr_v3_photos/'+id).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._phSet = function(id,d){ return _authReady.then(function(){ return _db.ref('cdr_v3_photos/'+id).set(d==null?null:d); }); };
+    window._phRemove = function(id){ return _authReady.then(function(){ return _db.ref('cdr_v3_photos/'+id).remove(); }); };
+    window._thGet = function(id){ return _authReady.then(function(){ return _db.ref('cdr_v3_thumbs/'+id).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._thSet = function(id,d){ return _authReady.then(function(){ return _db.ref('cdr_v3_thumbs/'+id).set(d==null?null:d); }); };
+    window._thRemove = function(id){ return _authReady.then(function(){ return _db.ref('cdr_v3_thumbs/'+id).remove(); }); };
     /* 修 5（2026-09-17）：直接打開檔案（file://）＝本機預覽 → 讀得到雲端、但一律不寫。
        當天 16:14 就是從 G 槽直接打開檔案，把試跑用的假資料寫進正式資料庫。 */
     if (location.protocol === 'file:') {
@@ -501,6 +511,8 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       window._cdrSet = _noWrite; window._cdrRemove = _noWrite;
       if (window._phSet) window._phSet = _noWrite;
       if (window._phRemove) window._phRemove = _noWrite;
+      if (window._thSet) window._thSet = _noWrite;
+      if (window._thRemove) window._thRemove = _noWrite;
     }
   } catch(e){ console.warn('Firebase init failed:',e); }
 })();
@@ -744,11 +756,9 @@ window._cloudErrBar = (function(){
             <th style="width:28px">#</th>
             <th style="min-width:104px">狀態</th>
             <th style="min-width:90px">施作位置</th>
-            <th style="min-width:100px">施工項目</th>
+            <!-- 2026-09-24 她交辦：施工項目／今日廠商／施工人員／今日出工 四欄移除。
+                 欄位本身沒刪，值改用 hidden 留在列上（見 addCaseRow）—— 舊資料不會被洗掉。 -->
             <th style="min-width:130px">施工說明</th>
-            <th style="min-width:88px">今日廠商</th>
-            <th style="min-width:88px">施工人員</th>
-            <th style="width:48px">今日<br>出工</th>
             <th style="width:64px">完成<br>進度%</th>
             <th style="min-width:110px">備註</th>
             <th style="width:76px">填表人</th>
@@ -756,13 +766,7 @@ window._cloudErrBar = (function(){
           </tr>
         </thead>
         <tbody id="case-tbody"></tbody>
-        <tfoot>
-          <tr class="tfoot-row">
-            <td colspan="7" style="text-align:right;padding-right:10px">合計</td>
-            <td id="case-tot-today">0</td>
-            <td colspan="4"></td>
-          </tr>
-        </tfoot>
+        <!-- 2026-09-24：「合計」那一列拿掉 —— 它加總的就是已經移除的「今日出工」 -->
       </table>
     </div>
     <div id="case-empty" class="tl-empty no-print" style="margin:10px 14px">還沒有案件明細，點右上角「＋ 新增案件」</div>
@@ -812,6 +816,8 @@ window._cloudErrBar = (function(){
         </tfoot>
       </table>
     </div>
+    <!-- 2026-09-30 她指定文字：施工說明會進照片下載檔名，整張表只提示這一行（不是每一列都加） -->
+    <div id="wdesc-hint" class="tl-hint no-print" style="margin:6px 16px 10px">※ 施工說明會帶進照片的下載檔名（只取前 30 字，如有符號 / \ : * ? " &lt; &gt; |，將以底線 _ 取代）</div>
   </div>
 
   <!-- 材料明細 -->
@@ -881,7 +887,7 @@ window._cloudErrBar = (function(){
     </div>
     <div class="card-body">
       <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
-      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／日期」四層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_日期_序號」。</div>
+      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／施工說明／日期」五層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_施工說明_日期_序號」。</div>
       <div id="ph-tree"></div>
       <div id="ph-empty" class="tl-empty no-print" style="margin-top:6px">尚無照片，選好工項後點「📷 上傳」</div>
     </div>
@@ -1329,7 +1335,7 @@ window._cloudErrBar = (function(){
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
         <input type="checkbox" id="carry-notes" checked> 備註事項</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-        <input type="checkbox" id="carry-case" checked> 案件明細（內部同仁）<span style="color:var(--muted)">（出工歸零）</span></label>
+        <input type="checkbox" id="carry-case" checked> 案件明細（內部同仁）</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
         <input type="checkbox" id="carry-work" checked> 施工明細（廠商）<span style="color:var(--muted)">（出工歸零）</span></label>
     </div>
@@ -1697,7 +1703,9 @@ function _localCopy(data, cloudOk){
       return Object.assign({}, r, {
         photos: r.photos.map(function(p){
           if(!p) return p;
-          if(!p.thumb) return p;            // 本機是它唯一的離線副本 → 不動
+          /* 2026-09-28：th=1 ＝ 縮圖、大圖都已確定在 cdr_v3_thumbs／cdr_v3_photos（_clearReportData 才會清 data）。
+             兩個都沒有的＝舊照片，本機是它的離線副本 → 不動 */
+          if(!p.thumb && !p.th) return p;
           return Object.assign({}, p, { data: '' });
         })
       });
@@ -1732,6 +1740,8 @@ function save() {
     reports: S.reports, cfg: S.cfg, user: S.user,
     projSort: S.projSort, updatedAt: Date.now()
   };
+  _pushPendingThumb();   /* 照片搬出日報（2026-09-28）：先送縮圖、再送大圖，兩邊都確定上雲才清日報裡那份 */
+  _pushPendingFull();
   let cloudOk = false, localOk = false;
   try { if(window._cdrSet && !_cloudOffline){ pushCloud(data); cloudOk = true; } } catch(e){ console.warn('雲端同步失敗：', e && e.message); }
   try { localStorage.setItem('cdr_v3', JSON.stringify(_localCopy(data, cloudOk))); localOk = true; }
@@ -1741,6 +1751,49 @@ function save() {
     catch(e2){ console.warn('去掉照片後仍存不下：', e2 && e2.message); }
   }
   return { cloudOk, localOk };
+}
+/* ── 照片搬出日報（2026-09-28，她確認「做法跟日-專一樣」）───────────────
+ * 起因：開頁 _cdrGetRoot() 抓整個 cdr_v3 = 8.42MB，其中 29 張照片大圖佔 8.39MB，
+ *       實測下載 7.8 秒 —— 日曆在抓完之前整月空白，她以為呂謦安看不到日報。
+ * 做法跟 cdr-pm（2026-09-03 原圖、09-23 縮圖）一模一樣：
+ *   上傳 → 大圖先留在日報的 data 裡（跟改版前一樣不會掉）＋ 放進待推清單；
+ *   存檔 → 大圖推 cdr_v3_photos、縮圖推 cdr_v3_thumbs；縮圖推成功才標 th=1；
+ *   兩條都完成 → 才清掉日報裡那份大圖（下次存檔生效）。在那之前寧可兩邊都有，也不要弄丟。
+ *   推失敗 → 留在待推清單，下次存檔再試；期間大圖一直在日報裡。
+ * 什麼時候才敢清：① 大圖已經不在待推清單 ② 縮圖已標 th=1（或報表裡還有 thumb）。
+ * 這兩件事各自非同步完成、誰先誰後不一定 → 兩條路跑完都來敲一次，誰後到誰清。 */
+function _clearReportData(id){
+  if(_pendingFull[id]) return;                    // 大圖還沒確定上雲 → 一個字都不准動
+  var f=function(p){ if(p && p.id===id && (p.thumb||p.th)) p.data=''; };
+  (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(f); });
+  ((S.report&&S.report.photos)||[]).forEach(f);
+}
+function _pushPendingThumb(){
+  if(!window._thSet) return;
+  Object.keys(_pendingThumb).forEach(function(id){
+    var d=_pendingThumb[id];
+    try{
+      window._thSet(id, d).then(function(){
+        delete _pendingThumb[id];
+        var mark=function(p){ if(p && p.id===id) p.th=1; };
+        (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(mark); });
+        ((S.report&&S.report.photos)||[]).forEach(mark);
+        _clearReportData(id);      /* 大圖那條可能已經跑完在等這個標記 */
+      }).catch(function(e){ console.warn('縮圖推送失敗（會在下次存檔重試）：', id, e && e.message); });
+    }catch(e){ console.warn('縮圖推送失敗：', id, e && e.message); }
+  });
+}
+function _pushPendingFull(){
+  if(!window._phSet) return;
+  Object.keys(_pendingFull).forEach(function(id){
+    var d=_pendingFull[id];
+    try{
+      window._phSet(id, d).then(function(){
+        delete _pendingFull[id];
+        _clearReportData(id);
+      }).catch(function(e){ console.warn('照片大圖推送失敗（會在下次存檔重試）：', id, e && e.message); });
+    }catch(e){ console.warn('照片大圖推送失敗：', id, e && e.message); }
+  });
 }
 /* 2026-09-03 事故後移除 _dropStrippedPhotos（它會把照片整筆刪掉）。
    舊裝置的 localStorage 可能還留著空殼，開機時清乾淨： */
@@ -2726,7 +2779,7 @@ function carryApply(){
   if (wantCase && caseItemsOf(src).length) {
     caseItemsOf(src).forEach(it => addCaseRow({ ...it, id:uid(), w0:0,
       owner:(S.user&&S.user.name)||'', subId:undefined, subAt:undefined, subDept:undefined }));
-    brought.push(`案件明細（內部同仁）${caseItemsOf(src).length} 筆（出工已歸零）`);
+    brought.push(`案件明細（內部同仁）${caseItemsOf(src).length} 筆`);
   }
   if (wantWork && (src.workItems||[]).length) {
     (src.workItems||[]).forEach(it => addRow({ ...it, id:uid(), w0:0, w1:0,
@@ -3193,11 +3246,14 @@ function addCaseRow(it){
     <td style="text-align:center;color:var(--muted);font-size:11px" class="crnum"></td>
     <td data-label="狀態"><select class="cs st-pick ${escHtml(stClassName(cur))}" data-f="status" onchange="onCaseRowChange(this)"${dis}>${stOpts}</select></td>
     <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onCaseRowChange(this)"${dis}>${selOpts(S.cfg.locs,v('loc'),'施作位置...')}</select></td>
-    <td data-label="施工項目"><select class="cs" data-f="work" onchange="syncReport()"${dis}>${selOpts(worksOf(v('loc')),v('work'),'施工項目...')}</select></td>
-    <td data-label="施工說明"><input class="ci" data-f="wdesc" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." oninput="syncReport()"${dis}></td>
-    <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onCaseRowChange(this)"${dis}>${selOpts(S.cfg.vendors,v('vendor'),'廠商...')}</select></td>
-    <td data-label="施工人員"><select class="cs" data-f="staff" onchange="syncReport()"${dis}>${selOpts(staffOf(v('vendor')),v('staff'),'施工人員...')}</select></td>
-    <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalcCase();syncReport()" style="max-width:60px"${dis}></td>
+    <!-- 🚨 2026-09-24：施工項目／今日廠商／施工人員／今日出工 從畫面拿掉，
+         但值一定要留著 —— collectCaseRows() 是從這些欄位讀值再存檔的，
+         直接刪掉的話下一次存檔會把舊資料洗成空的。 -->
+    <td data-label="施工說明"><input class="ci" data-f="wdesc" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." oninput="syncReport()"${dis}>
+      <input type="hidden" data-f="work" value="${escHtml(v('work'))}">
+      <input type="hidden" data-f="vendor" value="${escHtml(v('vendor'))}">
+      <input type="hidden" data-f="staff" value="${escHtml(v('staff'))}">
+      <input type="hidden" data-f="w0" value="${v('w0')||0}"></td>
     <td data-label="完成進度%">
       <div class="prog-wrap">
         <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center"${dis}>
@@ -3268,9 +3324,10 @@ function collectCaseRows(){
 /* 摘要用：一列一行，格式跟施工明細一致，狀態擺最前面用【】框起來 */
 function caseSummaryLine(ci){
   if(!ci) return null;
-  if(!(ci.status || ci.loc || ci.work || ci.owner)) return null;
+  /* 2026-09-24：施工項目不再參與（那一欄已從畫面移除），判斷與內容都拿掉 */
+  if(!(ci.status || ci.loc || ci.wdesc || ci.owner)) return null;
   const head = ci.status ? '【' + String(ci.status).trim() + '】' : '';
-  const rest = [ci.loc, ci.work, ci.wdesc, ci.note, '進度' + (parseFloat(ci.progress)||0) + '%', ci.owner]
+  const rest = [ci.loc, ci.wdesc, ci.note, '進度' + (parseFloat(ci.progress)||0) + '%', ci.owner]
     .map(x => String(x == null ? '' : x).trim()).filter(Boolean).join('；');
   return head + rest;
 }
@@ -3799,6 +3856,79 @@ function compressImage(file){
     catch(e){ clearTimeout(readTimer); finish({ readError: true }); }
   });
 }
+/* 縮圖（2026-09-28，與 cdr-pm 同一套）：只給列表用，長邊 320、品質 0.6，一張約 15~25KB。 */
+var THUMB_MAX_EDGE = 320;
+var THUMB_QUALITY  = 0.6;
+function makeThumb(dataUri){
+  return new Promise(function(resolve){
+    /* 同樣的逾時保護：縮圖做不出來就回空字串，列表會退回用大圖，不會卡住整個流程 */
+    var done=false;
+    function fin(v){ if(done) return; done=true; resolve(v); }
+    var timer=setTimeout(function(){ fin(''); }, PHOTO_DECODE_TIMEOUT);
+    try{
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w=img.width, h=img.height;
+          var sc=Math.min(1, THUMB_MAX_EDGE/Math.max(w,h));
+          var cw=Math.max(1,Math.round(w*sc)), ch=Math.max(1,Math.round(h*sc));
+          var cv=document.createElement('canvas');
+          cv.width=cw; cv.height=ch;
+          cv.getContext('2d').drawImage(img,0,0,cw,ch);
+          var out=cv.toDataURL('image/jpeg', THUMB_QUALITY);
+          clearTimeout(timer);
+          /* 大圖本來就比縮圖還小 → 不用另外做縮圖，列表直接用大圖 */
+          fin(out.length < String(dataUri).length ? out : '');
+        }catch(e){ clearTimeout(timer); fin(''); }
+      };
+      img.onerror = function(){ clearTimeout(timer); fin(''); };
+      img.src = dataUri;
+    }catch(e){ clearTimeout(timer); fin(''); }
+  });
+}
+/* ── 取一張照片的影像（2026-09-28 照片搬出日報）──────────────────────
+ * 🚨 日報裡還帶著 data（或 thumb）的照片 → 永遠直接用那一份，**完全不碰雲端**。
+ *    既有 29 張在搬家前全部走這條，行為跟改版前一模一樣。 */
+var _fullCache = {};      // 這一輪已經抓過／剛上傳的大圖（記憶體，不落地）
+var _pendingFull = {};    // 還沒推上雲的大圖：id -> dataURI（存檔時一起送）
+var _thumbCache = {};     // 這一輪抓回來／剛做好的縮圖（記憶體，不落地）
+var _pendingThumb = {};   // 還沒推上雲的縮圖：id -> dataURI（存檔時一起送）
+var _thumbJobs = [];      // 正在產生的縮圖
+/* 大圖：日報裡的 data → 這一輪抓過的 → cdr_v3_photos；都沒有就退回縮圖，不破圖 */
+function photoFull(p){
+  if(!p) return Promise.resolve('');
+  if(p.data) return Promise.resolve(p.data);
+  if(_fullCache[p.id]) return Promise.resolve(_fullCache[p.id]);
+  if(!window._phGet) return Promise.resolve(p.thumb||_thumbCache[p.id]||'');
+  return window._phGet(p.id).then(function(d){
+    if(d){ _fullCache[p.id]=d; return d; }
+    return p.thumb||_thumbCache[p.id]||'';
+  }).catch(function(){ return p.thumb||_thumbCache[p.id]||''; });
+}
+/* 列表要顯示的那一張（同步）：日報裡的縮圖 → 日報裡的大圖 → 這一輪抓回來的縮圖 */
+function photoSrc(p){ return (p && (p.thumb || p.data || _thumbCache[p.id])) || ''; }
+/* 縮圖（非同步）：上面三個都沒有 → 去 cdr_v3_thumbs 抓；還是沒有 → 退回抓大圖，寧可慢一點也絕不破圖 */
+function photoThumb(p){
+  if(!p) return Promise.resolve('');
+  var inline = photoSrc(p);
+  if(inline) return Promise.resolve(inline);
+  if(!window._thGet) return photoFull(p);
+  return window._thGet(p.id).then(function(d){
+    if(d){ _thumbCache[p.id]=d; return d; }
+    return photoFull(p);
+  }).catch(function(){ return photoFull(p); });
+}
+/* 畫面上還沒有圖的那幾格，抓回來再補上去 —— 不重畫整棵樹，避免閃一下 */
+function fillLazyThumbs(){
+  var host=$('ph-tree'); if(!host) return;
+  [].forEach.call(host.querySelectorAll('img[data-ph]'), function(im){
+    if(im.getAttribute('src')) return;
+    var id=im.getAttribute('data-ph');
+    var p=((S.report&&S.report.photos)||[]).find(function(x){ return x && x.id===id; });
+    if(!p) return;
+    photoThumb(p).then(function(d){ if(d) im.setAttribute('src', d); });
+  });
+}
 function uploadPhotos(e) {
   try { return _uploadPhotos(e); }
   catch(err){ toast('照片上傳失敗：' + ((err && err.message) || err), 'e'); }
@@ -3827,15 +3957,29 @@ function _uploadPhotos(e) {
       if(r.timeout){ bad.push(nm + '（讀取逾時）'); return; }
       if(r.undecodable) undec.push(nm);
       if(r.slow) slow.push(nm);
+      var _pid = uid();
+      /* ⚠️ 大圖**先留在日報裡**（2026-09-28，同 cdr-pm）：這樣它會跟日報一起進雲端，
+         跟改版前一樣不會掉。等確認推進 cdr_v3_photos／縮圖標了 th=1，
+         _clearReportData() 才把這一格清掉、下次存檔就瘦身。
+         不這樣做的話：使用者上傳完馬上關掉分頁 → 大圖只存在記憶體裡 → 真的不見。 */
+      _fullCache[_pid] = r.data;
+      _pendingFull[_pid] = r.data;
       /* 保險：雲端讀回來的報表可能沒有 photos 欄位（Firebase 不存空陣列） */
       if(!Array.isArray(S.report.photos)) S.report.photos = [];
       S.report.photos.push({
-        id:uid(), data:r.data, name:f.name, ts:Date.now(),
+        id:_pid, data:r.data, thumb:'', name:f.name, ts:Date.now(),
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
-        projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
+        projName:tgt.projName, loc:tgt.loc, work:tgt.work, rowId:tgt.rowId||'', date:S.report?.date||today()
       });
+      /* 縮圖放記憶體＋待推清單，日報裡的 thumb 保持空字串；存檔時推到 cdr_v3_thumbs，推成功才標 th=1 */
+      _thumbJobs.push(makeThumb(r.data).then(function(th){
+        _thumbCache[_pid]   = th || r.data;
+        _pendingThumb[_pid] = th || r.data;   // 做不出縮圖就退回大圖，至少看得到
+      }));
       n++;
     });
+    /* 縮圖是非同步做的 → 等它們好了再重畫一次 */
+    Promise.all(_thumbJobs.splice(0)).then(function(){ renderPhotos(); });
     renderPhotos();
     if(n) toast('已加入 ' + n + ' 張照片，記得按「💾 儲存報表」','s');
     if(undec.length) toast('有 ' + undec.length + ' 張這台手機解不開（多半是 HEIC），已用原檔存下來：'
@@ -3851,12 +3995,48 @@ function _uploadPhotos(e) {
 /* ── 照片四層分類（2026-09-17 從專案管理搬過來）──
  * 每張照片記住 案場(projName) / 施作位置(loc) / 施工項目(work) / 日期(date)。
  * 上傳前先在右上的下拉挑一項「目前這張日報上的工項」，前三層自動帶入，日期用報表日期。
- * 瑪摩的照片仍整張存在報表裡（沒有專案管理那套縮圖／原圖分離），所以原圖就是 p.data。
+ * 2026-09-28 起瑪摩也有縮圖／大圖分離（同專案管理）：舊照片大圖在 p.data，新照片在 cdr_v3_photos，
+ * 一律透過 photoSrc()／photoThumb()／photoFull() 取圖，不要再直接讀 p.data。
  * ⚠️ 這一段與 cdr-pm 同名函式是同一套規則，改一邊要記得改另一邊。 */
 const PH_UNSET='（未指定）';
+/* ── 照片的「施工說明」（2026-09-30 她交辦，兩支一起改；規則見 cdr-pm 同名函式的註解）──
+ * 新照片上傳時記住 rowId → 一定對得到；舊照片同位置＋項目只有一種說明才用它，否則空白 →「（未指定）」。
+ * 對的是「施工明細（廠商）」那張表（workItems，照片右上角選的就是那一列），不是案件明細。 */
+const PH_DESC_MAX=30;   // 檔名只取前 30 字（她 09-30 定）
+function phRowDesc(p, r){
+  if(!p) return '';
+  const rows=(((r||S.report||{}).workItems)||[]).filter(Boolean);
+  if(p.rowId){
+    const hit=rows.find(w=>w.id===p.rowId);
+    if(hit) return String(hit.wdesc||'').trim();
+  }
+  if(!p.loc && !p.work){ const g=phGuessRow(p, r); return g ? String(g.wdesc||'').trim() : ''; }
+  const m=rows.filter(w=>(w.loc||'')===(p.loc||'')&&(w.work||'')===(p.work||''));
+  const ds=[...new Set(m.map(w=>String(w.wdesc||'').trim()))];
+  return (m.length && ds.length===1) ? ds[0] : '';
+}
+/* 什麼都沒記的舊照片（瑪摩 29 張都是：9/23 前只記 phase）→ 日報只有一列施工明細就當成那一列（她 09-30 選甲＋丙）；
+   好幾列分不出來回 null。只影響顯示與下載，不改照片上存的資料。 */
+function phGuessRow(p, r){
+  if(!p || p.loc || p.work) return null;
+  const rows=(((r||S.report||{}).workItems)||[]).filter(w=>w&&(w.loc||w.work));
+  return rows.length===1 ? rows[0] : null;
+}
+function phLocWork(p){
+  if(!p) return {loc:'',work:''};
+  if(p.loc || p.work) return {loc:p.loc||'', work:p.work||''};
+  const g=phGuessRow(p);
+  return g ? {loc:g.loc||'', work:g.work||''} : {loc:'',work:''};
+}
+function phDescName(p){
+  const d=Array.from(phRowDesc(p)).slice(0,PH_DESC_MAX).join('').trim();
+  return d ? safeName(d) : PH_UNSET;
+}
 function phPath(p){
   const d=(p.date||S.report?.date||'').trim();
-  return [p.projName||PH_UNSET, p.loc||PH_UNSET, p.work||PH_UNSET, d||PH_UNSET];
+  const lw=phLocWork(p);
+  /* 案場：照片沒記就用日報本身的案場（她 09-30：不要顯示（未指定）） */
+  return [p.projName||S.report?.projName||PH_UNSET, lw.loc||PH_UNSET, lw.work||PH_UNSET, phRowDesc(p)||PH_UNSET, d||PH_UNSET];
 }
 /* 檔名不能有這些字元，一律換成底線 */
 function safeName(s){ return String(s||'').replace(/[\\/:*?"<>|]/g,'_').trim()||PH_UNSET; }
@@ -3873,7 +4053,9 @@ function refreshPhWorkOptions(){
   $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
     const loc=tr.querySelector('[data-f="loc"]')?.value||'';
     const work=tr.querySelector('[data-f="work"]')?.value||'';
-    if(loc||work) opts.push({v:String(i),label:[loc,work].filter(Boolean).join('｜')});
+    const desc=(tr.querySelector('[data-f="wdesc"]')?.value||'').trim();
+    /* 2026-09-30：多帶施工說明 —— 同位置同項目有好幾列時才分得出來 */
+    if(loc||work) opts.push({v:String(i),label:[loc,work].filter(Boolean).concat([desc||PH_UNSET]).join('｜')});
   });
   sel.innerHTML = opts.length
     ? opts.map(o=>`<option value="${o.v}">${escHtml(o.label)}</option>`).join('')
@@ -3888,7 +4070,8 @@ function phTargetFromSelect(){
   return {
     projName: curProjName(),
     loc: tr.querySelector('[data-f="loc"]')?.value||'',
-    work: tr.querySelector('[data-f="work"]')?.value||''
+    work: tr.querySelector('[data-f="work"]')?.value||'',
+    rowId: tr.dataset.id||''          // 2026-09-30：記住是哪一列，下載檔名才帶得出正確的施工說明
   };
 }
 /* 依 案場 → 施作位置 → 施工項目 → 日期 分組列出（沒選過的舊照片歸到「（未指定）」那組） */
@@ -3914,17 +4097,28 @@ function renderPhotos() {
         <div class="photo-grid">
           ${items.map(({p,i})=>`
             <div class="photo-thumb" onclick="openPh(${i})">
-              <img src="${p.data}" alt="${escHtml(p.name)}" loading="lazy">
+              <img src="${photoSrc(p)}" data-ph="${escHtml(p.id||'')}" alt="${escHtml(p.name)}" loading="lazy">
               <div class="photo-thumb-info">${escHtml(p.name)}</div>
             </div>`).join('')}
         </div>
       </div>
     </div>`).join('');
+  fillLazyThumbs();   /* 照片搬出日報之後（2026-09-28）：沒圖的格子抓回來再補 */
 }
 function openPh(i) {
   viewPhIdx=i;
   const p=S.report.photos[i];
-  $('ph-img').src=p.data; $('ph-cap').textContent=p.name;
+  /* 先放手上有的（縮圖或舊照片的大圖），再去抓大圖換上（2026-09-28，同 cdr-pm）。
+     抓回來時要確認使用者還在看同一張，否則連點兩張會換錯圖。 */
+  $('ph-img').src=photoSrc(p); $('ph-cap').textContent=p.name;
+  /* 先把視窗打開再去抓 —— 大圖若已在快取，回來時要看得到「視窗開著」才會換上 */
+  $('ph-overlay').classList.add('show');
+  if(!photoSrc(p)) photoThumb(p).then(function(th){
+    if(th && viewPhIdx===i && !$('ph-img').getAttribute('src')) $('ph-img').src=th;
+  });
+  photoFull(p).then(function(full){
+    if(full && viewPhIdx===i && $('ph-overlay').classList.contains('show')) $('ph-img').src=full;
+  });
   const lbl=$('ph-phase-lbl');
   if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=phPath(p).join(' / '); }
   $('ph-overlay').classList.add('show');
@@ -3953,9 +4147,12 @@ function phFileNames(list, fulls){
   const seq={}, out=new Array(list.length);
   order.forEach(i=>{
     const p=list[i];
-    const head=[p.loc,p.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
+    const lw=phLocWork(p);
+    const head=[lw.loc,lw.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
     const ymd=phYmd(p.date||S.report?.date);
-    const prefix=(head.length?head:['未分類']).concat(ymd?[ymd]:[]).join('_');
+    /* 2026-09-30：多一段施工說明（取前 30 字；沒有或對不到 →「（未指定）」），序號跟著前綴分組；
+       位置、項目都沒有 → 只寫「未分類」，不再加（未指定）（她選甲） */
+    const prefix=(head.length?head.concat([phDescName(p)]):['未分類']).concat(ymd?[ymd]:[]).join('_');
     seq[prefix]=(seq[prefix]||0)+1;
     out[i]=prefix+'_'+String(seq[prefix]).padStart(3,'0')+'.'+phExt(p,(fulls&&fulls[i])||'');
   });
@@ -3968,7 +4165,8 @@ async function downloadPhotosZip(){
   toast('打包中…');
   try{
     const zip=new JSZip();
-    const fulls=list.map(p=>p.data||'');
+    /* 2026-09-28：大圖可能不在日報裡了 → 逐張抓回來再打包 */
+    const fulls=await Promise.all(list.map(p=>photoFull(p)));
     const names=phFileNames(list, fulls);
     list.forEach((p,i)=>{
       const b64=String(fulls[i]||'').split(',')[1]||'';
@@ -4387,21 +4585,20 @@ function histFilterActive(){
     .some(id=>$(id)&&$(id).value);
 }
 /* 表頭：分組用掉的那一欄不用再出現在每一列 */
-/* ══ 出工怎麼算（2026-09-18 她指定）══
- * 案件明細＝內部同仁、施工明細＝廠商，兩邊填的是不同的人 → 今日出工「加在一起」，
- * 但要看得出各幾個人，所以管理總表顯示「6（內部 3／廠商 3）」。
- * 明日預估只有施工明細（廠商）有填，維持只算它。 */
+/* ══ 出工怎麼算 ══
+ * 2026-09-18～09-23：案件明細（內部同仁）也有「今日出工」，所以顯示「6（內部 3／廠商 3）」。
+ * 🔄 2026-09-24 她交辦把案件明細的「今日出工」欄移除 → 內部那一半不再有人填，
+ *    她指定「不再拆內部／廠商，直接顯示總數（只算施工明細）」。
+ *    repW0Inner 保留著沒刪 —— 舊資料裡還有值，哪天要把欄位開回來只要改 w0Text。 */
 function sumW0(list, f){ return (list||[]).reduce((s,x)=>s+(Number(x&&x[f||'w0'])||0),0); }
 function repW0Vendor(r){ return sumW0(r&&r.workItems); }              // 廠商（施工明細）
 function repW0Inner(r){ return sumW0(caseItemsOf(r)); }               // 內部同仁（案件明細）
 function repW0Total(r){ return repW0Vendor(r)+repW0Inner(r); }
 function repW1(r){ return sumW0(r&&r.workItems,'w1'); }               // 明日預估：只算廠商
-/* 「6（內部 3／廠商 3）」；沒有案件明細時就只顯示數字，跟改版前一樣 */
+/* 2026-09-24 起只算施工明細（廠商）—— 案件明細的出工欄已移除 */
 function w0Text(r, numFn){
   const n = numFn || (v=>v);
-  const inner = repW0Inner(r), vend = repW0Vendor(r);
-  if(!inner) return String(n(vend));
-  return n(inner+vend) + '<span class="w0-split">（內部 ' + n(inner) + '／廠商 ' + n(vend) + '）</span>';
+  return String(n(repW0Vendor(r)));
 }
 function renderMgmtHead(){
   const th=$('master-thead'); if(!th)return;
@@ -4688,13 +4885,13 @@ function renderMgmt(){
   groups.forEach((g,gi)=>{
     const key=g[0], rows=g[1];
     const open=force||groupOpen(key);
-    const s0=rows.reduce((s,r)=>s+repW0Total(r),0);          // 2026-09-18：內部＋廠商
-    const s0i=rows.reduce((s,r)=>s+repW0Inner(r),0);
+    /* 2026-09-24 她指定：案件明細的出工欄移除後只算施工明細（廠商），不再拆內部／廠商 */
+    const s0=rows.reduce((s,r)=>s+repW0Vendor(r),0);
     const head=document.createElement('tr');
     head.className='grp-row';
     head.innerHTML=`<td colspan="${COLS}"><div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
       <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
-      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}${s0i?`（內部 ${num(s0i)}／廠商 ${num(s0-s0i)}）`:''}</span></div></td>`;
+      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}</span></div></td>`;
     tbody.appendChild(head);
     if(!open)return;
     rows.forEach(r=>{
@@ -4729,9 +4926,8 @@ function toggleDetail(btn,id){
     /* 2026-09-18 她指定：展開後先列案件明細（內部同仁），再列施工明細（廠商） */
     const caseRows=caseItemsOf(r).map((ci,i)=>`
       <tr><td>${i+1}</td><td><span class="st-chip ${escHtml(stClassName(ci.status))}">${escHtml(ci.status||'—')}</span></td>
-      <td>${escHtml(ci.loc||'—')}</td><td>${escHtml(ci.work||'—')}</td>
-      <td>${escHtml(ci.vendor||'—')}</td><td>${escHtml(ci.staff||'—')}</td>
-      <td style="text-align:center">${ci.w0||0}</td><td>${ci.progress||0}%</td>
+      <td>${escHtml(ci.loc||'—')}</td><td>${escHtml(ci.wdesc||'—')}</td>
+      <td>${ci.progress||0}%</td>
       <td>${escHtml(ci.owner||'—')}</td><td>${subTimeText(ci.subAt)||'—'}</td></tr>`).join('');
     const rows=(r.workItems||[]).map((wi,i)=>`
       <tr><td>${i+1}</td><td>${escHtml(wi.loc||'—')}</td>
@@ -4741,7 +4937,7 @@ function toggleDetail(btn,id){
     inner.innerHTML=`<div style="font-size:12px;margin-bottom:6px"><strong>案場：</strong>${escHtml(reportProjName(r)||'—')}</div>
       ${caseRows?`<div class="det-sec">案件明細（內部同仁）</div>
       <table class="stbl" style="font-size:12px;margin-bottom:10px">
-      <thead><tr><th>#</th><th>狀態</th><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th><th>出工</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
+      <thead><tr><th>#</th><th>狀態</th><th>施作位置</th><th>施工說明</th><th>進度</th><th>填表人</th><th>提交時間</th></tr></thead>
       <tbody>${caseRows}</tbody></table>
       <div class="det-sec">施工明細（廠商）</div>`:''}
       <table class="stbl" style="font-size:12px">
@@ -4998,8 +5194,9 @@ function getExCaseRows(){
   });
   return sortExRows(rows);
 }
-const EX_CASE_HEADERS=['日期','部門','專案工務','案場','狀態','施作位置','施工項目','施工說明','今日廠商','施工人員','今日出工','完成進度%','備註','填表人'];
-const EX_CASE_COLW=[13,12,14,24,12,16,16,28,14,12,10,11,24,12];
+/* 2026-09-24 她交辦：施工項目／今日廠商／施工人員／今日出工 四欄移除 → 14 欄變 10 欄 */
+const EX_CASE_HEADERS=['日期','部門','專案工務','案場','狀態','施作位置','施工說明','完成進度%','備註','填表人'];
+const EX_CASE_COLW=[13,12,14,24,12,16,28,11,24,12];
 /* 比照材料明細分頁（2026-09-11 方案 C）：第一頁完全不動，案件明細自己一張分頁 */
 function addCaseSheet(wb, caseRows){
   if(!caseRows||!caseRows.length) return null;
@@ -5013,8 +5210,8 @@ function addCaseSheet(wb, caseRows){
   });
   ws.getRow(1).height=22;
   caseRows.forEach((r,i)=>{
-    const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.status||'',r.loc||'',r.work||'',
-      r.wdesc||'',r.vendor||'',r.staff||'',r.w0,r.progress,r.note||'',r.owner||'']);
+    const row=ws.addRow([r.date,r.dept,r.reporter,r.projName||'',r.status||'',r.loc||'',
+      r.wdesc||'',r.progress,r.note||'',r.owner||'']);
     if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
     row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
   });

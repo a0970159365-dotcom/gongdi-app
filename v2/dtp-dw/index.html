@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -909,6 +909,22 @@ function normalizeRecord(r){
  *   · 整筆只要**任一品項卡關**，那一列就標紅（原本只看最後一筆）
  *   · 上方的狀態篩選：**任一品項符合**就顯示這一列 */
 var NO_ITEM = '（未分品項）';
+/* 沒填狀態的那些行，在**篩選**時當成一個叫「未標示狀態」的選項（2026-09-24 她交辦）。
+   它不是工作狀態，是「還沒標」—— 勾它正好用來抓漏標的。
+   🚫 編輯視窗的狀態下拉不會有它（那裡空白就是「— 狀態 —」，兩種寫法會讓人混淆）。 */
+var NO_STATUS = '未標示狀態';
+/* 一條進度記錄「拿來篩選用」的狀態：空白一律算「未標示狀態」 */
+function logStatusOf(l){ return (l && String(l.status || '').trim()) || NO_STATUS; }
+/* 一筆完全沒有進度記錄的資料，用它自己的狀態；也空白就算「未標示狀態」（她的第 5 題） */
+function recStatusOf(r){ return (r && String(r.狀態 || '').trim()) || NO_STATUS; }
+/* 這筆記錄的進度記錄陣列（字串格式的先轉成陣列） */
+function logsOf(r){
+  var logs = (r && r.進度記錄) || [];
+  if (typeof logs === 'string') logs = parseProgressString(logs);
+  return logs || [];
+}
+/* 依狀態篩選條件挑出符合的行；has 是一個 function(status)->bool */
+function logsMatching(logs, has){ return (logs || []).filter(function(l){ return has(logStatusOf(l)); }); }
 function statusByItem(r){
   var logs = (r && r.進度記錄) || [];
   if(typeof logs === 'string') logs = parseProgressString(logs);
@@ -922,7 +938,9 @@ function statusByItem(r){
   /* 2026-09-21：這個品項底下一條有狀態的記錄都沒有 → 狀態留空（畫面顯示「—」）。
      原本會退回記錄層的預設值「進行中」，看起來就像「狀態沒對應到品項」。 */
   var out = order.map(function(k){ return { item:k, status:map[k] || '' }; });
-  if(!out.length) out = [{ item:NO_ITEM, status:(r && r.狀態) || '進行中' }];
+  /* 2026-09-24：一條進度記錄都沒有的，狀態空白就是「未標示狀態」，
+     不要再自動當成「進行中」（她的第 5 題）。 */
+  if(!out.length) out = [{ item:NO_ITEM, status:recStatusOf(r) }];
   return out;
 }
 /* 這一筆記錄出現過的所有狀態（篩選、卡關判斷都吃這個） */
@@ -2005,11 +2023,17 @@ function xpOptions(){
   data.forEach(function(r){
     var d = String(r.部門 || '').trim();
     if(d && depts.indexOf(d) < 0) depts.push(d);
-    statusesOf(r).forEach(function(s){ if(s && sts.indexOf(s) < 0) sts.push(s); });
+    /* 2026-09-24：逐條看，而且空白算「未標示狀態」—— 跟畫面篩選同一套 */
+    var lg = logsOf(r);
+    if(lg.length) lg.forEach(function(l){ var s = logStatusOf(l); if(sts.indexOf(s) < 0) sts.push(s); });
+    else { var rs = recStatusOf(r); if(sts.indexOf(rs) < 0) sts.push(rs); }
   });
   depts.sort();
   var order = (cfg && cfg['狀態']) || [];
   sts.sort(function(a, b){
+    /* 「未標示狀態」一律排最後 —— 它不是工作狀態 */
+    if(a === NO_STATUS) return 1;
+    if(b === NO_STATUS) return -1;
     var ia = order.indexOf(a), ib = order.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b, 'zh-Hant');
   });
@@ -2017,7 +2041,9 @@ function xpOptions(){
 }
 function xpChip(kind, v, on){
   return '<button type="button" class="xp-chip' + (on ? ' on' : '') + '"'
-    + ' onclick="xpPick(' + JSON.stringify(kind) + ',' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">'
+    /* 🚨 兩個參數都要轉 &quot; —— 只轉一個，屬性會被另一個的雙引號提早結束（2026-09-24 事故） */
+    + ' onclick="xpPick(' + JSON.stringify(kind).replace(/"/g, '&quot;')
+    + ',' + JSON.stringify(v).replace(/"/g, '&quot;') + ')">'
     + esc(v) + '</button>';
 }
 function xpPick(kind, v){
@@ -2154,8 +2180,16 @@ function getFiltered(){
   return sortByProjOrder(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
     if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
     if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
-    /* 2026-09-20：狀態依品項之後，任一品項符合就算（原本只比最後一筆） */
-    if(msSel.status.size&&!statusesOf(r).some(s=>msSel.status.has(s)))return false;
+    /* 2026-09-24：改成逐條進度記錄篩 —— 只要有任何一條符合，這筆就留下來，
+       底下再只顯示符合的那幾條（在下面的 map 裡處理）。
+       一條進度記錄都沒有的，就看它自己的狀態。 */
+    if(msSel.status.size){
+      const _lg = logsOf(r);
+      const _hit = _lg.length
+        ? _lg.some(l => msSel.status.has(logStatusOf(l)))
+        : msSel.status.has(recStatusOf(r));
+      if(!_hit) return false;
+    }
     if(q){
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
       if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
@@ -2163,15 +2197,23 @@ function getFiltered(){
     if(drActive() && !logsInRange(r.進度記錄).length) return false;   /* 區間內沒有記錄 → 這一列不出現（2026-09-20） */
     return true;
   }).map(function(r){
-    /* 有設區間 → 回傳複本，只保留區間內的記錄；編輯／儲存仍然對原始那一筆（靠 id） */
-    return drActive() ? Object.assign({}, r, { 進度記錄: logsInRange(r.進度記錄) }) : r;
+    /* 有設區間或有勾狀態 → 回傳**複本**，只保留符合的那幾條進度記錄。
+       編輯／儲存仍然對原始那一筆（靠 id），所以畫面上少顯示幾條不會影響存檔。
+       ⚠️ 卡關紅字（isStuck）吃的就是這份複本 → 自動依「剩下的行」重算（她的第 3 題）。 */
+    const _dr = drActive(), _st = !!msSel.status.size;
+    if(!_dr && !_st) return r;
+    let logs = logsOf(r);
+    if(_dr) logs = logsInRange(logs);
+    if(_st) logs = logsMatching(logs, s => msSel.status.has(s));
+    return Object.assign({}, r, { 進度記錄: logs });
   }));
 }
 
 function updateFilters(){
   const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
   const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
-  const ss=(cfg['狀態']||[]).slice();
+  /* 2026-09-24：最後面多一個「未標示狀態」，用來篩沒填狀態的那幾條 */
+  const ss=(cfg['狀態']||[]).slice().concat([NO_STATUS]);
   if(!document.getElementById('msp-proj'))return;
   // 已經不存在的選項要從勾選中移掉，否則會篩出 0 筆卻看不出原因
   [['proj',ps],['exec',es],['status',ss]].forEach(function(pair){
@@ -2188,7 +2230,10 @@ function renderMain(){
   // 有搜尋字或有勾選篩選時一律展開符合的群組，否則篩完只看到一排標題，會以為壞掉
   const _forceOpen=hasActiveFilter();
   const filtered=getFiltered();
-  document.getElementById('result-count').textContent='共 '+filtered.length+' 筆';
+  /* 2026-09-24 她指定：一律「共 N 筆 · M 條」，不管用哪種篩選都同一個格式。
+     筆＝畫面上的資料列數；條＝那些列底下的進度記錄條數（＝匯出 Excel 的列數）。 */
+  const _lineCnt = filtered.reduce(function(a,r){ return a + logsOf(r).length; }, 0);
+  document.getElementById('result-count').textContent='共 '+filtered.length+' 筆 · '+_lineCnt+' 條';
   var _drh=document.getElementById('dr-hint');
   if(_drh) _drh.textContent = drActive() ? '（只看這個區間內的進度記錄）' : '';
   const groups={};
@@ -2894,7 +2939,16 @@ async function exportExcel(projs,opt){
   /* 2026-09-20 她交辦：匯出框裡的部門／日期區間／工作狀態 —— 沒選＝不限 */
   if(opt){
     if(opt.depts&&opt.depts.length) data=data.filter(r=>opt.depts.indexOf(String(r.部門||'').trim())>=0);
-    if(opt.statuses&&opt.statuses.length) data=data.filter(r=>statusesOf(r).some(s=>opt.statuses.indexOf(s)>=0));
+    /* 2026-09-24：跟畫面同一套 —— 逐條篩，只匯出狀態符合的那幾條；一條不剩的整筆不匯出 */
+    if(opt.statuses&&opt.statuses.length){
+      const _has = s => opt.statuses.indexOf(s) >= 0;
+      data = data.map(function(r){
+        const lg = logsOf(r);
+        if(!lg.length) return _has(recStatusOf(r)) ? r : null;
+        const keep = logsMatching(lg, _has);
+        return keep.length ? Object.assign({}, r, { 進度記錄: keep }) : null;
+      }).filter(Boolean);
+    }
     if(opt.from||opt.to){
       const inR=l=>{const d=String((l&&l.date)||'').slice(0,10); if(!d)return false;
         if(opt.from&&d<opt.from)return false; if(opt.to&&d>opt.to)return false; return true;};

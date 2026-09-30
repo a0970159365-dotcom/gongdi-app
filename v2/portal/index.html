@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-23.2';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -1895,9 +1895,17 @@ function onGateDeptChange() {
      設定頁的員工列表照樣看得到離職的人（要查歷史、要刪除都還在）。 */
   const list = S.employees.filter(e => e.dept === dept && !isResigned(e));
   if (!list.length) { sel.innerHTML = '<option value="">此部門尚無在職員工</option>'; return; }
-  /* 2026-09-11 她指定：只顯示姓名，後面的角色與狀態括號全部拿掉 */
+  /* 2026-09-11 她指定：只顯示姓名，後面的角色與狀態括號全部拿掉
+     2026-09-24 她交辦：前面補上員工編號 → 「P0100056（廖學健）」。
+     🚨 只改**看得到的文字**，value 一定要維持姓名 ——
+        authEmployee() 與「記住我」都是拿姓名比對的，value 一動兩邊都會壞。
+     沒填編號的就只顯示姓名（不要留一個空括號）。 */
   sel.innerHTML = '<option value="">請選擇姓名</option>' +
-    list.map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
+    list.map(e => {
+      const code = String(e.code || '').trim();
+      const label = code ? code + '（' + e.name + '）' : e.name;
+      return `<option value="${esc(e.name)}">${esc(label)}</option>`;
+    }).join('');
 }
 function gateError(msg) {
   const box = $('gate-err');
@@ -2027,9 +2035,15 @@ function onLoginDeptChange() {
     sel.innerHTML = '<option value="">此部門尚無在職員工</option>';
     return;
   }
-  /* 2026-09-11 她指定：只顯示姓名 —— 角色名稱那個括號拿掉 */
+  /* 2026-09-11 她指定：只顯示姓名 —— 角色名稱那個括號拿掉
+     2026-09-24：跟登入閘門一致，前面補員工編號 →「P0100056（廖學健）」。
+     🚨 value 一樣要維持姓名（doLogin 是拿姓名比對的）。 */
   sel.innerHTML = '<option value="">請選擇姓名</option>' +
-    list.map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
+    list.map(e => {
+      const code = String(e.code || '').trim();
+      const label = code ? code + '（' + e.name + '）' : e.name;
+      return `<option value="${esc(e.name)}">${esc(label)}</option>`;
+    }).join('');
 }
 function doLogin() {
   // 與登入閘門共用同一套驗證（部門 / 姓名 / 離職停用 / 密碼）
@@ -2310,7 +2324,8 @@ function ovRoleRow(r) {
     const chg = !!(_ovPend[r.id] && c.key in _ovPend[r.id]);
     const isDiff = diff.indexOf(c.key) >= 0 && !chg;
     return '<td class="ovc"><button type="button" class="ovbtn ' + (on ? 'y' : 'n') + (chg ? ' chg' : '') + '"'
-      + ' onclick="ovToggle(' + JSON.stringify(r.id) + ',' + JSON.stringify(c.key) + ')"'
+      + ' onclick="ovToggle(' + JSON.stringify(r.id).replace(/"/g, '&quot;')
+      + ',' + JSON.stringify(c.key).replace(/"/g, '&quot;') + ')"'
       + ' title="' + (chg ? '待儲存' : (isDiff ? '目前值跟預設不同' : '')) + '">'
       + (on ? '✓' : '✗') + '</button>'
       + (isDiff ? '<span class="ov-diff"></span>' : '') + '</td>';
@@ -3052,7 +3067,8 @@ function renderRoleTier() {
   box.innerHTML = ROLE_TIERS.map(function(t){
     const used = S.roles.filter(function(r){ return t.roles.indexOf(r.name) >= 0; }).length;
     return '<button type="button" class="tier-b' + (t.key === _roleTier ? ' on' : '')
-      + (t.special ? ' sp' : '') + '" onclick="roleTierTo(' + JSON.stringify(t.key) + ')">'
+      + (t.special ? ' sp' : '') + '" onclick="roleTierTo('
+      + JSON.stringify(t.key).replace(/"/g, '&quot;') + ')">'
       + '<b>' + esc(t.label) + '</b><span>' + t.roles.length + ' 個角色'
       + (used ? ' · 已建 ' + used : '') + '<br>' + esc(t.hint) + '</span></button>';
   }).join('');
@@ -3076,7 +3092,7 @@ function renderRolePick() {
     const n = role ? S.employees.filter(function(e){ return e.roleId === role.id; }).length : 0;
     const exists = !!role;
     return '<button type="button" class="' + (nm === cur ? 'on' : '') + '"'
-      + ' onclick="rolePickTo(' + JSON.stringify(nm) + ')">'
+      + ' onclick="rolePickTo(' + JSON.stringify(nm).replace(/"/g, '&quot;') + ')">'
       + '<span class="dot"></span><span>' + esc(nm) + '</span>'
       + '<span class="cnt">' + (exists ? (n + ' 位') : '尚未建立') + '</span></button>';
   }).join('');

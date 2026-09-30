@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -861,6 +861,8 @@ window._cloudErrBar = (function(){
         </tfoot>
       </table>
     </div>
+    <!-- 2026-09-30 她指定文字：施工說明會進照片下載檔名，整張表只提示這一行（不是每一列都加） -->
+    <div id="wdesc-hint" class="tl-hint no-print" style="margin:6px 16px 10px">※ 施工說明會帶進照片的下載檔名（只取前 30 字，如有符號 / \ : * ? " &lt; &gt; |，將以底線 _ 取代）</div>
   </div>
 
   <!-- 材料明細 -->
@@ -933,7 +935,7 @@ window._cloudErrBar = (function(){
     </div>
     <div class="card-body">
       <input type="file" id="ph-input" accept="image/*" multiple onchange="uploadPhotos(event)">
-      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／日期」四層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_日期_序號」。</div>
+      <div class="tl-hint no-print">照片依「案場／施作位置／施工項目／施工說明／日期」五層分類存放。上傳前先在右上選一項工項，下載時檔名會自動改成「施作位置_施工項目_施工說明_日期_序號」。</div>
       <div id="ph-tree"></div>
       <div id="ph-empty" class="tl-empty no-print" style="margin-top:6px">尚無照片，選好工項後點「📷 上傳」</div>
     </div>
@@ -4384,9 +4386,49 @@ function collectMatRows() {
  *    在那之前，「⬇️ 下載全部」用 位置_項目_日期_序號 當檔名（2026-09-17 起不分資料夾，見 phFileNames）。
  */
 const PH_UNSET='（未指定）';
+/* ── 照片的「施工說明」（2026-09-30 她交辦：檔名與分組都多一層施工說明）──
+ * 照片原本只記 loc＋work，同一格一天常有好幾列（例：基座｜東向 有 e8柱施作、e9柱施作），分不出是哪一列。
+ * 所以：新照片上傳時記住 rowId（右上角選的就是某一列）→ 一定對得到；
+ *       舊照片（沒有 rowId，或那一列被刪了）→ 同位置＋項目只有一種說明才用它，否則空白。
+ * 空白的由呼叫端顯示「（未指定）」（她指定：依日-瑪現在的表示方式）。
+ * 說明一律以日報「現在」那一列為準 —— 事後改了說明，下載檔名跟著變。 */
+const PH_DESC_MAX=30;   // 檔名只取前 30 字（她 09-30 定；日報裡照樣可以打長）
+function phRowDesc(p, r){
+  if(!p) return '';
+  const rows=(((r||S.report||{}).workItems)||[]).filter(Boolean);
+  if(p.rowId){
+    const hit=rows.find(w=>w.id===p.rowId);
+    if(hit) return String(hit.wdesc||'').trim();
+  }
+  if(!p.loc && !p.work){ const g=phGuessRow(p, r); return g ? String(g.wdesc||'').trim() : ''; }
+  const m=rows.filter(w=>(w.loc||'')===(p.loc||'')&&(w.work||'')===(p.work||''));
+  const ds=[...new Set(m.map(w=>String(w.wdesc||'').trim()))];
+  return (m.length && ds.length===1) ? ds[0] : '';
+}
+/* 什麼都沒記的舊照片（位置、項目都空白）→ 日報只有一列施工明細時，就當成那一列（2026-09-30 她選甲＋丙）。
+   好幾列就分不出來，回 null。只影響顯示與下載，**不改照片上存的資料**，判斷錯了也不會壞東西。 */
+function phGuessRow(p, r){
+  if(!p || p.loc || p.work) return null;
+  const rows=(((r||S.report||{}).workItems)||[]).filter(w=>w&&(w.loc||w.work));
+  return rows.length===1 ? rows[0] : null;
+}
+/* 照片實際要顯示的位置／項目：照片自己有記就用，沒記就看 phGuessRow */
+function phLocWork(p){
+  if(!p) return {loc:'',work:''};
+  if(p.loc || p.work) return {loc:p.loc||'', work:p.work||''};
+  const g=phGuessRow(p);
+  return g ? {loc:g.loc||'', work:g.work||''} : {loc:'',work:''};
+}
+/* 放進檔名用：取前 30 字（用 Array.from 以字為單位，不會把中文或表情切一半），不能用的符號換底線 */
+function phDescName(p){
+  const d=Array.from(phRowDesc(p)).slice(0,PH_DESC_MAX).join('').trim();
+  return d ? safeName(d) : PH_UNSET;
+}
 function phPath(p){
   const d=(p.date||S.report?.date||'').trim();
-  return [p.projName||PH_UNSET, p.loc||PH_UNSET, p.work||PH_UNSET, d||PH_UNSET];
+  const lw=phLocWork(p);
+  /* 案場：照片沒記就用日報本身的案場（她 09-30：不要顯示（未指定）） */
+  return [p.projName||S.report?.projName||PH_UNSET, lw.loc||PH_UNSET, lw.work||PH_UNSET, phRowDesc(p)||PH_UNSET, d||PH_UNSET];
 }
 /* 檔名/資料夾名不能有這些字元，一律換成底線 */
 function safeName(s){ return String(s||'').replace(/[\\/:*?"<>|]/g,'_').trim()||PH_UNSET; }
@@ -4403,9 +4445,11 @@ function refreshPhWorkOptions(){
   $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
     const loc=tr.querySelector('[data-f="loc"]')?.value||'';
     const work=tr.querySelector('[data-f="work"]')?.value||'';
+    const desc=(tr.querySelector('[data-f="wdesc"]')?.value||'').trim();
     // C 批：案場是整張報表的，下拉只要分得出「哪一項工項」就夠了
+    // 2026-09-30：多帶施工說明 —— 同位置同項目有好幾列時（e8柱、e9柱）才分得出來
     if(loc||work){
-      opts.push({v:String(i),label:[loc,work].filter(Boolean).join('｜')});
+      opts.push({v:String(i),label:[loc,work].filter(Boolean).concat([desc||PH_UNSET]).join('｜')});
     }
   });
   sel.innerHTML = opts.length
@@ -4421,7 +4465,8 @@ function phTargetFromSelect(){
   return {
     projName: curProjName(),          // C 批：案場取自報表層
     loc: tr.querySelector('[data-f="loc"]')?.value||'',
-    work: tr.querySelector('[data-f="work"]')?.value||''
+    work: tr.querySelector('[data-f="work"]')?.value||'',
+    rowId: tr.dataset.id||''          // 2026-09-30：記住是哪一列，下載檔名才帶得出正確的施工說明
   };
 }
 /* ── 照片壓縮（2026-08-18）────────────────────────────────────────
@@ -4616,7 +4661,7 @@ function _uploadPhotos(e) {
         id:_pid, data:r.data, thumb:'', name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
-        projName:tgt.projName, loc:tgt.loc, work:tgt.work, date:S.report?.date||today()
+        projName:tgt.projName, loc:tgt.loc, work:tgt.work, rowId:tgt.rowId||'', date:S.report?.date||today()
       });
       _thumbJobs.push(makeThumb(r.data).then(function(th){
         /* 2026-09-23 第 2 步：縮圖改放記憶體＋待推清單，報表裡的 thumb 保持空字串，
@@ -4714,16 +4759,21 @@ function deletePhoto(){
  *   · 序號：每組「位置＋項目」各自從 001 開始，照上傳時間排（她選 Q3 甲）
  *   · 位置或項目沒選的舊照片 → 只留有的那段；兩段都沒有 → 「未分類」
  *   · 分組用的是「組好的檔名前綴」而不是原始字串 —— safeName 會把 A/B 與 A_B 變成同一個前綴，
- *     用前綴當 key 才保證 zip 裡不會出現兩個同名檔（後放的會蓋掉前一張）。 */
+ *     用前綴當 key 才保證 zip 裡不會出現兩個同名檔（後放的會蓋掉前一張）。
+ * 2026-09-30 她交辦：多一段施工說明 → 施作位置_施工項目_施工說明_YYMMDD_序號
+ *   · 說明取前 30 字、不能用的符號換底線；沒有說明或對不到是哪一列 → 「（未指定）」（phDescName）
+ *   · 序號改成「位置＋項目＋說明＋日期」相同的一組 —— 前綴本來就含說明，規則不用另外寫 */
 function phYmd(d){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||'')); return m ? m[1].slice(2)+m[2]+m[3] : ''; }
 function phFileNames(list, fulls){
   const order=list.map((p,i)=>i).sort((a,b)=>((list[a].ts||0)-(list[b].ts||0))||(a-b));
   const seq={}, out=new Array(list.length);
   order.forEach(i=>{
     const p=list[i];
-    const head=[p.loc,p.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
+    const lw=phLocWork(p);
+    const head=[lw.loc,lw.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
     const ymd=phYmd(p.date||S.report?.date);
-    const prefix=(head.length?head:['未分類']).concat(ymd?[ymd]:[]).join('_');
+    /* 位置、項目都沒有 → 只寫「未分類」，不再加（未指定）（她 09-30 選甲，兩個佔位字疊在一起看不懂） */
+    const prefix=(head.length?head.concat([phDescName(p)]):['未分類']).concat(ymd?[ymd]:[]).join('_');
     seq[prefix]=(seq[prefix]||0)+1;
     out[i]=prefix+'_'+String(seq[prefix]).padStart(3,'0')+'.'+phExt(p,(fulls&&fulls[i])||'');
   });

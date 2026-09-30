@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-09-23.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -486,6 +486,17 @@
     window._sopSet    = function(p,d){ if(window._LOCAL_PREVIEW) return Promise.resolve();   /* 2026-09-18 本機預覽 */ return _authReady.then(function(){ return _db.ref('sop/'+p).set(d); }); };
     window._sopGet    = function(p){ return _authReady.then(function(){ return _db.ref('sop/'+p).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
     window._sopRemove = function(p){ if(window._LOCAL_PREVIEW) return Promise.resolve();   /* 2026-09-18 本機預覽 */ return _authReady.then(function(){ return _db.ref('sop/'+p).remove(); }); };
+    /* 照片大圖／縮圖搬出查檢表資料（2026-09-28，照日報表-專案管理那一套）──
+     * 開頁 _sopGet('reports') 會把 sop/reports 整包抓下來；3.45MB 裡幾乎都是照片。
+     * 大圖放 sop_photos/{photoId}、縮圖放 sop_thumbs/{photoId}，兩個都在 sop 節點**之外**，
+     * 開頁抓整包時根本不會被下載到；要顯示哪一張才來抓那一張。
+     * ⚠️ 既有照片的 photo／photoThumb 還內嵌在查檢表裡，程式永遠優先用那一份，不會來這裡找。
+     * ⚠️ 寫入跟 _sopSet 一樣在函式裡擋本機預覽（file://）—— 2026-09-17 就是本機預覽把假資料寫進正式庫。 */
+    window._phGet = function(id){ return _authReady.then(function(){ return _db.ref('sop_photos/'+id).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._phSet = function(id,d){ if(window._LOCAL_PREVIEW) return Promise.resolve();   /* 2026-09-28 本機預覽 */ return _authReady.then(function(){ return _db.ref('sop_photos/'+id).set(d==null?null:d); }); };
+    window._thGet = function(id){ return _authReady.then(function(){ return _db.ref('sop_thumbs/'+id).once('value'); }).then(function(s){ return s.exists()?s.val():null; }); };
+    window._thSet = function(id,d){ if(window._LOCAL_PREVIEW) return Promise.resolve();   /* 2026-09-28 本機預覽 */ return _authReady.then(function(){ return _db.ref('sop_thumbs/'+id).set(d==null?null:d); }); };
+    /* 刻意不提供 _phRemove／_thRemove：刪照片時不動雲端節點裡的圖，留著當備份（cdr-pm 也是這樣）。 */
   } catch(e){ console.warn('Firebase init failed:',e); }
 })();
 </script>
@@ -672,13 +683,17 @@ function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function loadLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ return null; } }
 /* 本機快取只留縮圖：原圖動輒兩三百 KB，全塞進 localStorage（上限約 5MB）
  * 十幾張就滿了，滿了之後整包存不進去、離線連清單都看不到。
- * 拿掉的項目標 photoOnCloud，存檔時會先把原圖補回來再寫雲端（見 persistReport）。*/
+ * 拿掉的項目標 photoOnCloud，存檔時會先把原圖補回來再寫雲端（見 persistReport）。
+ * 2026-09-28 新格式照片（有 photoId）：縮圖還沒確定在 sop_thumbs（沒有 th）之前，
+ * 內嵌的大圖是這台裝置**唯一**看得到的影像（新縮圖只放記憶體）→ 原樣留著，不准拿掉。
+ * 跟 cdr-pm 的 _localCopy 同一條規則：有縮圖可看，才敢清大圖。 */
 function _lightReports(){
   return (S.reports||[]).map(function(r){
     if(!r||!r.items) return r;
     var c=Object.assign({},r);
     c.items=r.items.map(function(it){
       if(!it||!it.photo) return it;
+      if(it.photoId && !it.th) return it;   /* 新照片、縮圖還沒上雲 → 整張留著（2026-09-28） */
       var ci=Object.assign({},it);
       delete ci.photo; ci.photoOnCloud=true;
       return ci;
@@ -1217,17 +1232,19 @@ function renderChecklist(){
       +'<div id="item-extra-'+idx+'" class="space-y-2">'
       +'<textarea id="item-desc-'+idx+'" onchange="setDesc('+idx+',this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none" rows="2" placeholder="'+(item.status==='不正常'?'狀況說明（必填）':'狀況說明')+'">'+esc(item.description)+'</textarea>'
       +'<div class="flex items-center gap-2">'
-      +'<label for="item-photo-'+idx+'" class="flex-1 flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-2 text-sm cursor-pointer '+(item.photoThumb?'border-green-400 text-green-600 bg-green-50':'border-gray-300 text-gray-500 hover:border-blue-400')+'">'
-      +'📷 '+(item.photoThumb?'已拍照（點擊更換）':'拍照 / 上傳')
+      /* 2026-09-28：「有沒有照片」改看 itemHasPhoto —— 新格式照片查檢表裡可能一格影像都沒有，只有 photoId */
+      +'<label for="item-photo-'+idx+'" class="flex-1 flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-2 text-sm cursor-pointer '+(itemHasPhoto(item)?'border-green-400 text-green-600 bg-green-50':'border-gray-300 text-gray-500 hover:border-blue-400')+'">'
+      +'📷 '+(itemHasPhoto(item)?'已拍照（點擊更換）':'拍照 / 上傳')
       +'<input id="item-photo-'+idx+'" type="file" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event,'+idx+')">'
       +'</label>'
-      +(item.photoThumb?'<button onclick="removePhoto('+idx+')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">🗑️</button>':'')
+      +(itemHasPhoto(item)?'<button onclick="removePhoto('+idx+')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">🗑️</button>':'')
       +'</div>'
-      +(item.photoThumb?'<img src="'+item.photoThumb+'" onclick="openPhotoAt(\'checklist\','+idx+')" class="w-full object-cover rounded-xl border border-gray-200 cursor-zoom-in" style="max-height:9rem" title="點擊放大">':'')
+      +(itemHasPhoto(item)?'<img'+itemImgAttrs(item)+' onclick="openPhotoAt(\'checklist\','+idx+')" class="w-full object-cover rounded-xl border border-gray-200 cursor-zoom-in" style="max-height:9rem" title="點擊放大">':'')
       +'</div>'
       +'</div></div>';
   });
   $('checklist-items').innerHTML=html;
+  fillLazyItemThumbs($('checklist-items'), S.report.items);   /* 縮圖在 sop_thumbs 的那幾格，抓回來再補（2026-09-28） */
   updateCompleteBtn();
 }
 
@@ -1331,20 +1348,153 @@ function makePhoto(file,cb){
   };
   rd.readAsDataURL(file);
 }
+/* ══════ 照片搬出查檢表資料（2026-09-28，照日報表-專案管理 2026-09-03／09-23 那一套）══════
+ * 起因：sop 節點 3.45MB，幾乎都是內嵌在 sop/reports/{id}/items[] 裡的 photo（大圖）＋ photoThumb（縮圖），
+ *       開頁 _sopGet('reports') 整包下載，所以慢。
+ *
+ * 查驗項目上的欄位（新舊兩種格式並存）：
+ *   舊格式 —— photo（大圖 dataURI）／photoThumb（縮圖 dataURI）內嵌；沒有 photoId。
+ *            （本機快取可能已經拿掉 photo、標 photoOnCloud，那是 2026-08 就有的機制，照舊）
+ *   新格式 —— photoId：大圖在 sop_photos/{photoId}、縮圖在 sop_thumbs/{photoId}
+ *            th:1     ：縮圖**確定**已經推上 sop_thumbs（推成功才標）
+ *            photo    ：剛上傳時大圖**先留在查檢表裡**，確定已在 sop_photos、而且有 th 之後才清成 null
+ *                       （清是在記憶體裡清，下次存檔才生效；在那之前寧可兩邊都有，也不要弄丟）
+ *            photoThumb：新照片一律是 null（縮圖只放記憶體 _thumbCache 與待推清單）
+ *
+ * 🔑 判斷規則：項目裡有內嵌影像（photoThumb 或 photo）→ 永遠用它，完全不碰雲端；
+ *             沒有內嵌影像、有 photoId → 才去新節點抓那一張。 */
+var _fullCache = {};      // 這一輪抓回來／剛上傳的大圖（記憶體，不落地）：photoId -> dataURI
+var _pendingFull = {};    // 還沒推上 sop_photos 的大圖：photoId -> dataURI（存檔時一起送）
+var _thumbCache = {};     // 這一輪抓回來／剛做好的縮圖（記憶體，不落地）
+var _pendingThumb = {};   // 還沒推上 sop_thumbs 的縮圖
+/* 「這一格有沒有照片」—— 新格式可能一格影像都沒有，只剩 photoId */
+function itemHasPhoto(it){ return !!(it && (it.photoThumb || it.photo || it.photoId)); }
+/* 列表要顯示的那一張（同步，完全不碰雲端）：內嵌縮圖 → 這一輪做好／抓回來的縮圖 → 內嵌大圖。
+   記憶體縮圖排在內嵌大圖前面：剛上傳的新照片大圖還留在項目裡，列表不必拿 1600px 那張來縮著顯示。
+   舊照片沒有 photoId，中間那一段永遠跳過 → 行為跟改版前一樣。 */
+function itemSrc(it){ return (it && (it.photoThumb || (it.photoId && _thumbCache[it.photoId]) || it.photo)) || ''; }
+/* <img> 的 src＋data-ph：手上沒有影像就先不給 src，留 data-ph 讓 fillLazyItemThumbs 來補 */
+function itemImgAttrs(it){
+  var s=itemSrc(it);
+  return (s?' src="'+s+'"':'')+(it&&it.photoId?' data-ph="'+esc(it.photoId)+'"':'');
+}
+/* 取大圖（非同步）：內嵌 photo → 記憶體 → sop_photos/{photoId} → 抓不到就退回縮圖（絕不破圖）。
+   舊照片（沒有 photoId）永遠不碰新節點，沒有大圖就給內嵌縮圖（跟改版前一樣）。 */
+function itemFull(it){
+  if(!it) return Promise.resolve('');
+  if(it.photo) return Promise.resolve(it.photo);
+  if(!it.photoId) return Promise.resolve(it.photoThumb||'');
+  if(_fullCache[it.photoId]) return Promise.resolve(_fullCache[it.photoId]);
+  if(!window._phGet) return Promise.resolve(itemSrc(it));
+  return window._phGet(it.photoId).then(function(d){
+    if(d){ _fullCache[it.photoId]=d; return d; }
+    return itemSrc(it);
+  }).catch(function(){ return itemSrc(it); });
+}
+/* 取縮圖（非同步）：
+ *   ① 項目裡有內嵌影像 → 直接用，**完全不碰雲端**（既有照片都走這條）
+ *   ② 這一輪抓過 → 記憶體快取（itemSrc 已經包含）
+ *   ③ 去 sop_thumbs/{photoId} 抓那一張
+ *   ④ 抓不到 → 退回去抓大圖，寧可慢一點也絕不破圖 */
+function itemThumb(it){
+  if(!it) return Promise.resolve('');
+  var inline=itemSrc(it);
+  if(inline) return Promise.resolve(inline);
+  if(!it.photoId) return Promise.resolve('');
+  if(!window._thGet) return itemFull(it);
+  return window._thGet(it.photoId).then(function(d){
+    if(d){ _thumbCache[it.photoId]=d; return d; }
+    return itemFull(it);
+  }).catch(function(){ return itemFull(it); });
+}
+/* 一次補齊一批項目的縮圖（列印前用）。已經有影像的一張都不會打雲端。 */
+function hydrateItems(items){
+  return Promise.all((items||[]).filter(function(it){ return it && !itemSrc(it) && it.photoId; })
+    .map(function(it){ return itemThumb(it); }));
+}
+/* 畫面上還沒有圖的那幾格，抓回來再補上去 —— 不重畫整塊，避免閃一下 */
+function fillLazyItemThumbs(host, items){
+  if(!host) return;
+  [].forEach.call(host.querySelectorAll('img[data-ph]'), function(im){
+    if(im.getAttribute('src')) return;
+    var id=im.getAttribute('data-ph');
+    var it=(items||[]).find(function(x){ return x && x.photoId===id; });
+    if(!it) return;
+    itemThumb(it).then(function(d){ if(d) im.setAttribute('src', d); });
+  });
+}
+/* 什麼時候才敢把查檢表裡那份大圖清掉？兩個條件同時成立（照 cdr-pm _clearReportData）：
+ *   ① 大圖確定已經在 sop_photos（＝不在待推清單裡了）
+ *   ② 縮圖看得到（項目裡還有 photoThumb，或已經標了 th=1 表示在 sop_thumbs）
+ * 兩條推送各自非同步完成、誰先誰後不一定 → 兩條跑完都來敲一次，誰後到誰清。
+ * S.report 是編輯中的深拷貝、S.reports 是清單，兩邊都要清，否則下次存檔又被 S.report 帶回來。 */
+function _eachItemWith(id, fn){
+  (S.reports||[]).forEach(function(r){ ((r&&r.items)||[]).forEach(function(it){ if(it && it.photoId===id) fn(it); }); });
+  ((S.report&&S.report.items)||[]).forEach(function(it){ if(it && it.photoId===id) fn(it); });
+}
+function _clearReportData(id){
+  if(_pendingFull[id]) return;                    // 大圖還沒確定上雲 → 一個字都不准動
+  _eachItemWith(id, function(it){ if(it.photoThumb || it.th) it.photo=null; });
+}
+/* 存檔時把「這次新做好的縮圖」推到 sop_thumbs/{photoId}。
+   推成功才標 th=1；失敗就留在待推清單，下次存檔再試（期間大圖還在查檢表裡，照片不會不見）。
+   本機預覽（file://）整段不跑：_thSet 雖然已經是空操作，但空操作「成功」會讓這裡標 th=1、
+   接著清掉大圖 → 預覽畫面上的照片就從雲端抓不回來了。 */
+function _pushPendingThumb(){
+  if(!window._thSet || window._LOCAL_PREVIEW) return;
+  Object.keys(_pendingThumb).forEach(function(id){
+    var d=_pendingThumb[id];
+    try{
+      window._thSet(id, d).then(function(){
+        delete _pendingThumb[id];
+        _eachItemWith(id, function(it){ it.th=1; });
+        _clearReportData(id);      /* 大圖那條可能已經跑完在等這個標記 */
+      }).catch(function(e){ console.warn('縮圖推送失敗（會在下次存檔重試）：', id, e && e.message); });
+    }catch(e){ console.warn('縮圖推送失敗：', id, e && e.message); }
+  });
+}
+/* 存檔時把「這次新上傳的大圖」推到 sop_photos/{photoId}。推成功才從待推清單移除；失敗留著下次再試。 */
+function _pushPendingFull(){
+  if(!window._phSet || window._LOCAL_PREVIEW) return;
+  Object.keys(_pendingFull).forEach(function(id){
+    var d=_pendingFull[id];
+    try{
+      window._phSet(id, d).then(function(){
+        delete _pendingFull[id];
+        _clearReportData(id);      /* 確認大圖已在 sop_photos 了，才輪到清查檢表裡那一份 */
+      }).catch(function(e){ console.warn('照片大圖推送失敗（會在下次存檔重試）：', id, e && e.message); });
+    }catch(e){ console.warn('照片大圖推送失敗：', id, e && e.message); }
+  });
+}
+/* 換照片／刪照片：舊的那張如果還沒推上去，就從待推清單拿掉（項目已經不指向它，推上去只是垃圾）。
+   ⚠️ 雲端 sop_photos／sop_thumbs 裡已經有的圖**不刪**，留著當備份（cdr-pm 也沒刪）。 */
+function _dropPending(it){
+  if(!it || !it.photoId) return;
+  delete _pendingFull[it.photoId]; delete _pendingThumb[it.photoId];
+}
 function handlePhoto(e,idx){
   var file=e.target.files[0]; if(!file) return;
   makePhoto(file,function(p){
     var it=S.report.items[idx];
-    it.photo=p.photo; it.photoThumb=p.photoThumb;
+    _dropPending(it);
+    /* 2026-09-28 新格式：大圖**先留在查檢表裡**（跟改版前一樣會一起進雲端，關掉分頁也不會掉），
+       同時放待推清單；縮圖只放記憶體＋待推清單，查檢表裡的 photoThumb 保持 null。
+       存檔時推上 sop_photos／sop_thumbs，兩條都成功才把這裡的 photo 清掉（下次存檔生效）。 */
+    var pid=uid();
+    it.photoId=pid; it.photo=p.photo; it.photoThumb=null;
+    _fullCache[pid]=p.photo;     _pendingFull[pid]=p.photo;
+    _thumbCache[pid]=_pendingThumb[pid]=p.photoThumb||p.photo;   // 做不出縮圖就退回大圖，至少看得到
     it.origName=p.origName; it.origSize=p.origSize; it.origW=p.origW; it.origH=p.origH;
-    delete it.photoOnCloud;
+    delete it.photoOnCloud; delete it.th;
     renderChecklist();
   });
 }
 function removePhoto(idx){
   var it=S.report.items[idx];
+  _dropPending(it);
   it.photo=null; it.photoThumb=null;
   delete it.origName; delete it.origSize; delete it.origW; delete it.origH; delete it.photoOnCloud;
+  delete it.photoId; delete it.th;   /* 2026-09-28 新格式標記一起拿掉；雲端節點裡的圖不動 */
   renderChecklist();
 }
 /* ── 放大檢視 ── */
@@ -1355,9 +1505,14 @@ function _itemAt(where,idx){
   }
   return S.report && (S.report.items||[])[idx];
 }
+var _pvTok=0;   // 放大檢視的「第幾次打開」—— 非同步抓回來時比對，連點兩張才不會換錯圖（2026-09-28）
 function openPhotoAt(where,idx){
   var it=_itemAt(where,idx); if(!it) return;
-  var src=it.photo||it.photoThumb; if(!src) return;
+  /* 內嵌大圖優先（舊資料、剛上傳還沒清的都走這條，跟改版前一樣）；
+     沒有就先放手上有的縮圖，再去 sop_photos 抓大圖換上（2026-09-28） */
+  var src=it.photo||itemSrc(it);
+  if(!src && !it.photoId) return;
+  var tok=++_pvTok;
   var ov=$('photo-view');
   if(!ov){
     ov=document.createElement('div');
@@ -1368,12 +1523,18 @@ function openPhotoAt(where,idx){
   }
   var cap='';
   if(it.origW&&it.origH) cap='原檔 '+it.origW+'×'+it.origH+(it.origSize?(' · '+Math.round(it.origSize/1024)+' KB'):'');
-  if(!it.photo&&it.photoOnCloud) cap=(cap?cap+'　':'')+'（離線中，顯示的是縮圖）';
-  ov.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:82vh;object-fit:contain" class="rounded-lg">'
+  /* 「離線中」只講舊照片：新格式（有 photoId）下面會自己去 sop_photos 抓大圖 */
+  if(!it.photo&&it.photoOnCloud&&!it.photoId) cap=(cap?cap+'　':'')+'（離線中，顯示的是縮圖）';
+  ov.innerHTML='<img id="photo-view-img"'+(src?' src="'+src+'"':'')+' style="max-width:100%;max-height:82vh;object-fit:contain" class="rounded-lg">'
     +'<button onclick="closePhotoView()" class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/15 text-white rounded-full text-lg">&#10005;</button>'
     +(cap?'<div class="absolute bottom-4 left-0 right-0 text-center text-white/70 text-xs px-4">'+esc(cap)+'</div>':'');
   ov.classList.remove('hidden');
   ov.onclick=function(e){ if(e.target===ov) closePhotoView(); };
+  if(it.photo || !it.photoId) return;             // 手上已經是大圖／舊照片 → 不碰雲端
+  var still=function(){ var im=$('photo-view-img'); return (tok===_pvTok && !ov.classList.contains('hidden') && im) ? im : null; };
+  /* 連縮圖都還沒有 → 先補縮圖，不要留白 */
+  if(!src) itemThumb(it).then(function(th){ var im=still(); if(th && im && !im.getAttribute('src')) im.setAttribute('src', th); });
+  itemFull(it).then(function(full){ var im=still(); if(full && im) im.setAttribute('src', full); });
 }
 function closePhotoView(){ var ov=$('photo-view'); if(ov){ ov.classList.add('hidden'); ov.innerHTML=''; } }
 
@@ -1445,6 +1606,22 @@ function restoreCloudPhotos(data){
     return true;
   }).catch(function(){ return false; });
 }
+/* ── 把一張查檢表整張寫回雲端（2026-09-29 她確認修法）──────────────────
+ * 起因：開頁時雲端那份沒比本機新，就沿用本機那份（init 合併規則）；本機那份是
+ *   _lightReports() 拿掉舊照片大圖、標了 photoOnCloud 的 → **平常開頁 S.reports 就沒有大圖**。
+ *   「立即同步」與「改案場名稱 → 一起更新」原本直接把它整張寫回 → 雲端大圖被洗掉。
+ *   一般「儲存」（persistReport）早就會先 restoreCloudPhotos，只有這兩個按鈕漏了。
+ * 規則跟 persistReport 一樣：先把雲端的大圖補回來才寫；補不回來（離線／讀取失敗）
+ *   就**這一張先不寫**，回傳 false，讓呼叫端提示「稍後再同步」。
+ * 補回來的是一份複本，S.reports 那份不動（本機快取照樣保持輕量）。 */
+function writeReportSafely(r){
+  if(!window._sopSet || !r) return Promise.resolve(false);
+  var copy=JSON.parse(JSON.stringify(r));
+  return restoreCloudPhotos(copy).then(function(ok){
+    if(!ok) return false;
+    return window._sopSet('reports/'+copy.id, copy).then(function(){ return true; });
+  });
+}
 function persistReport(){
   var data=JSON.parse(JSON.stringify(S.report));
   data.createdAt=Date.now();
@@ -1462,6 +1639,11 @@ function persistReport(){
       window._sopSet('reports/'+data.id, data).then(function(){ setSyncStatus('saved'); }).catch(function(){ setSyncStatus('error'); });
     });
   }
+  /* 照片搬家（2026-09-28）：先送縮圖（標 th=1），再送大圖；兩條都成功才清查檢表裡那份大圖。
+     刻意放在上面那次寫入**之後**才開始推 —— 這一次存上去的查檢表一定還帶著大圖，
+     清掉的版本要等「下次存檔」才上雲（照 cdr-pm）。推失敗留在待推清單，下次存檔重試。 */
+  _pushPendingThumb();
+  _pushPendingFull();
 }
 
 // ====== COMPLETE VIEW ======
@@ -1738,11 +1920,13 @@ function renderDetail(){
         +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+esc(item.name)+'</div>'
         +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
         +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1">&#128221; '+esc(item.description)+'</div>':'')
-        +(item.photoThumb?'<img src="'+item.photoThumb+'" onclick="openPhotoAt(\'detail\','+idx+')" class="mt-2 w-full object-cover rounded-lg cursor-zoom-in" style="max-height:7rem" title="點擊放大">':'')
+        /* 2026-09-28：新格式照片可能只有 photoId → 先出格子、fillLazyItemThumbs 再補圖 */
+        +(itemHasPhoto(item)?'<img'+itemImgAttrs(item)+' onclick="openPhotoAt(\'detail\','+idx+')" class="mt-2 w-full object-cover rounded-lg cursor-zoom-in" style="max-height:7rem" title="點擊放大">':'')
         +'</div>'
         +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
         +'</div></div>';
     }).join('')+'</div>';
+  fillLazyItemThumbs($('detail-items'), r.items);
 
   $('btn-print-detail').onclick=function(){ printReportData(r); };
   $('btn-delete-detail').onclick=function(){ deleteReport(r.id); };
@@ -2931,13 +3115,14 @@ function saveCfgEdit(key){
 }
 function commitCfgRename(key,idx,oldV,newV,alsoReports){
   S.config[key][idx]=newV;
-  var n=0;
+  var n=0, jobs=[];
   if(alsoReports){
     var f=CFG_FIELD[key];
     (S.reports||[]).forEach(function(r){
       if(r&&r[f]===oldV){
         r[f]=newV; n++;
-        if(window._sopSet){ window._sopSet('reports/'+r.id, r).catch(function(){}); }
+        /* 2026-09-29：改走 writeReportSafely —— 原本直接寫 r，會把本機那份（沒有舊照片大圖）蓋上雲 */
+        if(window._sopSet){ jobs.push(writeReportSafely(r).catch(function(){ return false; })); }
       }
     });
   }
@@ -2946,6 +3131,11 @@ function commitCfgRename(key,idx,oldV,newV,alsoReports){
   if(window._sopSet){ window._sopSet('config', S.config).catch(function(){}); }
   renderSettings();
   showToast(alsoReports ? ('已改名，連同 '+n+' 筆紀錄一起更新') : '已改名');
+  /* 有幾張因為補不回大圖而沒寫上雲 → 講清楚，不要讓人以為都同步了 */
+  if(jobs.length) Promise.all(jobs).then(function(res){
+    var skip=res.filter(function(x){ return !x; }).length;
+    if(skip) showToast('有 '+skip+' 筆紀錄暫時無法取得照片原圖，名稱已改在這台，稍後連線再按「立即同步」');
+  });
 }
 function askCfgRename(key,oldV,newV,used,cb){
   var label=(key==='cases'?'案場':'施工廠商');
@@ -2999,9 +3189,14 @@ function saveConfig(manual){
 function syncNow(){
   if(!window._sopSet){ showToast('Firebase 未連線'); return; }
   setSyncStatus('saving');
-  var p = window._sopSet('config', S.config);
-  S.reports.forEach(function(r){ p = p.then(function(){ return window._sopSet('reports/'+r.id, r); }); });
-  p.then(function(){ setSyncStatus('saved'); showToast('同步完成'); }).catch(function(){ setSyncStatus('error'); showToast('同步失敗'); });
+  var p = window._sopSet('config', S.config), skip = 0;
+  /* 2026-09-29：每一張都走 writeReportSafely（先補回雲端大圖才寫）；補不回的那張先不寫 */
+  S.reports.forEach(function(r){ p = p.then(function(){ return writeReportSafely(r).then(function(ok){ if(!ok) skip++; }); }); });
+  p.then(function(){
+    if(skip){ setSyncStatus('error'); showToast('同步完成，但有 '+skip+' 筆暫時無法取得照片原圖、先留在這台，稍後再同步一次'); }
+    else { setSyncStatus('saved'); showToast('同步完成'); }
+  }).catch(function(){ setSyncStatus('error'); showToast('同步失敗'); });
+  _pushPendingThumb(); _pushPendingFull();   /* 手動同步也順手把待推的照片送出去（2026-09-28，規則同 persistReport） */
 }
 
 // ====== PRINT ======
@@ -3013,7 +3208,8 @@ function buildPrintHTML(r){
       +'<td><strong>'+esc(it.name)+'</strong></td>'
       +'<td style="text-align:center;width:88px"><span class="status-badge '+sc+'">'+esc(it.status||'未填')+'</span></td>'
       +'<td style="font-size:9.5pt;color:#555">'+esc(it.description||'')
-      +(it.photoThumb?'<br><img src="'+it.photoThumb+'" style="max-height:72px;border-radius:4px;margin-top:4px">':'')+'</td></tr>';
+      /* 2026-09-28：改用 itemSrc —— 新格式照片的縮圖在 sop_thumbs，列印前 _printWithThumbs 會先補進記憶體 */
+      +(itemSrc(it)?'<br><img src="'+itemSrc(it)+'" style="max-height:72px;border-radius:4px;margin-top:4px">':'')+'</td></tr>';
   }).join('');
 
   return '<div style="font-family:sans-serif;max-width:760px;margin:0 auto;padding:16px">'
@@ -3057,8 +3253,8 @@ function printFileName(r){
   var parts=['查檢表-標準作業', (r&&r.date)||'', (r&&r.caseName)||'', (r&&r.templateName)||''];
   return parts.filter(Boolean).join('_').replace(/[\\\/:*?"<>|]/g,'_');
 }
-function openPrint(html, title){
-  var w=window.open('','_blank');
+function openPrint(html, title, preOpened){
+  var w=preOpened||window.open('','_blank');   /* preOpened：_printWithThumbs 先開好的視窗（2026-09-28） */
   var doc='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>'+esc(title||'查檢表—標準作業')+'</title>'
     +'<style>body{font-family:sans-serif;margin:0;padding:0}'
     +'.status-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:9pt;font-weight:600}'
@@ -3089,11 +3285,27 @@ function openPrint(html, title){
   try{ w.focus(); }catch(e){}
 }
 
+/* 列印前先把缺的縮圖補齊（2026-09-28）——
+ * 新格式照片的縮圖在 sop_thumbs，沒補就直接印，那一格會是空白（cdr-pm 匯出 Excel 前 hydrateThumbs 同一個道理）。
+ *   · 全部都有內嵌影像（舊資料都是）→ 跟改版前一模一樣，同步開視窗、一次都不打雲端
+ *   · 有缺的 → **先開視窗**（還在使用者點擊當下，瀏覽器才不會當成彈出廣告擋掉），
+ *             補完再把內容寫進去；最多等 PRINT_THUMB_WAIT，時間到就用手上有的先印，不讓視窗一直空白 */
+var PRINT_THUMB_WAIT=8000;
+function _printWithThumbs(r){
+  var need=(r.items||[]).filter(function(it){ return it && !itemSrc(it) && it.photoId; });
+  if(!need.length){ openPrint(buildPrintHTML(r), printFileName(r)); return; }
+  var w=window.open('','_blank');
+  try{ w.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">照片載入中…</p>'); }catch(e){}
+  var done=false;
+  var go=function(){ if(done) return; done=true; try{ w.document.open(); }catch(e){} openPrint(buildPrintHTML(r), printFileName(r), w); };
+  setTimeout(go, PRINT_THUMB_WAIT);
+  hydrateItems(need).then(go, go);
+}
 function printCurrentReport(){
   var r=JSON.parse(JSON.stringify(S.report));
-  openPrint(buildPrintHTML(r), printFileName(r));
+  _printWithThumbs(r);
 }
-function printReportData(r){ openPrint(buildPrintHTML(r), printFileName(r)); }
+function printReportData(r){ _printWithThumbs(r); }
 
 // ====== PORTAL INTEGRATION ======
 // 從入口網頁同步 部門/人員 清單（如有），並抓當前登入身分預填表單
