@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -105,6 +105,13 @@ textarea.fi{resize:vertical;min-height:60px}
   .filter-bar::before,.filter-bar::after{display:none}
 }
 .filter-bar::after{bottom:-15px;height:15px}
+/* 2026-10-01 她回報：全部展開時中間還是有一條紫線把字切掉（螢幕高、沒放大也會）。
+ * 真正原因：日期那排是 class="filter-bar date-bar"，連篩選列的兩片遮片也帶上了；
+ *   但它不黏頂（static）→ 遮片改以整頁為基準定位，落在約一個畫面高的位置，橫在資料中間，
+ *   左右又各多 16px → 頁面多出一條左右捲軸。09-21 只關了矮畫面的遮片，高畫面照舊。
+ *   日期那排不黏頂，根本不需要遮片 → 關掉。篩選列自己的遮片保留。
+ *   真 Chrome 1900×998 量：修前色帶在 968～982、頁寬多 16px；修後 0 處。 */
+.date-bar::before,.date-bar::after{display:none}
 
 /* ── 複選篩選器（2026-08-20 新增）── */
 .ms{position:relative}
@@ -1987,6 +1994,27 @@ function hasActiveFilter(){
   const q=(document.getElementById('q')||{value:''}).value.trim();
   return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0||drActive();
 }
+/* 篩選後也能收合（2026-10-01 她指定，選甲）：
+ * 以前有篩選就每次重畫都強制全開 → 「全部收合」、點標題都沒用。
+ * 改成：篩選條件「改變的那一刻」才把找到的案場全部打開，之後照使用者自己開關（存檔、同步不會又全開）；
+ * 清除篩選 → 回到篩選前自己開關的樣子。 */
+let _fltSig='', _openBeforeFilter=null;
+function filterSig(){
+  if(!hasActiveFilter())return '';
+  const q=(document.getElementById('q')||{value:''}).value.trim();
+  return JSON.stringify([q,[...msSel.proj].sort(),[...msSel.exec].sort(),[...msSel.status].sort(),drVal('dr-from'),drVal('dr-to')]);
+}
+function syncOpenWithFilter(filtered){
+  const sig=filterSig();
+  if(sig===_fltSig)return;
+  if(sig){
+    if(!_fltSig)_openBeforeFilter=new Set(_openSecs);   // 剛開始篩選：先記住原本的開關
+    _openSecs=new Set(filtered.map(r=>secId(r.案場)));
+  }else{
+    _openSecs=_openBeforeFilter||new Set();_openBeforeFilter=null;
+  }
+  _fltSig=sig;
+}
 document.addEventListener('click',function(e){
   if(e.target&&e.target.closest&&e.target.closest('.ms'))return;
   document.querySelectorAll('.ms.open').forEach(b=>b.classList.remove('open'));
@@ -2227,9 +2255,9 @@ function updateFilters(){
 // 渲染：進度總表
 // ============================================================
 function renderMain(){
-  // 有搜尋字或有勾選篩選時一律展開符合的群組，否則篩完只看到一排標題，會以為壞掉
-  const _forceOpen=hasActiveFilter();
   const filtered=getFiltered();
+  // 篩選條件一改就展開符合的群組（否則篩完只看到一排標題，會以為壞掉）；之後可以自己收合（2026-10-01）
+  syncOpenWithFilter(filtered);
   /* 2026-09-24 她指定：一律「共 N 筆 · M 條」，不管用哪種篩選都同一個格式。
      筆＝畫面上的資料列數；條＝那些列底下的進度記錄條數（＝匯出 Excel 的列數）。 */
   const _lineCnt = filtered.reduce(function(a,r){ return a + logsOf(r).length; }, 0);
@@ -2239,17 +2267,13 @@ function renderMain(){
   const groups={};
   filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
   /* 2026-09-20：同一個案場底下照「順序」欄位排（沒有順序的排在後面，維持原本的相對位置） */
-  Object.keys(groups).forEach(function(k){
-    groups[k]=groups[k].map(function(r,i){return {r:r,i:i}})
-      .sort(function(a,b){return (rowOrderIdx(a.r)-rowOrderIdx(b.r))||(a.i-b.i)})
-      .map(function(x){return x.r});
-  });
+  Object.keys(groups).forEach(function(k){ groups[k]=sortRowsByOrder(groups[k]); });
   const el=document.getElementById('main-table');
   if(!filtered.length){el.innerHTML=emptyReasonHtml();return}   /* 0 筆要講出原因（2026-09-22） */
   const _groupCount=Object.keys(groups).length;
   el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
     const sid=secId(proj);
-    const open=_forceOpen||_openSecs.has(sid);
+    const open=_openSecs.has(sid);
     /* 抬頭右邊的 ↑↓：直接在這一頁調案場順序（2026-09-02 用戶指定）。
        點箭頭時要 stopPropagation，否則會順便把這一組收合起來。 */
     const canMv=portalCanDragSort();   /* 2026-09-03：↑↓ 與拖曳改由「資料排序」權管 */
@@ -2293,9 +2317,17 @@ function rowOrderIdx(r){
   var v = Number(r && r.順序);
   return isFinite(v) ? v : Number.MAX_SAFE_INTEGER;
 }
+/* 同一個案場底下照「順序」排（沒有順序的排在後面，維持原本的相對位置）。
+ * 畫面（renderMain）跟拖曳／↑↓（rowsOfProj）共用這一個 —— 2026-10-01 她回報：
+ * 以前 rowsOfProj 沒排，拖曳算位置用的是建立順序、畫面是排過的順序 → 第二次以後拖曳會放錯位置。 */
+function sortRowsByOrder(list){
+  return list.map(function(r,i){return {r:r,i:i}})
+    .sort(function(a,b){return (rowOrderIdx(a.r)-rowOrderIdx(b.r))||(a.i-b.i)})
+    .map(function(x){return x.r});
+}
 /* 同一個案場底下、目前畫面上的那幾列（順序＝畫面順序） */
 function rowsOfProj(proj){
-  return getFiltered().filter(function(r){ return (r.案場 || '') === proj; });
+  return sortRowsByOrder(getFiltered().filter(function(r){ return (r.案場 || '') === proj; }));
 }
 /* 把整個案場底下的記錄重新編號：10、20、30…（中間插入才有空間） */
 function renumberProj(proj, orderedIds){
@@ -2895,7 +2927,11 @@ function saveRecord(){
   const proj=document.getElementById('e-proj').value.trim();
   if(!proj){alert('請填入案場名稱');return}
   const id=document.getElementById('edit-id').value;
-  const r={
+  /* 2026-10-01 她確認：存檔只覆蓋編輯視窗裡的欄位，原本那筆的其他欄位（拖曳排的「順序」等）原樣留著。
+     之前整筆重建 → 拖好的順序一存檔就沒了，那一列掉到案場最下面。
+     換了案場的話，舊案場的順序在新案場沒有意義 → 拿掉，排到新案場最後（跟以前一樣）。 */
+  const old=id?records.find(x=>x&&x.id===id):null;
+  const r=Object.assign({},old||{},{
     id:id||uid(),案場:proj,
     部門:document.getElementById('e-dept').value.trim(),
     執行者:document.getElementById('e-exec').value.trim(),
@@ -2904,7 +2940,8 @@ function saveRecord(){
     進度記錄:logRowsToArray(),
     備註:document.getElementById('e-note').value.trim(),
     updatedAt:new Date().toISOString()
-  };
+  });
+  if(old&&(old.案場||'')!==proj)delete r.順序;
   if(id){const i=records.findIndex(x=>x.id===id);if(i>=0)records[i]=r;else records.push(r)}
   else records.push(r);
   fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit(true);   // 已存檔 → 直接關（2026-09-20）

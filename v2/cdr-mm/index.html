@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-30.2';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用（2026-09-17 從專案管理搬過來）：檔名＝施作位置_施工項目_YYMMDD_序號，不分資料夾。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -4319,10 +4319,9 @@ function renderCalDay(){
   let h = '<div class="cal-day-head">'+CAL.sel+'（星期'+DOW[d.getDay()]+'）'
         + '<span style="font-weight:400;color:var(--muted);font-size:12px">共 '+rs.length+' 張</span></div>';
 
+  /* 2026-10-01 她指定：上方已有「＋ 新增日報」（也會帶這天）→ 下方「＋ 建立這天的日報」拿掉 */
   if (!rs.length){
-    h += '<div class="cal-empty">這天還沒有日報'
-       + '<br><button class="btn btn-a btn-sm" style="margin-top:10px" onclick="calNewOn(\''+CAL.sel+'\')">＋ 建立這天的日報</button>'
-       + '</div>';
+    h += '<div class="cal-empty">這天還沒有日報</div>';
   } else {
     rs.forEach(r=>{
       const t0   = (r.workItems||[]).reduce((s,w)=>s+(Number(w.w0)||0),0);
@@ -4342,23 +4341,6 @@ function renderCalDay(){
 }
 
 /* 從日曆的空白日建立那天的日報（照這支自己的 newReport 流程，只是日期換成點選那天） */
-function calNewOn(ds){
-  if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value){
-    if (!confirm('目前表單有內容，確定新增一張空白日報表？')) return;
-  }
-  const newR = blankReport();
-  newR.dept = S.user.dept;
-  newR.reporter = S.user.name;
-  newR.date = ds;
-  S.report = newR;
-  renderReport();
-  applyPermissions();
-  $('f-date').value = ds;
-  onDateChange();
-  goPage('report');
-  toast('已建立 '+ds+' 的日報表','s');
-}
-
 /* 歷史資料排序（2026-08-25 用戶指定）：先照案場分群，同案場再依日期新→舊。
    案場名多半是「數字開頭」（雙橡園1617、雙橡園1920…），用 numeric 才會照數字大小排，
    不然 1617 會排在 199 後面。沒有案場的舊資料一律排最後。與 cdr-pm 同一份。 */

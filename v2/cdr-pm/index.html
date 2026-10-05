@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-09-30.2';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -4998,10 +4998,10 @@ function renderCalDay(){
   let h = '<div class="cal-day-head">'+CAL.sel+'（星期'+DOW[d.getDay()]+'）'
         + '<span style="font-weight:400;color:var(--muted);font-size:12px">共 '+rs.length+' 張</span></div>';
 
+  /* 2026-10-01 她指定：上方已有「＋ 新增日報」（也會帶這天＋案場）→ 下方「＋ 建立這天的日報」拿掉 */
   if (!rs.length){
     h += '<div class="cal-empty">這天還沒有日報'
        + (CAL.proj && CAL.proj !== CAL_ALL ? '（' + escHtml(projNameById(CAL.proj)) + '）' : '')
-       + (appOutOfScope() ? '' : '<br><button class="btn btn-a btn-sm" style="margin-top:10px" onclick="calNewOn(\''+CAL.sel+'\')">＋ 建立這天的日報</button>')
        + '</div>';
   } else {
     rs.forEach(r=>{
@@ -5022,21 +5022,6 @@ function renderCalDay(){
 }
 
 /* 從日曆的空白日建立那天的日報：走既有的 _startNewReport，再把日期改成點選那天 */
-function calNewOn(ds){
-  if (appLockGuard()) return;
-  /* 案場在日曆頁已經選過（2026-09-03），直接沿用，不要開一張沒有案場的空報表 */
-  if (CAL.proj && CAL.proj !== CAL_ALL) _carryProjId = CAL.proj;
-  if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value){
-    if (!confirm('目前表單有內容，確定要離開它、開一張新的日報表？')) return;
-  }
-  _startNewReport();
-  S.report.date = ds;
-  $('f-date').value = ds;
-  onDateChange();                 // 星期、同日重複提示、摘要都要跟著重算
-  rememberBaseline(S.report);     // 日期改過了，基準值要重取，否則欄位級合併會拿舊日期比對
-  goPage('report');
-}
-
 /* 歷史資料排序（2026-08-25 用戶指定）：先照案場分群，同案場再依日期新→舊。
    案場名多半是「數字開頭」（雙橡園1617、雙橡園1920…），用 numeric 才會照數字大小排，
    不然 1617 會排在 199 後面。沒有案場的舊資料一律排最後。 */

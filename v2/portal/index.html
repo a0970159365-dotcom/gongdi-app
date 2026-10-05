@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -98,6 +98,35 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 @media(max-width:900px){.cards{grid-template-columns:1fr}}
 .app-card{background:var(--card-bg);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm);border:1px solid transparent;transition:all .2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;cursor:pointer;position:relative;overflow:hidden}
+.app-card[data-local-only][hidden]{display:none!important}
+/* 分三列的小標題（2026-10-05） */
+.cards .cards-lbl{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.08em;margin:6px 0 -6px}
+.cards .cards-lbl:first-child{margin-top:0}
+.cards .cards-lbl::after{content:"";flex:1;height:1px;background:var(--border)}
+/* 停用的卡片（2026-10-05 她選 A）：變灰、虛線框，照樣點得進去看舊資料 */
+.app-card [hidden]{display:none!important}
+.app-card.app-card-stopped{background:#f1f5f9;border:1px dashed #cbd5e1;box-shadow:none}
+.app-card.app-card-stopped h3,.app-card.app-card-stopped .desc,.app-card.app-card-stopped .meta{color:#94a3b8}
+.app-card.app-card-stopped h3 span{color:#94a3b8}
+.app-card.app-card-stopped .ic{filter:grayscale(1);opacity:.55}
+.app-card.app-card-stopped .stop-only{color:#a15c00}
+/* ── 一頁看完（2026-10-05 她確認示意圖）：卡片 267px → 約 113px，1366×650 的筆電三列一次看得到 ──
+ * 卡片上的圖示拿掉；名稱 17 → 21px；說明一行（太長用「…」，滑鼠停著看 title）；「進入系統 →」改成右邊圓形 →。
+ * 只改首頁 .cards 裡的卡片（.app-card 別處沒用，但還是加 .cards 範圍，免得撞名）。 */
+.hero.hero-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:0 0 14px 4px;text-align:left}
+.hero.hero-row h1{font-size:22px;margin:0;letter-spacing:0}
+.hero.hero-row .badge{margin:0}
+.cards{gap:12px 18px}
+.cards .cards-lbl{margin:4px 0 -2px;font-size:14px;color:#475569}
+.cards .app-card{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:4px;align-items:center;padding:14px 18px}
+.cards .app-card h3{grid-column:1;font-size:21px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cards .app-card .desc{grid-column:1;margin:0;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cards .app-card .meta{grid-column:1/-1;margin:0}
+.cards .app-card .enter-btn{grid-column:2;grid-row:1/3;width:34px;height:34px;border-radius:50%;padding:0;font-size:17px;flex:none}
+.cards .app-card.app-card-stopped .enter-btn{background:#94a3b8}
+.cards .app-card.app-card-stopped .meta .dot{background:#94a3b8}
+/* 手機：名稱放不下就折兩行，不截成「…」（真 Chrome 375 寬：「進度表—瑪摩工程（新增）」21px 放不下） */
+@media(max-width:560px){.cards .app-card h3{white-space:normal;overflow:visible}}   /* 試做版卡片：.app-card 的 display:flex 會蓋掉 hidden（2026-10-02） */
 .app-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);border-color:var(--primary-l)}
 .app-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary) 0%,var(--primary-l) 100%);opacity:0;transition:opacity .2s}
 .app-card:hover::before{opacity:1}
@@ -615,51 +644,64 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 
   <!-- ===== HOME ===== -->
   <main id="page-home" class="page active">
-    <div class="hero">
-      <div class="badge badge-beta">🧪 測試版 · 整合管理平台</div>
+    <!-- 2026-10-05 她確認示意圖：頁首併成一行（標題＋測試版標籤），「子系統入口」那行拿掉 —— 筆電 100% 一個畫面看得完三列卡片 -->
+    <div class="hero hero-row">
       <h1>石御石材工程管理系統</h1>
+      <div class="badge badge-beta">🧪 測試版 · 整合管理平台</div>
     </div>
 
     <div class="section">
-      <div class="section-title"><div class="bar"></div><h2>子系統入口</h2><div class="note">點擊卡片進入系統</div></div>
+      <!-- 2026-10-05 她確認示意圖（甲＋不要圖示）：照「表的種類」分三列，每列前面一行小標題（不加圖示）
+           第一列 日報表：專案管理、瑪摩工程（停用）／第二列 進度表：專案管理、瑪摩工程（新增）、圖面管理／第三列 查檢表。
+           .cards-lbl 佔滿一整行，後面的卡片自動換到下一列。 -->
       <div class="cards">
 
-        <a class="app-card" data-app="cdr" data-base-url="../cdr-mm/index.html" href="../cdr-mm/index.html">
-          <div class="ic ic-cdr">📋</div>
-          <h3>日報表—<span class="dept-mm">瑪摩工程</span></h3>
-          <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
-          <div class="meta"><div class="dot"></div>已上線 v3<span>·</span>瑪摩石工程事業處主用</div>
-          <div class="enter-btn">進入系統 →</div>
-        </a>
-
+        <div class="cards-lbl">📋 日報表</div>
         <a class="app-card" data-app="cdr_pm" data-base-url="../cdr-pm/index.html" href="../cdr-pm/index.html">
-          <div class="ic ic-cdr">📋</div>
           <h3>日報表—<span class="dept-pm">專案管理</span></h3>
-          <p class="desc">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
+          <p class="desc" title="每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部主用</div>
-          <div class="enter-btn">進入系統 →</div>
-        </a>
-        <a class="app-card" data-app="dtp" data-base-url="../dtp-dw/index.html" href="../dtp-dw/index.html">
-          <div class="ic ic-dtp">📊</div>
-          <h3>進度表—<span class="dept-dw">圖面管理</span></h3>
-          <p class="desc">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
-          <div class="meta"><div class="dot"></div>已上線<span>·</span>規劃設計部主用</div>
-          <div class="enter-btn">進入系統 →</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
 
-        <a class="app-card" data-app="dtp_pm" data-base-url="../dtp-pm/index.html" href="../dtp-pm/index.html">
-          <div class="ic ic-dtp">📊</div>
-          <h3>進度表—<span class="dept-pm">專案管理</span></h3>
-          <p class="desc">執行進度追蹤、狀態管理、工時計算；支援 Excel 匯出與歷史查詢</p>
-          <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部主用</div>
-          <div class="enter-btn">進入系統 →</div>
+        <a class="app-card" data-app="cdr" data-stop-local="1" data-base-url="../cdr-mm/index.html" href="../cdr-mm/index.html">
+          <h3>日報表—<span class="dept-mm">瑪摩工程</span><span class="stop-only" hidden>（停用）</span></h3>
+          <p class="desc live-only" title="每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
+          <p class="desc stop-only" hidden title="已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到">已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到</p>
+          <div class="meta"><div class="dot"></div>已上線 v3<span>·</span>瑪摩石工程事業處主用</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
+
+        <div class="cards-lbl">📊 進度表</div>
+        <a class="app-card" data-app="dtp_pm" data-base-url="../dtp-pm/index.html" href="../dtp-pm/index.html">
+          <h3>進度表—<span class="dept-pm">專案管理</span></h3>
+          <p class="desc" title="執行進度追蹤、狀態管理、工時計算；支援 Excel 匯出與歷史查詢">執行進度追蹤、狀態管理、工時計算；支援 Excel 匯出與歷史查詢</p>
+          <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部主用</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
+        </a>
+
+        <!-- 2026-10-02 她確認示意圖：進—瑪只在 G 槽（file://）出現，正式網址看不到（hidden）。
+             進—瑪正式上線時：拿掉 data-local-only 與 hidden，卡片就跟其他支一樣；同一天把日—瑪的 data-stop-local 換成一直顯示停用。 -->
+        <a class="app-card" data-app="dtp_mm" data-local-only="1" data-base-url="../dtp-mm/index.html" href="../dtp-mm/index.html" hidden>
+          <h3>進度表—<span class="dept-mm">瑪摩工程</span>（新增）</h3>   <!-- 2026-10-05 她指定：試做版 → 初版 → 卡片上寫「新增」（進—瑪頁首的小標仍是「初版」） -->
+          <p class="desc" title="報價→施工→收款；案場狀態、報價金額、已收帳款、出工數與施工照片">報價→施工→收款；案場狀態、報價金額、已收帳款、出工數與施工照片</p>
+          <div class="meta"><div class="dot"></div>新增（只在 G 槽看得到）<span>·</span>瑪摩石工程事業處</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
+        </a>
+
+        <a class="app-card" data-app="dtp" data-base-url="../dtp-dw/index.html" href="../dtp-dw/index.html">
+          <h3>進度表—<span class="dept-dw">圖面管理</span></h3>
+          <p class="desc" title="圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心">圖面執行追蹤、狀態管理、跨部門協作；繪圖組與設計部協作核心</p>
+          <div class="meta"><div class="dot"></div>已上線<span>·</span>規劃設計部主用</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
+        </a>
+
+        <div class="cards-lbl">📐 查檢表</div>
         <a class="app-card" data-app="sop" data-base-url="../sop/index.html" href="../sop/index.html">
-          <div class="ic ic-sop">📐</div>
           <h3>查檢表—標準作業</h3>
-          <p class="desc">SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用</p>
+          <p class="desc" title="SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用">SOP 流程管理、工法步驟、照片紀錄；現場手機/平板輸入專用</p>
           <div class="meta"><div class="dot"></div>已上線<span>·</span>專案管理部（工地現場）</div>
-          <div class="enter-btn">進入系統 →</div>
+          <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
 
       </div>
@@ -1800,6 +1842,15 @@ function updateNavPerms() {
 /* ── 把當前登入身分帶進 5 個子 App 的卡片連結 ──
  * 子 App 開啟時優先讀 localStorage（同網域共享），若沒拿到就 fallback 讀 URL 參數
  */
+/* 進度表—瑪摩工程只開放給瑪摩工程一處、二處（2026-10-02 她指定）—— 跟 dtp-mm 的 portalAppAllowed 同一套：
+ * 員工有明確勾／不勾 → 照員工；其次角色；都沒設定 → 部門有「瑪摩」或看全公司的角色（level＝all）才可以 */
+function mmAppAllowed(u, emp) {
+  const role = S.roles.find(r => r.id === u.roleId) || null;
+  const pick = o => (o && o.appAccess && typeof o.appAccess.dtp_mm === 'boolean') ? o.appAccess.dtp_mm : undefined;
+  const ex = pick(emp) !== undefined ? pick(emp) : pick(role);
+  if (typeof ex === 'boolean') return ex;
+  return String((emp && emp.dept) || u.dept || '').indexOf('瑪摩') >= 0 || !!(role && role.level === 'all');
+}
 function updateAppCardLinks() {
   const u = S.currentUser;
   const emp = u ? S.employees.find(e => e.id === u.id) : null;
@@ -1814,8 +1865,17 @@ function updateAppCardLinks() {
     const base = card.getAttribute('data-base-url');
     const app = card.getAttribute('data-app');
     card.href = qs ? (base + '?' + qs) : base;
+    // 試做版卡片只在 G 槽（file://）出現，正式網址一律藏著（2026-10-02）
+    if (card.hasAttribute('data-local-only')) card.hidden = !window._LOCAL_PREVIEW;
+    // 日—瑪「（停用）」也先只在 G 槽（2026-10-05 她指定：跟進—瑪上線一起切）
+    if (card.hasAttribute('data-stop-local')) {
+      const stop = !!window._LOCAL_PREVIEW;
+      card.classList.toggle('app-card-stopped', stop);
+      card.querySelectorAll('.stop-only').forEach(x => { x.hidden = !stop; });
+      card.querySelectorAll('.live-only').forEach(x => { x.hidden = stop; });
+    }
     // 離職停用 → 全鎖；否則若沒勾此 App 的使用權才灰掉
-    const allowed = !u || (!resigned && appAccess[app] !== false);
+    const allowed = !u || (!resigned && (app === 'dtp_mm' ? mmAppAllowed(u, emp) : appAccess[app] !== false));
     if (allowed) {
       card.classList.remove('app-card-disabled');
       card.removeAttribute('data-blocked');
@@ -1885,6 +1945,13 @@ function fillGateDepts() {
     S.departments.map(d => `<option value="${esc(d.name)}">${esc(d.name)}</option>`).join('');
   if (keep && S.departments.some(d => d.name === keep)) { sel.value = keep; onGateDeptChange(); }
 }
+/* 登入名單照員工編號排（2026-10-01 她指定）；沒填編號的排最後、維持原本先後。
+   登入閘門與登出後的登入視窗共用這一個。numeric：編號位數不同時也照數字大小排。 */
+function sortByEmpCode(list) {
+  return list.map((e, i) => ({ e, i, c: String(e.code || '').trim() }))
+    .sort((a, b) => (!a.c - !b.c) || (a.c && b.c ? a.c.localeCompare(b.c, 'zh-Hant', { numeric: true }) : 0) || (a.i - b.i))
+    .map(x => x.e);
+}
 function onGateDeptChange() {
   const dept = $('gate-dept').value;
   const sel  = $('gate-name');
@@ -1893,7 +1960,7 @@ function onGateDeptChange() {
      改版前是「顯示出來但點不了」（灰掉那種），她要的是整筆不見。
      ⚠️ 只影響「選誰登入」這份清單 —— 員工資料本身不動，
      設定頁的員工列表照樣看得到離職的人（要查歷史、要刪除都還在）。 */
-  const list = S.employees.filter(e => e.dept === dept && !isResigned(e));
+  const list = sortByEmpCode(S.employees.filter(e => e.dept === dept && !isResigned(e)));
   if (!list.length) { sel.innerHTML = '<option value="">此部門尚無在職員工</option>'; return; }
   /* 2026-09-11 她指定：只顯示姓名，後面的角色與狀態括號全部拿掉
      2026-09-24 她交辦：前面補上員工編號 → 「P0100056（廖學健）」。
@@ -2029,8 +2096,8 @@ function onLoginDeptChange() {
     sel.innerHTML = '<option value="">請先選擇部門</option>';
     return;
   }
-  /* 2026-09-11 她指定：離職員工完全不出現（改版前是顯示但點不了） */
-  const list = S.employees.filter(e => e.dept === dept && !isResigned(e));
+  /* 2026-09-11 她指定：離職員工完全不出現（改版前是顯示但點不了）；2026-10-01 照員工編號排 */
+  const list = sortByEmpCode(S.employees.filter(e => e.dept === dept && !isResigned(e)));
   if (!list.length) {
     sel.innerHTML = '<option value="">此部門尚無在職員工</option>';
     return;
@@ -3705,7 +3772,10 @@ attachCloudWatch();
 // ── 登入閘門 ──
 // 必須「這個分頁有工作階段」+「有登入身分」才放行；否則清掉殘留身分、回到空白登入畫面。
 // → 關掉分頁 / 重開瀏覽器 / 直接點書籤進來，一律重新登入（不會沿用上次的人）。
-if (hasSession() && S.currentUser) {
+/* 2026-10-01：以前 G 槽預覽入口留下的「預覽帳號」一律當沒登入 ——
+   不然雲端名冊一更新，saveLS 會把「預覽帳號＋真角色」寫回去，各支 App 讀到就變唯讀、只看一個部門。
+   正式網址不會有這個身分，這行不會被觸發。 */
+if (hasSession() && S.currentUser && S.currentUser.id !== 'preview-user') {
   hideLoginGate();
 } else {
   if (S.currentUser) { S.currentUser = null; saveLS(); updateNavUser(); }
