@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-10-06.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -98,7 +98,6 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 @media(max-width:900px){.cards{grid-template-columns:1fr}}
 .app-card{background:var(--card-bg);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm);border:1px solid transparent;transition:all .2s;text-decoration:none;color:inherit;display:flex;flex-direction:column;cursor:pointer;position:relative;overflow:hidden}
-.app-card[data-local-only][hidden]{display:none!important}
 /* 分三列的小標題（2026-10-05） */
 .cards .cards-lbl{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.08em;margin:6px 0 -6px}
 .cards .cards-lbl:first-child{margin-top:0}
@@ -147,6 +146,9 @@ nav{background:var(--primary);min-height:56px;display:flex;align-items:center;pa
 .dept-dw{color:#6d28d9}   /* 規劃設計部 */
 .dept-all{color:#2563eb}  /* 全公司共用 */
 .app-card h3 .dept-mm,.app-card h3 .dept-pm,.app-card h3 .dept-dw,.app-card h3 .dept-all{font-weight:800}
+/* 「新增」標籤（2026-10-06 她指定紅底白字）：標題已用深藍／綠／橘／紫四個部門色，紅色不會跟它們混在一起 */
+.app-card h3 .card-new{display:inline-block;vertical-align:3px;margin-left:6px;font-size:12px;font-weight:800;line-height:1;
+  padding:4px 8px;border-radius:99px;background:#dc2626;color:#fff;white-space:nowrap;flex:none}
 /* 人員清單的小圖示：圖示同款，一樣用部門色分 */
 .app-icon.dept-mm,.app-icon.dept-pm,.app-icon.dept-dw,.app-icon.dept-all{font-size:15px}
 .app-card h3{font-size:17px;font-weight:800;color:var(--primary);margin-bottom:6px}
@@ -664,10 +666,10 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
 
-        <a class="app-card" data-app="cdr" data-stop-local="1" data-base-url="../cdr-mm/index.html" href="../cdr-mm/index.html">
-          <h3>日報表—<span class="dept-mm">瑪摩工程</span><span class="stop-only" hidden>（停用）</span></h3>
-          <p class="desc live-only" title="每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢">每日施工進度、工項、材料、卡關記錄；支援 PDF / Excel 匯出與歷史查詢</p>
-          <p class="desc stop-only" hidden title="已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到">已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到</p>
+        <!-- 2026-10-06 進—瑪上線：日—瑪一直顯示停用（變灰、說明換成請改用進—瑪），照樣點得進去查舊資料（她 10-05 選 A） -->
+        <a class="app-card app-card-stopped" data-app="cdr" data-base-url="../cdr-mm/index.html" href="../cdr-mm/index.html">
+          <h3>日報表—<span class="dept-mm">瑪摩工程</span><span class="stop-only">（停用）</span></h3>
+          <p class="desc stop-only" title="已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到">已停用，請改用「進度表—瑪摩工程」· 舊的日報、照片、Excel 照樣查得到</p>
           <div class="meta"><div class="dot"></div>已上線 v3<span>·</span>瑪摩石工程事業處主用</div>
           <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
@@ -680,12 +682,11 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
           <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
 
-        <!-- 2026-10-02 她確認示意圖：進—瑪只在 G 槽（file://）出現，正式網址看不到（hidden）。
-             進—瑪正式上線時：拿掉 data-local-only 與 hidden，卡片就跟其他支一樣；同一天把日—瑪的 data-stop-local 換成一直顯示停用。 -->
-        <a class="app-card" data-app="dtp_mm" data-local-only="1" data-base-url="../dtp-mm/index.html" href="../dtp-mm/index.html" hidden>
-          <h3>進度表—<span class="dept-mm">瑪摩工程</span>（新增）</h3>   <!-- 2026-10-05 她指定：試做版 → 初版 → 卡片上寫「新增」（進—瑪頁首的小標仍是「初版」） -->
+        <!-- 2026-10-06 進—瑪正式上線：卡片一直顯示（原本 10-02 起只在 G 槽出現） -->
+        <a class="app-card" data-app="dtp_mm" data-base-url="../dtp-mm/index.html" href="../dtp-mm/index.html">
+          <h3>進度表—<span class="dept-mm">瑪摩工程</span><span class="card-new">新增</span></h3>   <!-- 2026-10-06 她指定紅底白字標籤；進—瑪頁首的「初版」上線時拿掉 -->
           <p class="desc" title="報價→施工→收款；案場狀態、報價金額、已收帳款、出工數與施工照片">報價→施工→收款；案場狀態、報價金額、已收帳款、出工數與施工照片</p>
-          <div class="meta"><div class="dot"></div>新增（只在 G 槽看得到）<span>·</span>瑪摩石工程事業處</div>
+          <div class="meta"><div class="dot"></div>新增<span>·</span>瑪摩石工程事業處主用</div>
           <div class="enter-btn" aria-label="進入系統" title="進入系統">→</div>
         </a>
 
@@ -978,6 +979,7 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
             <label class="rb-sub"><span>📋 日報表—<span class="dept-pm">專案管理</span></span><input type="checkbox" id="emp-app-cdr_pm" checked></label>
             <label class="rb-sub"><span>📋 日報表—<span class="dept-mm">瑪摩工程</span></span><input type="checkbox" id="emp-app-cdr" checked></label>
             <label class="rb-sub"><span>📊 進度表—<span class="dept-pm">專案管理</span></span><input type="checkbox" id="emp-app-dtp_pm" checked></label>
+            <label class="rb-sub"><span>📊 進度表—<span class="dept-mm">瑪摩工程</span></span><input type="checkbox" id="emp-app-dtp_mm" checked></label>   <!-- 2026-10-06 -->
             <label class="rb-sub"><span>📊 進度表—<span class="dept-dw">圖面管理</span></span><input type="checkbox" id="emp-app-dtp" checked></label>
             <label class="rb-sub"><span>📐 查檢表—標準作業</span><input type="checkbox" id="emp-app-sop" checked></label>
           </div>
@@ -1842,14 +1844,15 @@ function updateNavPerms() {
 /* ── 把當前登入身分帶進 5 個子 App 的卡片連結 ──
  * 子 App 開啟時優先讀 localStorage（同網域共享），若沒拿到就 fallback 讀 URL 參數
  */
-/* 進度表—瑪摩工程只開放給瑪摩工程一處、二處（2026-10-02 她指定）—— 跟 dtp-mm 的 portalAppAllowed 同一套：
- * 員工有明確勾／不勾 → 照員工；其次角色；都沒設定 → 部門有「瑪摩」或看全公司的角色（level＝all）才可以 */
+/* 進度表—瑪摩工程誰能用（2026-10-06 她選甲，取代 10-02「只開放瑪摩一、二處」）—— 跟 dtp-mm 的 portalAppAllowed 同一套：
+ * 員工有明確勾／不勾 dtp_mm → 照員工；沒設過 → 跟他的「日報表—瑪摩工程」一樣（日—瑪沒被取消勾就可以）。
+ * 角色不管（日—瑪也不管角色）。 */
+function mmDefaultOn(emp) { return !(emp && emp.appAccess && emp.appAccess.cdr === false); }
+/* 員工編輯、員工清單上「進—瑪」那一格：沒設過的照畫面上「日—瑪」那一格顯示（那兩個地方日—瑪是 !!appAccess.cdr） */
+function mmShownOn(emp) { const a = (emp && emp.appAccess) || {}; return typeof a.dtp_mm === 'boolean' ? a.dtp_mm : !!a.cdr; }
 function mmAppAllowed(u, emp) {
-  const role = S.roles.find(r => r.id === u.roleId) || null;
-  const pick = o => (o && o.appAccess && typeof o.appAccess.dtp_mm === 'boolean') ? o.appAccess.dtp_mm : undefined;
-  const ex = pick(emp) !== undefined ? pick(emp) : pick(role);
-  if (typeof ex === 'boolean') return ex;
-  return String((emp && emp.dept) || u.dept || '').indexOf('瑪摩') >= 0 || !!(role && role.level === 'all');
+  if (emp && emp.appAccess && typeof emp.appAccess.dtp_mm === 'boolean') return emp.appAccess.dtp_mm;
+  return mmDefaultOn(emp);
 }
 function updateAppCardLinks() {
   const u = S.currentUser;
@@ -1865,15 +1868,7 @@ function updateAppCardLinks() {
     const base = card.getAttribute('data-base-url');
     const app = card.getAttribute('data-app');
     card.href = qs ? (base + '?' + qs) : base;
-    // 試做版卡片只在 G 槽（file://）出現，正式網址一律藏著（2026-10-02）
-    if (card.hasAttribute('data-local-only')) card.hidden = !window._LOCAL_PREVIEW;
-    // 日—瑪「（停用）」也先只在 G 槽（2026-10-05 她指定：跟進—瑪上線一起切）
-    if (card.hasAttribute('data-stop-local')) {
-      const stop = !!window._LOCAL_PREVIEW;
-      card.classList.toggle('app-card-stopped', stop);
-      card.querySelectorAll('.stop-only').forEach(x => { x.hidden = !stop; });
-      card.querySelectorAll('.live-only').forEach(x => { x.hidden = stop; });
-    }
+    // 2026-10-06：進—瑪上線，「只在 G 槽出現」「停用只在 G 槽」兩段拿掉（改寫在 HTML 上，一直生效）
     // 離職停用 → 全鎖；否則若沒勾此 App 的使用權才灰掉
     const allowed = !u || (!resigned && (app === 'dtp_mm' ? mmAppAllowed(u, emp) : appAccess[app] !== false));
     if (allowed) {
@@ -2628,6 +2623,7 @@ function renderEmps() {
       <span class="app-icon dept-pm ${ac.cdr_pm?'on':'off'}" title="日報表—專案管理">📋</span>
       <span class="app-icon dept-dw ${ac.dtp?'on':'off'}" title="進度表—圖面管理">📊</span>
       <span class="app-icon dept-pm ${ac.dtp_pm?'on':'off'}" title="進度表—專案管理">📊</span>
+      <span class="app-icon dept-mm ${mmShownOn(e)?'on':'off'}" title="進度表—瑪摩工程">📊</span>
       <span class="app-icon ${ac.sop?'on':'off'}" title="查檢表—標準作業">📐</span>`;
     return `
     <tr>
@@ -2690,6 +2686,7 @@ function openEmpModal() {
   $('emp-app-cdr_pm').checked = true;
   $('emp-app-dtp').checked = true;
   $('emp-app-dtp_pm').checked = true;
+  $('emp-app-dtp_mm').checked = true;   // 2026-10-06：跟其他 5 個一樣預設勾
   $('emp-app-sop').checked = true;
   setRoleFieldLock(false);   // 新增員工：角色可自由選
   empTape();
@@ -2722,6 +2719,7 @@ function editEmp(id) {
   $('emp-app-cdr_pm').checked = !!e.appAccess?.cdr_pm;
   $('emp-app-dtp').checked = !!e.appAccess?.dtp;
   $('emp-app-dtp_pm').checked = !!e.appAccess?.dtp_pm;
+  $('emp-app-dtp_mm').checked = mmShownOn(e);   // 2026-10-06：沒設過的照日—瑪帶，按儲存就固定
   $('emp-app-sop').checked = !!e.appAccess?.sop;
   setRoleFieldLock(!!(S.currentUser && id === S.currentUser.id));
   empTape();
@@ -2741,6 +2739,7 @@ function saveEmp() {
     cdr_pm: $('emp-app-cdr_pm').checked,
     dtp: $('emp-app-dtp').checked,
     dtp_pm: $('emp-app-dtp_pm').checked,
+    dtp_mm: $('emp-app-dtp_mm').checked,
     sop: $('emp-app-sop').checked,
   };
   if (!code) { toast('請輸入員工編號', 'error'); $('emp-code').focus(); return; }
@@ -2969,7 +2968,7 @@ function empRoleOf(){
 }
 const EMP_APPS = [
   ['cdr_pm', '日報表—專案管理'], ['cdr', '日報表—瑪摩工程'],
-  ['dtp_pm', '進度表—專案管理'], ['dtp', '進度表—圖面管理'], ['sop', '查檢表—標準作業'],
+  ['dtp_pm', '進度表—專案管理'], ['dtp_mm', '進度表—瑪摩工程'], ['dtp', '進度表—圖面管理'], ['sop', '查檢表—標準作業'],
 ];
 function empDerived(){
   const box = $('emp-derived'); if (!box) return;

@@ -1,10 +1,8 @@
 {
-  "version": "2026-10-05.1",
-  "updated": "2026-10-05",
+  "version": "2026-10-06.1",
+  "updated": "2026-10-06",
   "critical": [
     "portal",
-    "cdr",
-    "cdr_pm",
     "dtp",
     "dtp_pm"
   ],
@@ -17,14 +15,16 @@
     "cdr_pm": "cdr-pm/index.html",
     "dtp": "dtp-dw/index.html",
     "dtp_pm": "dtp-pm/index.html",
-    "sop": "sop/index.html"
+    "sop": "sop/index.html",
+    "dtp_mm": "dtp-mm/index.html"
   },
   "apps": {
-    "portal": "2026-10-05.1",
+    "portal": "2026-10-06.1",
     "cdr": "2026-10-05.1",
     "cdr_pm": "2026-10-05.1",
-    "dtp": "2026-10-05.1",
-    "dtp_pm": "2026-10-05.1",
-    "sop": "2026-09-30.1"
+    "dtp": "2026-10-06.1",
+    "dtp_pm": "2026-10-06.1",
+    "sop": "2026-09-30.1",
+    "dtp_mm": "2026-10-06.1"
   }
 }

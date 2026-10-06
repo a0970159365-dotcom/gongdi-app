@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-06.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1552,6 +1552,22 @@ function updateDataLists(){
  * 呼叫端（saveRecord / delRecord / saveCfg / importJson…）完全不用改。
  */
 let _lastPushed={};   // id -> 上次推上雲的 JSON 字串
+/* ── 刪除紀錄（墓碑，2026-10-06 她確認示意圖）──────────────────────────
+ * 她回報：進—圖刪掉的一筆，隔天又跑回來。原因是刪除沒有留下記錄 →
+ * 別台裝置本機還留著那筆，開頁時 rescueLocalNewer 當成「上次沒傳成功」補回雲端。
+ * 現在刪除會在 dtp_pm/deleted/{id} 記下刪除時間；開頁補傳、即時同步、存檔上傳前都先查，
+ * 查到就丟掉、不補回去。做法同日報表 2026-09-03（cdr_pm/deleted）。
+ *   · 墓碑永久保留（她選 3甲）：一筆只有幾十個字；真的刪錯從每日備份找回
+ *   · 編輯到一半被別人刪掉 → 以刪除為準，修改不存、跳提示（她選 1甲）
+ *   · 紀錄 id 是亂數（r_時間_亂碼），不會有「同一個 id 重建」的問題，所以不用像日報表比對 createdAt */
+let _tombstones={};
+function isDeleted(id){return !!(id&&_tombstones[id])}
+function loadTombstones(data){
+  const d=data&&data.deleted;
+  if(d&&typeof d==='object')Object.keys(d).forEach(k=>{if(d[k])_tombstones[k]=d[k]});
+}
+function dropDeleted(list){return (list||[]).filter(r=>!(r&&isDeleted(r.id)))}
+const DELETED_MSG='這筆紀錄已經被別人刪除，剛剛的修改沒有存。';
 function _snapshot(list){const m={};(list||[]).forEach(r=>{if(r&&r.id)m[r.id]=JSON.stringify(r)});return m}
 
 // ── 設定（cfg）同步：整包覆蓋改為聯集合併（2026-08-06 修正）────────────────
@@ -1685,7 +1701,15 @@ async function fbSave(){
     // 只把我真的動過的格子寫上去 —— 我沒碰的欄位與別人剛新增的進度列都不會被蓋掉。
     const changed=records.filter(r=>r&&r.id&&_lastPushed[r.id]!==cur[r.id]);
     let mergedAny=false;
+    let goneByOthers=0;
     for(const r of changed){
+      /* 刪除紀錄（2026-10-06）：上傳前再問一次雲端 —— 別人剛刪掉、這台還沒收到的，不要寫回去 */
+      if(window._fbGetPath){
+        try{
+          const ts=await window._fbGetPath('deleted/'+r.id);
+          if(ts){_tombstones[r.id]=ts;records=records.filter(x=>x.id!==r.id);goneByOthers++;continue}
+        }catch(e){}
+      }
       let toWrite=r;
       if(window._fbGetPath){
         try{
@@ -1698,12 +1722,16 @@ async function fbSave(){
       const i=records.findIndex(x=>x.id===r.id);
       if(i>=0&&JSON.stringify(records[i])!==JSON.stringify(toWrite)){records[i]=toWrite;mergedAny=true}
     }
-    dels.forEach(id=>jobs.push(window._fbSetPath('records/'+id,null)));
+    dels.forEach(id=>{
+      jobs.push(window._fbSetPath('records/'+id,null));
+      if(_tombstones[id])jobs.push(window._fbSetPath('deleted/'+id,_tombstones[id]));   // 刪除紀錄（2026-10-06）
+    });
     jobs.push(pushCfg(_cfgAuthoritative));
     _cfgAuthoritative=false;
     await Promise.all(jobs);
     // 合併結果要回到畫面上，不然使用者看到的還是自己那份，跟雲端不一致
-    if(mergedAny){saveLocal();renderMain();renderHistory();updateFilters()}
+    if(mergedAny||goneByOthers){saveLocal();renderMain();renderHistory();updateFilters()}
+    if(goneByOthers)toast(DELETED_MSG,'e');
     _lastPushed=_snapshot(records);
     setSyncIcon('ok');
   }catch(e){console.warn('fbSave failed:',e);setSyncIcon('err');showSyncWarn(e)}
@@ -1718,7 +1746,7 @@ function rescueLocalNewer(){
   const week=Date.now()-7*24*3600*1000;
   let n=0;
   localRecs.map(normalizeRecord).forEach(lr=>{
-    if(!lr||!lr.id)return;
+    if(!lr||!lr.id||isDeleted(lr.id))return;   // 被刪過的不補回（2026-10-06）
     const cr=byId[lr.id];
     const lt=Date.parse(lr.updatedAt||'')||0;
     const ct=cr?(Date.parse(cr.updatedAt||'')||0):0;
@@ -1735,10 +1763,11 @@ async function initFb(){
   try{
     const data=await window._fbGet();
     if(data&&data.records){
-      records=Object.values(data.records).map(normalizeRecord);
+      loadTombstones(data);   // 刪除紀錄（2026-10-06）
+      records=dropDeleted(Object.values(data.records).map(normalizeRecord));
       // 記下「雲端目前有哪幾筆」當作 per-record 同步的比較基準；
       // 沒有這份基準就無法分辨「使用者刪了一筆」與「這台裝置本來就沒讀到」→ 一律不刪最安全
-      _lastPushed=_snapshot(Object.values(data.records));
+      _lastPushed=_snapshot(records);
       // 搶救本機還沒推上去的修改（2026-08-21 事故）：以前這裡直接用雲端整包覆蓋，
       // 上一次存檔如果沒推成功，使用者打的字會在重新整理的瞬間無聲消失。
       // 判斷方式：同一筆的 updatedAt 本機比雲端新 ＝ 這台改過但沒送出去。
@@ -1770,12 +1799,12 @@ function applyRemote(data){
   let changed=false;
   if(data.records&&Object.keys(data.records).length){
     const incMap={};
-    Object.values(data.records).map(normalizeRecord).forEach(r=>{if(r&&r.id)incMap[r.id]=r});
+    dropDeleted(Object.values(data.records).map(normalizeRecord)).forEach(r=>{if(r&&r.id)incMap[r.id]=r});
     const cloudSnap=_snapshot(Object.values(incMap));
     // 保留本機還沒成功推上雲的修改：_lastPushed 是「最後一次確認寫進雲端的版本」，
     // 本機與它不同就代表這筆正在同步中 → 以本機為準，免得剛編輯好的內容被雲端舊值蓋回去。
     records.forEach(r=>{
-      if(r&&r.id&&_lastPushed[r.id]!==JSON.stringify(r))incMap[r.id]=r;
+      if(r&&r.id&&!isDeleted(r.id)&&_lastPushed[r.id]!==JSON.stringify(r))incMap[r.id]=r;
     });
     const merged=Object.values(incMap);
     // 用「id 排序後」比對，避免只是先後順序不同就判定有變動而重繪整頁
@@ -1804,6 +1833,7 @@ function startWatch(){
   _watchStarted=true;
   window._fbWatch(data=>{
     // 使用者正在編輯視窗裡打字時不要抽換底下的資料，先收著，關掉視窗再套用
+    loadTombstones(data);   // 編輯中也先收刪除紀錄，存檔時才擋得住（2026-10-06）
     if(isEditingNow()){_pendingRemote=data;return}
     applyRemote(data);
   });
@@ -2929,6 +2959,8 @@ function saveRecord(){
   if(appLockGuard())return;
   const proj=document.getElementById('e-proj').value.trim();
   if(!proj){alert('請填入案場名稱');return}
+  { const _eid=document.getElementById('edit-id').value;   // 編輯到一半被別人刪掉 → 以刪除為準（2026-10-06 她選 1甲）
+    if(_eid&&isDeleted(_eid)){records=dropDeleted(records);saveLocal();closeEdit(true);renderMain();renderHistory();updateFilters();toast(DELETED_MSG,'e');return} }
   const id=document.getElementById('edit-id').value;
   /* 2026-10-01 她確認：存檔只覆蓋編輯視窗裡的欄位，原本那筆的其他欄位（拖曳排的「順序」等）原樣留著。
      之前整筆重建 → 拖好的順序一存檔就沒了，那一列掉到案場最下面。
@@ -2955,6 +2987,7 @@ function delRecord(){
   if(!requireDelete())return;
   const id=document.getElementById('edit-id').value;
   if(!id||!confirm('確定刪除這筆紀錄？'))return;
+  _tombstones[id]=new Date().toISOString();   // 刪除紀錄，fbSave 會一起寫上雲端（2026-10-06）
   records=records.filter(r=>r.id!==id);
   fbSave();renderMain();renderHistory();updateFilters();closeEdit(true);   // 已存檔／已刪除 → 直接關（2026-09-20）
   toast('已刪除','s');
