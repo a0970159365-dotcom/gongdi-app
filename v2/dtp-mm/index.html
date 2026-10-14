@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-06.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -242,6 +242,11 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #main-table .mm-col-recv{width:180px}
 @media(min-width:1280px){#main-table .mm-inner{min-width:1230px}#main-table .mm-col-quote{width:200px}#main-table .mm-col-recv{width:240px}}
 #main-table .mm-inner.mm-noamt{min-width:950px}   /* 金額兩欄收起來時（2026-10-02 第三批） */
+#main-table .mm-inner.mm-oneamt:not(.mm-noamt){min-width:1000px}   /* 只收一欄（2026-10-12 兩欄各一組開關） */
+/* 應收帳款實際值、大約值都開：那一欄加寬（2026-10-12） */
+#main-table .mm-inner.mm-recv2 .mm-col-recv{width:250px}
+#main-table .mm-inner.mm-recv2{min-width:1070px}
+@media(min-width:1280px){#main-table .mm-inner.mm-recv2 .mm-col-recv{width:310px}#main-table .mm-inner.mm-recv2{min-width:1300px}}
 #main-table .tbl-scroll{overflow:visible}
 #main-table .mm-tbl{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;background:#fff}
 #main-table .mm-colhead th{text-align:left;background:#f8fafc;color:var(--muted);font-weight:700;font-size:12px;padding:7px 8px;border-bottom:2px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -276,6 +281,11 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #main-table .mm-recv .mm-sub{padding-left:1em}   /* 第六批：已收／未收底下那行「未稅」縮排 */
 #main-table .mm-money small{color:var(--muted);font-weight:400;font-size:11px}
 #main-table .mm-dash{color:var(--muted);font-weight:400}
+/* 2026-10-12 第七八批：案場列的人員／部門、區域格的範圍、手機黏住的案場條 */
+#main-table .mm-case-exec{font-weight:400}
+#main-table .mm-case-exec .mm-dept{font-size:11px;color:var(--muted);margin-top:3px;font-weight:400}
+#main-table .mm-scope{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
+#main-table .mm-mbar{display:none}
 #main-table .mm-hbtns{display:flex;flex-direction:column;gap:3px;align-items:stretch}
 #main-table .mm-hbtn{flex:none;white-space:nowrap;background:#fff;border:1px solid var(--border);color:var(--text);border-radius:5px;padding:2px 6px;font-size:11.5px;font-family:inherit;cursor:pointer;font-weight:600}
 #main-table .mm-hbtn:hover{border-color:var(--primary-l);color:var(--primary)}
@@ -293,22 +303,36 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 /* 設定頁三塊並排（2026-10-05 第五批）：群組二＝狀態｜案場｜區域、群組三＝款別｜施工項目｜業務。
  * 筆電（>1024）三塊同一列，狀態、業務那塊寬一點；平板（≤1024）寬的那塊獨佔一列、另兩塊兩欄；手機（≤640）一塊一列。
  * 狀態表在並排時不設最小寬度（欄位本來就排得下），≤1024 才回到原本的 560px＋左右滑。 */
-#page-settings .mm-set3{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+/* 2026-10-12（七 Q2 定案）：狀態那塊縮、案場加寬、區域（只剩室內／外牆／景觀）最窄 —— 1280 寬時 18 個字的案場名稱一行放得下 */
+#page-settings .mm-set3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.35fr) minmax(0,.7fr);gap:16px;align-items:start}
 #page-settings .mm-set3.mm-set3b{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr)}
+/* 2026-10-12：群組三四塊（款別｜報價項目｜施工項目｜業務），業務那塊寬一點 */
+#page-settings .mm-set3.mm-set4{grid-template-columns:repeat(3,minmax(0,1fr)) minmax(0,1.7fr)}
 #page-settings .mm-set3>div{min-width:0}
-@media(min-width:1025px){#page-settings .mm-set3 .st-tbl{min-width:0}#page-settings .mm-set3 .st-tbl .st-name{min-width:90px}}
+@media(min-width:1025px){#page-settings .mm-set3 .st-tbl{min-width:0}#page-settings .mm-set3 .st-tbl .st-name{min-width:90px}
+  /* 狀態那塊變窄（2026-10-12）：階段、案場數、按鈕三欄縮小，名稱那欄才夠寬 */
+  #page-settings .mm-set3 .st-tbl .st-stage{width:84px}#page-settings .mm-set3 .st-tbl .st-cnt{width:86px;white-space:nowrap}
+  #page-settings .mm-set3 .st-tbl .st-act{width:76px}#page-settings .mm-set3 .st-tbl .st-color{width:44px}}
 @media(max-width:1024px){
-  #page-settings .mm-set3,#page-settings .mm-set3.mm-set3b{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #page-settings .mm-set3,#page-settings .mm-set3.mm-set3b,#page-settings .mm-set3.mm-set4{grid-template-columns:repeat(2,minmax(0,1fr))}
   #page-settings .mm-set3>.mm-set-st,#page-settings .mm-set3>.mm-set-sg{grid-column:1/-1}
+  #page-settings .mm-set3.mm-set4{grid-template-columns:repeat(3,minmax(0,1fr))}   /* 2026-10-12：三塊一列、業務一整列 */
 }
-@media(max-width:640px){#page-settings .mm-set3,#page-settings .mm-set3.mm-set3b{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){#page-settings .mm-set3,#page-settings .mm-set3.mm-set3b,#page-settings .mm-set3.mm-set4{grid-template-columns:minmax(0,1fr)}}
 #page-settings .st-tbl td{vertical-align:middle}
+/* 2026-10-13 她指定：狀態改回自己一張表（不再接報價項目／施工項目），階段又變回下拉 */
+#page-settings .st-hint{font-size:12px;color:var(--muted);line-height:1.6;margin:-2px 0 8px}
+#page-settings .st-tbl .st-stage-sel{width:100%;min-width:0}
 #page-settings .st-tbl .st-name{min-width:140px}
 #page-settings .st-tbl .fi{padding:4px 8px;font-size:13px}
 #page-settings .st-tbl .st-stage{width:90px}
 #page-settings .st-tbl .st-cnt{text-align:right;font-variant-numeric:tabular-nums;width:90px}
 #page-settings .st-tbl .st-act{white-space:nowrap;width:130px}
 #page-settings .st-lock,#page-settings .cfg-lock{font-size:11px;color:var(--warning);white-space:nowrap;flex-shrink:0}
+/* 群組四（2026-10-12）：左邊廠商→施工人員（寬）、右邊工廠一欄；≤1024 上下排 */
+#page-settings .mm-set-g4{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1fr);gap:16px;align-items:start}
+#page-settings .mm-set-g4>div{min-width:0}
+@media(max-width:1024px){#page-settings .mm-set-g4{grid-template-columns:minmax(0,1fr)}}
 #page-settings .fs-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
 #page-settings .fs-grp{border:1px solid var(--border);border-radius:8px;padding:8px;background:#fff;min-width:0}
 #page-settings .fs-head{display:flex;align-items:center;gap:6px}
@@ -322,6 +346,14 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #page-settings .fs-add{display:flex;gap:6px;margin-top:2px}
 #page-settings .fs-grp.fs-new{border-color:var(--primary);box-shadow:0 0 0 3px rgba(22,101,52,.25)}   /* 剛新增的那家閃一下（2026-10-05） */
 #page-settings .fs-add .fi{flex:1 1 auto;min-width:0;padding:4px 8px;font-size:12.5px}
+/* 群組四拖曳換順序（2026-10-14 她指定 1乙）：⠿ 抓整家（廠商＋施工人員一起）；施工人員只在同一家裡換先後。
+   手機（≤640）不好拖 → 換成 ↑↓，跟群組三業務一樣 */
+#page-settings .fs-grip{cursor:grab;color:var(--muted);user-select:none;flex:none;font-size:13px;line-height:1}
+#page-settings .fs-mv{display:none;flex:none}
+#page-settings .fs-grp.fs-over{box-shadow:0 0 0 2px var(--primary-l)}
+#page-settings .fs-row.fs-over{box-shadow:inset 0 2px 0 var(--primary-l)}
+#page-settings .fs-grp.fs-dragging,#page-settings .fs-row.fs-dragging{opacity:.5}
+@media(max-width:640px){#page-settings .fs-grip{display:none}#page-settings .fs-mv{display:inline-flex;gap:1px}}
 /* 進度記錄：進場施工 → 那家工廠的施工人員（複選） */
 .log-edit-row .log-staff{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
 .log-edit-row .log-staff label{display:inline-flex;align-items:center;gap:3px;font-size:12px;border:1px solid var(--border);border-radius:999px;padding:2px 9px;background:#fff;cursor:pointer;white-space:nowrap}
@@ -342,6 +374,8 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
  * 只改排法，按鈕、下拉、點標題收合全部照舊（DOM 一樣，測試與功能共用）。 */
 @media(max-width:640px){
   #main-table .mm-inner,#main-table .mm-inner.mm-noamt{min-width:0}
+  /* 2026-10-12：金額開關的寬度設定（只收一欄、應收兩個都開）在手機一律不要（卡片排法，不左右滑） */
+  #main-table .mm-inner.mm-oneamt:not(.mm-noamt),#main-table .mm-inner.mm-recv2{min-width:0}
   #main-table .mm-tbl,#main-table .mm-tbl tbody{display:block;width:100%}
   #main-table .mm-tbl.mm-colhead{display:none}   /* 要寫在上一行後面、而且比較具體，不然被 display:block 蓋掉 */
   #main-table .mm-sticky{position:static}
@@ -360,6 +394,14 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
   #main-table .mm-rec{margin-left:14px;border-left:3px solid var(--border)}
   #main-table .mm-rec .row-handle{width:auto;flex:none}
   #main-table .mm-rec .log-cell{order:3;flex:1 1 100%}
+  /* 2026-10-12（C 甲）：綠色導覽列下面黏一條「現在捲到的案場」—— 每個案場一條、放在案場最上面、position:sticky，
+     捲過這個案場就被下一個案場的那條推走，所以會自己換。.mm-scroll 在手機不左右滑（卡片），要讓它 overflow 可見才黏得住整頁 */
+  #main-table .mm-scroll,#main-table .mm-wrap{overflow:visible}
+  #main-table .mm-mbar{display:flex;justify-content:space-between;gap:8px;position:sticky;top:var(--navh,52px);z-index:20;
+    padding:5px 10px;font-size:12.5px;font-weight:700;border-bottom:2px solid rgba(15,23,42,.18);box-shadow:0 2px 4px rgba(0,0,0,.08)}
+  #main-table .mm-mbar .mm-mbar-n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #main-table .mm-mbar .mm-mbar-s{flex:none;white-space:nowrap}
+  #main-table .mm-case-head .mm-case-exec{order:3;flex:1 1 100%;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
 }
 /* 系統設定：狀態的底色（點色塊 → 下面展開 10 色） */
 #page-settings .st-sw{width:28px;height:22px;border-radius:5px;border:1px solid var(--border);cursor:pointer;vertical-align:middle}
@@ -382,7 +424,23 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 /* 案場金額＋應收帳款視窗（2026-10-02 第二版）：一律用 #money-overlay 當範圍。
  * 每一格都寫死 grid-column／flex，不讓瀏覽器去壓寬度（CLAUDE.md 09-11、09-23 兩次擠成一直排）。 */
 #money-overlay .mn-top{gap:10px;margin-bottom:6px}
+/* 業務複選（2026-10-12）：一組一行，組別名稱是按鈕（整組），後面是名字按鈕 */
+#money-overlay .mn-sales{display:flex;flex-direction:column;gap:5px}
+#money-overlay .mn-sg{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+#money-overlay .mn-sg-name{font-family:inherit;font-size:12px;font-weight:700;border:none;background:none;color:var(--text);cursor:pointer;padding:2px 4px;border-radius:4px;min-width:64px;text-align:left}
+#money-overlay .mn-sg-name:hover{background:#f1f5f9}
+#money-overlay .mn-sp{font-family:inherit;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;background:#fff;color:var(--muted);border:1.5px solid var(--border);border-radius:999px;padding:3px 11px}
+#money-overlay .mn-sp[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+#money-overlay .mn-sp:disabled,#money-overlay .mn-sg-name:disabled{cursor:default;opacity:.75}
+#money-overlay .mn-sg-none{font-size:12px;color:var(--muted)}
 #money-overlay .mn-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:6px}
+/* 計算含稅價／倒推未稅價（2026-10-14 她指定，整個框一顆） */
+#money-overlay .mn-modebar{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
+#money-overlay .mn-modebar .mn-hint{margin-bottom:0;flex:1 1 200px;min-width:0}
+#money-overlay .mn-mode{display:inline-flex;border:1.5px solid var(--primary);border-radius:6px;overflow:hidden;flex:none}
+#money-overlay .mn-mode-btn{border:none;background:#fff;color:var(--primary);padding:4px 12px;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap}
+#money-overlay .mn-mode-btn[aria-pressed="true"]{background:var(--primary);color:#fff}
+#money-overlay .mn-amt.mn-calc{background:var(--bg)}
 #money-overlay .mn-err{display:none;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:6px;padding:6px 10px;font-size:12.5px;font-weight:700;margin-bottom:8px}
 #money-overlay .mn-err.on{display:block}
 #money-overlay .fi.bad{border-color:var(--danger);background:#fff7f7}
@@ -408,6 +466,11 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
   #money-overlay .mn-row .mn-pct::before{content:"佔總額 "}
   #money-overlay .mn-row .mn-del{grid-column:3;grid-row:1/4}
   #money-overlay .mn-tot-row{grid-template-columns:minmax(0,1fr) 78px 78px 48px}
+  /* 2026-10-14：手機上「已收合計」那一欄原本剛好 51px，視窗一長出捲軸（矮手機本來就會）就被擠成兩行 →
+     字不換行、第一欄照字寬；最後那格空的（電腦版刪除鈕的位置）手機不佔一列 */
+  #money-overlay .mn-tot-row{grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) 44px}
+  #money-overlay .mn-tot-row>span:first-child{white-space:nowrap}
+  #money-overlay .mn-tot-row>span:last-child:empty{display:none}
 }
 /* 照片小檢視（2026-10-02）：點編輯框裡的縮圖看大圖 */
 #ph-view{z-index:320;align-items:center}
@@ -417,8 +480,27 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 /* 系統設定：業務群組（2026-10-02） */
 #page-settings .sg-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;background:#f0fdf4;border:1px solid var(--border);border-radius:8px;padding:8px}
 #page-settings .sg-form .fi{flex:1 1 200px;min-width:0}
-#page-settings .sg-people{display:flex;flex-wrap:wrap;gap:4px}
-#page-settings .sg-people span{background:#f1f5f9;border-radius:999px;padding:1px 9px;font-size:12px;white-space:nowrap}
+/* 業務群組（2026-10-12 第七八批）：整列拖拉換順序（⠿）、名字按鈕拖進別組／組內換先後、每列「＋ 加人」；手機用 ↑↓ */
+#page-settings .sg-people{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:26px;border-radius:6px}
+#page-settings .sg-people.sg-over{outline:2px dashed var(--primary-l);outline-offset:2px;background:#f0fdf4}
+#page-settings .sg-people .sg-chip{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid transparent;border-radius:999px;padding:1px 4px 1px 9px;font-size:12px;white-space:nowrap}
+#page-settings .sg-people .sg-chip[draggable="true"]{cursor:grab}
+#page-settings .sg-people .sg-x{border:none;background:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 3px;line-height:1}
+#page-settings .sg-people .sg-x:hover{color:var(--danger)}
+#page-settings .sg-addp{font-family:inherit;font-size:12px;font-weight:600;border:1px dashed var(--primary-l);background:#fff;color:var(--primary);border-radius:999px;padding:1px 9px;cursor:pointer;white-space:nowrap}
+#page-settings .sg-pick{margin-top:6px;border:1px solid var(--border);border-radius:8px;padding:6px;background:#f8fafc;display:flex;flex-direction:column;gap:6px}
+#page-settings .sg-pick-list{display:flex;flex-wrap:wrap;gap:4px}
+#page-settings .sg-pick-list button{font-family:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:1px 9px;cursor:pointer;white-space:nowrap}
+#page-settings .sg-pick-list button:hover{border-color:var(--primary-l);color:var(--primary)}
+#page-settings .sg-pick-own{display:flex;gap:6px}
+#page-settings .sg-pick-own .fi{flex:1 1 auto;min-width:0;padding:3px 8px;font-size:12.5px}
+#page-settings .sg-hd{white-space:nowrap}
+#page-settings .sg-row td.sg-hd{white-space:normal;min-width:110px}
+#page-settings .sg-row .sg-grip{cursor:grab;color:var(--muted);margin-right:4px;user-select:none}
+#page-settings .sg-row .sg-no{color:var(--muted);font-weight:600;margin-right:4px;font-variant-numeric:tabular-nums}
+#page-settings .sg-row.sg-row-over td{box-shadow:inset 0 2px 0 var(--primary-l)}
+#page-settings .sg-row .sg-mv{display:none}
+@media(max-width:640px){#page-settings .sg-row .sg-grip{display:none}#page-settings .sg-row .sg-mv{display:inline-flex;gap:2px;margin-right:4px}}
 #page-settings .sg-act{white-space:nowrap;text-align:right;width:80px}
 .chevron{transition:transform .2s}
 .sec-collapsed .chevron{transform:rotate(-90deg)}
@@ -481,7 +563,12 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 /* SETTINGS */
 .set-grp-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--primary)}
 .set-grp-title{font-size:13px;font-weight:700;color:var(--primary)}
-.cfg-list-wrap{display:flex;flex-direction:column;gap:1px;margin-bottom:8px;max-height:200px;overflow-y:auto}
+/* 2026-10-12：以前固定 max-height:200px（只看得到 5 列多）→ 改成最多 10 列、超過才捲，高度由 capSettingsLists() 照第 10 列的底算 */
+.cfg-list-wrap{display:flex;flex-direction:column;gap:1px;margin-bottom:8px;overflow-y:auto}
+/* 狀態表、業務表超過 10 列時在 .tbl-scroll 裡捲：表頭黏在上面 */
+#page-settings .tbl-scroll.mm-capped{overflow-y:auto}
+#page-settings .tbl-scroll.mm-capped thead th{position:sticky;top:0;z-index:1}
+#page-settings .fs-body.mm-capped{overflow-y:auto}
 .cfg-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px dashed #e2e8f0;font-size:13px}
 .cfg-row:last-child{border-bottom:none}
 .cfg-row-num{min-width:22px;text-align:right;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;flex-shrink:0}
@@ -502,7 +589,22 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .cfg-ren-new{color:var(--primary);font-weight:700}
 .cfg-inp-row{display:flex;gap:6px;margin-top:6px}
 .cfg-inp-row input{flex:1;min-width:0}
-.log-edit-wrap{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--border);border-radius:6px;padding:8px;min-height:52px;max-height:380px;overflow-y:auto;background:#fafafa}
+/* 一個區域一塊（2026-10-12 第七八批）：區域（短）＋範圍同一行；多出來的區域塊右上角有 ✕ */
+#edit-overlay .rg-block{border:1.5px solid var(--border);border-radius:8px;padding:10px;background:#fff;min-width:0}
+#edit-overlay .rg-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px}
+#edit-overlay .rg-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}
+#edit-overlay .rg-row .rg-loc{flex:0 0 130px;min-width:0}
+@media(max-width:640px){
+  #edit-overlay .rg-row{flex-wrap:nowrap}
+  #edit-overlay .rg-row .rg-loc{flex:0 0 104px}
+  #edit-overlay .rg-row .rg-scope{flex:1 1 0}
+  #edit-overlay .rg-block{border:none;border-radius:0;padding:0;background:transparent}
+  #edit-overlay .rg-extra{border-top:2px dashed var(--border);padding-top:10px}
+}
+#edit-overlay .rg-row .rg-scope{flex:1 1 180px;min-width:0}
+#edit-overlay .rg-logs-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px}
+/* 2026-10-12（她選 T 甲）：以前 max-height:380px，第 4 筆起要在框裡再捲一次、跟編輯框兩層捲軸 → 拿掉，有幾筆就多高 */
+.log-edit-wrap{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--border);border-radius:6px;padding:8px;min-height:52px;background:#fafafa}
 /* ── 進度記錄一條變兩行（2026-09-30 瑪摩試做版）──
  * 多了「施工項目」＋「工廠／施工班」兩個下拉，一行塞不下 → 第一行：日期／施工項目／第二個下拉／狀態，
  * 第二行：品項／說明。每一格都**寫死 grid-column／grid-row**：
@@ -517,7 +619,7 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .log-edit-row .log-man-wrap{grid-column:4;grid-row:1}
 .log-edit-row .log-del{grid-column:5;grid-row:1/5}
 .log-edit-row .log-staff{grid-column:1/5;grid-row:2}   /* 2026-10-02 第三批：進場施工 → 勾施工人員 */
-.log-edit-row .log-text{grid-column:1/5;grid-row:3}
+.log-edit-row .log-text{grid-column:1/5;grid-row:3}   /* 2026-10-12：這格叫「工作內容」（她 10-12 取消每筆底下的說明欄） */
 .log-edit-row .log-ph{grid-column:1/5;grid-row:4}
 .log-edit-row .fi{padding:4px 8px;font-size:12px;min-width:0}
 .log-edit-row .log-man-wrap{display:flex;align-items:center;gap:4px;min-width:0;font-size:11.5px;color:var(--muted);white-space:nowrap}
@@ -735,11 +837,26 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <button type="button" data-phase="done" onclick="setPhase('done')">完工</button>
       </span>
     </span>
-    <!-- 金額兩種顯示（2026-10-02 第三批；10-05 改名「顯示（依金額）」實際值／大約值）：各自開關；打開頁面兩個都開、不記憶。兩個都關 → 金額兩欄整欄收起 -->
-    <span class="mm-amt-tg" role="group" aria-label="顯示（依金額）">
-      <span class="mm-amt-lb">顯示（依金額）</span>
-      <button type="button" id="tg-act" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('act')"><span class="mm-tg-mk">☑</span>實際值</button>
-      <button type="button" id="tg-apx" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('apx')"><span class="mm-tg-mk">☑</span>大約值</button>
+    <!-- 顯示順序（2026-10-13 她指定）：依新增日期（新的在上）／依案場狀態（照群組二狀態表的順序，同狀態新的在上）。
+         預設依案場狀態；選了哪個這台電腦記住。onclick 只帶固定英文字。 -->
+    <span class="mm-amt-tg" role="group" aria-label="顯示順序">
+      <span class="mm-amt-lb">顯示順序</span>
+      <span class="mm-seg" id="mm-order-seg">
+        <button type="button" data-ord="date" onclick="setOrder('date')">依新增日期</button>
+        <button type="button" data-ord="status" onclick="setOrder('status')">依案場狀態</button>
+      </span>
+    </span>
+    <!-- 金額顯示的開關（2026-10-12 她選 V 甲：兩欄各一組）：打開頁面 報價金額＝只開大約值、應收帳款＝只開實際值（不記憶）。
+         某一欄兩個都關 → 那一欄整欄收起。匯出 Excel 的框不受這裡影響（兩個都勾）。 -->
+    <span class="mm-amt-tg" role="group" aria-label="報價金額">
+      <span class="mm-amt-lb">報價金額</span>
+      <button type="button" id="tg-q-act" class="mm-tg" aria-pressed="false" onclick="toggleAmt('qact')"><span class="mm-tg-mk">☐</span>實際值</button>
+      <button type="button" id="tg-q-apx" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('qapx')"><span class="mm-tg-mk">☑</span>大約值</button>
+    </span>
+    <span class="mm-amt-tg" role="group" aria-label="應收帳款">
+      <span class="mm-amt-lb">應收帳款</span>
+      <button type="button" id="tg-r-act" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('ract')"><span class="mm-tg-mk">☑</span>實際值</button>
+      <button type="button" id="tg-r-apx" class="mm-tg" aria-pressed="false" onclick="toggleAmt('rapx')"><span class="mm-tg-mk">☐</span>大約值</button>
     </span>
     <span id="result-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
   </div>
@@ -838,6 +955,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           <span class="set-grp-title">📌 狀態</span>
           <button class="btn btn-a btn-sm" data-mng id="st-add" onclick="stOpenAdd()">＋ 新增</button>
         </div>
+        <div class="st-hint">名稱、階段、順序、底色都在這裡改。群組三的「報價項目」「施工項目」只給編輯紀錄的下拉用，跟狀態無關。</div>
         <div class="tbl-scroll">
           <table class="user-tbl st-tbl" id="st-tbl">
             <thead><tr><th style="width:36px">#</th><th class="st-stage">階段</th><th>名稱</th><th class="st-color">底色</th><th class="st-cnt">用到的案場</th><th class="st-act"></th></tr></thead>
@@ -845,8 +963,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </table>
         </div>
         <div class="sg-form" id="st-form" style="display:none">
-          <select id="st-new-stage" class="fi" style="flex:0 0 100px"><option>報價</option><option>執行</option><option>完工</option></select>
-          <input type="text" id="st-new-name" class="fi" placeholder="狀態名稱（例：暫停）"
+          <!-- 2026-10-13：改回自己選階段（10-12 那版「一律放完工段」作廢） -->
+          <select id="st-new-stage" class="fi" aria-label="階段" style="flex:0 0 90px"><option>報價</option><option>執行</option><option>完工</option></select>
+          <input type="text" id="st-new-name" class="fi" placeholder="狀態名稱（例：已結案）"
             onkeydown="if(event.key==='Enter')stAdd();if(event.key==='Escape')stCloseAdd()">
           <button class="btn btn-p btn-sm" data-mng id="st-new-save" onclick="stAdd()">新增</button>
           <button class="btn btn-g btn-sm" onclick="stCloseAdd()">取消</button>
@@ -888,11 +1007,12 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
              資料 cfg.業務群組＝[{名稱, 人員:[…]}]；按鈕只帶數字序號，不帶名字（引號截斷）。
            施工項目：進度記錄每一條的「施工項目」下拉。 -->
       <div class="grp-hdr-bar">
-        <span class="grp-title">群組三：款別、施工項目、業務</span>
+        <span class="grp-title">群組三：款別、報價項目、施工項目、業務</span>
         <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存</button>
       </div>
       <!-- 第五批：款別、施工項目、業務三塊並排（業務那塊寬一點） -->
-      <div class="mm-set3 mm-set3b">
+      <!-- 2026-10-12 第七八批：多一塊「報價項目」（狀態表報價段接它；報價階段的案場，紀錄的施工項目下拉列它） -->
+      <div class="mm-set3 mm-set3b mm-set4">
         <div>
           <div class="set-grp-hdr">
             <span class="set-grp-title">💵 款別</span>
@@ -904,6 +1024,19 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
               onkeydown="if(event.key==='Enter')cfgAdd('款別');if(event.key==='Escape')cfgHideInp('款別')">
             <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('款別')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('款別')">取消</button>
+          </div>
+        </div>
+        <div>
+          <div class="set-grp-hdr">
+            <span class="set-grp-title">📝 報價項目</span>
+            <button class="btn btn-a btn-sm" data-mng onclick="cfgAddFromBtn('報價項目')">＋ 新增</button>
+          </div>
+          <div class="cfg-list-wrap" id="lw-報價項目"></div>
+          <div class="cfg-inp-row" id="ir-報價項目" style="display:none">
+            <input type="text" id="cfg-inp-報價項目" class="fi" placeholder="報價項目（例：圖面計算）"
+              onkeydown="if(event.key==='Enter')cfgAdd('報價項目');if(event.key==='Escape')cfgHideInp('報價項目')">
+            <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('報價項目')">新增</button>
+            <button class="btn btn-g btn-sm" onclick="cfgHideInp('報價項目')">取消</button>
           </div>
         </div>
         <div>
@@ -926,14 +1059,13 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         </div>
         <div class="tbl-scroll">
           <table class="user-tbl" id="sg-tbl">
-            <thead><tr><th>部門名稱／業務群組</th><th>業務人員</th><th class="sg-act"></th></tr></thead>
+            <thead><tr><th class="sg-hd">部門名稱／業務群組</th><th>業務人員</th><th class="sg-act"></th></tr></thead>
             <tbody id="sg-body"></tbody>
           </table>
         </div>
         <div class="sg-form" id="sg-form" style="display:none">
           <input type="text" id="sg-name" class="fi" placeholder="部門名稱／業務群組（例：瑪摩一處）">
-          <input type="text" id="sg-people" class="fi" list="dl-sg-people" placeholder="業務人員，多人用「、」分隔">
-          <datalist id="dl-sg-people"></datalist>
+          <!-- 2026-10-12：人員改成在每一列用「＋ 加人」點名字（以前打在這格，從建議清單點名字會把整格換掉，看起來像只能放一位） -->
           <button class="btn btn-p btn-sm" data-mng id="sg-save" onclick="sgSave()">儲存</button>
           <button class="btn btn-g btn-sm" id="sg-cancel" onclick="sgClose()">取消</button>
         </div>
@@ -947,11 +1079,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
            2026-10-02 第四批：畫面上的「工廠」全部改叫「廠商」（施工項目「下單工廠」是她自己設的名稱，不動）。
            資料鍵名刻意不改（cfg.工廠、cfg.施工人員ByFactory、進度記錄的 factory）—— 改了要搬舊資料、雲端也要一起換，風險比好處大。 -->
       <div class="grp-hdr-bar">
-        <span class="grp-title">群組四：廠商與施工人員</span>
+        <span class="grp-title">群組四：廠商與施工人員、工廠</span>
         <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存</button>
       </div>
       <!-- 2026-10-05 她回報「按新增廠商沒有反應」（輸入框空白時按，程式直接略過）→ 她選乙：
            跟群組二、三一樣，先按標題列右邊的「＋ 新增廠商」才展開輸入框；輸入框放在標題列正下方（廠商一多，放清單底下會在畫面外）。 -->
+      <!-- 2026-10-12 第七八批：右邊多一塊「工廠」（一欄）—— 進度記錄選「下單工廠」時從這裡單選；廠商與施工人員給「進場施工」用 -->
+      <div class="mm-set-g4">
+      <div class="mm-g4-fs">
       <div class="set-grp-hdr">
         <span class="set-grp-title">🏭 廠商 → 👷 施工人員</span>
         <button class="btn btn-a btn-sm" data-mng id="fs-add-open" onclick="fsOpenAdd()">＋ 新增廠商</button>
@@ -963,6 +1098,21 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <button class="btn btn-g btn-sm" id="fs-add-cancel" onclick="fsCloseAdd()">取消</button>
       </div>
       <div class="fs-wrap" id="fs-groups"></div>
+      </div>
+      <div class="mm-g4-fac">
+        <div class="set-grp-hdr">
+          <span class="set-grp-title">🏗️ 工廠</span>
+          <button class="btn btn-a btn-sm" data-mng onclick="cfgAddFromBtn('工廠清單')">＋ 新增</button>
+        </div>
+        <div class="cfg-list-wrap" id="lw-工廠清單"></div>
+        <div class="cfg-inp-row" id="ir-工廠清單" style="display:none">
+          <input type="text" id="cfg-inp-工廠清單" class="fi" placeholder="工廠名稱"
+            onkeydown="if(event.key==='Enter')cfgAdd('工廠清單');if(event.key==='Escape')cfgHideInp('工廠清單')">
+          <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('工廠清單')">新增</button>
+          <button class="btn btn-g btn-sm" onclick="cfgHideInp('工廠清單')">取消</button>
+        </div>
+      </div>
+      </div>
 
       <!-- 底部按鈕（仿 v3） -->
       <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
@@ -1018,42 +1168,51 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <datalist id="dl-位置"></datalist>
 
     <div class="g g-edit" style="gap:12px;margin-bottom:12px">
+      <!-- 2026-10-12 第七八批（她選 A 甲）：案場、部門改成真正的下拉 —— 建議清單有字時只剩自己那一個、看不到全部。
+           案場最後一項「＋ 新案場…」點了才出現打字格（#e-proj）；選清單裡的案場時 #e-proj 跟著帶值、藏起來。
+           其他程式一律讀 #e-proj 的值，不用跟著改。 -->
       <div class="fg" style="grid-column:span 2">
         <label class="fl">案場 *</label>
-        <input type="text" id="e-proj" class="fi" list="dl-案場" placeholder="選擇或輸入案場名稱">
+        <select id="e-proj-sel" class="fi" aria-label="案場" onchange="projSelChanged(this)"></select>
+        <input type="text" id="e-proj" class="fi d-none" placeholder="輸入新案場名稱" oninput="editProjChanged()" style="margin-top:6px">
       </div>
       <div class="fg">
         <label class="fl">部門</label>
-        <input type="text" id="e-dept" class="fi" list="dl-部門" placeholder="選擇或輸入部門" oninput="execDeptChanged()">
+        <select id="e-dept" class="fi" aria-label="部門" onchange="execDeptChanged()"></select>
       </div>
       <div class="fg">
         <label class="fl">執行者<span class="fl-tip" id="exec-tip">2人以上，請直接複選下方名字</span></label>
-        <input type="text" id="e-exec" class="fi" list="dl-執行者" placeholder="多人可用、分隔" oninput="renderExecPicker()">
+        <!-- 2026-10-12：拿掉建議清單（打第二個人時清單就空了），留下面的名字按鈕；名單外的人照樣可以打 -->
+        <input type="text" id="e-exec" class="fi" placeholder="點下面的名字，名單外的人可以直接打（多人用、分隔）" oninput="renderExecPicker()">
       </div>
       <!-- 可點的同仁名字（2026-09-22 她交辦）：點一下接進執行者欄、再點一下拿掉，自動補「、」 -->
       <div class="fg" id="exec-pick-wrap">
         <div class="ep-hint" id="exec-pick-hint"></div>
         <div class="ep-chips" id="exec-pick"></div>
       </div>
-      <div class="fg" style="grid-column:span 2">
-        <label class="fl">區域</label>
-        <input type="text" id="e-loc" class="fi" list="dl-施作位置" placeholder="選擇或輸入區域（例：1F大廳）">
-      </div>
       <!-- 業務（2026-10-02 第二版）：搬到案場層級（案場標題列的「金額 ✏️」裡選），這裡不再有業務欄。 -->
-      <div class="fg" style="grid-column:span 2">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+      <!-- ══ 一個區域一塊（2026-10-12 第七八批，她選 K 甲、L 乙）══
+           區域＝真下拉（系統設定的區域：室內／外牆／景觀），右邊同一行「範圍」自己打字。
+           底下「＋ 新增區域」多一整塊（區域＋範圍＋自己的工作內容＋備註）；存檔後每一塊就是進度總表的一列。
+           第一塊沿用原本的 id（e-loc／log-editor／e-note），其他程式不用改；多出來的塊在 #rg-extra 裡。 -->
+      <div class="rg-block rg-main" style="grid-column:span 2">
+        <div class="rg-row">
+          <div class="rg-loc"><label class="fl">區域</label><select id="e-loc" class="fi" aria-label="區域"></select></div>
+          <div class="rg-scope"><label class="fl">範圍</label><input type="text" id="e-scope" class="fi" placeholder="例：1F廊道、各區域公設"></div>
+        </div>
+        <div class="rg-logs-hd">
           <label class="fl" style="margin-bottom:0">工作內容（進度記錄：每一筆各自記出工數、照片）</label>
           <span style="display:flex;gap:6px;flex-wrap:wrap">
-            <button type="button" class="btn btn-o btn-sm" id="e-ph-dl" onclick="downloadRecPhotos()">下載這個區域的照片📥</button>
-            <button type="button" class="btn btn-a btn-sm" onclick="addLogRow()">＋ 新增一筆</button>
+            <button type="button" class="btn btn-o btn-sm" id="e-ph-dl" onclick="downloadRecPhotos()">區域照片 📥</button>
+            <button type="button" class="btn btn-a btn-sm" id="e-add-log" onclick="addLogRow()">＋ 新增一筆</button>
           </span>
         </div>
         <div id="log-editor" class="log-edit-wrap"></div>
-      </div>
-      <div class="fg" style="grid-column:span 2">
-        <label class="fl">備註</label>
+        <label class="fl" style="margin-top:8px">備註</label>
         <textarea id="e-note" class="fi" rows="3" placeholder="材料（例：花崗岩 120 片、AB 膠 6 組）、注意事項…"></textarea>
       </div>
+      <div id="rg-extra" style="grid-column:span 2;display:flex;flex-direction:column;gap:12px"></div>
+      <div style="grid-column:span 2"><button type="button" class="btn btn-a btn-sm" id="rg-add" onclick="rgAddBlock()">＋ 新增區域</button></div>
     </div>
 
     <div class="modal-footer">
@@ -1081,9 +1240,18 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     </div>
     <div class="g g2 mn-top">
       <!-- 2026-10-02 第四批：狀態搬到進度總表直接選（案場標題列的下拉），這個視窗不再有狀態 -->
+      <!-- 2026-10-12 第七八批（她選 N 甲）：業務可以複選 —— 照業務群組列名字按鈕，點名字選、再點一下取消；點組別名稱＝整組選起來／整組取消 -->
       <div class="fg" style="grid-column:1/-1">
-        <label class="fl" for="mn-sales">業務</label>
-        <select id="mn-sales" class="fi"></select>
+        <label class="fl">業務<span class="fl-tip">點名字選，可以選好幾位；點組別名稱＝整組</span></label>
+        <div id="mn-sales" class="mn-sales" role="group" aria-label="業務"></div>
+      </div>
+      <!-- 2026-10-14：切換鈕跟提示字同一列（原本提示在金額下面自成一列）—— 多一列的話手機 375 視窗會長出捲軸、「已收合計」被擠成兩行（真 Chrome 量過） -->
+      <div class="mn-modebar" style="grid-column:1/-1">
+        <div class="mn-mode" role="group" aria-label="自動計算">
+          <button type="button" class="mn-mode-btn" id="mn-mode-tax" aria-pressed="true" onclick="setMnMode('tax')">計算含稅價</button>
+          <button type="button" class="mn-mode-btn" id="mn-mode-untax" aria-pressed="false" onclick="setMnMode('untax')">倒推未稅價</button>
+        </div>
+        <div class="mn-hint" id="mn-hint">填了未稅，含稅自動帶 ×1.05（四捨五入到元），可以再改 · 單位「元」、整數，可以打千分位逗號</div>
       </div>
       <div class="fg">
         <label class="fl" for="mn-untax">報價金額・未稅（元）</label>
@@ -1091,10 +1259,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       </div>
       <div class="fg">
         <label class="fl" for="mn-tax">含稅（元）</label>
-        <input type="text" id="mn-tax" class="fi mn-amt" inputmode="numeric" autocomplete="off" placeholder="自動帶 ×1.05" oninput="renderMoneySum()">
+        <input type="text" id="mn-tax" class="fi mn-amt" inputmode="numeric" autocomplete="off" placeholder="自動帶 ×1.05" oninput="mnTaxInput()">
       </div>
     </div>
-    <div class="mn-hint">填了未稅，含稅自動帶 ×1.05（四捨五入到元），可以再改 · 單位「元」、整數，可以打千分位逗號</div>
     <div class="mn-err" id="mn-err" role="alert"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px;gap:6px;flex-wrap:wrap">
       <label class="fl" style="margin-bottom:0">已收帳款（已回款）</label>
@@ -1104,8 +1271,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <div class="mn-head"><span>日期</span><span>款別</span><span style="text-align:right">未稅（元）</span><span style="text-align:right">含稅（元）</span><span style="text-align:right">佔總額</span><span></span></div>
     <div id="mn-list"></div>
     <div class="mn-tot" id="mn-tot">
-      <div class="mn-tot-row"><span>已收合計</span><span class="mn-tv" id="mn-paid-u">—</span><span class="mn-tv" id="mn-paid">—</span><span class="mn-tp" id="mn-paid-p">—</span><span></span></div>
+      <!-- 2026-10-14 她選乙：「已收合計」改「已收」，跟「未收」、進度總表、Excel 同一套字 -->
+      <div class="mn-tot-row"><span>已收</span><span class="mn-tv" id="mn-paid-u">—</span><span class="mn-tv" id="mn-paid">—</span><span class="mn-tp" id="mn-paid-p">—</span><span></span></div>
       <div class="mn-tot-row"><span>未收</span><span class="mn-tv" id="mn-unpaid-u">—</span><span class="mn-tv" id="mn-unpaid">—</span><span class="mn-tp" id="mn-unpaid-p">—</span><span></span></div>
+    </div>
+    <!-- 2026-10-12（她選 I 甲）：報價／回款說明 —— 自己打字，Excel「報價／回款說明」那欄印這段 -->
+    <div class="fg" style="margin-top:10px">
+      <label class="fl" for="mn-note">報價／回款說明</label>
+      <textarea id="mn-note" class="fi" rows="2" placeholder="例：圖面報價；230 大廳地坪、573 標準層梯廳"></textarea>
     </div>
     <div class="modal-footer">
       <button class="btn btn-o btn-sm" onclick="closeCaseMoney()">取消</button>
@@ -1184,6 +1357,19 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 
 <script>
 // ============================================================
+// G 槽測試區（2026-10-12 第七八批，她選 E 甲：要確定跟線上分開、不影響線上）
+// ============================================================
+/* 只有從 G 槽直接打開（file://）才有兩種模式，存在 localStorage 'dtp_mm_preview_mode'：
+ *   · 看線上資料（預設）：讀線上 dtp_mm、一律不寫雲端（跟 09-17 起一樣）；選照片直接跳框擋下（B 甲）
+ *   · 🧪 測試區：所有讀寫都在雲端 test/ 底下（test/dtp_mm、test/dtp_mm_photos、test/dtp_mm_thumbs），可以存、可以傳照片
+ * 正式網址（https）MM_TEST 一定是 false、切換鈕也不會出現。
+ * 本機快取的鍵在測試區一律加 test__（不然線上的快取會被「救回」推進測試區，反過來也一樣）。
+ * 雲端節點名只在下面 MM_ROOTS 決定一次，Firebase 那段照這裡走。 */
+var MM_TEST=(function(){ try{ return location.protocol==='file:'&&localStorage.getItem('dtp_mm_preview_mode')==='test'; }catch(e){ return false; } })();
+var MM_ROOTS=MM_TEST?{db:'test/dtp_mm',ph:'test/dtp_mm_photos',th:'test/dtp_mm_thumbs'}:{db:'dtp_mm',ph:'dtp_mm_photos',th:'dtp_mm_thumbs'};
+function LSK(k){ return MM_TEST?'test__'+k:k; }
+
+// ============================================================
 // 初始資料
 // ============================================================
 /* ── 範例資料（2026-10-02 第二版，照示意圖 v2 的假資料）──
@@ -1236,14 +1422,18 @@ function buildDefaultCfg(){
     案場:[...projSet].sort(),
     部門:[],
     執行者:[...execSet].sort(),
-    施作位置:[...locSet].filter(Boolean).sort(),
+    施作位置:MM_REGION_DEFAULT.slice(),   /* 2026-10-12：區域＝大區域；範例紀錄的舊區域字照「舊格式」規則當成範圍顯示 */
     /* 2026-10-02 第三批：狀態改成可以在系統設定編修，存在 狀態設定（{名稱, 階段}）。
        舊的 cfg.狀態（字串清單，試做版留下來的）不再讀、也不再寫預設。 */
     狀態設定:MM_STATUS_DEFAULT.map(s=>Object.assign({},s)),
     施工項目:MM_WORK_DEFAULT.slice(),
+    /* 2026-10-12 第七八批：報價項目（狀態表報價段接它）；區域只放大區域，範圍改成紀錄上自己打字 */
+    報價項目:MM_QUOTE_DEFAULT.slice(),
     /* 工廠 → 施工人員兩層（2026-10-02 第三批，跟日—瑪一樣） */
     工廠:MM_VENDORS_DEFAULT.slice(),
     施工人員ByFactory:JSON.parse(JSON.stringify(MM_STAFF_DEFAULT)),
+    /* 2026-10-12：「下單工廠」用的工廠清單（她選 M 甲：一開始空的）。cfg.工廠 是廠商（鍵名歷史因素不改） */
+    工廠清單:[],
     款別:MM_PAY_KINDS_DEFAULT.slice(),
     業務群組:[]
   };
@@ -1277,6 +1467,9 @@ function nextFreeColor(defs){
   return free?free.bg:MM_PALETTE[(defs||[]).length%MM_PALETTE.length].bg;
 }
 var MM_WORK_DEFAULT = ['現場丈量','圖面確認','下單工廠','進場施工'];
+/* 2026-10-12 第七八批：報價項目（群組三新的一塊）。2026-10-13 起只給編輯紀錄的「報價／施工項目」下拉用，跟狀態無關 */
+var MM_QUOTE_DEFAULT = ['圖面計算','現場提案','案場追蹤'];
+var MM_REGION_DEFAULT = ['室內','外牆','景觀'];
 /* 選到這兩個施工項目時，旁邊才多出東西：下單工廠 → 工廠下拉；進場施工 → 工廠下拉＋那家工廠的施工人員（複選）。
    用名稱比對 —— 在系統設定把「下單工廠」改名的話，要連這裡一起改。 */
 var MM_WORK_FACTORY = '下單工廠';
@@ -1297,7 +1490,8 @@ function ensureStatusOptions(){
   if(!Array.isArray(cfg.狀態設定)||!cfg.狀態設定.length)cfg.狀態設定=MM_STATUS_DEFAULT.map(s=>Object.assign({},s));
   const seen=new Set();
   cfg.狀態設定=cfg.狀態設定.filter(s=>s&&typeof s==='object'&&String(s.名稱||'').trim())
-    .map(s=>({名稱:String(s.名稱).trim(),階段:MM_STAGES.indexOf(s.階段)>=0?s.階段:'報價',底色:paletteOf(s.底色)?String(s.底色).toLowerCase():''}))
+    .map(s=>{ const o={名稱:String(s.名稱).trim(),階段:MM_STAGES.indexOf(s.階段)>=0?s.階段:'報價',底色:paletteOf(s.底色)?String(s.底色).toLowerCase():''};
+      return o; })   /* 10-12 那版的「舊」標記（2026-10-13 起不用了）讀到就丟掉 */
     .filter(s=>{if(seen.has(s.名稱))return false;seen.add(s.名稱);return true});
   if(!cfg.狀態設定.length)cfg.狀態設定=MM_STATUS_DEFAULT.map(s=>Object.assign({},s));
   /* 底色（2026-10-02 第四批）：沒有的（舊資料）→ 照名稱給預設；不在名單的照順序配還沒用過的 */
@@ -1305,6 +1499,10 @@ function ensureStatusOptions(){
   cfg.狀態設定.forEach(s=>{ if(!s.底色)s.底色=nextFreeColor(cfg.狀態設定); });
   /* 舊的本機快取（還沒有這幾份清單的 cfg）→ 補預設值；已經有的（就算是空陣列）不動 */
   if(!Array.isArray(cfg.施工項目))cfg.施工項目=MM_WORK_DEFAULT.slice();
+  /* 2026-10-12 第七八批：報價項目、工廠清單（舊快取沒有 → 補；Firebase 會把空陣列拿掉，讀回來是 undefined → 當空的） */
+  if(!Array.isArray(cfg.報價項目))cfg.報價項目=MM_QUOTE_DEFAULT.slice();
+  if(!Array.isArray(cfg.工廠清單))cfg.工廠清單=[];
+  if(!cfg.已刪除狀態||typeof cfg.已刪除狀態!=='object'||Array.isArray(cfg.已刪除狀態))cfg.已刪除狀態={};
   if(!Array.isArray(cfg.工廠))cfg.工廠=MM_VENDORS_DEFAULT.slice();
   /* 施工人員：{工廠: [人…]}。Firebase 會把空陣列拿掉 → 沒有那家的鍵就當空的 */
   if(!cfg.施工人員ByFactory||typeof cfg.施工人員ByFactory!=='object'||Array.isArray(cfg.施工人員ByFactory))
@@ -1323,6 +1521,8 @@ function ensureStatusOptions(){
   if(cfg.users)delete cfg.users;
   if(!cfg.部門)cfg.部門=[];
 }
+/* 2026-10-13 她指定：狀態不再接報價項目／施工項目（10-12 的 syncStatusStore 拿掉）。
+ * 狀態表回到自己一張：名稱、階段、順序、底色都在群組二改；報價項目／施工項目只給編輯紀錄的下拉用。 */
 
 // ============================================================
 // 狀態
@@ -1375,11 +1575,14 @@ const CFG_KEYS=[
   {key:'施作位置',icon:'📍'},
   /* 2026-10-02 第二版：狀態改成固定 6 種、案場層級 → 清單拿掉，換成應收帳款的「款別」 */
   {key:'款別',icon:'💵'},
-  {key:'施工項目',icon:'🧰'}
+  {key:'施工項目',icon:'🧰'},
+  /* 2026-10-12 第七八批：報價項目（狀態表報價段接它）、工廠清單（下單工廠選它，單選） */
+  {key:'報價項目',icon:'📝'},
+  {key:'工廠清單',icon:'🏗️'}
   /* 2026-10-02 第三批：工廠、施工班兩張清單合併成「工廠 → 施工人員」兩層（renderFactoryStaff），不走這一套 */
 ];
 /* 資料欄位名 → 畫面上的名稱（2026-09-30：cfg.施作位置 在畫面上一律叫「區域」） */
-const CFG_LABEL={施作位置:'區域'};
+const CFG_LABEL={施作位置:'區域',工廠清單:'工廠'};
 function cfgLabel(key){ return CFG_LABEL[key]||key; }
 
 // ============================================================
@@ -1431,6 +1634,19 @@ function normalizeRecord(r){
  *   · 整筆只要**任一品項卡關**，那一列就標紅（原本只看最後一筆）
  *   · 上方的狀態篩選：**任一品項符合**就顯示這一列 */
 var NO_ITEM = '（未分品項）';
+/* ── 區域＋範圍（2026-10-12 第七八批，她選 L 乙：範圍自己打字）──
+ * 新格式（區域格式:2）：施作位置＝區域（室內／外牆／景觀）、範圍＝自己打的字。
+ * 舊格式（這天以前存的）：施作位置是一格自由輸入 —— 字在區域清單裡＝區域；不在的（例：內裝、大廳地坪）＝範圍、區域空著讓他選
+ *   （10-08 定案：舊區域不搬）。打開存一次就變成新格式。 */
+function regionOf(r){
+  if(!r)return {區域:'',範圍:''};
+  const loc=String(r.施作位置||'').trim();
+  if(r.區域格式===2)return {區域:loc,範圍:String(r.範圍||'').trim()};
+  if(loc&&(cfg.施作位置||[]).indexOf(loc)>=0)return {區域:loc,範圍:''};
+  return {區域:'',範圍:loc};
+}
+/* 一行字版本（工時統計、歷史資料、搜尋用）：「室內 1F廊道」 */
+function regionText(r){ const rg=regionOf(r); return [rg.區域,rg.範圍].filter(Boolean).join(' '); }
 /* 沒填狀態的那些行，在**篩選**時當成一個叫「未標示狀態」的選項（2026-09-24 她交辦）。
    它不是工作狀態，是「還沒標」—— 勾它正好用來抓漏標的。
    🚫 編輯視窗的狀態下拉不會有它（那裡空白就是「— 狀態 —」，兩種寫法會讓人混淆）。 */
@@ -1503,18 +1719,26 @@ function caseMoneyOf(proj){ return caseOf(proj); }   /* 舊名字留著 */
 /* ── 狀態（2026-10-02 第三批：改成讀系統設定 cfg.狀態設定＝[{名稱, 階段}]）── */
 function statusDefs(){ return (cfg&&Array.isArray(cfg.狀態設定)&&cfg.狀態設定.length)?cfg.狀態設定:MM_STATUS_DEFAULT; }
 function statusNames(){ return statusDefs().map(s=>s.名稱); }
-function statusStageOf(name){ const d=statusDefs().find(s=>s.名稱===name); return d?d.階段:'報價'; }
+/* 刪掉的狀態（2026-10-12）：照刪的時候記下的階段排；查不到當報價 */
+function statusStageOf(name){ const d=statusDefs().find(s=>s.名稱===name); if(d)return d.階段;
+  const g=cfg&&cfg.已刪除狀態&&cfg.已刪除狀態[name]; return MM_STAGES.indexOf(g)>=0?g:'報價'; }
+/* 這個狀態已經不在狀態表上了（被刪掉）→ 案場照樣顯示原名、灰底標「已刪除」（10-08 定案） */
+function statusIsDeleted(name){ return !!name&&statusNames().indexOf(name)<0; }
 /* 樣式與篩選用的階段代碼：quote／exec／done */
 function statusGroupOf(name){ return MM_STAGE_CODE[statusStageOf(name)]||'quote'; }
 /* 新案場的預設＝「報價」階段裡排第一個的狀態（報價階段一個都沒有時，退回整份清單的第一個） */
 function defaultStatus(){ const d=statusDefs(); const q=d.find(s=>s.階段==='報價'); return (q||d[0]||{名稱:'待報價'}).名稱; }
-function caseStoredStatus(proj){ var c=caseOf(proj), s=c&&String(c.狀態||'').trim(); return (s&&statusNames().indexOf(s)>=0)?s:''; }
+/* 2026-10-12：存的狀態不在狀態表上（被刪了）也照原名回傳 —— 以前退回預設，等於偷改案場狀態 */
+function caseStoredStatus(proj){ var c=caseOf(proj), s=c&&String(c.狀態||'').trim(); return s||''; }
 function caseStatusOf(proj){ return caseStoredStatus(proj)||defaultStatus(); }
+/* 業務（2026-10-12 她選 N 甲：可以複選）：存成「、」接起來的字串，舊資料只有一位照樣讀 */
 function caseSalesOf(proj){ var c=caseOf(proj); return c&&typeof c.業務==='string' ? c.業務.trim() : ''; }
+function caseSalesList(proj){ return sgSplit(caseSalesOf(proj)); }
 /* 狀態的顏色（2026-10-02 第四批）：bg＝設定的底色、fg＝同色系深色字、light＝工作項目列用的更淡同色（她選 5 乙） */
 function statusColor(name){
   const d=statusDefs().find(s=>s.名稱===name);
-  const bg=(d&&paletteOf(d.底色))?d.底色:(MM_COLOR_BY_NAME[name]||MM_PALETTE[0].bg);
+  /* 被刪掉的狀態一律灰底（10-08 定案：灰底標「已刪除」） */
+  const bg=(d&&paletteOf(d.底色))?d.底色:(d?(MM_COLOR_BY_NAME[name]||MM_PALETTE[0].bg):MM_PALETTE[0].bg);
   const p=paletteOf(bg)||MM_PALETTE[0];
   return {bg:p.bg,fg:p.fg,light:mixWhite(p.bg,0.55)};
 }
@@ -1524,7 +1748,7 @@ function mixWhite(hex,t){
   return '#'+[1,2,3].map(i=>{ const v=parseInt(m[i],16); return ('0'+Math.round(v+(255-v)*t).toString(16)).slice(-2); }).join('');
 }
 /* 狀態小標籤：框線照階段（報價＝虛線、執行＝實線、完工＝灰框），底色、字色照狀態自己的顏色 */
-function statusPillHtml(s){ const c=statusColor(s); return '<span class="mm-st g-'+statusGroupOf(s)+'" style="background:'+c.bg+';color:'+c.fg+'">'+esc(s)+'</span>'; }
+function statusPillHtml(s){ const c=statusColor(s); return '<span class="mm-st g-'+statusGroupOf(s)+'" style="background:'+c.bg+';color:'+c.fg+'">'+esc(s)+(statusIsDeleted(s)?'（已刪除）':'')+'</span>'; }
 /* 進度總表標題列的狀態下拉（2026-10-02 第四批）：照階段分組；選了馬上存。名稱放 data-case，onchange 只傳 this */
 function statusSelectHtml(proj,cur,can){
   const c=statusColor(cur);
@@ -1535,7 +1759,9 @@ function statusSelectHtml(proj,cur,can){
       const list=statusDefs().filter(s=>s.階段===g); if(!list.length)return '';
       return '<optgroup label="'+g+'">'+list.map(s=>{ const k=statusColor(s.名稱);
         return '<option value="'+esc(s.名稱)+'"'+(s.名稱===cur?' selected':'')+' style="background-color:'+k.bg+';color:'+k.fg+'">'+esc(s.名稱)+'</option>'; }).join('')+'</optgroup>';
-    }).join('')+'</select>';
+    }).join('')
+    /* 刪掉的狀態：照樣選著、寫「已刪除」，不讓下拉把它靜靜換成別的 */
+    +(statusIsDeleted(cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'（已刪除）</option>':'')+'</select>';
 }
 /* 這個案場能不能改（狀態下拉、金額 ✏️ 的儲存）：登入，而且這個案場底下至少有一筆自己改得動的工作項目
    （跟工作項目的編輯權同一套：入口角色的編輯範圍）。 */
@@ -1615,8 +1841,20 @@ function caseMoneyInfo(proj){
 }
 
 /* ── 金額兩種顯示（2026-10-02 第三批）：進度總表上方兩顆開關，各自開關；打開頁面兩個都開（不記憶）── */
-var mmShowAct=true, mmShowApx=true;
-function amtShown(){ return mmShowAct||mmShowApx; }
+var mmShowAct=true, mmShowApx=true;   /* 匯出框的預設（2026-10-12：兩個都勾，不跟畫面的開關） */
+/* 2026-10-12（她選 V 甲）：報價金額、應收帳款各一組開關；打開頁面 報價只開大約值、應收只開實際值 */
+var mmAmt={q:{act:false,apx:true},r:{act:true,apx:false}};
+function amtShownQ(){ return mmAmt.q.act||mmAmt.q.apx; }
+function amtShownR(){ return mmAmt.r.act||mmAmt.r.apx; }
+function amtShown(){ return amtShownQ()||amtShownR(); }
+/* 一欄的金額照那一欄的開關組字：兩個都開「10.6萬 ($105,525)」（大約值在前、實際值放括號，10-12 O 甲）、只開一個就只寫那一個 */
+function amtOf(n,k){
+  if(n===null||n===undefined)return '—';
+  const o=mmAmt[k], w=fmtWanApprox(n), y=fmtYuan(n);
+  return o.act&&o.apx?w+' ('+y+')':o.apx?w:y;
+}
+/* 進度總表的金額格式（2026-10-12 她選 O 甲）：報價＝「10.6萬 ($105,525)」大約值在前、實際值放括號；應收帳款只放實際值 */
+function wanYuanText(n){ return n===null||n===undefined?'—':fmtWanApprox(n)+' ('+fmtYuan(n)+')'; }
 /* 一個金額照開關組字：兩個都開「$100,500　10.1萬」、只開一個就只寫那一個 */
 function amtText(n){
   if(n===null||n===undefined)return '—';
@@ -1624,16 +1862,71 @@ function amtText(n){
   return p.join('　');
 }
 function toggleAmt(k){
-  if(k==='act')mmShowAct=!mmShowAct; else if(k==='apx')mmShowApx=!mmShowApx; else return;
+  const m=/^([qr])(act|apx)$/.exec(String(k||'')); if(!m)return;
+  mmAmt[m[1]][m[2]]=!mmAmt[m[1]][m[2]];
   syncAmtButtons();
   renderMain();
 }
 function syncAmtButtons(){
-  [['act',mmShowAct],['apx',mmShowApx]].forEach(function(x){
+  [['q-act',mmAmt.q.act],['q-apx',mmAmt.q.apx],['r-act',mmAmt.r.act],['r-apx',mmAmt.r.apx]].forEach(function(x){
     var b=document.getElementById('tg-'+x[0]); if(!b)return;
     b.classList.toggle('on',x[1]); b.setAttribute('aria-pressed',String(x[1]));
     var m=b.querySelector('.mm-tg-mk'); if(m)m.textContent=x[1]?'☑':'☐';
   });
+}
+
+/* ══ 顯示順序（2026-10-13 她指定：5甲 新的在上、4甲 預設依案場狀態、5甲 同狀態裡新的在上）══
+ * 案場的「新增日期」＝這個案場最早那一筆紀錄的建立時間（紀錄 id 是 r_毫秒_亂碼）；
+ * id 不是這種格式的（範例、匯入的舊資料）→ 用那筆最早的進度記錄日期；都沒有 → 排最後。
+ * 同分的照系統設定的案場清單順序，再照原本的先後（不會每次重畫就跳）。 */
+var MM_ORDER_LS='dtp_mm_order';
+var MM_CASE_MOVE_UI=false;   /* 進度總表案場標題列的 ↑↓／拖曳（2026-10-13 隱藏，程式保留） */
+var mmOrder=(function(){ try{ return localStorage.getItem(MM_ORDER_LS)==='date'?'date':'status'; }catch(e){ return 'status'; } })();
+function setOrder(m){
+  mmOrder=(m==='date')?'date':'status';
+  try{ localStorage.setItem(MM_ORDER_LS,mmOrder); }catch(e){}
+  renderMain();
+}
+function syncOrderButtons(){
+  [].forEach.call(document.querySelectorAll('#mm-order-seg button'),function(b){
+    b.classList.toggle('on',b.getAttribute('data-ord')===mmOrder);
+  });
+}
+function recAddedAt(r){
+  const m=/^r_(\d{10,})_/.exec(String((r&&r.id)||''));
+  if(m)return Number(m[1]);
+  let t=0;
+  logsOf(r).forEach(l=>{ const d=Date.parse(String((l&&l.date)||'').slice(0,10)); if(isFinite(d)&&(!t||d<t))t=d; });
+  return t;
+}
+/* 每個案場的新增日期（看全部紀錄，不只篩選後的） */
+function caseAddedMap(){
+  const m={};
+  (records||[]).forEach(r=>{ if(!r)return; const p=r.案場||'', t=recAddedAt(r); if(t&&(!m[p]||t<m[p]))m[p]=t; });
+  return m;
+}
+/* 狀態在群組二狀態表的位置；被刪掉的狀態排在它原本那一段的最後面 */
+function statusRank(name){
+  const defs=statusDefs(), i=defs.findIndex(d=>d.名稱===name);
+  if(i>=0)return i;
+  const g=statusStageOf(name); let last=-1;
+  defs.forEach((d,k)=>{ if(d.階段===g)last=k; });
+  return last>=0?last+0.5:defs.length+MM_STAGES.indexOf(g);
+}
+function sortForMain(list){
+  const added=caseAddedMap(), rk={};
+  const rankOf=p=>(p in rk)?rk[p]:(rk[p]=statusRank(caseStatusOf(p)));
+  return list.map((r,i)=>({r,i,p:r.案場||''}))
+    .sort((a,b)=>{
+      if(a.p!==b.p){
+        if(mmOrder==='status'){ const d=rankOf(a.p)-rankOf(b.p); if(d)return d; }
+        const ta=added[a.p]||0, tb=added[b.p]||0;
+        if(ta!==tb)return tb-ta;   /* 新的在上；沒有日期（0）自然排最後 */
+        const o=projOrderIdx(a.p)-projOrderIdx(b.p); if(o)return o;
+      }
+      return a.i-b.i;
+    })
+    .map(x=>x.r);
 }
 
 /* 篩選列的「全部／報價／執行／完工」（階段） */
@@ -1880,11 +2173,11 @@ function delUser(){
 // CFG 管理
 // ============================================================
 function loadCfg(){
-  const saved=localStorage.getItem('dtp_mm_cfg');
+  const saved=localStorage.getItem(LSK('dtp_mm_cfg'));
   cfg=saved?JSON.parse(saved):buildDefaultCfg();
   ensureStatusOptions();
 }
-function saveCfg(){localStorage.setItem('dtp_mm_cfg',JSON.stringify(cfg));fbSave()}
+function saveCfg(){localStorage.setItem(LSK('dtp_mm_cfg'),JSON.stringify(cfg));fbSave()}
 function manualSave(){if(mngGuard())return;saveCfg();toast('已儲存設定 ✓','s')}
 
 function cfgAdd(key){
@@ -1900,10 +2193,33 @@ function cfgAdd(key){
 }
 /* 案場「使用中」＝有工作項目（紀錄）用到它 → 不能刪（2026-10-02 第三批，照日—瑪 isProjLocked） */
 function projInUse(name){ return (records||[]).some(r=>r&&(r.案場||'')===name); }
+/* 案場的金額 ✏️ 填過東西（未稅、含稅、已收帳款、業務）也算使用中（2026-10-07 她指定：金額和帳款算進去） */
+function caseHasMoney(name){
+  const c=caseOf(name); if(!c)return false;
+  const has=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
+  return has(c.未稅)||has(c.含稅)||has(c.業務)||(Array.isArray(c.應收帳款)&&c.應收帳款.some(Boolean));
+}
+/* ── 刪除規則（2026-10-08 最終版，10-12 確認）：不鎖、全部先問 ──
+ * 2026-10-07 的 🔒（用過的不能刪）拿掉了。按 ✕ 一律先跳確認框，框裡寫「有幾筆用到、刪了會怎樣」：
+ * 刪了以後，用過的紀錄照樣顯示原本的字，只是下拉選單不再出現（_optsHtml 會把目前的值補回去）。
+ * 只改進—瑪；其他 App 的刪除規則不動。 */
+function cfgDelMsg(key,val){
+  const n=cfgUsage(key,val), head='確定刪除'+cfgLabel(key)+'「'+val+'」？';
+  if(key==='案場'){
+    const money=caseHasMoney(val);
+    return head+'\n'+(n?('有 '+n+' 筆工作項目'+(money?'和金額、帳款':'')+'用到。'):money?'有金額、帳款用到。':'目前沒有紀錄用到。')
+      +'\n只從清單和下拉拿掉，底下的紀錄、金額、照片都不會刪。';
+  }
+  if(key==='款別')return head+'\n'+(n?'有 '+n+' 個案場的已收帳款用到，刪了以後照樣顯示「'+val+'」，只是下拉選單不再出現。':'目前沒有案場用到。');
+  if(!n)return head+'\n目前沒有紀錄用到。';
+  return head+'\n有 '+n+' 筆紀錄用到，刪了以後照樣顯示「'+val+'」，只是下拉選單不再出現。';
+}
 function cfgDel(key,idx){
-  if(key==='案場'&&projInUse((cfg[key]||[])[idx])){toast('這個案場有工作項目在用，不能刪除','e');return}
+  const val=(cfg[key]||[])[idx]; if(val===undefined)return;
   if(mngGuard())return;
   if(!requireDelete())return;
+  if(!confirm(cfgDelMsg(key,val)))return;
+  if((cfg[key]||[])[idx]!==val)return;   /* 問的時候清單被別台改過 → 不刪錯一列 */
   cfg[key].splice(idx,1);
   markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
@@ -1976,10 +2292,14 @@ function cfgUsage(key,val){
     normalizeRecord(r);
     let hit=false;
     if(key==='案場')hit=(r.案場===val);
-    else if(key==='施作位置')hit=(r.施作位置===val||r.工作項目===val);
+    else if(key==='施作位置')hit=(regionOf(r).區域===val||r.工作項目===val);   /* 2026-10-12：區域＝大區域（舊格式不在清單的字算範圍） */
     else if(key==='狀態'){
       hit=(r.狀態===val);
       (r.進度記錄||[]).forEach(l=>{if(l&&l.status===val)hit=true});
+    }
+    /* 2026-10-12：工廠清單＝「下單工廠」那幾筆的 factory（同一格「進場施工」存的是廠商，不算） */
+    else if(key==='工廠清單'){
+      (r.進度記錄||[]).forEach(l=>{if(l&&l.work===MM_WORK_FACTORY&&l.factory===val)hit=true});
     }
     /* 2026-09-30 瑪摩試做版：施工項目／工廠／施工班存在每一條進度記錄上 */
     else if(LOG_CFG_FIELD[key]){
@@ -1998,7 +2318,7 @@ function cfgUsage(key,val){
   return n;
 }
 /* 設定清單 → 進度記錄上的欄位名（2026-09-30）。改名、統計使用數都靠這張表 */
-const LOG_CFG_FIELD={施工項目:'work',工廠:'factory',施工班:'crew'};
+const LOG_CFG_FIELD={施工項目:'work',報價項目:'work',工廠:'factory',施工班:'crew'};
 function cfgApplyRename(key,oldV,newV){
   let n=0;
   (records||[]).forEach(r=>{
@@ -2014,7 +2334,10 @@ function cfgApplyRename(key,oldV,newV){
       if(r.狀態===oldV){r.狀態=newV;ch=true}
       (r.進度記錄||[]).forEach(l=>{if(l&&l.status===oldV){l.status=newV;ch=true}});
     }
-    if(LOG_CFG_FIELD[key]){
+    if(key==='工廠清單'){
+      (r.進度記錄||[]).forEach(l=>{if(l&&l.work===MM_WORK_FACTORY&&l.factory===oldV){l.factory=newV;ch=true}});
+    }
+    else if(LOG_CFG_FIELD[key]){
       const f=LOG_CFG_FIELD[key];
       (r.進度記錄||[]).forEach(l=>{if(l&&l[f]===oldV){l[f]=newV;ch=true}});
     }
@@ -2025,8 +2348,10 @@ function cfgApplyRename(key,oldV,newV){
   if(key==='案場'){
     const ok=caseKey(oldV), nk=caseKey(newV);
     if(cases[ok]&&!cases[nk]){
-      cases[nk]=Object.assign({},cases[ok],{案場:newV,updatedAt:new Date().toISOString()});
+      const now=new Date().toISOString();
+      cases[nk]=Object.assign({},cases[ok],{案場:newV,updatedAt:now});
       delete cases[ok];
+      _caseTombs[ok]=now;   /* 舊名字已經搬走：別台電腦的副本不准補回來（2026-10-12） */
       saveCasesLocal();
     }
   }
@@ -2060,13 +2385,14 @@ function cfgEditSave(key,idx){
 }
 function cfgCommitRename(key,idx,oldV,newV,alsoRecords){
   cfg[key][idx]=newV;
+  /* 沒有「一起更新」的選項了（10-06 5甲），alsoRecords 一定是 true */
   // 改名＝明確意圖，這次用本機版本覆蓋雲端，否則舊名字會被聯集補回來
   markCfgAuthoritative();
   let n=0;
   if(alsoRecords)n=cfgApplyRename(key,oldV,newV);
   saveCfg();renderCfgLists();updateDataLists();
   if(alsoRecords){renderMain();renderHistory();updateFilters()}
-  if(key==='款別')renderMain();
+  if(key==='款別'||key==='報價項目'||key==='施工項目'){renderMain();updateFilters()}
   toast(alsoRecords?('已改名，連同 '+n+' 筆紀錄一起更新 ✓'):'已改名 ✓','s');
 }
 /* 改名確認視窗：用 JS 建，兩支 App 的設定頁 HTML 都不用動
@@ -2112,15 +2438,39 @@ function renderCfgLists(){
           <span class="cfg-row-lbl">${esc(v)}</span>
           ${portalCanDragSort()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}
           ${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}
-          ${(key==='案場'&&projInUse(v))?'<span class="cfg-lock" title="有工作項目用到這個案場，不能刪">🔒 使用中</span>'
-            :portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
+          ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
         </div>`).join('');
   });
   renderSalesGroups();   /* 業務群組（2026-10-02）跟著清單一起重畫 */
   renderStatusSettings(); renderFactoryStaff();   /* 狀態、工廠兩層（2026-10-02 第三批） */
+  capSettingsLists();   /* 最多 10 列（2026-10-12） */
 }
 
 function renderCfgCards(){renderCfgLists()}
+
+/* ── 系統設定的清單最多顯示 10 列，超過才捲（2026-10-12 她指定；選乙＝連狀態表、業務、每家廠商的施工人員也一樣）──
+ * 以前固定 200px，案場、施工項目只看得到 5 列多。列高不一定一樣（案場名稱長會折行），所以不寫死高度：
+ * 每次畫完量「第 10 列的底」當成上限；10 列以內就不設上限（不會有捲軸）。
+ * 設定頁沒顯示時量不到（高度 0）→ 不設；切到設定頁時 goPage 會重畫、再量一次。 */
+var MM_LIST_ROWS=10;
+function capRows(box,rowSel){
+  if(!box)return;
+  box.style.maxHeight=''; box.classList.remove('mm-capped');
+  const rows=box.querySelectorAll(rowSel);
+  if(rows.length<=MM_LIST_ROWS)return;
+  const b=box.getBoundingClientRect(), r=rows[MM_LIST_ROWS-1].getBoundingClientRect();
+  if(!b.height||!r.height)return;
+  box.style.maxHeight=Math.ceil(r.bottom-b.top+box.scrollTop+1)+'px';
+  box.classList.add('mm-capped');
+}
+function capSettingsLists(){
+  CFG_KEYS.forEach(({key})=>capRows(document.getElementById('lw-'+key),'.cfg-row'));
+  const st=document.getElementById('st-tbl'); capRows(st&&st.closest('.tbl-scroll'),'#st-body .st-row');
+  const sg=document.getElementById('sg-tbl'); capRows(sg&&sg.closest('.tbl-scroll'),'#sg-body .sg-row');
+  document.querySelectorAll('#fs-groups .fs-body').forEach(b=>capRows(b,'.fs-row'));
+}
+var _capT=0;
+window.addEventListener('resize',function(){ clearTimeout(_capT); _capT=setTimeout(capSettingsLists,150); });
 
 // ============================================================
 // 系統設定：狀態（2026-10-02 第三批）
@@ -2179,6 +2529,9 @@ function stSetColor(i,bg){
   renderStatusSettings();renderMain();updateFilters();renderHistory();
   toast('已換底色 ✓','s');
 }
+/* 狀態表（2026-10-13 她指定改回自己一張）：每一列都能改名、改階段、上下移、換底色、刪除
+ *   · 刪除照 10-12 規則：不鎖、一律先問，寫有幾個案場在用；刪了以後那些案場照樣顯示原名、灰底標「已刪除」
+ * 按鈕只帶數字序號（statusDefs() 的位置），不帶名字（引號截斷）。 */
 function renderStatusSettings(){
   const body=document.getElementById('st-body');
   if(!body)return;
@@ -2186,9 +2539,9 @@ function renderStatusSettings(){
   const canSort=portalCanDragSort(), canDel=portalCanDelete();
   body.innerHTML=defs.map((s,i)=>{
     const n=use[s.名稱]||0;
-    return '<tr class="st-row">'
+    return '<tr class="st-row st-g-'+MM_STAGE_CODE[s.階段]+'" data-name="'+esc(s.名稱)+'">'
       +'<td class="cfg-row-num">'+(i+1)+'</td>'
-      +'<td><select class="fi st-stage-sel" aria-label="階段" onchange="stSetStage('+i+',this.value)">'
+      +'<td class="st-stage"><select class="fi st-stage-sel" aria-label="階段" onchange="stSetStage('+i+',this.value)">'
       +MM_STAGES.map(g=>'<option'+(g===s.階段?' selected':'')+'>'+g+'</option>').join('')+'</select></td>'
       +'<td><input type="text" class="fi st-name" aria-label="狀態名稱" value="'+esc(s.名稱)+'" onchange="stRename('+i+',this.value)"></td>'
       /* 底色（2026-10-02 第四批）：點色塊 → 底下展開 10 個淡色，點一個就換 */
@@ -2199,10 +2552,10 @@ function renderStatusSettings(){
       +'<td class="st-act">'
       +(canSort?'<button type="button" class="cfg-mv" title="上移" onclick="stMove('+i+',-1)"'+(i===0?' disabled':'')+'>↑</button>'
                +'<button type="button" class="cfg-mv" title="下移" onclick="stMove('+i+',1)"'+(i===defs.length-1?' disabled':'')+'>↓</button>':'')
-      +(n?'<span class="st-lock" title="有案場正在用這個狀態，不能刪">🔒 使用中</span>'
-         :(canDel?'<button type="button" class="cfg-del" title="刪除" onclick="stDel('+i+')">✕</button>':''))
+      +(canDel?'<button type="button" class="cfg-del" title="刪除" onclick="stDel('+i+')">✕</button>':'')
       +'</td></tr>';
   }).join('');
+  if(typeof capSettingsLists==='function')capSettingsLists();   /* 最多 10 列（2026-10-12） */
 }
 function stOpenAdd(){
   if(mngGuard())return;
@@ -2210,31 +2563,34 @@ function stOpenAdd(){
   document.getElementById('st-new-name').focus();
 }
 function stCloseAdd(){ const f=document.getElementById('st-form'); if(f)f.style.display='none'; }
+/* 新增：自己選階段（2026-10-13 改回） */
 function stAdd(){
   if(mngGuard())return;
   const name=document.getElementById('st-new-name').value.trim();
-  const stage=document.getElementById('st-new-stage').value;
+  const stEl=document.getElementById('st-new-stage'), stage=stEl?stEl.value:'完工';
   if(!name){toast('請填狀態名稱','e');return}
   if(statusNames().indexOf(name)>=0){toast('已經有同名的狀態','e');return}
   if(MM_STAGES.indexOf(stage)<0)return;
   /* 新增的狀態自動給一個還沒用過的底色（全部用過就循環） */
   cfg.狀態設定=statusDefs().map(s=>Object.assign({},s)).concat([{名稱:name,階段:stage,底色:nextFreeColor(statusDefs())}]);
+  if(cfg.已刪除狀態)delete cfg.已刪除狀態[name];
   /* 新增不用「本機為準」：雲端合併是依名稱聯集，新的會被帶上去 */
   saveCfg();
   document.getElementById('st-new-name').value='';
-  stCloseAdd();renderStatusSettings();updateFilters();
+  stCloseAdd();renderStatusSettings();updateFilters();renderMain();
   toast('已新增狀態「'+name+'」✓','s');
 }
+/* 改名：每一列都可以（2026-10-13 改回） */
 function stRename(i,v){
   if(mngGuard()){renderStatusSettings();return}
   const defs=statusDefs().map(s=>Object.assign({},s));
-  const cur=defs[i]; if(!cur)return;
+  const cur=defs[i]; if(!cur){renderStatusSettings();return}
   const name=String(v||'').trim(), old=cur.名稱;
   if(name===old)return;
   if(!name){toast('名稱不能空白','e');renderStatusSettings();return}
   if(defs.some((s,j)=>j!==i&&s.名稱===name)){toast('已經有同名的狀態','e');renderStatusSettings();return}
   cur.名稱=name; cfg.狀態設定=defs;
-  /* 用到它的案場一起改（還沒自己選過、照預設顯示的那些不用改：預設照位置算，名字自然跟著變） */
+  /* 用到它的案場一起改 */
   let n=0; const now=new Date().toISOString();
   Object.keys(cases||{}).forEach(k=>{ const c=cases[k]; if(c&&c.狀態===old){c.狀態=name;c.updatedAt=now;n++} });
   if(n)saveCasesLocal();
@@ -2244,6 +2600,14 @@ function stRename(i,v){
   renderStatusSettings();renderMain();updateFilters();renderHistory();
   toast('已改名'+(n?'，'+n+' 個案場一起更新':'')+' ✓','s');
 }
+/* 排序：整張表上下換（2026-10-13 改回）。順序＝主表篩選、Excel 案場的排法 */
+function stMove(i,dir){
+  if(sortGuard())return;
+  const defs=statusDefs().map(s=>Object.assign({},s));
+  const j=i+dir; if(j<0||j>=defs.length)return;
+  stChange(()=>{ const t=defs[i];defs[i]=defs[j];defs[j]=t; cfg.狀態設定=defs; });
+}
+/* 改階段（2026-10-13 改回）：報價段至少留一個（新案場用它當預設） */
 function stSetStage(i,stage){
   if(mngGuard()){renderStatusSettings();return}
   const defs=statusDefs().map(s=>Object.assign({},s));
@@ -2253,19 +2617,22 @@ function stSetStage(i,stage){
   }
   stChange(()=>{ cur.階段=stage; cfg.狀態設定=defs; });
 }
-function stMove(i,dir){
-  if(sortGuard())return;
-  const defs=statusDefs().map(s=>Object.assign({},s));
-  const j=i+dir; if(j<0||j>=defs.length)return;
-  stChange(()=>{ const t=defs[i];defs[i]=defs[j];defs[j]=t; cfg.狀態設定=defs; });
+/* 從狀態倉庫拿掉一個名稱，記下它原本在哪一段（案場照樣顯示原名、排序用得到） */
+function stForget(name){
+  const d=statusDefs().find(s=>s.名稱===name);
+  if(!cfg.已刪除狀態||typeof cfg.已刪除狀態!=='object')cfg.已刪除狀態={};
+  if(d)cfg.已刪除狀態[name]=d.階段;
+  cfg.狀態設定=(cfg.狀態設定||[]).filter(s=>s&&s.名稱!==name);
 }
+/* 刪除：不鎖，先問；寫有幾個案場在用（2026-10-08 最終版；10-13 起每一列都能刪） */
 function stDel(i){
   if(!requireDelete())return;
-  const defs=statusDefs().map(s=>Object.assign({},s));
-  const cur=defs[i]; if(!cur)return;
-  if(statusUsage()[cur.名稱]){toast('有案場正在用「'+cur.名稱+'」，不能刪除','e');return}
-  if(cur.階段==='報價'&&defs.filter(s=>s.階段==='報價').length===1){toast('「報價」階段至少要留一個狀態','e');return}
-  stChange(()=>{ defs.splice(i,1); cfg.狀態設定=defs; });
+  const cur=statusDefs()[i]; if(!cur)return;
+  if(cur.階段==='報價'&&statusDefs().filter(s=>s.階段==='報價').length===1){toast('「報價」階段至少要留一個狀態','e');return}
+  const n=statusUsage()[cur.名稱]||0;
+  if(!confirm('確定刪除狀態「'+cur.名稱+'」？\n'+(n?'有 '+n+' 個案場用到，刪了以後照樣顯示「'+cur.名稱+'」（灰底標「已刪除」），只是下拉選單不再出現。':'目前沒有案場用到。')))return;
+  const name=cur.名稱;
+  stChange(()=>{ stForget(name); });
   toast('已刪除','s');
 }
 
@@ -2280,43 +2647,47 @@ var _fsCollapsed={};
 function staffMap(){ return (cfg.施工人員ByFactory&&typeof cfg.施工人員ByFactory==='object')?cfg.施工人員ByFactory:(cfg.施工人員ByFactory={}); }
 function staffOf(fac){ const v=staffMap()[fac]; return Array.isArray(v)?v:[]; }
 function fsBadName(v){ return /[.#$\[\]\/]/.test(v); }
-/* 使用中的廠商／施工人員不能刪（2026-10-06 她選 6甲，照案場、狀態的 🔒 使用中）
- * 「使用中」＝有進度記錄選了這家廠商，或勾了這位施工人員（同一家底下）。
- * （施工人員一定掛在某家廠商底下：記錄要先選廠商才勾得到人，所以有人被勾過＝那家廠商也在用）
- * 已刪除的工作項目不在 records 裡，不算。名稱照樣可以改（會連動）。 */
-function fsStaffInUse(f,k){
-  return (records||[]).some(r=>r&&logsOf(r).some(l=>l&&l.factory===f&&Array.isArray(l.施工人員)&&l.施工人員.indexOf(k)>=0));
+/* 廠商／施工人員用到幾筆（2026-10-12：刪除改成不鎖、先問，框裡寫筆數）
+ * 「用到」＝有進度記錄選了這家廠商，或勾了這位施工人員（同一家底下）。已刪除的工作項目不在 records 裡，不算。 */
+function fsStaffUsage(f,k){
+  return (records||[]).filter(r=>r&&logsOf(r).some(l=>l&&l.factory===f&&Array.isArray(l.施工人員)&&l.施工人員.indexOf(k)>=0)).length;
 }
-function fsFacInUse(f){
+function fsFacUsage(f){
   /* 舊資料只有「施工班」（crew）、沒有 factory 的，打開編輯框時當成工廠（logRowHtml），畫面也顯示「施工班：X」→ 一樣算在用 */
-  return (records||[]).some(r=>r&&logsOf(r).some(l=>l&&(l.factory===f||(!l.factory&&l.crew===f))));
+  return (records||[]).filter(r=>r&&logsOf(r).some(l=>l&&(l.factory===f||(!l.factory&&l.crew===f)))).length;
 }
-const FS_LOCK_FAC='<span class="cfg-lock" title="有進度記錄用到這家廠商，不能刪">🔒 使用中</span>';
-const FS_LOCK_STAFF='<span class="cfg-lock" title="有進度記錄勾了這位施工人員，不能刪">🔒 使用中</span>';
 function renderFactoryStaff(){
   const host=document.getElementById('fs-groups');
   if(!host)return;
-  const facs=cfg.工廠||[], canDel=portalCanDelete();
+  const facs=cfg.工廠||[], canDel=portalCanDelete(), canSort=portalCanDragSort();
   if(!facs.length){host.innerHTML='<div class="cfg-empty-txt">還沒有廠商，在下面填名稱按「＋ 新增廠商」</div>';return}
   host.innerHTML=facs.map((f,i)=>{
     const kids=staffOf(f), col=_fsCollapsed[f];
-    return '<div class="fs-grp'+(col?' collapsed':'')+'">'
-      +'<div class="fs-head"><button type="button" class="fs-tog" title="展開／收合" onclick="fsToggle('+i+')">'+(col?'▶':'▼')+'</button>'
+    /* 拖曳／↑↓（2026-10-14）：只有能拖曳排序的人看得到；從 data-* 讀數字，不帶名字 */
+    const mv=(dir,dis,attr)=>'<button type="button" class="cfg-mv" title="'+(dir<0?'上移':'下移')+'" '+attr+'="'+dir+'"'+(dis?' disabled':'')+'>'+(dir<0?'↑':'↓')+'</button>';
+    return '<div class="fs-grp'+(col?' collapsed':'')+'" data-f="'+i+'">'
+      +'<div class="fs-head">'
+      +(canSort?'<span class="fs-grip" draggable="true" title="按住拖曳換順序（整家一起搬）">⠿</span>'
+          +'<span class="fs-mv">'+mv(-1,i===0,'data-fsmv')+mv(1,i===facs.length-1,'data-fsmv')+'</span>':'')
+      +'<button type="button" class="fs-tog" title="展開／收合" onclick="fsToggle('+i+')">'+(col?'▶':'▼')+'</button>'
       +'<span class="fs-no">'+(i+1)+'</span>'
       +'<input type="text" class="fi fs-fac" aria-label="廠商名稱" value="'+esc(f)+'" onchange="fsRenameFactory('+i+',this.value)">'
       +'<span class="fs-cnt">'+kids.length+' 人</span>'
-      +(fsFacInUse(f)?FS_LOCK_FAC
-         :canDel?'<button type="button" class="cfg-del" title="刪除這家廠商" onclick="fsDelFactory('+i+')">✕</button>':'')+'</div>'
+      +(canDel?'<button type="button" class="cfg-del" title="刪除這家廠商" onclick="fsDelFactory('+i+')">✕</button>':'')+'</div>'
       +'<div class="fs-body">'
-      +(kids.length?kids.map((k,j)=>'<div class="fs-row"><span class="fs-no">'+(j+1)+'</span>'
+      /* 施工人員序號寫 1) 2)…，跟廠商的 1 2 分得出來（2026-10-12 她指定） */
+      +(kids.length?kids.map((k,j)=>'<div class="fs-row" data-f="'+i+'" data-s="'+j+'">'
+          +(canSort&&kids.length>1?'<span class="fs-grip" draggable="true" title="按住拖曳換順序（同一家裡）">⠿</span>'
+              +'<span class="fs-mv">'+mv(-1,j===0,'data-fsmvs')+mv(1,j===kids.length-1,'data-fsmvs')+'</span>':'')
+          +'<span class="fs-no fs-no-s">'+(j+1)+')</span>'
           +'<input type="text" class="fi fs-staff" aria-label="施工人員" value="'+esc(k)+'" onchange="fsRenameStaff('+i+','+j+',this.value)">'
-          +(fsStaffInUse(f,k)?FS_LOCK_STAFF
-             :canDel?'<button type="button" class="cfg-del" title="刪除" onclick="fsDelStaff('+i+','+j+')">✕</button>':'')+'</div>').join('')
+          +(canDel?'<button type="button" class="cfg-del" title="刪除" onclick="fsDelStaff('+i+','+j+')">✕</button>':'')+'</div>').join('')
         :'<div class="cfg-empty-txt" style="text-align:left">這家還沒有施工人員</div>')
       +'<div class="fs-add"><input type="text" class="fi fs-new-staff" placeholder="新增施工人員" onkeydown="if(event.key===\'Enter\')fsAddStaff('+i+',this)">'
       +'<button type="button" class="btn btn-a btn-sm" data-mng onclick="fsAddStaff('+i+',this.previousElementSibling)">＋</button></div>'
       +'</div></div>';
   }).join('');
+  if(typeof capSettingsLists==='function')capSettingsLists();   /* 最多 10 列（2026-10-12） */
 }
 function fsToggle(i){ const f=(cfg.工廠||[])[i]; if(f===undefined)return; _fsCollapsed[f]=!_fsCollapsed[f]; renderFactoryStaff(); }
 function _fsSaved(){ saveCfg(); renderFactoryStaff(); }
@@ -2368,7 +2739,10 @@ function fsRenameFactory(i,v){
 function fsDelFactory(i){
   if(!requireDelete())return;
   const f=(cfg.工廠||[])[i]; if(f===undefined)return;
-  if(!confirm('確定刪除廠商「'+f+'」和底下 '+staffOf(f).length+' 位施工人員？\n（已經填過的進度記錄照樣顯示原本的名字）'))return;
+  /* 2026-10-12（10-08 最終版）：不鎖、先問，寫有幾筆用到；兩層的寫底下幾位一起刪 */
+  const n=fsFacUsage(f);
+  if(!confirm('確定刪除廠商「'+f+'」和底下 '+staffOf(f).length+' 位施工人員？\n'
+    +(n?'有 '+n+' 筆紀錄用到，刪了以後照樣顯示原本的名字，只是下拉選單不再出現。':'目前沒有紀錄用到。')))return;
   cfg.工廠=cfg.工廠.filter((x,j)=>j!==i);
   delete staffMap()[f];
   markCfgAuthoritative();
@@ -2407,10 +2781,75 @@ function fsRenameStaff(i,j,v){
 function fsDelStaff(i,j){
   if(!requireDelete())return;
   const f=(cfg.工廠||[])[i]; if(f===undefined)return;
+  const who=staffOf(f)[j]; if(who===undefined)return;
+  const n=fsStaffUsage(f,who);   /* 2026-10-12：不鎖、先問 */
+  if(!confirm('確定刪除施工人員「'+who+'」（'+f+'）？\n'
+    +(n?'有 '+n+' 筆紀錄勾了這位，刪了以後照樣顯示原本的名字，只是不能再勾。':'目前沒有紀錄用到。')))return;
+  if(staffOf(f)[j]!==who)return;
   staffMap()[f]=staffOf(f).filter((x,k)=>k!==j);
   markCfgAuthoritative();
   _fsSaved();
 }
+/* ══════ 群組四換順序（2026-10-14 她指定 1乙）══════
+ * 整家搬＝cfg.工廠 換位置（施工人員存在 施工人員ByFactory[廠商名]，跟著名字走，不用動）；
+ * 施工人員＝同一家的陣列裡換位置，不能搬到別家。
+ * 順序就是陣列順序 → 一定要 markCfgAuthoritative()，不然雲端合併會把舊順序補回來。 */
+function fsMoveFactory(from,to){
+  if(sortGuard())return;
+  const a=(cfg.工廠||[]).slice(); if(a[from]===undefined||to<0||to>=a.length||from===to)return;
+  const x=a.splice(from,1)[0]; a.splice(to,0,x); cfg.工廠=a;
+  markCfgAuthoritative();
+  _fsSaved();
+}
+function fsMoveStaff(i,from,to){
+  if(sortGuard())return;
+  const f=(cfg.工廠||[])[i]; if(f===undefined)return;
+  const a=staffOf(f).slice(); if(a[from]===undefined||to<0||to>=a.length||from===to)return;
+  const x=a.splice(from,1)[0]; a.splice(to,0,x); staffMap()[f]=a;
+  markCfgAuthoritative();
+  _fsSaved();
+}
+/* 手機的 ↑↓ */
+document.addEventListener('click',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#fs-groups'))return;
+  const m=t.closest('[data-fsmv]');
+  if(m){ const i=Number(m.closest('.fs-grp').getAttribute('data-f')); fsMoveFactory(i,i+Number(m.getAttribute('data-fsmv'))); return; }
+  const ms=t.closest('[data-fsmvs]');
+  if(ms){ const r=ms.closest('.fs-row'), i=Number(r.getAttribute('data-f')), j=Number(r.getAttribute('data-s'));
+    fsMoveStaff(i,j,j+Number(ms.getAttribute('data-fsmvs'))); }
+});
+/* 電腦拖曳：抓 ⠿。抓廠商的 ⠿ → 放到別家的卡片上；抓人員的 ⠿ → 放到同一家的另一個人上 */
+var _fsDrag=null;
+function _fsClearMarks(){ document.querySelectorAll('#fs-groups .fs-over,#fs-groups .fs-dragging').forEach(x=>x.classList.remove('fs-over','fs-dragging')); }
+function _fsTarget(t){
+  if(!_fsDrag||!t||!t.closest)return null;
+  if(_fsDrag.kind==='f'){ const g=t.closest('#fs-groups .fs-grp'); return g; }
+  const r=t.closest('#fs-groups .fs-row');
+  return r&&Number(r.getAttribute('data-f'))===_fsDrag.f?r:null;   /* 別家的人上面不能放 */
+}
+document.addEventListener('dragstart',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#fs-groups'))return;
+  const grip=t.closest('.fs-grip'); if(!grip){return}
+  if(!portalCanDragSort()){e.preventDefault();return}
+  const row=grip.closest('.fs-row');
+  if(row){ _fsDrag={kind:'s',f:Number(row.getAttribute('data-f')),s:Number(row.getAttribute('data-s'))}; row.classList.add('fs-dragging'); }
+  else{ const g=grip.closest('.fs-grp'); _fsDrag={kind:'f',f:Number(g.getAttribute('data-f'))}; g.classList.add('fs-dragging'); }
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','fs'); }catch(err){}
+});
+document.addEventListener('dragover',function(e){
+  const box=_fsTarget(e.target); if(!box)return;
+  e.preventDefault();
+  document.querySelectorAll('#fs-groups .fs-over').forEach(x=>x.classList.remove('fs-over'));
+  box.classList.add('fs-over');
+});
+document.addEventListener('drop',function(e){
+  if(!_fsDrag)return;
+  const box=_fsTarget(e.target), d=_fsDrag; _fsDrag=null; _fsClearMarks();
+  if(!box)return; e.preventDefault();
+  if(d.kind==='f')fsMoveFactory(d.f,Number(box.getAttribute('data-f')));
+  else fsMoveStaff(d.f,d.s,Number(box.getAttribute('data-s')));
+});
+document.addEventListener('dragend',function(){ if(!_fsDrag)return; _fsDrag=null; _fsClearMarks(); });
 
 // ============================================================
 // 系統設定：業務群組（2026-10-02 第二版）
@@ -2419,32 +2858,155 @@ function fsDelStaff(i,j){
  * 新增／改：要「系統設定維護」權（跟其他清單一樣）；刪除：要「刪除」權，而且先問一次。
  * 改、刪是明確意圖 → markCfgAuthoritative()（這次用本機版本覆蓋雲端，不然會被聯集補回來）。
  * 所有按鈕只帶數字序號，不帶名字（名字有引號會把 onclick 屬性提早結束）。 */
-var _sgEdit=-1;
+var _sgEdit=-1, _sgPick=-1;
 function salesGroups(){ return Array.isArray(cfg.業務群組)?cfg.業務群組:[]; }
+/* 用到這一組的案場數：案場的業務（可以好幾位）有人在這一組裡 */
+function sgUsage(g){
+  const ps=(g&&g.人員)||[]; if(!ps.length)return 0;
+  return Object.keys(cases||{}).filter(k=>{ const c=cases[k]; return c&&typeof c.業務==='string'&&sgSplit(c.業務).some(p=>ps.indexOf(p)>=0); }).length;
+}
 function sgSplit(s){ return [...new Set(String(s||'').split(/[、,，;；\n]+/).map(x=>x.trim()).filter(Boolean))]; }
+/* 業務群組表（2026-10-12 第七八批，10-08 定案）：
+ *   · 整列：⠿ 拖拉換順序（資料排序權）；手機（≤640）改 ↑↓
+ *   · 名字按鈕：拖進別組、或在組內拖到另一個名字前面換先後（系統設定維護權）；✕ 拿掉
+ *   · 「＋ 加人」：展開入口網頁的同仁名單（這一組還沒有的），點一個加一個；名單外的人在下面那格打
+ *   · 每一組前面有序號；「金額 ✏️」的業務照這個順序
+ * 所有按鈕只帶數字序號（data-g／data-p），名字不進 onclick（引號截斷）。 */
 function renderSalesGroups(){
   const body=document.getElementById('sg-body');
   if(!body)return;
   const gs=salesGroups();
-  const canEdit=portalCanManageSettings(), canDel=portalCanDelete();
+  const canEdit=portalCanManageSettings(), canDel=portalCanDelete(), canSort=portalCanDragSort();
   body.innerHTML=gs.length
-    ? gs.map((g,i)=>'<tr class="sg-row">'
-        +'<td><b class="sg-name">'+esc(g.名稱)+'</b></td>'
-        +'<td><div class="sg-people">'+(g.人員||[]).map(p=>'<span>'+esc(p)+'</span>').join('')+'</div></td>'
-        +'<td class="sg-act">'
-        +(canEdit?'<button type="button" class="cfg-edit" title="編輯" onclick="sgOpen('+i+')">✏️</button>':'')
-        +(canDel?'<button type="button" class="cfg-del" title="刪除" onclick="sgDel('+i+')">🗑</button>':'')
-        +'</td></tr>').join('')
-    : '<tr><td colspan="3" class="cfg-empty-txt">還沒有業務群組，按右上「＋ 新增群組」加入（例：瑪摩一處／林業務、王業務）</td></tr>';
-  const dl=document.getElementById('dl-sg-people');
-  if(dl)dl.innerHTML=portalExecs('').map(v=>`<option value="${esc(v)}">`).join('');
+    ? gs.map((g,i)=>{
+        const ps=g.人員||[];
+        const picker=(canEdit&&_sgPick===i)?sgPickerHtml(i):'';
+        return '<tr class="sg-row" data-g="'+i+'"'+(canSort?' draggable="true"':'')+'>'
+          +'<td class="sg-hd">'
+          +(canSort?'<span class="sg-grip" title="按住拖曳換順序">⠿</span><span class="sg-mv">'
+              +'<button type="button" class="cfg-mv" title="上移" data-sgmv="-1"'+(i===0?' disabled':'')+'>↑</button>'
+              +'<button type="button" class="cfg-mv" title="下移" data-sgmv="1"'+(i===gs.length-1?' disabled':'')+'>↓</button></span>':'')
+          +'<span class="sg-no">'+(i+1)+'.</span><b class="sg-name">'+esc(g.名稱)+'</b></td>'
+          +'<td><div class="sg-people" data-g="'+i+'">'
+          +ps.map((p,j)=>'<span class="sg-chip" data-g="'+i+'" data-p="'+j+'"'+(canEdit?' draggable="true"':'')+'>'+esc(p)
+              +(canEdit?'<button type="button" class="sg-x" title="拿掉">✕</button>':'')+'</span>').join('')
+          +(canEdit?'<button type="button" class="sg-addp">＋ 加人</button>':'')
+          +'</div>'+picker+'</td>'
+          +'<td class="sg-act">'
+          +(canEdit?'<button type="button" class="cfg-edit" title="改名稱" onclick="sgOpen('+i+')">✏️</button>':'')
+          +(canDel?'<button type="button" class="cfg-del" title="刪除" onclick="sgDel('+i+')">🗑</button>':'')
+          +'</td></tr>';
+      }).join('')
+    : '<tr><td colspan="3" class="cfg-empty-txt">還沒有業務群組，按右上「＋ 新增群組」加入（例：瑪摩一處），再按「＋ 加人」放業務</td></tr>';
+  if(typeof capSettingsLists==='function')capSettingsLists();   /* 最多 10 列（2026-10-12） */
 }
+/* 「＋ 加人」展開的名單：入口網頁的同仁（離職的不列），這一組已經有的不列 */
+function sgPickerHtml(i){
+  const g=salesGroups()[i]; if(!g)return '';
+  const have=g.人員||[];
+  const names=portalExecs('').filter(n=>have.indexOf(n)<0);
+  return '<div class="sg-pick" data-g="'+i+'">'
+    +'<div class="sg-pick-list">'+(names.length?names.map(n=>'<button type="button" data-n="'+esc(n)+'">＋ '+esc(n)+'</button>').join('')
+        :'<span class="cfg-empty-txt">名單上的人都在這一組了</span>')+'</div>'
+    +'<div class="sg-pick-own"><input type="text" class="fi sg-own" placeholder="名單外的人，打名字按 Enter" aria-label="名單外的人">'
+    +'<button type="button" class="btn btn-p btn-sm sg-own-add">加入</button>'
+    +'<button type="button" class="btn btn-g btn-sm sg-pick-close">完成</button></div></div>';
+}
+/* 改業務群組的共同收尾：明確意圖 → 本機為準（不然拿掉的人會被雲端聯集補回來） */
+function _sgSaved(){ markCfgAuthoritative(); saveCfg(); renderSalesGroups(); updateFilters(); }
+function sgAddPerson(i,name){
+  if(mngGuard())return;
+  const gs=salesGroups().map(g=>({名稱:g.名稱,人員:(g.人員||[]).slice()}));
+  const g=gs[i]; name=String(name||'').trim(); if(!g||!name)return;
+  if(g.人員.indexOf(name)>=0){toast('「'+name+'」已經在這一組','e');return}
+  g.人員.push(name); cfg.業務群組=gs;
+  _sgSaved();
+  const inp=document.querySelector('#sg-body .sg-pick .sg-own'); if(inp)inp.focus();
+}
+function sgRemovePerson(i,j){
+  if(mngGuard())return;
+  const gs=salesGroups().map(g=>({名稱:g.名稱,人員:(g.人員||[]).slice()}));
+  const g=gs[i]; if(!g||g.人員[j]===undefined)return;
+  g.人員.splice(j,1); cfg.業務群組=gs;
+  _sgSaved();
+}
+/* 名字拖到另一組（toJ＝插在第幾個前面；-1＝接在最後）；同一組裡就是換先後 */
+function sgMovePerson(fromG,fromJ,toG,toJ){
+  if(mngGuard())return;
+  const gs=salesGroups().map(g=>({名稱:g.名稱,人員:(g.人員||[]).slice()}));
+  const a=gs[fromG], b=gs[toG]; if(!a||!b)return;
+  const who=a.人員[fromJ]; if(who===undefined)return;
+  if(fromG===toG){
+    if(toJ===fromJ)return;
+    a.人員.splice(fromJ,1);
+    let at=toJ<0?a.人員.length:(toJ>fromJ?toJ-1:toJ);
+    a.人員.splice(Math.max(0,Math.min(at,a.人員.length)),0,who);
+  }else{
+    a.人員.splice(fromJ,1);
+    if(b.人員.indexOf(who)<0)b.人員.splice(toJ<0?b.人員.length:Math.min(toJ,b.人員.length),0,who);
+  }
+  cfg.業務群組=gs;
+  _sgSaved();
+}
+function sgMoveGroup(from,to){
+  if(sortGuard())return;
+  const gs=salesGroups().slice(); if(!gs[from]||to<0||to>=gs.length||from===to)return;
+  const g=gs.splice(from,1)[0]; gs.splice(to,0,g); cfg.業務群組=gs;
+  _sgPick=-1;
+  _sgSaved();
+}
+/* 點：✕ 拿掉、＋ 加人、名單裡的名字、名單外的「加入」、完成、手機的 ↑↓（都從 data-* 讀數字，不帶名字） */
+document.addEventListener('click',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#sg-body'))return;
+  const row=t.closest('.sg-row'); const gi=row?Number(row.getAttribute('data-g')):-1;
+  if(t.closest('.sg-x')){ const c=t.closest('.sg-chip'); sgRemovePerson(Number(c.getAttribute('data-g')),Number(c.getAttribute('data-p'))); return; }
+  if(t.closest('.sg-addp')){ if(mngGuard())return; _sgPick=(_sgPick===gi)?-1:gi; renderSalesGroups();
+    const inp=document.querySelector('#sg-body .sg-pick .sg-own'); if(inp)inp.focus(); return; }
+  if(t.closest('.sg-pick-close')){ _sgPick=-1; renderSalesGroups(); return; }
+  const pickBtn=t.closest('.sg-pick-list button[data-n]');
+  if(pickBtn){ sgAddPerson(gi,pickBtn.getAttribute('data-n')); return; }
+  if(t.closest('.sg-own-add')){ const inp=row&&row.querySelector('.sg-own'); sgAddPerson(gi,inp&&inp.value); return; }
+  const mv=t.closest('[data-sgmv]');
+  if(mv){ sgMoveGroup(gi,gi+Number(mv.getAttribute('data-sgmv'))); return; }
+});
+document.addEventListener('keydown',function(e){
+  const t=e.target; if(!t||!t.classList||!t.classList.contains('sg-own')||e.key!=='Enter')return;
+  e.preventDefault(); const row=t.closest('.sg-row'); sgAddPerson(row?Number(row.getAttribute('data-g')):-1,t.value);
+});
+/* 拖拉（電腦）：拖名字＝搬人；拖整列（⠿）＝換群組順序 */
+var _sgDrag=null;
+document.addEventListener('dragstart',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#sg-body'))return;
+  const chip=t.closest('.sg-chip');
+  if(chip){ if(!portalCanManageSettings()){e.preventDefault();return}
+    _sgDrag={kind:'p',g:Number(chip.getAttribute('data-g')),p:Number(chip.getAttribute('data-p'))}; }
+  else{ const row=t.closest('.sg-row'); if(!row||!portalCanDragSort()){e.preventDefault();return}
+    _sgDrag={kind:'g',g:Number(row.getAttribute('data-g'))}; }
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','sg'); }catch(err){}
+});
+function _sgClearMarks(){ document.querySelectorAll('#sg-body .sg-over,#sg-body .sg-row-over').forEach(x=>x.classList.remove('sg-over','sg-row-over')); }
+document.addEventListener('dragover',function(e){
+  if(!_sgDrag)return; const t=e.target; if(!t||!t.closest)return;
+  if(_sgDrag.kind==='p'){ const box=t.closest('#sg-body .sg-people'); if(!box)return; e.preventDefault();
+    _sgClearMarks(); box.classList.add('sg-over'); }
+  else{ const row=t.closest('#sg-body .sg-row'); if(!row)return; e.preventDefault();
+    _sgClearMarks(); row.classList.add('sg-row-over'); }
+});
+document.addEventListener('drop',function(e){
+  if(!_sgDrag)return; const t=e.target, d=_sgDrag; _sgDrag=null;
+  _sgClearMarks();
+  if(!t||!t.closest)return;
+  if(d.kind==='p'){ const box=t.closest('#sg-body .sg-people'); if(!box)return; e.preventDefault();
+    const onChip=t.closest('.sg-chip'); sgMovePerson(d.g,d.p,Number(box.getAttribute('data-g')),onChip?Number(onChip.getAttribute('data-p')):-1); }
+  else{ const row=t.closest('#sg-body .sg-row'); if(!row)return; e.preventDefault(); sgMoveGroup(d.g,Number(row.getAttribute('data-g'))); }
+});
+document.addEventListener('dragend',function(){ if(!_sgDrag)return; _sgDrag=null; _sgClearMarks(); });
+/* ✏️／＋ 新增群組：只填名稱（人員用每一列的「＋ 加人」） */
 function sgOpen(i){
   if(mngGuard())return;
   _sgEdit=(typeof i==='number'&&i>=0&&i<salesGroups().length)?i:-1;
   const g=_sgEdit>=0?salesGroups()[_sgEdit]:null;
   document.getElementById('sg-name').value=g?g.名稱:'';
-  document.getElementById('sg-people').value=g?(g.人員||[]).join('、'):'';
   document.getElementById('sg-form').style.display='flex';
   document.getElementById('sg-name').focus();
 }
@@ -2452,22 +3014,23 @@ function sgClose(){ _sgEdit=-1; const f=document.getElementById('sg-form'); if(f
 function sgSave(){
   if(mngGuard())return;
   const name=document.getElementById('sg-name').value.trim();
-  const people=sgSplit(document.getElementById('sg-people').value);
   if(!name){toast('請填部門名稱／業務群組','e');return}
-  if(!people.length){toast('請至少填一位業務人員','e');return}
-  const gs=salesGroups().slice();
+  const gs=salesGroups().map(g=>({名稱:g.名稱,人員:(g.人員||[]).slice()}));
   if(gs.some((g,j)=>j!==_sgEdit&&g.名稱===name)){toast('已經有同名的業務群組','e');return}
-  if(_sgEdit>=0){gs[_sgEdit]={名稱:name,人員:people};markCfgAuthoritative()}
-  else gs.push({名稱:name,人員:people});
+  if(_sgEdit>=0){gs[_sgEdit].名稱=name;markCfgAuthoritative()}
+  else{gs.push({名稱:name,人員:[]});_sgPick=gs.length-1}   /* 新的那一組直接展開「＋ 加人」 */
   cfg.業務群組=gs;
   saveCfg();sgClose();renderSalesGroups();updateFilters();
   toast('業務群組已儲存 ✓','s');
 }
+/* 刪除：不鎖、先問（2026-10-08 最終版）。案場的業務照樣顯示原本的名字 */
 function sgDel(i){
   if(!requireDelete())return;
   const g=salesGroups()[i]; if(!g)return;
-  if(!confirm('確定刪除業務群組「'+g.名稱+'」？\n（已經選了這些業務的案場不受影響，照樣顯示原本的名字）'))return;
+  const n=sgUsage(g);
+  if(!confirm('確定刪除業務群組「'+g.名稱+'」？\n'+(n?'有 '+n+' 個案場的業務是這一組的人，刪了以後案場照樣顯示原本的名字，只是金額視窗不再列這一組。':'目前沒有案場用到。')))return;
   cfg.業務群組=salesGroups().filter((x,j)=>j!==i);
+  _sgPick=-1;
   markCfgAuthoritative();
   saveCfg();sgClose();renderSalesGroups();
   toast('已刪除','s');
@@ -2494,8 +3057,11 @@ function salesOptsHtml(cur){
 // ============================================================
 /* 狀態與品項兩格拿掉了（狀態改成案場層級）。舊資料身上還有的 status／location
    原樣放在那一列的 dataset 裡、存檔時照樣帶回去，不會因為打開存一次就被清掉。 */
-function logRowsToArray(){
-  return[...document.querySelectorAll('#log-editor .log-edit-row')].map(row=>{
+/* host＝哪一塊的進度記錄（不給＝第一塊 #log-editor；2026-10-12 一個編輯框可以有好幾塊區域） */
+function logRowsToArray(host){
+  host=host||document.getElementById('log-editor');
+  if(!host)return [];
+  return[...host.querySelectorAll('.log-edit-row')].map(row=>{
     const date=row.querySelector('.log-date').value;
     const text=row.querySelector('.log-text').value.trim();
     /* 施工項目，以及看施工項目決定要不要存的工廠／施工人員（2026-10-02 第三批）：
@@ -2523,7 +3089,7 @@ function logRowsToArray(){
 }
 /* 出工數要是 0 以上的整數；回傳第一個有問題的那一列（1 起算），都沒問題回 0 */
 function badManRow(){
-  const rows=[...document.querySelectorAll('#log-editor .log-edit-row')];
+  const rows=[...document.querySelectorAll('#edit-overlay .log-edit-row')];   /* 每一塊區域都算，照畫面順序數 */
   for(let i=0;i<rows.length;i++){
     const v=String(rows[i].querySelector('.log-man').value||'').trim();
     if(v!==''&&!/^\d+$/.test(v))return i+1;
@@ -2537,9 +3103,24 @@ function _optsHtml(list,cur,blank){
   if(cur&&arr.indexOf(cur)<0)arr.push(cur);
   return ['',...arr].map(v=>`<option value="${esc(v)}"${v===(cur||'')?' selected':''}>${v?esc(v):blank}</option>`).join('');
 }
-/* l＝一條進度記錄（物件）；按「＋ 新增一筆」時沒有參數＝空白的一列 */
-function addLogRow(l){
-  const editor=document.getElementById('log-editor');
+/* 「報價／施工項目」下拉（2026-10-13 她指定）：不看案場狀態，報價項目、施工項目兩段一起列（optgroup 分段）。
+   兩張都有的名字只列在報價那一段；這一條已經存著、但兩張都沒有的值（被刪、被改名）放最後，不然一打開就被換成空白。 */
+const WORK_BLANK='— 報價／施工項目 —';
+function workOptsHtml(cur){
+  const q=(cfg.報價項目||[]).filter(Boolean), w=(cfg.施工項目||[]).filter(v=>v&&q.indexOf(v)<0);
+  const opt=v=>'<option value="'+esc(v)+'"'+(v===(cur||'')?' selected':'')+'>'+esc(v)+'</option>';
+  let h='<option value=""'+(cur?'':' selected')+'>'+WORK_BLANK+'</option>';
+  if(q.length)h+='<optgroup label="報價項目">'+q.map(opt).join('')+'</optgroup>';
+  if(w.length)h+='<optgroup label="施工項目">'+w.map(opt).join('')+'</optgroup>';
+  if(cur&&q.indexOf(cur)<0&&w.indexOf(cur)<0)h+=opt(cur);
+  return h;
+}
+/* 第三格下拉列哪一張（2026-10-12 她指定）：下單工廠 → 工廠（群組四右邊那一欄，單選）；進場施工 → 廠商（群組四的廠商與施工人員） */
+function facKind(work){ return work===MM_WORK_FACTORY?'工廠':(work===MM_WORK_CREW?'廠商':''); }
+function facOptsHtml(work,cur){ return work===MM_WORK_FACTORY?_optsHtml(cfg.工廠清單,cur,'— 工廠 —'):_optsHtml(cfg['工廠'],cur,'— 廠商 —'); }
+/* l＝一條進度記錄（物件）；按「＋ 新增一筆」時沒有參數＝空白的一列。host＝放在哪一塊（不給＝第一塊） */
+function addLogRow(l,host){
+  const editor=(host&&host.nodeType===1)?host:document.getElementById('log-editor');
   if(!editor)return;
   l=(l&&typeof l==='object')?l:{};
   const row=document.createElement('div');
@@ -2554,15 +3135,16 @@ function addLogRow(l){
   /* 施工項目的 onchange 只傳 this，不帶任何字串參數 —— 不會有引號截斷的問題 */
   row.innerHTML=`
     <input type="date" class="fi log-date" value="${esc(l.date||'')}" aria-label="日期">
-    <select class="fi log-work" title="施工項目" onchange="logWorkChanged(this)">${_optsHtml(cfg['施工項目'],work,'— 施工項目 —')}</select>
-    <select class="fi log-fac" title="廠商" onchange="logFacChanged(this)">${_optsHtml(cfg['工廠'],fac,'— 廠商 —')}</select>
+    <select class="fi log-work" title="報價／施工項目" onchange="logWorkChanged(this)">${workOptsHtml(work)}</select>
+    <select class="fi log-fac" title="${facKind(work)||'廠商'}" onchange="logFacChanged(this)">${facOptsHtml(work,fac)}</select>
     <div class="log-staff" aria-label="施工人員"></div>
     <label class="log-man-wrap">出工數<input type="number" class="fi log-man" min="0" step="1" inputmode="numeric" placeholder="人" value="${esc(man)}"></label>
-    <input type="text" class="fi log-text" placeholder="說明（例：東側立面乾掛）" value="${esc(l.text||'')}">
+    <input type="text" class="fi log-text" placeholder="工作內容（例：東側立面乾掛）" aria-label="工作內容" value="${esc(l.text||'')}">
     <div class="log-ph"></div>
     <button type="button" class="btn btn-g btn-icon btn-sm log-del" onclick="logRowDel(this)" title="刪除這一筆">✕</button>`;
   row._ph=(Array.isArray(l.photos)?l.photos:[]).filter(p=>p&&p.id).map(p=>Object.assign({},p));
   row._staff=(Array.isArray(l.施工人員)?l.施工人員:[]).map(x=>String(x||'').trim()).filter(Boolean);
+  row.dataset.fk=facKind(work);   /* 記下第三格現在是工廠還是廠商，換施工項目時才知道要不要清掉 */
   editor.appendChild(row);
   syncLogSub(row);
   renderRowStaff(row);
@@ -2581,7 +3163,19 @@ function syncLogSub(row){
   if(f)f.classList.toggle('d-none',w!==MM_WORK_FACTORY&&w!==MM_WORK_CREW);
   if(st)st.classList.toggle('d-none',w!==MM_WORK_CREW);
 }
-function logWorkChanged(sel){ const row=sel&&sel.closest?sel.closest('.log-edit-row'):null; syncLogSub(row); renderRowStaff(row); }
+/* 換施工項目：第三格在「工廠」「廠商」兩張清單之間換了 → 原本選的不屬於新清單，清掉重列（勾的施工人員一起清） */
+function logWorkChanged(sel){
+  const row=sel&&sel.closest?sel.closest('.log-edit-row'):null; if(!row)return;
+  const work=sel.value, k=facKind(work), f=row.querySelector('.log-fac');
+  if(f&&k&&k!==row.dataset.fk){
+    f.innerHTML=facOptsHtml(work,''); f.title=k;
+    if((row._staff||[]).length){row._staff=[];staffSetCount(row)}
+  }
+  if(k)row.dataset.fk=k;
+  syncLogSub(row); renderRowStaff(row);
+}
+/* 編輯框換案場：2026-10-13 起下拉不看案場狀態，不用重列（函式留著，onchange 還會叫它） */
+function editProjChanged(){}
 /* 那家工廠的施工人員，一人一個勾選框。只列選到的那家；已經勾著、但清單裡已經沒有的人（被刪、被改名）照樣列出來、照樣勾著。
    名字放 data-n、事件委派 —— 不在 onclick 裡帶名字（引號截斷）。 */
 function renderRowStaff(row){
@@ -2605,7 +3199,7 @@ function logFacChanged(sel){
   renderRowStaff(row);
 }
 document.addEventListener('change',function(e){
-  const cb=(e.target&&e.target.closest)?e.target.closest('#log-editor .log-staff .sf-cb'):null;
+  const cb=(e.target&&e.target.closest)?e.target.closest('#edit-overlay .log-staff .sf-cb'):null;
   if(!cb)return;
   const row=cb.closest('.log-edit-row'); if(!row)return;
   const n=cb.getAttribute('data-n'), cur=(row._staff||[]).filter(x=>x!==n);
@@ -2633,7 +3227,7 @@ var THUMB_MAX_EDGE = 320, THUMB_QUALITY = 0.6;
 var PHOTO_READ_TIMEOUT = 20000, PHOTO_DECODE_TIMEOUT = 15000;
 var _fullCache = {}, _thumbCache = {};       // 這一輪看過／剛上傳的影像（記憶體）
 var _pendingFull = {}, _pendingThumb = {};   // 還沒推上雲的：id -> dataURI
-var PH_PEND_KEY = 'dtp_mm_ph_pending';
+var PH_PEND_KEY = LSK('dtp_mm_ph_pending');   /* 測試區另一把鑰匙（2026-10-12） */
 function phNewId(){ return 'ph_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); }
 /* 待推清單也放一份在本機：推上去之前關掉分頁，下次打開還推得上去（存不下就算了，至少記憶體裡還有） */
 function _phPendSave(){
@@ -2760,8 +3354,23 @@ function renderRowPhotos(row){
     if(p)photoThumb(p).then(d=>{if(d)im.setAttribute('src',d)});
   });
 }
+/* G 槽「看線上資料」選照片 → 直接跳框擋下（2026-10-12 B 甲）。
+   以前 _phSet 在本機預覽直接 return、_pushPendingPhotos 當成成功清掉暫存 → 照片看起來傳了、重新整理就不見、找不回來。 */
+function phBlockLocal(){
+  let ov=document.getElementById('lp-ph-block');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='lp-ph-block'; ov.className='overlay'; ov.style.alignItems='center';
+    ov.innerHTML='<div class="modal-box" style="max-width:420px"><div style="font-size:16px;font-weight:800;margin-bottom:10px">📁 本機預覽不能上傳照片</div>'
+      +'<div style="font-size:14px;line-height:1.7;margin-bottom:14px">從 G 槽打開、正在「看線上資料」時不會存到雲端，照片會不見。要測照片請切到上面的「🧪 測試區」；要真的上傳請用正式網址。</div>'
+      +'<div style="text-align:right"><button type="button" class="btn btn-p btn-sm" id="lp-ph-ok">知道了</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#lp-ph-ok').onclick=()=>ov.classList.remove('show');
+  }
+  ov.classList.add('show');
+}
 function phPicked(inp){
   const row=inp.closest('.log-edit-row'); if(!row)return;
+  if(window._LOCAL_PREVIEW){ inp.value=''; phBlockLocal(); return; }
   const picked=Array.from(inp.files||[]);
   inp.value='';
   if(!picked.length)return;
@@ -2804,25 +3413,26 @@ function phViewOpen(id,row){
 }
 function phViewClose(){ _phViewId=''; document.getElementById('ph-view').classList.remove('show'); }
 document.addEventListener('change',function(e){
-  const inp=(e.target&&e.target.closest)?e.target.closest('#log-editor .ph-inp'):null;
+  const inp=(e.target&&e.target.closest)?e.target.closest('#edit-overlay .ph-inp'):null;
   if(inp)phPicked(inp);
 });
 document.addEventListener('click',function(e){
   const t=e.target; if(!t||!t.closest)return;
-  const x=t.closest('#log-editor .ph-x');
+  const x=t.closest('#edit-overlay .ph-x');
   if(x){e.preventDefault();phRemove(x);return}
-  const im=t.closest('#log-editor .ph-th img');
+  const im=t.closest('#edit-overlay .ph-th img');
   if(im)phViewOpen(im.getAttribute('data-ph'),im.closest('.log-edit-row'));
 });
 
 /* ── 照片下載（比照日報表—專案管理 phFileNames／downloadPhotosZip，她 10-02 確認）──
- * 檔名：區域_施工項目_說明_YYMMDD_序號.副檔名，例：基座_進場施工_東側立面乾掛_260916_001.jpg
+ * 檔名：區域_範圍_施工項目_工作內容_YYMMDD_序號.副檔名，例：室內_1F廊道_案場追蹤_公設估價_261008_001.jpg
+ *   （2026-10-12：多了範圍，取前 20 字；舊格式的區域字當範圍）
  *   · 說明＝那一筆進度記錄的說明，取前 30 字；沒有說明 →「（未指定）」
  *   · 區域、施工項目都沒有 → 只寫「未分類」（不再接說明）
  *   · / \ : * ? " < > | 換成底線
  *   · 序號：前綴完全相同的一組各自從 001 開始，照上傳時間排
  *     （用組好的前綴當 key：A/B 跟 A_B 換完底線會變一樣，這樣 zip 裡才不會出現同名檔互蓋） */
-var PH_DESC_MAX=30, PH_UNSET='（未指定）', PH_NOCAT='未分類';
+var PH_DESC_MAX=30, PH_SCOPE_MAX=20, PH_UNSET='（未指定）', PH_NOCAT='未分類';
 function phSafe(s){ return String(s||'').replace(/[\\\/:*?"<>|]/g,'_').trim(); }
 function phYmd(d){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||'')); return m?m[1].slice(2)+m[2]+m[3]:''; }
 function phExt(src){ const m=/^data:image\/([a-z0-9+.-]+);/i.exec(String(src||'')); const t=(m?m[1]:'jpeg').toLowerCase(); return t==='jpeg'?'jpg':t; }
@@ -2832,7 +3442,7 @@ function phFileNames(items,fulls){
   const seq={}, out=new Array(items.length);
   order.forEach(i=>{
     const it=items[i], log=it.log||{};
-    const head=[it.loc,log.work].map(s=>phSafe(s)).filter(Boolean);
+    const head=[it.loc,Array.from(String(it.scope||'')).slice(0,PH_SCOPE_MAX).join(''),log.work].map(s=>phSafe(s)).filter(Boolean);
     const desc=phSafe(Array.from(String(log.text||'').trim()).slice(0,PH_DESC_MAX).join(''));
     const ymd=phYmd(log.date);
     const prefix=(head.length?head.concat([desc||PH_UNSET]):[PH_NOCAT]).concat(ymd?[ymd]:[]).join('_');
@@ -2843,9 +3453,9 @@ function phFileNames(items,fulls){
 }
 function phItemsOf(recs){
   const items=[];
-  (recs||[]).forEach(r=>logsOf(r).forEach(l=>((l&&l.photos)||[]).forEach(p=>{
-    if(p&&p.id)items.push({p,loc:(r&&r.施作位置)||'',log:l});
-  })));
+  (recs||[]).forEach(r=>{ const rg=regionOf(r); logsOf(r).forEach(l=>((l&&l.photos)||[]).forEach(p=>{
+    if(p&&p.id)items.push({p,loc:rg.區域,scope:rg.範圍,log:l});
+  })); });
   return items;
 }
 async function phZip(items,zipName){
@@ -2877,8 +3487,8 @@ function downloadCasePhotos(proj){
    → 施工照片_{案場}_{區域}_{今天}.zip（區域空白寫「未分類」） */
 function downloadRecPhotos(){
   const proj=document.getElementById('e-proj').value.trim();
-  const loc=document.getElementById('e-loc').value.trim();
-  const items=phItemsOf([{施作位置:loc,進度記錄:logRowsToArray()}]);
+  const loc=document.getElementById('e-loc').value.trim(), scope=document.getElementById('e-scope').value.trim();
+  const items=phItemsOf([{施作位置:loc,範圍:scope,區域格式:2,進度記錄:logRowsToArray()}]);
   return phZip(items,'施工照片_'+phSafe(proj||'（未填案場）')+'_'+(phSafe(loc)||PH_NOCAT)+'_'+fnDate()+'.zip');
 }
 /* ── 部門建議清單一律以入口網頁為準（2026-08-19）──────────────────────
@@ -3031,6 +3641,23 @@ function loadTombstones(data){
   if(d&&typeof d==='object')Object.keys(d).forEach(k=>{if(d[k])_tombstones[k]=d[k]});
 }
 function dropDeleted(list){return (list||[]).filter(r=>!(r&&isDeleted(r.id)))}
+/* ── 案場金額的刪除紀錄（2026-10-12 她選甲）──────────────────────────
+ * 10-12 查到：案場改名時，金額那份搬到新名字、雲端舊名字那份刪掉；但別台電腦的副本（本機快取）裡還有舊名字，
+ * 下次打開時 rescueLocalCases 把它當成「上次沒存上去」補回雲端 → 雲端同時有新、舊兩份，
+ * 以後有人再建同名案場會直接繼承舊的狀態、金額、業務。（線上 09-30 起就有；10-12 唯讀查過，線上還沒發生）
+ * 修法同工作項目（10-06）：改名搬走時在 dtp_mm/casesDeleted/{舊鍵} 記下時間；補傳、即時同步都先查，
+ * 副本那份比紀錄舊 → 丟掉不補。之後真的有人用同一個名字建新案場（存的時間比紀錄新）→ 照常存、紀錄一起清掉。
+ * 另外補一道保險（同 rescueLocalNewer）：雲端根本沒有的案場，副本只有 7 天內改過的才補傳。 */
+let _caseTombs={};
+function loadCaseTombs(data){
+  const d=data&&data.casesDeleted;
+  if(d&&typeof d==='object')Object.keys(d).forEach(k=>{if(d[k])_caseTombs[k]=d[k]});
+}
+/* 這份副本是不是「已經被搬走／刪掉」之前的舊資料 */
+function caseIsGone(k,c){
+  const t=_caseTombs[k]; if(!t)return false;
+  return (Date.parse((c&&c.updatedAt)||'')||0)<=(Date.parse(t)||0);
+}
 const DELETED_MSG='這筆紀錄已經被別人刪除，剛剛的修改沒有存。';
 function _snapshot(list){const m={};(list||[]).forEach(r=>{if(r&&r.id)m[r.id]=JSON.stringify(r)});return m}
 
@@ -3158,7 +3785,7 @@ function _pickScalar(mine,theirs,base){
   if(JSON.stringify(mine)!==JSON.stringify(base))return mine;   // 我改過 → 用我的
   return theirs!==undefined?theirs:mine;                 // 我沒改 → 保留雲端
 }
-const REC_SCALARS=['案場','部門','執行者','施作位置','工作項目','備註','狀態'];   /* 2026-10-02：業務搬到案場層級，紀錄上不再有 */
+const REC_SCALARS=['案場','部門','執行者','施作位置','工作項目','備註','狀態','範圍','區域格式'];   /* 2026-10-12：範圍、區域格式 */   /* 2026-10-02：業務搬到案場層級，紀錄上不再有 */
 function mergeRecord(local,cloud,base){
   if(!cloud)return local;
   const out={...local};
@@ -3240,9 +3867,17 @@ async function fbSave(){
        試做版是「整個案場一份、後存的蓋先存的」—— 兩個人同時改同一個案場的帳款，後存的那份會贏。
        刪除（案場改名時舊鍵搬走）一次最多一個，多了代表本機資料異常，跟紀錄一樣整批不刪。 */
     const cSnap=_casesSnap(cases);
-    Object.keys(cSnap).forEach(k=>{ if(_lastPushedCases[k]!==cSnap[k])jobs.push(window._fbSetPath('cases/'+k,cases[k])); });
+    Object.keys(cSnap).forEach(k=>{
+      if(_lastPushedCases[k]===cSnap[k])return;
+      jobs.push(window._fbSetPath('cases/'+k,cases[k]));
+      /* 同一個名字又建了新的（2026-10-12）：存的時間比刪除紀錄新 → 紀錄清掉，不然以後別台會把它當舊的 */
+      if(_caseTombs[k]&&!caseIsGone(k,cases[k])){delete _caseTombs[k];jobs.push(window._fbSetPath('casesDeleted/'+k,null));}
+    });
     const cDels=Object.keys(_lastPushedCases).filter(k=>!(k in cSnap));
-    if(cDels.length===1)jobs.push(window._fbSetPath('cases/'+cDels[0],null));
+    if(cDels.length===1){
+      jobs.push(window._fbSetPath('cases/'+cDels[0],null));
+      if(_caseTombs[cDels[0]])jobs.push(window._fbSetPath('casesDeleted/'+cDels[0],_caseTombs[cDels[0]]));   /* 刪除紀錄（2026-10-12） */
+    }
     await Promise.all(jobs);
     // 合併結果要回到畫面上，不然使用者看到的還是自己那份，跟雲端不一致
     if(mergedAny||goneByOthers){saveLocal();renderMain();renderHistory();updateFilters()}
@@ -3257,7 +3892,7 @@ async function fbSave(){
 // 雲端已經沒有、但本機有的：只在 7 天內動過才留（避免把別人早就刪掉的紀錄又復活）。
 function rescueLocalNewer(){
   let localRecs=[];
-  try{const s=localStorage.getItem('dtp_mm_rec');localRecs=s?JSON.parse(s):[]}catch(e){return 0}
+  try{const s=localStorage.getItem(LSK('dtp_mm_rec'));localRecs=s?JSON.parse(s):[]}catch(e){return 0}
   if(!Array.isArray(localRecs)||!localRecs.length)return 0;
   const byId={};records.forEach(r=>{if(r&&r.id)byId[r.id]=r});
   const week=Date.now()-7*24*3600*1000;
@@ -3277,13 +3912,16 @@ function rescueLocalNewer(){
    本機那份的 updatedAt 比雲端新（或雲端根本沒有）＝上次沒推上去，留本機的。回傳救回幾個。 */
 function rescueLocalCases(cloudCases){
   let local={};
-  try{const s=localStorage.getItem('dtp_mm_cases');local=s?JSON.parse(s):{}}catch(e){local={}}
+  try{const s=localStorage.getItem(LSK('dtp_mm_cases'));local=s?JSON.parse(s):{}}catch(e){local={}}
   const out=Object.assign({},cloudCases||{});
+  const week=Date.now()-7*24*3600*1000;
   let n=0;
   Object.keys(local||{}).forEach(k=>{
     const lc=local[k], cc=out[k];
     if(!lc)return;
+    if(caseIsGone(k,lc))return;   /* 改名搬走／刪掉的舊名字：不補回去（2026-10-12） */
     const lt=Date.parse(lc.updatedAt||'')||0, ct=cc?(Date.parse(cc.updatedAt||'')||0):0;
+    if(!cc&&lt<=week)return;      /* 雲端沒有、副本又是一週前的 → 不補（同 rescueLocalNewer） */
     if(lt>ct&&JSON.stringify(lc)!==JSON.stringify(cc)){out[k]=lc;n++}
   });
   cases=out;saveCasesLocal();
@@ -3302,6 +3940,7 @@ async function initFb(){
     if(data&&data.records){
       /* 金額與帳款：雲端那份為準，再把本機比較新的救回來（2026-09-30） */
       _lastPushedCases=_casesSnap(data.cases||{});
+      loadCaseTombs(data);   /* 先收案場的刪除紀錄，補傳才擋得住（2026-10-12） */
       if(rescueLocalCases(data.cases||{}))setTimeout(()=>fbSave(),350);
       loadTombstones(data);   // 刪除紀錄（2026-10-06）
       records=dropDeleted(Object.values(data.records).map(normalizeRecord));
@@ -3365,9 +4004,10 @@ function applyRemote(data){
   }
   /* 金額與帳款（2026-09-30）：雲端為準；本機跟「上次推上去的版本」不同的＝還在同步中，留本機的 */
   if(data.cases&&typeof data.cases==='object'){
+    loadCaseTombs(data);
     const inc=Object.assign({},data.cases);
     Object.keys(cases||{}).forEach(k=>{
-      if(cases[k]&&_lastPushedCases[k]!==_caseJson(cases[k]))inc[k]=cases[k];
+      if(cases[k]&&_lastPushedCases[k]!==_caseJson(cases[k])&&!caseIsGone(k,cases[k]))inc[k]=cases[k];
     });
     if(JSON.stringify(_casesSnap(inc))!==JSON.stringify(_casesSnap(cases))){
       cases=inc;saveCasesLocal();changed=true;
@@ -3388,6 +4028,7 @@ function startWatch(){
   window._fbWatch(data=>{
     // 使用者正在編輯視窗裡打字時不要抽換底下的資料，先收著，關掉視窗再套用
     loadTombstones(data);   // 編輯中也先收刪除紀錄，存檔時才擋得住（2026-10-06）
+    loadCaseTombs(data);    // 案場金額的刪除紀錄（2026-10-12）
     if(isEditingNow()){_pendingRemote=data;return}
     applyRemote(data);
   });
@@ -3397,15 +4038,15 @@ function flushPendingRemote(){
 }
 /* 本機暫存的鍵名（2026-09-30）：全部掛 dtp_mm_ 開頭，跟圖面管理的 dtp_rec／dtp_cfg 分開 ——
    兩支都從同一個網域打開，鍵名一樣就會互相蓋掉對方的暫存。 */
-function saveLocal(){localStorage.setItem('dtp_mm_rec',JSON.stringify(records))}
-function saveCfgLocal(){localStorage.setItem('dtp_mm_cfg',JSON.stringify(cfg))}
-function saveCasesLocal(){try{localStorage.setItem('dtp_mm_cases',JSON.stringify(cases))}catch(e){}}
+function saveLocal(){localStorage.setItem(LSK('dtp_mm_rec'),JSON.stringify(records))}
+function saveCfgLocal(){localStorage.setItem(LSK('dtp_mm_cfg'),JSON.stringify(cfg))}
+function saveCasesLocal(){try{localStorage.setItem(LSK('dtp_mm_cases'),JSON.stringify(cases))}catch(e){}}
 function loadLocal(){
-  const s=localStorage.getItem('dtp_mm_rec');
+  const s=localStorage.getItem(LSK('dtp_mm_rec'));
   /* 範例要整份深拷貝：進度記錄是物件陣列，淺拷貝的話改名（cfgApplyRename）會直接改到 INIT 本身 */
   records=(s?JSON.parse(s):JSON.parse(JSON.stringify(INIT))).map(normalizeRecord);
   if(!s)saveLocal();
-  const c=localStorage.getItem('dtp_mm_cases');
+  const c=localStorage.getItem(LSK('dtp_mm_cases'));
   try{cases=c?(JSON.parse(c)||{}):JSON.parse(JSON.stringify(INIT_CASES))}catch(e){cases={}}
   if(!c)saveCasesLocal();
 }
@@ -3637,8 +4278,11 @@ function openExportPicker(){
     '目前畫面上共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
   xpDept=new Set(); xpStatus=new Set();
   /* 金額兩個勾選（2026-10-02 第三批）：預設＝畫面上目前的兩顆開關 */
-  xpAct=mmShowAct; xpApx=mmShowApx;
+  xpAct=true; xpApx=true;   /* 2026-10-12（V 甲）：不跟畫面上的開關，兩個都勾 */
+  xpTax=true; xpUntax=false;   /* 2026-10-13 她指定：預設只勾含稅 */
   xpPh=false;               /* 含施工照片（2026-10-05 第五批）：每次打開預設不勾 */
+  xpPaid=true; xpUnpaid=false;   /* 2026-10-14 她指定：已收／未收各一個勾選，預設只勾已收 */
+  xpMan0=true;              /* 2026-10-14 她指定：出工 0 列印／不列印，預設列印 */
   renderExportPicker();
   renderExportExtra();      /* 部門／日期區間／工作狀態（2026-09-20） */
   document.getElementById('xp-overlay').classList.add('show');
@@ -3648,7 +4292,10 @@ function openExportPicker(){
  * 三個都是**沒選＝不限**，跟畫面上的篩選同一套邏輯。 */
 var xpDept = new Set(), xpStatus = new Set();
 var xpAct = true, xpApx = true;   /* 匯出的金額欄（2026-10-02 第三批） */
+var xpTax = true, xpUntax = false;   /* 含稅／未稅（2026-10-13）：兩個都勾＝兩行都印；都不勾＝沒有金額欄 */
 var xpPh = false;                 /* 含施工照片（2026-10-05 第五批，她選甲＝另開「施工照片」分頁） */
+var xpPaid = true, xpUnpaid = false;   /* 已收／未收（2026-10-14）：報價一律印；已收、未收照勾選 */
+var xpMan0 = true;                /* 出工數＝0 要不要印「（出工 0）」（2026-10-14，預設列印） */
 function xpOptions(){
   var data = getFiltered();
   var depts = [], sts = [];
@@ -3696,10 +4343,21 @@ function renderExportExtra(){
     + xpChip('status', '', xpStatus.size === 0).replace('>' + '<', '>全部<')
     + o.sts.map(function(s){ return xpChip('status', s, xpStatus.has(s)); }).join('')
     + '</div></div>'
-    /* 金額（2026-10-02 第三批）：各自勾或不勾；兩個都勾 → 每個金額各一欄；都不勾 → 沒有金額欄 */
+    /* 金額（2026-10-02 第三批；10-12 她選 R 乙＝照舊）：勾了才印「$元」「萬」；兩個都勾同一格兩種都寫；都不勾 → 沒有金額欄 */
     + '<div class="xp-grp"><b>金額</b><div class="xp-chips">'
     + '<label class="xp-chk"><input type="checkbox" id="xp-act"' + (xpAct ? ' checked' : '') + ' onchange="xpAct=this.checked">實際值（元）</label>'
     + '<label class="xp-chk"><input type="checkbox" id="xp-apx"' + (xpApx ? ' checked' : '') + ' onchange="xpApx=this.checked">大約值（萬）</label>'
+    + '</div><div class="xp-chips" style="margin-top:4px">'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-tax"' + (xpTax ? ' checked' : '') + ' onchange="xpTax=this.checked">含稅</label>'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-untax"' + (xpUntax ? ' checked' : '') + ' onchange="xpUntax=this.checked">未稅</label>'
+    + '</div><div class="xp-chips" style="margin-top:4px">'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-paid"' + (xpPaid ? ' checked' : '') + ' onchange="xpPaid=this.checked">已收</label>'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-unpaid"' + (xpUnpaid ? ' checked' : '') + ' onchange="xpUnpaid=this.checked">未收</label>'
+    + '</div></div>'
+    /* 出工數＝0（2026-10-14 她指定）：畫面上 0 不顯示；Excel 由這裡選，預設列印 */
+    + '<div class="xp-grp"><b>出工數＝0</b><div class="xp-chips">'
+    + '<label class="xp-chk"><input type="radio" name="xp-man0" id="xp-man0-on"' + (xpMan0 ? ' checked' : '') + ' onchange="if(this.checked)xpMan0=true">列印</label>'
+    + '<label class="xp-chk"><input type="radio" name="xp-man0" id="xp-man0-off"' + (xpMan0 ? '' : ' checked') + ' onchange="if(this.checked)xpMan0=false">不列印</label>'
     + '</div></div>'
     /* 照片（2026-10-05 第五批）：勾了 → 多一個「施工照片」分頁，照 案場 › 區域 › 日期 分組，用縮圖 */
     + '<div class="xp-grp"><b>照片</b><div class="xp-chips">'
@@ -3718,7 +4376,7 @@ function xpDateClear(){
 /* 匯出時真正套用的條件（exportExcel 會讀這一包） */
 function xpFilters(){
   var g = function(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
-  return { depts:[...xpDept], statuses:[...xpStatus], from:g('xp-from'), to:g('xp-to'), act:!!xpAct, apx:!!xpApx, photos:!!xpPh };
+  return { depts:[...xpDept], statuses:[...xpStatus], from:g('xp-from'), to:g('xp-to'), act:!!xpAct, apx:!!xpApx, tax:!!xpTax, untax:!!xpUntax, paid:!!xpPaid, unpaid:!!xpUnpaid, man0:!!xpMan0, photos:!!xpPh };
 }
 function renderExportPicker(){
   const names=[...xpGroups.keys()].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
@@ -3813,17 +4471,17 @@ function getFiltered(){
   /* 2026-10-02 第二版：狀態、業務都是**案場層級**的（cases），篩的時候看這一列所屬案場的值。
      狀態篩選不再一條一條篩進度記錄（進度記錄已經沒有狀態）。 */
   // 2026-08-20：篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
-  return sortByProjOrder(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{
+  return sortForMain(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{   /* 2026-10-13：照「顯示順序」按鈕排 */
     const cs=caseStatusOf(r.案場);
     if(mmPhase!=='all' && statusGroupOf(cs)!==mmPhase) return false;
     if(msSel.status.size&&!msSel.status.has(cs))return false;
-    if(msSel.sales.size&&!msSel.sales.has(caseSalesOf(r.案場)))return false;
+    if(msSel.sales.size&&!caseSalesList(r.案場).some(s=>msSel.sales.has(s)))return false;   /* 2026-10-12 業務複選 */
     if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
     if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
     if(q){
       /* 搜尋也吃案場的狀態、業務，以及施工項目、工廠、施工班 */
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.text,p.work,p.factory,p.crew,(p.施工人員||[]).join(' ')].join(' ')).join(' ');
-      if(![r.案場,r.部門,r.執行者,caseSalesOf(r.案場),cs,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
+      if(![r.案場,r.部門,r.執行者,caseSalesOf(r.案場),cs,r.施作位置,r.範圍,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
     }
     if(drActive() && !logsInRange(r.進度記錄).length) return false;   /* 區間內沒有記錄 → 這一列不出現（2026-09-20） */
     return true;
@@ -3839,8 +4497,9 @@ function updateFilters(){
   const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
   const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   /* 狀態＝系統設定的狀態清單（2026-10-02 第三批）；業務＝看得到的案場目前選的業務 */
-  const ss=statusNames();
-  const sa=[...new Set(ps.map(caseSalesOf).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  /* 2026-10-12：刪掉、但還有案場在用的狀態也列（不然篩不到那幾個案場）；業務可以複選 → 拆成一個一個人 */
+  const ss=statusNames().concat([...new Set(ps.map(caseStatusOf).filter(statusIsDeleted))]);
+  const sa=[...new Set(ps.flatMap(caseSalesList))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
   if(!document.getElementById('msp-proj'))return;
   // 已經不存在的選項要從勾選中移掉，否則會篩出 0 筆卻看不出原因
   [['proj',ps],['exec',es],['status',ss],['sales',sa]].forEach(function(pair){
@@ -3913,28 +4572,34 @@ function renderMain(){
    * 每張表都用同一組 colgroup ＋ table-layout:fixed → 表頭、標題列、工作項目列欄位對齊。 */
   /* 2026-10-02 第三批：金額兩種顯示（實際金額／大約金額）各自開關；兩個都關 → 報價金額、應收帳款兩欄整欄收起
      （colgroup、表頭、標題列、工作項目列四個地方一起少兩欄，欄位才對得齊）。金額欄改用固定寬度，兩種一起顯示也排得下。 */
-  const showAmt=amtShown();
+  const showAmt=amtShown(), showQ=amtShownQ(), showR=amtShownR();   /* 2026-10-12：兩欄各自收起 */
+  syncAmtButtons();   /* 開關按鈕的打勾一律照 mmAmt 畫（不靠 HTML 寫死的初始值） */
+  syncOrderButtons(); /* 顯示順序兩顆一樣（2026-10-13） */
   /* 2026-10-02 第四批：最右邊的按鈕欄拿掉 —— 工作項目的 ✏️ 搬到「工作內容」那格最上面；
      案場標題列的「金額 ✏️」「照片📥」放在業務那格（業務名字底下，照示意圖）。狀態欄放下拉，比較寬。 */
   /* 2026-10-05 第五批：金額兩欄的寬度改由 CSS 決定（.mm-col-quote／.mm-col-recv）——
      畫面夠寬（≥1280）照舊 200／240；比較窄或筆電放大時縮成 150／180、字放不下就折兩行，表格最小寬度 1230 → 1000 */
   const COLG='<colgroup><col style="width:96px"><col style="width:11%"><col style="width:7%"><col style="width:6%"><col>'
-    +(showAmt?'<col class="mm-col-quote"><col class="mm-col-recv">':'')
+    +(showQ?'<col class="mm-col-quote">':'')+(showR?'<col class="mm-col-recv">':'')
     +'<col class="mm-col-sales" style="width:100px"></colgroup>';
   const head='<table class="mm-tbl mm-colhead">'+COLG+'<thead><tr><th class="mm-fz1">狀態</th><th class="mm-fz2">案場</th><th>執行者</th><th>區域</th><th>工作內容／施工照片</th>'
-    +(showAmt?'<th>報價金額</th><th>已收帳款</th>':'')+'<th>業務</th></tr></thead></table>';
+    +(showQ?'<th>報價金額</th>':'')+(showR?'<th>應收帳款</th>':'')+'<th>業務</th></tr></thead></table>';   /* 2026-10-12：標題「已收帳款」→「應收帳款」（格子裡的已收／未收不變） */
   const _oldSc=el.querySelector('.mm-scroll'), _oldLeft=_oldSc?_oldSc.scrollLeft:0;   /* 第五批：重畫後留在原本左右滑到的位置 */
   /* 2026-10-05 第六批（她指定）：欄位標題列固定在上方 ——
      標題列原本在 .mm-scroll（可以左右滑的那一塊）裡面，overflow 容器裡的 sticky 黏不到整頁，
      所以拉到外面一層 .mm-sticky（連第五批的「左右滑動」提示一起），左右位置由 mmHsSetup 跟著表格同步。 */
-  const innerCls='mm-inner'+(showAmt?'':' mm-noamt');
+  /* 應收帳款兩個都開（「已收 含稅 178.8萬 ($1,787,625)（30.0%）」）那一欄比較寬，不然 1280／1366 會折行（真 Chrome 量過） */
+  const innerCls='mm-inner'+(showAmt?'':' mm-noamt')+((showQ&&showR)?'':' mm-oneamt')+((mmAmt.r.act&&mmAmt.r.apx)?' mm-recv2':'');
   el.innerHTML='<div class="mm-sticky">'+MM_HS_HTML+'<div class="mm-hd-scroll"><div class="'+innerCls+'">'+head+'</div></div></div>'
     +'<div class="mm-wrap"><div class="mm-scroll"><div class="'+innerCls+'">'+Object.entries(groups).map(([proj,rows],gi)=>{
     const sid=secId(proj);
     const open=_openSecs.has(sid);
     /* 案場名稱旁的 ↑↓：直接在這一頁調案場順序（2026-09-02 用戶指定）。
        點箭頭時要 stopPropagation，否則會順便把這一組收合起來。 */
-    const canMv=portalCanDragSort();   /* 2026-09-03：↑↓ 與拖曳改由「資料排序」權管 */
+    /* 2026-09-03：↑↓ 與拖曳改由「資料排序」權管。
+       2026-10-13 她選「保留但隱藏」：順序改由「顯示順序」按鈕決定，案場的 ↑↓／拖曳在畫面上看不出效果 → 先藏起來；
+       要開回來把 MM_CASE_MOVE_UI 改成 true（projMove／projDrag* 都還在）。工作項目列的拖曳（canMvRow）不受影響。 */
+    const canMv=MM_CASE_MOVE_UI&&portalCanDragSort();
     const mv=canMv?`<span class="sec-mv-wrap" style="display:inline-flex;margin-left:4px">
         <button class="sec-mv" title="往上移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',-1)"${gi===0?' disabled':''}>↑</button>
         <button class="sec-mv" title="往下移" onclick="event.stopPropagation();projMove('${esc(proj).replace(/'/g,"\\'")}',1)"${gi===_groupCount-1?' disabled':''}>↓</button>
@@ -3950,29 +4615,37 @@ function renderMain(){
     /* 狀態底色（2026-10-02 第四批）：標題列整列＝狀態底色、底下工作項目列＝同色更淡（她選 5 乙） */
     const sc=statusColor(st), canCase=canEditCase(proj);
     /* 百分比、加總、未收都用實際金額（元）算，算完才換成大約金額（示意圖：所以大約金額偶爾差 0.1 萬） */
+    /* 2026-10-12（O 甲）：含稅在上（粗、寫「含稅」）、未稅小字在下；格式「萬（$元）」。線上很多案場只填了含稅 → 沒填的那行不畫 */
     const quote=(mi.untax===null&&mi.tax===null)?'<span class="mm-dash">—</span>'
-      :`<div class="mm-money mm-quote"><span>未稅 ${amtText(mi.untax)}</span><small>含稅 ${amtText(mi.tax)}</small></div>`;
+      :'<div class="mm-money mm-quote">'+(mi.tax!==null?'<span>'+amtOf(mi.tax,'q')+'（含稅）</span>':'')
+        +(mi.untax!==null?'<small>'+amtOf(mi.untax,'q')+'（未稅）</small>':'')+'</div>';
+    /* 2026-10-14 她指定（增2）：「含稅 803.9萬」→「803.9萬（含稅）」；已收寫「已收 $830,000（含稅）（10.3%）」；
+       未收兩行不顯示（金額編輯框的未收合計照舊） */
     /* 已收帳款（2026-10-05 第六批，她選乙＝照示意圖「每格多一行未稅」）：
        已收（含稅、百分比＝含稅 ÷ 報價含稅）→ 下一行縮排「未稅」；未收一樣。
        「已收・含稅 $83,101 8.3萬（78.8%）」寫全在 1280 寬會折行（真 Chrome 量過）→ 含稅那行沿用原本的「已收／未收」字樣 */
+    /* 應收帳款（2026-10-12 O 甲）：只放實際值（$），含稅在上、寫「含稅」；未稅縮排小字在下 */
     const recv=!mi.n?'<span class="mm-dash">—</span>'
-      :`<div class="mm-money mm-recv"><span title="含稅">已收 ${amtText(mi.paid)}（${pctText(mi.paid,mi.tax)}）</span><small class="mm-sub">未稅 ${amtText(mi.paidU)}</small>`
-        +`<small title="含稅">未收 ${mi.unpaid===null?'—':amtText(mi.unpaid)+'（'+pctText(mi.unpaid,mi.tax)+'）'}</small><small class="mm-sub">未稅 ${mi.unpaidU===null?'—':amtText(mi.unpaidU)}</small></div>`;
+      :'<div class="mm-money mm-recv"><span>已收 '+amtOf(mi.paid,'r')+'（含稅）（'+pctText(mi.paid,mi.tax)+'）</span><small class="mm-sub">'+amtOf(mi.paidU,'r')+'（未稅）</small></div>';
     const btns=`<div class="mm-hbtns">`
       +`<button type="button" class="mm-hbtn mm-money-btn" data-case="${esc(proj)}" onclick="event.stopPropagation();openCaseMoney(this.getAttribute('data-case'))">金額 ✏️</button>`
-      +`<button type="button" class="mm-hbtn mm-ph-btn" data-case="${esc(proj)}" onclick="event.stopPropagation();downloadCasePhotos(this.getAttribute('data-case'))">照片📥</button></div>`;
-    return`<div class="proj-section mm-sec">
+      +`<button type="button" class="mm-hbtn mm-ph-btn" data-case="${esc(proj)}" onclick="event.stopPropagation();downloadCasePhotos(this.getAttribute('data-case'))">案場照片 📥</button></div>`;
+    /* 人員、部門放在案場列（2026-10-12，七 Q5 乙）：這個案場所有工作項目的執行者、部門（照出現順序）；工作項目列只有跟這裡不同時才寫 */
+    const cx=caseExecInfo(rows);
+    /* 手機（≤640）的案場條：黏在綠色導覽列下面，捲到下一個案場自動換（10-08 定案 C 甲） */
+    const mbar='<div class="mm-mbar" aria-hidden="true" style="background:'+sc.bg+';color:'+sc.fg+'"><span class="mm-mbar-n">'+(gi+1)+'. '+esc(proj)+'</span><span class="mm-mbar-s">'+esc(st)+(statusIsDeleted(st)?'（已刪除）':'')+'</span></div>';
+    return`<div class="proj-section mm-sec">${mbar}
       <div class="proj-header mm-case-head${open?'':' sec-collapsed'}"${dragAttr} style="background:${sc.bg};--rowbg:${sc.bg}" onclick="toggleSec('${sid}',this)">
         <table class="mm-tbl">${COLG}<tbody><tr>
           <td class="mm-st-cell mm-fz1">${statusSelectHtml(proj,st,canCase)}</td>
           <td class="mm-cname mm-fz2">${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:4px">▼</span><span style="opacity:.7;margin-right:4px;font-variant-numeric:tabular-nums">${gi+1}.</span><span class="mm-cn">${esc(proj)}</span><span class="proj-cnt">${rows.length} 筆</span>${mv}</td>
-          <td colspan="3"></td>
-          ${showAmt?'<td class="mm-amt-td" data-lb="報價金額">'+quote+'</td><td class="mm-amt-td" data-lb="已收帳款">'+recv+'</td>':''}
-          <td class="mm-sales-td" data-lb="業務"><div class="mm-sales">${sales?esc(sales):'<span class="mm-dash">—</span>'}</div>${btns}</td>
+          <td class="mm-case-exec" data-lb="人員">${cx.html}</td><td colspan="2"></td>
+          ${showQ?'<td class="mm-amt-td" data-lb="報價金額">'+quote+'</td>':''}${showR?'<td class="mm-amt-td" data-lb="應收帳款">'+recv+'</td>':''}
+          <td class="mm-sales-td" data-lb="業務"><div class="mm-sales">${sales?esc(sgSplit(sales).join('、')):'<span class="mm-dash">—</span>'}</div>${btns}</td>
         </tr></tbody></table>
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
-        <table class="mm-tbl">${COLG}<tbody>${rows.map((r,ri)=>renderRow(r,ri,rows.length,sc.light)).join('')}</tbody></table>
+        <table class="mm-tbl">${COLG}<tbody>${rows.map((r,ri)=>renderRow(r,ri,rows.length,sc.light,cx.key)).join('')}</tbody></table>
       </div>
     </div>`;
   }).join('')+'</div></div></div>';
@@ -4064,10 +4737,28 @@ function rowDragEnd(){
  * 2026-10-02 第二版：欄位跟著表頭（狀態／案場／執行者／區域／工作內容／報價／應收帳款／業務／✏️），
  * 工作項目列的「狀態、案場、金額、業務」幾格空著（那些是案場層級的，寫在灰底標題列上）。
  * 狀態那一格拿來放拖曳抓手；備註（材料）放在工作內容底下。 */
-function renderRow(r, ri, total, tint){
+/* 案場列的人員（2026-10-12，七 Q5 乙）：底下每一筆工作項目的執行者、部門，照出現順序不重複。
+   key＝「執行者|部門」，工作項目列跟它一樣就不再寫一次 */
+function execKeyOf(r){ return _execList(r).join('、')+'|'+String((r&&r.部門)||'').trim(); }
+function caseExecInfo(rows){
+  const ex=[], dp=[];
+  (rows||[]).forEach(r=>{ _execList(r).forEach(e=>{ if(ex.indexOf(e)<0)ex.push(e); }); const d=String((r&&r.部門)||'').trim(); if(d&&dp.indexOf(d)<0)dp.push(d); });
+  const keys=[...new Set((rows||[]).map(execKeyOf))];
+  return {key:keys.length===1?keys[0]:null,
+    html:ex.map(e=>'<span class="ex-tag">'+esc(e)+'</span>').join('')+(dp.length?'<div class="mm-dept">'+esc(dp.join('、'))+'</div>':'')};
+}
+/* 區域格（2026-10-12）：區域（粗）＋下一行範圍（小字）；舊格式的區域字當範圍 */
+function regionHtml(r){
+  const rg=regionOf(r);
+  if(!rg.區域&&!rg.範圍)return '';
+  return (rg.區域?'<span class="loc-tag">'+esc(rg.區域)+'</span>':'')+(rg.範圍?'<div class="mm-scope">'+esc(rg.範圍)+'</div>':'');
+}
+function renderRow(r, ri, total, tint, caseKeyExec){
   normalizeRecord(r);
-  const exs=(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean).map(e=>`<span class="ex-tag">${esc(e)}</span>`).join('');
-  const loc=r.施作位置?`<span class="loc-tag">${esc(r.施作位置)}</span>`:'';
+  /* 人員：跟案場列一樣（整個案場只有一種組合）就不再寫（2026-10-12 七 Q5 乙） */
+  const sameAsCase=caseKeyExec!==undefined&&caseKeyExec!==null&&execKeyOf(r)===caseKeyExec;
+  const exs=sameAsCase?'':(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean).map(e=>`<span class="ex-tag">${esc(e)}</span>`).join('');
+  const loc=regionHtml(r);
   const log=renderLog(r.進度記錄);
   const note=r.備註?`<div class="mm-note">備註：${esc(r.備註).replace(/\n/g,'<br>')}</div>`:'';
   const editable=canEditRecord(r);
@@ -4088,10 +4779,10 @@ function renderRow(r, ri, total, tint){
   return`<tr class="mm-rec"${dragRow}${tint?' style="background:'+tint+';--rowbg:'+tint+'"':''}>
     ${handleCell}
     <td class="mm-fz2"></td>
-    <td>${exs}${r.部門?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
+    <td>${exs}${(!sameAsCase&&r.部門)?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
     <td>${loc}</td>
     <td class="log-cell"><div class="mm-rec-edit">${actionCell}</div>${log}${note}</td>
-    ${amtShown()?'<td></td><td></td>':''}<td></td>
+    ${amtShownQ()?'<td></td>':''}${amtShownR()?'<td></td>':''}<td></td>
   </tr>`;
 }
 
@@ -4101,7 +4792,7 @@ function logSubText(l){
   if(!l)return '';
   const st=Array.isArray(l.施工人員)?l.施工人員.filter(Boolean):[];
   if(l.factory&&l.work===MM_WORK_CREW)return l.factory+(st.length?'：'+st.join('、'):'');
-  if(l.factory)return '廠商：'+l.factory;
+  if(l.factory)return (l.work===MM_WORK_FACTORY?'工廠：':'廠商：')+l.factory;
   if(l.crew)return '施工班：'+l.crew;
   return '';
 }
@@ -4119,7 +4810,8 @@ function renderLog(logs){
     const wiHtml=item.work?`<span class="log-wi">${esc(item.work)}</span>`:'';
     const subV=logSubText(item);
     const subHtml=subV?`<span class="log-wsub">${esc(subV)}</span>`:'';
-    const manHtml=(typeof item.出工數==='number'&&isFinite(item.出工數))?`<span class="mm-man">出工 ${item.出工數}</span>`:'';
+    /* 2026-10-14 她指定（增3）：出工數＝0 不顯示、>0 才顯示；存的資料不動，編輯框照樣看得到 0 */
+    const manHtml=(typeof item.出工數==='number'&&isFinite(item.出工數)&&item.出工數>0)?`<span class="mm-man">出工 ${item.出工數}</span>`:'';
     const phN=Array.isArray(item.photos)?item.photos.filter(p=>p&&p.id).length:0;
     const phHtml=phN?`<span class="mm-phn" title="這一筆有 ${phN} 張照片">📷 ${phN}</span>`:'';
     return`<li class="log-li">${dtHtml}<span class="log-tx">${wiHtml}${subHtml}${locHtml}${esc(item.text||'')}${manHtml}${phHtml}</span></li>`;
@@ -4259,7 +4951,7 @@ function getWorktimeRows(){
     if(fs&&st!==fs)return;
     if(q){
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
-      if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return;
+      if(![r.案場,r.部門,r.執行者,regionText(r),logText,r.備註].join(' ').toLowerCase().includes(q))return;
     }
     // 日期區間：紀錄至少有一筆 log 落在區間內
     if(fromD||toD){
@@ -4284,7 +4976,7 @@ function getWorktimeRows(){
     switch(k){
       case'proj':av=projOrderIdx(a.r.案場);bv=projOrderIdx(b.r.案場);break;
       case'exec':av=a.r.執行者||'';bv=b.r.執行者||'';break;
-      case'loc':av=a.r.施作位置||'';bv=b.r.施作位置||'';break;
+      case'loc':av=regionText(a.r);bv=regionText(b.r);break;
       case'start':av=a.stat.startDate;bv=b.stat.startDate;break;
       case'end':av=a.stat.endDate;bv=b.stat.endDate;break;
       case'total':av=num(a.stat.total);bv=num(b.stat.total);break;
@@ -4335,7 +5027,7 @@ function renderWorktime(){
       <td>${i+1}</td>
       <td class="tl"><strong>${esc(r.案場)}</strong></td>
       <td class="tl">${esc(r.執行者)}</td>
-      <td class="tl">${esc(r.施作位置||'')}</td>
+      <td class="tl">${esc(regionText(r))}</td>
       <td>${esc(stat.startDate)}</td>
       <td>${stat.isClosed?esc(stat.endDate):'<span style="color:var(--muted)">至今</span>'}</td>
       <td>${stat.total}</td>
@@ -4364,7 +5056,7 @@ async function exportWorktimeExcel(){
   const headers=['#','案場','執行者','區域','起始日','終止日','總曆時','暫停天','工作天','目前狀態'];   /* 施作位置→區域（2026-09-30） */
   const minW=[5,22,18,20,14,14,8,8,8,12];
   const maxW=[5,40,24,40,14,14,12,12,12,16];
-  const rd=rows.map((row,i)=>[i+1,row.r.案場,row.r.執行者,row.r.施作位置||'',row.stat.startDate,row.stat.isClosed?row.stat.endDate:'至今',row.stat.total,row.stat.paused,row.stat.work,row.st]);
+  const rd=rows.map((row,i)=>[i+1,row.r.案場,row.r.執行者,regionText(row.r),row.stat.startDate,row.stat.isClosed?row.stat.endDate:'至今',row.stat.total,row.stat.paused,row.stat.work,row.st]);
   const colW=headers.map((h,ci)=>{
     let maxLine=visW(h);
     rd.forEach(r=>String(r[ci]||'').split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);}));
@@ -4456,7 +5148,7 @@ function renderHistory(){
   if(bP)bP.className='btn btn-sm '+(histSortMode==='proj'?'btn-p':'btn-g');
   const filtered=q?sorted.filter(r=>{
     const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
-    return[r.案場,r.執行者,r.施作位置,logText].join(' ').toLowerCase().includes(q);
+    return[r.案場,r.執行者,regionText(r),logText].join(' ').toLowerCase().includes(q);
   }):sorted;
   const el=document.getElementById('hist-list');
   if(!filtered.length){el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>沒有資料</div>';return}
@@ -4475,7 +5167,7 @@ function renderHistory(){
     const dt=r.updatedAt?new Date(r.updatedAt).toLocaleDateString('zh-TW'):'—';
     /* 2026-10-02 第二版：狀態、業務都改看案場層級 */
     const st=caseStatusOf(r.案場), sales=caseSalesOf(r.案場);
-    const sub=[r.執行者,r.施作位置,sales?('業務 '+sales):''].filter(Boolean).join(' · ');
+    const sub=[r.執行者,regionText(r),sales?('業務 '+sgSplit(sales).join('、')):''].filter(Boolean).join(' · ');
     const stuckCls='';
     /* 抬頭已經寫了分組的那一項，卡片左欄就顯示另一項（案場↔更新時間），不重複同一個字 */
     const head=(histSortMode==='proj')?('更新：'+esc(dt)):esc(r.案場);
@@ -4524,6 +5216,69 @@ function renderSettingsFbStatus(){
 // ============================================================
 // 編輯 Modal
 // ============================================================
+/* 案場下拉（2026-10-12 她選 A 甲）：系統設定的案場（照清單順序）＋紀錄裡有、清單還沒有的案場（線上 10-12 有 5 個是這樣）
+   ＋這筆原本的案場＋最後「＋ 新案場…」 */
+var PROJ_NEW='__new__';
+function fillProjSelect(cur){
+  const sel=document.getElementById('e-proj-sel'); if(!sel)return;
+  const list=(cfg.案場||[]).slice();
+  [...new Set((records||[]).map(r=>r&&r.案場).filter(Boolean))].filter(p=>list.indexOf(p)<0)
+    .sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true})).forEach(p=>list.push(p));
+  if(cur&&list.indexOf(cur)<0)list.push(cur);
+  sel.innerHTML='<option value="">— 選擇案場 —</option>'
+    +list.map(v=>'<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(v)+'</option>').join('')
+    +'<option value="'+PROJ_NEW+'">＋ 新案場…</option>';
+  sel.value=cur||'';
+}
+function projSelChanged(sel){
+  const inp=document.getElementById('e-proj');
+  if(sel.value===PROJ_NEW){ inp.value=''; inp.classList.remove('d-none'); inp.focus(); }
+  else{ inp.value=sel.value; inp.classList.add('d-none'); }
+  editProjChanged();
+}
+/* 部門下拉：入口網頁的部門（2026-08-19 起一律以入口為準）＋這筆原本的部門（不在名單裡也列，不讓它被靜靜換掉） */
+function fillDeptSelect(cur){
+  const sel=document.getElementById('e-dept'); if(!sel)return;
+  sel.innerHTML=_optsHtml(portalDepts(),cur||'','— 部門 —');
+  sel.value=cur||'';
+}
+/* 區域下拉：系統設定的區域（大區域）＋這筆原本的（不在清單也列） */
+function regionOptsHtml(cur){ return _optsHtml(cfg.施作位置,cur||'','— 區域 —'); }
+/* 「＋ 新增區域」：多一整塊（區域＋範圍＋工作內容＋備註），存檔時每一塊各自變成一筆工作項目 */
+function rgAddBlock(){
+  const host=document.getElementById('rg-extra'); if(!host)return;
+  const n=host.querySelectorAll('.rg-extra').length+2;
+  const b=document.createElement('div');
+  b.className='rg-block rg-extra';
+  b.innerHTML='<div class="rg-hd"><b>區域 '+n+'</b><button type="button" class="btn btn-g btn-icon btn-sm rg-del" title="拿掉這個區域">✕</button></div>'
+    +'<div class="rg-row"><div class="rg-loc"><label class="fl">區域</label><select class="fi rg-loc-sel" aria-label="區域">'+regionOptsHtml('')+'</select></div>'
+    +'<div class="rg-scope"><label class="fl">範圍</label><input type="text" class="fi rg-scope-inp" placeholder="例：1F廊道、各區域公設"></div></div>'
+    +'<div class="rg-logs-hd"><label class="fl" style="margin-bottom:0">工作內容（進度記錄：每一筆各自記出工數、照片）</label>'
+    +'<button type="button" class="btn btn-a btn-sm rg-addlog">＋ 新增一筆</button></div>'
+    +'<div class="log-edit-wrap rg-logs"></div>'
+    +'<label class="fl" style="margin-top:8px">備註</label><textarea class="fi rg-note" rows="2" placeholder="材料、注意事項…"></textarea>';
+  host.appendChild(b);
+  addLogRow(null,b.querySelector('.rg-logs'));
+  const sel=b.querySelector('.rg-loc-sel'); if(sel)sel.focus();
+  return b;
+}
+/* 多出來的那幾塊：有沒有填東西 */
+function rgBlockData(b){
+  const logs=logRowsToArray(b.querySelector('.rg-logs'));
+  return {loc:(b.querySelector('.rg-loc-sel')||{}).value||'',scope:((b.querySelector('.rg-scope-inp')||{}).value||'').trim(),
+    note:((b.querySelector('.rg-note')||{}).value||'').trim(),logs};
+}
+document.addEventListener('click',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#rg-extra'))return;
+  const b=t.closest('.rg-extra'); if(!b)return;
+  if(t.closest('.rg-addlog')){ addLogRow(null,b.querySelector('.rg-logs')); return; }
+  if(t.closest('.rg-del')){
+    const d=rgBlockData(b);
+    if((d.loc||d.scope||d.note||d.logs.length)&&!confirm('拿掉這個區域？已經填的內容不會存。'))return;
+    b.remove();
+    [].forEach.call(document.querySelectorAll('#rg-extra .rg-extra .rg-hd b'),(x,i)=>{x.textContent='區域 '+(i+2)});
+  }
+});
 function openEdit(id){
   if(!isLoggedIn()){toast('請先登入','e');showLogin();return}
   const r=id?normalizeRecord(records.find(x=>x.id===id)):null;
@@ -4534,25 +5289,35 @@ function openEdit(id){
   document.getElementById('save-btn').style.display=readonly?'none':'';
   const editor=document.getElementById('log-editor');
   editor.innerHTML='';
+  document.getElementById('rg-extra').innerHTML='';   /* 上一次多加的區域塊清掉 */
   updateDataLists();
   if(id&&r){
+    const rg=regionOf(r);
+    fillProjSelect(r.案場||'');
     document.getElementById('e-proj').value=r.案場||'';
-    document.getElementById('e-dept').value=r.部門||'';
+    document.getElementById('e-proj').classList.add('d-none');
+    fillDeptSelect(r.部門||'');
     document.getElementById('e-exec').value=r.執行者||'';
-    document.getElementById('e-loc').value=r.施作位置||'';
+    document.getElementById('e-loc').innerHTML=regionOptsHtml(rg.區域);
+    document.getElementById('e-loc').value=rg.區域;
+    document.getElementById('e-scope').value=rg.範圍;
     document.getElementById('e-note').value=r.備註||'';
     const rows=r.進度記錄||[];
     if(rows.length)rows.forEach(row=>addLogRow(row));   /* 2026-10-02：整條記錄物件傳進去（出工數、照片都在裡面） */
     else addLogRow();
     rememberBaseline(r);   // 記下「我打開它時長什麼樣」，存檔時才知道哪幾格是我真的改過的
   }else{
-    ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).value='');
+    ['e-proj','e-exec','e-scope','e-note'].forEach(fid=>document.getElementById(fid).value='');
+    fillProjSelect('');
+    document.getElementById('e-proj').classList.add('d-none');
+    document.getElementById('e-loc').innerHTML=regionOptsHtml('');
+    fillDeptSelect('');
     // 新增時自動帶入當前執行者與所屬部門
     // 部門原本是空白讓人自己填，打錯字就會變成一個不存在的部門、同事全看不到（2026-08-19 事故）。
     // 這裡只是預設值，欄位仍可改 —— 要幫別部門代填時還是動得了。
     if(currentUser){
       document.getElementById('e-exec').value=currentUser.name;
-      document.getElementById('e-dept').value=currentUser.dept||'';
+      fillDeptSelect(currentUser.dept||'');
     }
     /* 2026-10-02 第二版：狀態改成案場層級（新案場自動「待報價」），新的一筆不再預帶狀態 */
     addLogRow();
@@ -4565,10 +5330,11 @@ function openEdit(id){
   const _etip=document.getElementById('exec-tip');      // 唯讀沒有名字排 → 這句提醒也收起來
   if(_etip)_etip.style.display=readonly?'none':'';
   // 唯讀模式：所有 input 設為 disabled
-  ['e-proj','e-dept','e-exec','e-loc','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
+  ['e-proj-sel','e-proj','e-dept','e-exec','e-loc','e-scope','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
   document.querySelectorAll('#log-editor .fi').forEach(el=>el.disabled=readonly);
   document.querySelectorAll('#log-editor .log-del').forEach(el=>el.style.display=readonly?'none':'');
-  document.querySelector('button[onclick="addLogRow()"]').style.display=readonly?'none':'';
+  document.getElementById('e-add-log').style.display=readonly?'none':'';
+  document.getElementById('rg-add').style.display=readonly?'none':'';   /* 唯讀不能加區域 */
   document.getElementById('edit-overlay').classList.add('show');
   _editSnap = editFormSnapshot();   // 拍快照：關閉前比對才知道有沒有改過（2026-09-20）
 }
@@ -4579,10 +5345,14 @@ function openEdit(id){
  * 判斷「有沒有改過」：開啟當下把整張表單拍一張快照，關閉前比對。 */
 var _editSnap = '';
 function editFormSnapshot(){
-  var v = ['e-proj','e-dept','e-exec','e-loc','e-note'].map(function(id){
+  var v = ['e-proj','e-dept','e-exec','e-loc','e-scope','e-note'].map(function(id){
     var el = document.getElementById(id); return el ? el.value : '';
   });
-  var logs = [].map.call(document.querySelectorAll('#log-editor .log-edit-row'), function(row){
+  /* 多加的區域塊（2026-10-12）：區域、範圍、備註也算 */
+  [].forEach.call(document.querySelectorAll('#rg-extra .rg-extra'), function(b){
+    [].forEach.call(b.querySelectorAll('.rg-loc-sel,.rg-scope-inp,.rg-note'), function(el){ v.push(el.value); });
+  });
+  var logs = [].map.call(document.querySelectorAll('#edit-overlay .log-edit-row'), function(row){
     /* 照片（2026-10-02）不是輸入框，另外把 id 接上去：加一張、刪一張都算「有改過」 */
     return [].map.call(row.querySelectorAll('input:not([type=file]):not([type=checkbox]),select,textarea'), function(el){ return el.value; }).join('\u0001')
       + '\u0002' + (row._ph||[]).map(function(p){ return p.id; }).join(',')
@@ -4628,11 +5398,15 @@ function saveRecord(){
      之前整筆重建 → 拖好的順序一存檔就沒了，那一列掉到案場最下面。
      換了案場的話，舊案場的順序在新案場沒有意義 → 拿掉，排到新案場最後（跟以前一樣）。 */
   const old=id?records.find(x=>x&&x.id===id):null;
+  const dept=document.getElementById('e-dept').value.trim(), exec=document.getElementById('e-exec').value.trim();
   const r=Object.assign({},old||{},{
     id:id||uid(),案場:proj,
-    部門:document.getElementById('e-dept').value.trim(),
-    執行者:document.getElementById('e-exec').value.trim(),
+    部門:dept,
+    執行者:exec,
+    /* 2026-10-12：區域（真下拉）＋範圍（自己打字），標新格式 */
     施作位置:document.getElementById('e-loc').value.trim(),
+    範圍:document.getElementById('e-scope').value.trim(),
+    區域格式:2,
     工作項目:'',
     進度記錄:logRowsToArray(),
     備註:document.getElementById('e-note').value.trim(),
@@ -4641,8 +5415,20 @@ function saveRecord(){
   if(old&&(old.案場||'')!==proj)delete r.順序;
   if(id){const i=records.findIndex(x=>x.id===id);if(i>=0)records[i]=r;else records.push(r)}
   else records.push(r);
+  /* 「＋ 新案場…」打的新名字 → 也加進系統設定的案場清單（2026-10-12：案場改成下拉後，清單沒有的下次就選不到） */
+  if(!Array.isArray(cfg.案場))cfg.案場=[];
+  if(cfg.案場.indexOf(proj)<0){cfg.案場.push(proj);saveCfgLocal();renderCfgLists()}
+  /* 「＋ 新增區域」多出來的每一塊 → 各自一筆工作項目（同一個案場、部門、執行者；什麼都沒填的塊不存） */
+  let extra=0;
+  [].forEach.call(document.querySelectorAll('#rg-extra .rg-extra'),b=>{
+    const d=rgBlockData(b);
+    if(!d.loc&&!d.scope&&!d.note&&!d.logs.length)return;
+    records.push({id:uid(),案場:proj,部門:dept,執行者:exec,施作位置:d.loc,範圍:d.scope,區域格式:2,工作項目:'',
+      進度記錄:d.logs,備註:d.note,updatedAt:new Date().toISOString()});
+    extra++;
+  });
   fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit(true);   // 已存檔 → 直接關（2026-09-20）
-  toast('已儲存 ✓','s');
+  toast(extra?'已儲存 ✓（共 '+(extra+1)+' 個區域）':'已儲存 ✓','s');
 }
 function delRecord(){
   if(!requireDelete())return;
@@ -4670,7 +5456,11 @@ function openCaseMoney(proj){
   const can=canEditCase(_moneyCase);
   document.getElementById('mn-save').style.display=can?'':'none';
   document.getElementById('mn-add').style.display=can?'':'none';
-  document.getElementById('mn-sales').innerHTML=salesOptsHtml(caseSalesOf(_moneyCase));
+  _mnSales=caseSalesList(_moneyCase);
+  _mnCan=can;
+  renderMnSales();
+  document.getElementById('mn-note').value=String(c.報價回款說明||'');
+  document.getElementById('mn-note').disabled=!can;
   /* 金額一律元（2026-10-02 第三批）。第二版存的「萬」（沒有 單位:'元'）是試做假資料 → 當成沒填，不換算 */
   const yuan=caseIsYuan(c);
   const u=yuan?yuanOf(c.未稅):null, t=yuan?yuanOf(c.含稅):null;
@@ -4679,28 +5469,120 @@ function openCaseMoney(proj){
   const list=document.getElementById('mn-list');
   list.innerHTML='';
   (yuan&&Array.isArray(c.應收帳款)?c.應收帳款:[]).forEach(p=>{if(p)addPayRow(p)});
+  syncMnMode();
   renderMoneySum();
   document.getElementById('money-overlay').classList.add('show');
   _moneySnap=moneyFormSnap();
 }
+/* 業務複選（2026-10-12 N 甲）：_mnSales＝選了誰（照點的順序，存的時候照業務群組的順序排） */
+var _mnSales=[], _mnCan=true;
+function renderMnSales(){
+  const host=document.getElementById('mn-sales'); if(!host)return;
+  const gs=salesGroups().filter(g=>(g.人員||[]).length);
+  const inGroups=new Set(gs.flatMap(g=>g.人員));
+  const extra=_mnSales.filter(p=>!inGroups.has(p));   /* 已經選了、但不在業務設定裡的（群組刪掉、改名）→ 照樣列、照樣選著 */
+  const dis=_mnCan?'':' disabled';
+  const chip=(p,gi,j)=>'<button type="button" class="mn-sp" data-g="'+gi+'" data-p="'+j+'" aria-pressed="'+(_mnSales.indexOf(p)>=0)+'"'+dis+'>'
+    +(_mnSales.indexOf(p)>=0?'✓ ':'')+esc(p)+'</button>';
+  host.innerHTML=(gs.length||extra.length)
+    ? gs.map((g,i)=>'<div class="mn-sg"><button type="button" class="mn-sg-name" data-g="'+i+'" title="整組選起來／取消"'+dis+'>'+esc(g.名稱)+'</button>'
+        +g.人員.map((p,j)=>chip(p,i,j)).join('')+'</div>').join('')
+      +(extra.length?'<div class="mn-sg"><span class="mn-sg-name" style="cursor:default">（不在業務設定裡）</span>'
+        +extra.map((p,j)=>chip(p,-1,j)).join('')+'</div>':'')
+    : '<span class="mn-sg-none">還沒有業務群組，到系統設定群組三新增</span>';
+}
+/* 存的順序：照業務群組的順序，設定裡沒有的接在後面 */
+function mnSalesValue(){
+  const order=salesGroups().flatMap(g=>g.人員||[]);
+  return _mnSales.slice().sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?9999:ia)-(ib<0?9999:ib)}).join('、');
+}
+document.addEventListener('click',function(e){
+  const t=e.target; if(!t||!t.closest||!t.closest('#mn-sales')||!_mnCan)return;
+  const gs=salesGroups().filter(g=>(g.人員||[]).length);
+  const sp=t.closest('.mn-sp');
+  if(sp){
+    const gi=Number(sp.getAttribute('data-g')), j=Number(sp.getAttribute('data-p'));
+    const inGroups=new Set(gs.flatMap(g=>g.人員));
+    const name=gi>=0?(gs[gi]&&gs[gi].人員[j]):_mnSales.filter(p=>!inGroups.has(p))[j];
+    if(name===undefined)return;
+    const at=_mnSales.indexOf(name); if(at>=0)_mnSales.splice(at,1); else _mnSales.push(name);
+    renderMnSales(); return;
+  }
+  const gn=t.closest('.mn-sg-name[data-g]');
+  if(gn){
+    const g=gs[Number(gn.getAttribute('data-g'))]; if(!g)return;
+    const all=g.人員.every(p=>_mnSales.indexOf(p)>=0);
+    if(all)_mnSales=_mnSales.filter(p=>g.人員.indexOf(p)<0);
+    else g.人員.forEach(p=>{ if(_mnSales.indexOf(p)<0)_mnSales.push(p); });
+    renderMnSales();
+  }
+});
 function moneyFormSnap(){
-  return JSON.stringify(['mn-sales','mn-untax','mn-tax'].map(id=>document.getElementById(id).value)
+  return JSON.stringify([mnSalesValue(),document.getElementById('mn-note').value].concat(['mn-untax','mn-tax'].map(id=>document.getElementById(id).value))
     .concat([[].map.call(document.querySelectorAll('#mn-list .mn-row'),row=>
       [row.querySelector('.mn-date').value,row.querySelector('.mn-kind').value,row.querySelector('.mn-pu').value,row.querySelector('.mn-pt').value].join('\u0001'))]));
 }
 /* 打未稅 → 含稅自動帶「未稅 × 1.05」（四捨五入到元），之後可以自己改含稅。
    未稅打錯（例 100.5、12a）就不動含稅，下面會跳紅字。 */
+/* ══════ 計算含稅價／倒推未稅價（2026-10-14 她指定：增4）══════
+ * 整個框一顆（報價＋每一筆收款）；這台電腦記住上次選的，第一次＝計算含稅價。
+ *   tax  ＝計算含稅價：打未稅 → 含稅自動帶 ×1.05
+ *   untax＝倒推未稅價：打含稅 → 未稅自動帶 ÷1.05
+ * 都四捨五入到整數元。算出來的那格可以再手改，手改不會回頭動另一格；
+ * 再改「打的那格」才會重算。切換本身不動已經填好的數字。 */
+const MN_MODE_LSKEY='dtp_mm_tax_mode';
+var mnMode=(function(){ try{ return localStorage.getItem(MN_MODE_LSKEY)==='untax'?'untax':'tax'; }catch(e){ return 'tax'; } })();
+function untaxFromTax(t){ return t===null?null:Math.floor((t*200+105)/210); }
+function setMnMode(m){
+  mnMode=m==='untax'?'untax':'tax';
+  try{ localStorage.setItem(MN_MODE_LSKEY,mnMode); }catch(e){}
+  syncMnMode();
+}
+/* 按鈕亮哪顆、哪一格是「算出來的」（淡底＋提示字），提示文字跟著換 */
+function syncMnMode(){
+  const up=mnMode==='tax';
+  const bt=document.getElementById('mn-mode-tax'), bu=document.getElementById('mn-mode-untax');
+  if(bt)bt.setAttribute('aria-pressed',String(up));
+  if(bu)bu.setAttribute('aria-pressed',String(!up));
+  const mark=(el,calc,ph)=>{ if(!el)return; el.classList.toggle('mn-calc',calc); if(ph!==undefined)el.placeholder=ph; };
+  mark(document.getElementById('mn-untax'),!up,up?'例：100,500':'自動帶 ÷1.05');
+  mark(document.getElementById('mn-tax'),up,up?'自動帶 ×1.05':'例：105,525');
+  document.querySelectorAll('#mn-list .mn-row').forEach(row=>{
+    mark(row.querySelector('.mn-pu'),!up); mark(row.querySelector('.mn-pt'),up);
+  });
+  const h=document.getElementById('mn-hint');
+  if(h)h.textContent=(up?'填了未稅，含稅自動帶 ×1.05':'填了含稅，未稅自動帶 ÷1.05')
+    +'（四捨五入到元），可以再改 · 單位「元」、整數，可以打千分位逗號';
+}
 function mnUntaxInput(){
-  const p=yuanParse(document.getElementById('mn-untax').value);
-  const tax=document.getElementById('mn-tax');
-  if(p.ok)tax.value=p.v===null?'':commas(taxFromUntax(p.v));
+  if(mnMode==='tax'){
+    const p=yuanParse(document.getElementById('mn-untax').value);
+    const tax=document.getElementById('mn-tax');
+    if(p.ok)tax.value=p.v===null?'':commas(taxFromUntax(p.v));
+  }
+  renderMoneySum();
+}
+/* 倒推未稅價：打含稅 → 未稅自動帶 ÷1.05（含稅打錯就不動未稅，下面會跳紅字） */
+function mnTaxInput(){
+  if(mnMode==='untax'){
+    const p=yuanParse(document.getElementById('mn-tax').value);
+    const un=document.getElementById('mn-untax');
+    if(p.ok)un.value=p.v===null?'':commas(untaxFromTax(p.v));
+  }
   renderMoneySum();
 }
 /* 收款列的未稅 → 含稅自動帶 ×1.05（未稅打錯就不動含稅，下面會跳紅字） */
 function mnPayUntaxInput(el){
   const row=el&&el.closest?el.closest('.mn-row'):null; if(!row)return;
   const p=yuanParse(el.value);
-  if(p.ok)row.querySelector('.mn-pt').value=p.v===null?'':commas(taxFromUntax(p.v));
+  if(mnMode==='tax'&&p.ok)row.querySelector('.mn-pt').value=p.v===null?'':commas(taxFromUntax(p.v));
+  renderMoneySum();
+}
+/* 收款列的含稅 → 倒推未稅價時，未稅自動帶 ÷1.05 */
+function mnPayTaxInput(el){
+  const row=el&&el.closest?el.closest('.mn-row'):null; if(!row)return;
+  const p=yuanParse(el.value);
+  if(mnMode==='untax'&&p.ok)row.querySelector('.mn-pu').value=p.v===null?'':commas(untaxFromTax(p.v));
   renderMoneySum();
 }
 function addPayRow(p){
@@ -4716,10 +5598,11 @@ function addPayRow(p){
     +`<select class="fi mn-kind" aria-label="款別">${_optsHtml(cfg.款別,p.款別||'','— 款別 —')}</select>`
     /* 未稅打了 → 含稅自動帶 ×1.05（跟上面報價一樣），之後可以自己改含稅 */
     +`<input type="text" class="fi mn-amt mn-pu" inputmode="numeric" autocomplete="off" placeholder="未稅（元）" aria-label="未稅（元）" value="${a.u===null?'':commas(a.u)}" oninput="mnPayUntaxInput(this)">`
-    +`<input type="text" class="fi mn-amt mn-pt" inputmode="numeric" autocomplete="off" placeholder="含稅（元）" aria-label="含稅（元）" value="${a.t===null?'':commas(a.t)}" oninput="renderMoneySum()">`
+    +`<input type="text" class="fi mn-amt mn-pt" inputmode="numeric" autocomplete="off" placeholder="含稅（元）" aria-label="含稅（元）" value="${a.t===null?'':commas(a.t)}" oninput="mnPayTaxInput(this)">`
     +`<span class="mn-pct">—</span>`
     +`<button type="button" class="btn btn-g btn-icon btn-sm mn-del" title="刪除這筆收款" onclick="this.closest('.mn-row').remove();renderMoneySum()">✕</button>`;
   list.appendChild(row);
+  syncMnMode();   /* 新的這列也標出哪一格是算出來的（2026-10-14） */
   renderMoneySum();
 }
 /* 視窗裡所有金額欄的檢查：回傳第一個錯誤訊息（沒有錯回空字串），順便把錯的那一格標紅 */
@@ -4805,7 +5688,8 @@ function saveCaseMoney(){
   cases[k]={
     案場:_moneyCase||'（未填案場）',
     狀態:st||undefined,
-    業務:document.getElementById('mn-sales').value.trim(),
+    業務:mnSalesValue(),   /* 2026-10-12：可以好幾位，「、」接起來 */
+    報價回款說明:document.getElementById('mn-note').value.trim(),   /* 2026-10-12（I 甲）：Excel「報價／回款說明」 */
     單位:'元',
     未稅:u,
     含稅:t,
@@ -4866,89 +5750,111 @@ async function exportExcel(projs,opt){
        · 兩個都勾 → 未稅、含稅、已收、未收每個各兩欄（元欄格式 #,##0；萬欄放萬的數字、格式 0.0）
        · 只勾一個 → 每個一欄；都不勾 → 沒有金額欄
      欄位是動態的 → 對齊／格式一律看欄位的 kind，不寫死欄號。 */
+  /* ══ 2026-10-12 第七八批：Excel 改成 8 欄（10-08 定案 D 全甲＋J 甲；10-12 她選 Q 乙維持 8 欄、R 乙金額照匯出框勾選）══
+   *   狀態｜案場｜執行者（下一行部門）｜區域（下一行範圍）｜工作內容｜報價／回款金額｜報價／回款說明｜業務
+   *   · 一個工作項目（一筆紀錄）一列；同一個案場的狀態、案場、金額、說明、業務合併儲存格
+   *   · 工作內容：一筆進度記錄一行「09/16 進場施工 廣泰：喨哥、宗哥 東側立面乾掛（出工 4）」，最後一行備註（她 10-12 取消每筆的說明）
+   *   · 金額：報價 → 已收 → 未收，各自含稅在上、未稅在下；「$元」「萬」照匯出框勾的實際值／大約值，都沒勾 → 沒有這欄
+   *   · 最上面一列標題；案場照 報價 → 執行 → 完工 排（10-12 她說不用分區塊，所以沒有段落列），同一段裡照畫面上的案場順序
+   *   · 金額變成文字，Excel 不能直接加總（7-3 甲時就講好） */
   const act=opt&&typeof opt.act==='boolean'?opt.act:mmShowAct;
   const apx=opt&&typeof opt.apx==='boolean'?opt.apx:mmShowApx;
-  const COLS=[{h:'狀態',min:10,max:12,k:'status'},{h:'案場',min:22,max:40},{h:'業務',min:10,max:16}];
-  /* 2026-10-05 第六批：已收、未收各分未稅／含稅（以前只有含稅的「已收」「未收」） */
-  [['未稅','untax'],['含稅','tax'],['已收未稅','paidU'],['已收含稅','paid'],['未收未稅','unpaidU'],['未收含稅','unpaid']].forEach(([nm,key])=>{
-    if(act)COLS.push({h:nm+'（元）',min:12,max:16,k:'yuan',key});
-    if(apx)COLS.push({h:nm+'（萬）',min:9,max:12,k:'wan',key});
-  });
-  COLS.push({h:'部門',min:14,max:20},{h:'執行者',min:18,max:24},{h:'區域',min:16,max:30},{h:'日期',min:12,max:14,k:'center'},
-    {h:'施工項目',min:12,max:16},{h:'廠商／施工人員',min:14,max:30},{h:'工作內容',min:40,max:80},
-    {h:'出工數',min:8,max:10,k:'center'},{h:'照片',min:7,max:8,k:'center'},{h:'備註',min:24,max:50});
-  const headers=COLS.map(c=>c.h), minW=COLS.map(c=>c.min), maxW=COLS.map(c=>c.max);
-  /* 金額欄放「數字」（Excel 才加得起來）；空白就放空字串。萬＝先四捨五入到 0.1 萬（整數運算）再除 10 */
-  const moneyVals=mi=>{
-    const v={untax:mi.untax,tax:mi.tax,paidU:mi.n?mi.paidU:null,paid:mi.n?mi.paid:null,unpaidU:mi.unpaidU,unpaid:mi.unpaid};
-    const out=[];
-    ['untax','tax','paidU','paid','unpaidU','unpaid'].forEach(key=>{
-      const n=v[key];
-      if(act)out.push(n===null?'':n);
-      if(apx)out.push(n===null?'':wanTenths(n)/10);
-    });
-    return out;
-  };
-  const expanded=[];
-  data.forEach(r=>{
-    let logs=r.進度記錄||[];
-    if(typeof logs==='string')logs=parseProgressString(logs);
-    const st=caseStatusOf(r.案場), mi=caseMoneyInfo(r.案場);
-    const head=[st,r.案場,caseSalesOf(r.案場)].concat(moneyVals(mi),[r.部門,r.執行者,r.施作位置]);
-    if(!logs.length){
-      /* 一筆進度記錄都沒有的，也要留一列 —— 不然這筆資料在 Excel 裡整個不見 */
-      expanded.push({r:r,status:st,vals:head.concat(['','','','','','',r.備註])});
-      return;
+  /* 含稅／未稅（2026-10-13 她指定）：匯出框勾哪個印哪個；沒帶這兩個參數（舊的呼叫）＝兩個都印 */
+  const xTax=opt&&typeof opt.tax==='boolean'?opt.tax:true;
+  const xUntax=opt&&typeof opt.untax==='boolean'?opt.untax:true;
+  /* 已收／未收（2026-10-14 她指定）：沒帶參數（舊的呼叫）＝兩段都印；出工 0 沒帶＝照印 */
+  const xPaid=opt&&typeof opt.paid==='boolean'?opt.paid:true;
+  const xUnpaid=opt&&typeof opt.unpaid==='boolean'?opt.unpaid:true;
+  const xMan0=opt&&typeof opt.man0==='boolean'?opt.man0:true;
+  const showMoney=(act||apx)&&(xTax||xUntax);
+  const amtX=n=>{ if(n===null||n===undefined)return '—'; const p=[]; if(act)p.push(fmtYuan(n)); if(apx)p.push(fmtWanApprox(n)); return p.join('　'); };
+  const moneyText=mi=>{
+    const L=[];
+    /* 一段（報價／已收／未收）：勾的那幾種各一行，第一行帶段名、第二行縮排 */
+    const block=(head,parts)=>{ parts.filter(Boolean).forEach((t,i)=>L.push((i?'　　':head)+' '+t)); };
+    if(mi.tax===null&&mi.untax===null)L.push('報價 —');
+    /* 兩個都勾時，沒填的未稅那行不印（線上很多案場只填含稅，跟畫面一樣）；只勾未稅就照樣印「—」 */
+    else block('報價',[xTax?'含稅 '+amtX(mi.tax):'',xUntax&&(mi.untax!==null||!xTax)?'未稅 '+amtX(mi.untax):'']);
+    if(mi.n){
+      if(xPaid)block('已收',[xTax?'含稅 '+amtX(mi.paid)+'（'+pctText(mi.paid,mi.tax)+'）':'',xUntax?'未稅 '+amtX(mi.paidU):'']);
+      if(xUnpaid)block('未收',[xTax?'含稅 '+(mi.unpaid===null?'—':amtX(mi.unpaid)+'（'+pctText(mi.unpaid,mi.tax)+'）'):'',xUntax?'未稅 '+(mi.unpaidU===null?'—':amtX(mi.unpaidU)):'']);
     }
-    logs.forEach(l=>{
-      if(!l)return;
-      const sub=logSubText(l);
-      const man=(typeof l.出工數==='number'&&isFinite(l.出工數))?l.出工數:'';
-      const phN=Array.isArray(l.photos)?l.photos.filter(p=>p&&p.id).length:0;
-      expanded.push({r:r,status:st,
-        vals:head.concat([String(l.date||'').slice(0,10),l.work||'',sub,String(l.text||''),man,phN||'',r.備註])});
+    return L.join('\n');
+  };
+  const logLine=l=>{
+    const dt=fmtLogDate(l.date), sub=logSubText(l);
+    const man=(typeof l.出工數==='number'&&isFinite(l.出工數)&&(xMan0||l.出工數!==0))?'（出工 '+l.出工數+'）':'';
+    return [dt,l.work||'',sub,String(l.text||'').trim()].filter(Boolean).join(' ')+man;
+  };
+  const COLS=[{h:'狀態',min:10,max:12,k:'status',c:1},{h:'案場',min:22,max:36,c:1},{h:'執行者',min:14,max:22},{h:'區域',min:12,max:24},
+    {h:'工作內容',min:40,max:70}];
+  if(showMoney)COLS.push({h:'報價／回款金額',min:act&&apx?30:20,max:40,c:1});
+  COLS.push({h:'報價／回款說明',min:16,max:30,c:1},{h:'業務',min:10,max:16,c:1});
+  const headers=COLS.map(c=>c.h), NC=COLS.length;
+  /* 案場分組（2026-10-13 她指定）：照群組二狀態表的順序（待報價 → 報價中 → 已報價 → 已成案 → 執行中 → 已完工），
+     同一個狀態裡照系統設定的案場清單順序。以前只分報價／執行／完工三段，已成案和執行中會混在一起。
+     不跟畫面的「顯示順序」按鈕（示意圖講好的）。 */
+  const projList=[...new Set(data.map(r=>r.案場||''))];
+  const projOrder=projList.map((p,i)=>({p,i,k:statusRank(caseStatusOf(p)),o:projOrderIdx(p)}))
+    .sort((a,b)=>(a.k-b.k)||(a.o-b.o)||(a.i-b.i)).map(x=>x.p);
+  const groupsX=projOrder.map(p=>({p,st:caseStatusOf(p),mi:caseMoneyInfo(p),c:caseOf(p)||{},rows:sortRowsByOrder(data.filter(r=>(r.案場||'')===p))}));
+  const lines=[];   /* 每一列的值（合併的那幾格只有每組第一列有字） */
+  groupsX.forEach(g=>{
+    g.rows.forEach((r,ri)=>{
+      let logs=r.進度記錄||[]; if(typeof logs==='string')logs=parseProgressString(logs);
+      const rg=regionOf(r);
+      const work=logs.filter(Boolean).map(logLine).concat(r.備註?['備註：'+r.備註]:[]).join('\n');
+      const v=[ri?'':g.st+(statusIsDeleted(g.st)?'（已刪除）':''),ri?'':(g.p||'（未填案場）'),
+        [_execList(r).join('、'),String(r.部門||'').trim()].filter(Boolean).join('\n'),
+        [rg.區域,rg.範圍].filter(Boolean).join('\n'),work];
+      if(showMoney)v.push(ri?'':moneyText(g.mi));
+      v.push(ri?'':String(g.c.報價回款說明||''),ri?'':sgSplit(caseSalesOf(g.p)).join('、'));
+      lines.push({g,ri,v});
     });
   });
-  const rowsData=expanded.map(x=>x.vals);
-  // 依實際內容算欄寬：取每欄最長一行的視覺寬 +2，夾在 [minW, maxW]
-  const colW=headers.map((h,ci)=>{
-    let maxLine=visW(h);
-    rowsData.forEach(rd=>{
-      String(rd[ci]===undefined||rd[ci]===null?'':rd[ci]).split('\n').forEach(ln=>{if(visW(ln)>maxLine)maxLine=visW(ln);});
-    });
-    return Math.min(maxW[ci],Math.max(minW[ci],Math.ceil(maxLine+2)));
+  // 依實際內容算欄寬：取每欄最長一行的視覺寬 +2，夾在 [min, max]
+  const colW=COLS.map((col,ci)=>{
+    let m=visW(col.h);
+    lines.forEach(x=>String(x.v[ci]||'').split('\n').forEach(ln=>{ if(visW(ln)>m)m=visW(ln); }));
+    return Math.min(col.max,Math.max(col.min,Math.ceil(m+2)));
   });
-  ws.columns=headers.map((h,i)=>({header:h,width:colW[i]}));
-  const hr=ws.getRow(1);hr.height=26;
+  ws.columns=colW.map(w=>({width:w}));
+  /* 第 1 列：標題（跨全部欄） */
+  const tr=ws.addRow(['進度表—瑪摩工程　'+fnDate()+' 匯出']);
+  ws.mergeCells(tr.number,1,tr.number,NC);
+  tr.height=26;
+  tr.getCell(1).font={bold:true,size:14,color:{argb:'FF1A3A5C'}};
+  tr.getCell(1).alignment={vertical:'middle',horizontal:'left'};
+  /* 第 2 列：欄位標題 */
+  const hr=ws.addRow(headers);hr.height=26;
   hr.eachCell(c=>{
     c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
     c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
-    c.alignment={vertical:'middle',horizontal:'center'};
+    c.alignment={vertical:'middle',horizontal:'center',wrapText:true};
   });
-  /* 狀態格的底色：報價（淡）、執行（綠）、完工（灰）—— 跟畫面上三個階段對應 */
-  const GBG={quote:'FFFFFFFF',exec:'FFDCFCE7',done:'FFE2E8F0'};
-  expanded.forEach((x,i)=>{
-    const rd=x.vals;
-    const row=ws.addRow(rd);
-    // 取全列各儲存格估算行數的最大值來定列高（每行 20pt + 6pt buffer）
-    const maxLines=Math.max(...rd.map((v,ci)=>estLines(String(v===undefined||v===null?'':v),colW[ci])));
-    row.height=Math.max(24,maxLines*20+6);
-    row.eachCell(c=>{
-      c.alignment={vertical:'top',wrapText:true};
-      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:i%2===0?'FFF8FAFC':'FFFFFFFF'}};
-    });
+  const argbOf=hex=>'FF'+String(hex||'#ffffff').replace('#','').toUpperCase();
+  let gStart=0;
+  lines.forEach((x,i)=>{
+    const row=ws.addRow(x.v);
+    if(x.ri===0)gStart=row.number;
+    const own=Math.max(...x.v.map((v,ci)=>COLS[ci].c?1:estLines(String(v||''),colW[ci])));
+    row.height=Math.max(24,own*18+6);
+    row.eachCell(c=>{ c.alignment={vertical:'top',wrapText:true}; });
+    const sc=statusColor(x.g.st);
     COLS.forEach((col,ci)=>{
       const c=row.getCell(ci+1);
-      if(col.k==='status'){
-        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:GBG[statusGroupOf(x.status)]||'FFFFFFFF'}};
-        c.font={bold:true}; c.alignment={vertical:'middle',horizontal:'center',wrapText:false};
-      }else if(col.k==='yuan'||col.k==='wan'){
-        c.numFmt=col.k==='yuan'?'#,##0':'0.0';
-        c.alignment={vertical:'top',horizontal:'right',wrapText:false};
-      }else if(col.k==='center'){
-        c.alignment={vertical:'middle',horizontal:'center',wrapText:false};
-      }
+      if(col.k==='status'){ c.fill={type:'pattern',pattern:'solid',fgColor:{argb:argbOf(sc.bg)}}; c.font={bold:true}; c.alignment={vertical:'top',horizontal:'center',wrapText:true}; }
+      /* 2026-10-12（她選甲）：整列都上案場狀態的淡色 —— 以前只有合併的那幾欄有色，中間執行者／區域／工作內容白底，看起來缺一塊 */
+      else{ c.fill={type:'pattern',pattern:'solid',fgColor:{argb:argbOf(sc.light)}}; }
     });
+    /* 這一組最後一列：案場那幾格合併；合併格的字比這幾列加起來還高 → 最後一列補高 */
+    const last=i===lines.length-1||lines[i+1].g!==x.g;
+    if(!last)return;
+    const n=row.number-gStart+1;
+    COLS.forEach((col,ci)=>{ if(col.c&&n>1)ws.mergeCells(gStart,ci+1,row.number,ci+1); });
+    const need=Math.max(...COLS.map((col,ci)=>col.c?estLines(String(x.g.rows.length?lines[i-n+1].v[ci]||'':''),colW[ci]):1))*18+6;
+    let have=0; for(let k=gStart;k<=row.number;k++)have+=ws.getRow(k).height||24;
+    if(need>have)row.height+=need-have;
   });
 
   /* 含施工照片（2026-10-05 第五批）：另開一個分頁，只放這次匯出到的那幾筆進度記錄的照片（日期區間有套用就只有區間內的） */
@@ -4960,7 +5866,7 @@ async function exportExcel(projs,opt){
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   const a=document.createElement('a');a.href=url;a.download='進度表-瑪摩工程_'+fnDate()+(projs&&projs.length===1?'_'+fnSafe(projs[0]):'')+'.xlsx';a.click();
-  URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（${expanded.length} 列，一筆記錄一列`+(opt&&opt.photos?`；照片 ${phN} 張`:'')+`）`,'s');
+  URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（${groupsX.length} 個案場、${lines.length} 列，一個工作項目一列`+(opt&&opt.photos?`；照片 ${phN} 張`:'')+`）`,'s');
 }
 /* ══ Excel「施工照片」分頁（2026-10-05 第五批，她選甲）══
  * 做法照日報表—專案管理的含照片 Excel（cdr-pm addPhotoSection），差別：照片放在自己的分頁，不接在表格下面。
@@ -4981,9 +5887,10 @@ async function addMmPhotoSheet(wb, recs){
   ws.columns = Array.from({ length: MM_XL_PH_PER }, function(){ return { width: MM_XL_PH_COLW }; });
   var items = [];
   (recs || []).forEach(function(r){
+    var rg = regionOf(r);   /* 2026-10-12：分組照區域（大區域），檔名多範圍 */
     logsOf(r).forEach(function(l){
       ((l && l.photos) || []).forEach(function(p){
-        if (p && p.id) items.push({ p: p, loc: (r && r.施作位置) || '', log: l, proj: (r && r.案場) || '' });
+        if (p && p.id) items.push({ p: p, loc: rg.區域, scope: rg.範圍, log: l, proj: (r && r.案場) || '' });
       });
     });
   });
@@ -5268,6 +6175,37 @@ function backToPortal(){
   location.href = '../portal/index.html';
 }
 
+/* 從線上複製一份到測試區（2026-10-12）：只「讀」線上 dtp_mm，寫的只有 test/dtp_mm；照片不抄（太大）。
+   順便做上線那天要做的設定（mmLaunchPrep），測試區看到的就是上線後的樣子。 */
+function mmLaunchPrep(data){
+  const d=JSON.parse(JSON.stringify(data||{}));
+  d.cfg=d.cfg||{};
+  if(!Array.isArray(d.cfg.報價項目))d.cfg.報價項目=MM_QUOTE_DEFAULT.slice();
+  /* 施工項目裡跟報價項目同名的（圖面計算、現場提案、案場追蹤）拿掉 —— 用過的紀錄照樣顯示原字 */
+  if(Array.isArray(d.cfg.施工項目))d.cfg.施工項目=d.cfg.施工項目.filter(x=>d.cfg.報價項目.indexOf(x)<0);
+  return d;
+}
+function _mmTestDropLocal(){ ['dtp_mm_cfg','dtp_mm_rec','dtp_mm_cases','dtp_mm_ph_pending'].forEach(k=>{ try{localStorage.removeItem('test__'+k)}catch(e){} }); }
+async function mmTestCopyFromOnline(){
+  if(!MM_TEST||location.protocol!=='file:'||!window._fbGetOnline||!window._fbSetTestRoot)return;
+  if(!confirm('把線上的案場、紀錄、設定抄一份到測試區？\n只讀線上、不會改線上；測試區原本的內容會被蓋掉；照片不抄。'))return;
+  try{
+    toast('從線上讀取中…');
+    const online=await window._fbGetOnline();
+    await window._fbSetTestRoot(mmLaunchPrep(online));
+    _mmTestDropLocal();
+    toast('已複製到測試區 ✓，重新載入中…','s');
+    setTimeout(()=>location.reload(),600);
+  }catch(err){ toast('複製失敗：'+((err&&err.message)||err),'e'); }
+}
+async function mmTestClear(){
+  if(!MM_TEST||location.protocol!=='file:'||!window._fbClearTest)return;
+  if(!confirm('清空測試區？\n雲端 test/ 底下的紀錄、設定、照片全部刪掉（線上的資料不受影響）。'))return;
+  try{ await window._fbClearTest(); _mmTestDropLocal(); toast('測試區已清空，重新載入中…','s'); setTimeout(()=>location.reload(),600); }
+  catch(err){ toast('清空失敗：'+((err&&err.message)||err),'e'); }
+}
+window.mmTestCopyFromOnline=mmTestCopyFromOnline; window.mmTestClear=mmTestClear;
+
 document.addEventListener('DOMContentLoaded',()=>{
   loadCfg();
   // 未從入口登入 → 立刻蓋上閘門，不做任何初始化（避免資料先閃現）
@@ -5368,16 +6306,34 @@ window._cloudErrBar = (function(){
  * ⚠️ 線上是 https，這一段完全不會觸發。 */
 (function(){
   if (location.protocol !== 'file:') return;
-  window._LOCAL_PREVIEW = true;
+  /* 2026-10-12：測試區（MM_TEST）可以寫雲端，但只寫 test/ 底下；看線上資料照舊一律不寫 */
+  window._LOCAL_PREVIEW = !window.MM_TEST;
   function bar(){
     if (document.getElementById('local-preview-bar')) return;
     var el = document.createElement('div');
     el.id = 'local-preview-bar';
     el.className = 'no-print';
-    el.style.cssText = 'position:sticky;top:0;z-index:99999;background:#7c2d12;color:#fff;'
-      + 'font:700 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:7px 14px;text-align:center';
-    el.textContent = '📁 本機預覽（直接開啟檔案）：可以看、可以操作，但不會存到雲端';
+    el.style.cssText = 'position:sticky;top:0;z-index:99999;background:' + (window.MM_TEST ? '#1e3a8a' : '#7c2d12') + ';color:#fff;'
+      + 'font:700 13px/1.5 "Microsoft JhengHei","Noto Sans TC",sans-serif;padding:7px 14px;text-align:center;'
+      + 'display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap';
+    var B = 'font:inherit;font-size:12px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;border-radius:5px;padding:2px 10px;cursor:pointer';
+    el.innerHTML = window.MM_TEST
+      ? '<span id="lp-mode">🧪 測試區：存在雲端 test/ 底下，跟線上分開（可以存、可以傳照片）</span>'
+        + '<button type="button" id="lp-to-online" style="' + B + '">切回看線上資料</button>'
+        + '<button type="button" id="lp-copy" style="' + B + '">從線上複製一份過來</button>'
+        + '<button type="button" id="lp-clear" style="' + B + '">清空測試區</button>'
+      : '<span id="lp-mode">📁 本機預覽：看線上資料，可以看、可以操作，但不會存到雲端</span>'
+        + '<button type="button" id="lp-to-test" style="' + B + '">切到 🧪 測試區（可以存）</button>';
     document.body.insertBefore(el, document.body.firstChild);
+    el.addEventListener('click', function(e){
+      var t = e.target; if (!t || !t.id) return;
+      if (t.id === 'lp-to-test' || t.id === 'lp-to-online') {
+        try { localStorage.setItem('dtp_mm_preview_mode', t.id === 'lp-to-test' ? 'test' : 'online'); } catch (err) {}
+        location.reload();
+      }
+      if (t.id === 'lp-copy' && window.mmTestCopyFromOnline) window.mmTestCopyFromOnline();
+      if (t.id === 'lp-clear' && window.mmTestClear) window.mmTestClear();
+    });
   }
   if (document.body) bar(); else document.addEventListener('DOMContentLoaded', bar);
 })();
@@ -5422,7 +6378,8 @@ const _noUndef = (v) => {
 };
 /* 🚨 雲端節點（2026-09-30 瑪摩試做版）：整支 App 只在這裡寫一次節點名。
    一定要是 dtp_mm —— 寫成 dtp 就會直接讀寫到「進度表—圖面管理」的正式資料。 */
-const FB_ROOT = 'dtp_mm';
+/* 2026-10-12：測試區（只有 G 槽 file:// 才可能）改走 test/dtp_mm —— 節點名在主程式的 MM_ROOTS 決定 */
+const FB_ROOT = (window.MM_ROOTS && window.MM_ROOTS.db) || 'dtp_mm';
 window._fbSet = async (data) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, FB_ROOT), _noUndef(data)); };
 window._fbSetPath = async (path, val) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, FB_ROOT + '/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
 window._fbGet = async () => { await authReady; const s = await get(ref(db, FB_ROOT)); return s.exists() ? s.val() : null; };
@@ -5430,7 +6387,15 @@ window._fbGetPath = async (path) => { await authReady; const s = await get(ref(d
 /* 📷 施工照片（2026-10-02 第二版，做法照日報表—專案管理）：原圖、縮圖放在 dtp_mm **之外**的兩個節點，
    開頁抓整包 dtp_mm 時一張影像都不會下載到；一張照片一個 id，用到哪張才抓哪張。
    🚨 節點名只寫在這兩行，一定要是 dtp_mm_photos／dtp_mm_thumbs —— 不能碰到日報表的 cdr_pm_photos 等節點。 */
-const PH_ROOT = 'dtp_mm_photos', TH_ROOT = 'dtp_mm_thumbs';
+const PH_ROOT = (window.MM_ROOTS && window.MM_ROOTS.ph) || 'dtp_mm_photos', TH_ROOT = (window.MM_ROOTS && window.MM_ROOTS.th) || 'dtp_mm_thumbs';
+/* 測試區專用（2026-10-12）：只有 file:// 而且在測試區才掛上去。
+   _fbGetOnline 只讀線上 dtp_mm；_fbSetTestRoot／_fbClearTest 寫的路徑寫死在 test/ 底下，傳不了別的路徑進來 */
+if (location.protocol === 'file:' && window.MM_TEST) {
+  window._fbGetOnline = async () => { await authReady; const s = await get(ref(db, 'dtp_mm')); return s.exists() ? s.val() : null; };
+  window._fbSetTestRoot = async (data) => { await authReady; await set(ref(db, 'test/dtp_mm'), _noUndef(data || {})); };
+  window._fbClearTest = async () => { await authReady;
+    await set(ref(db, 'test/dtp_mm'), null); await set(ref(db, 'test/dtp_mm_photos'), null); await set(ref(db, 'test/dtp_mm_thumbs'), null); };
+}
 window._phGet = async (id) => { await authReady; const s = await get(ref(db, PH_ROOT + '/' + id)); return s.exists() ? s.val() : null; };
 window._phSet = async (id, d) => { if (window._LOCAL_PREVIEW) return;   /* 本機預覽不寫雲端 */ await authReady; await set(ref(db, PH_ROOT + '/' + id), d == null ? null : d); };
 window._thGet = async (id) => { await authReady; const s = await get(ref(db, TH_ROOT + '/' + id)); return s.exists() ? s.val() : null; };

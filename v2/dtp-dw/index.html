@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-06.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -89,6 +89,9 @@ textarea.fi{resize:vertical;min-height:60px}
 /* 黏住時上下各補一塊同色底，免得捲過去的內容從圓角與間距的縫隙露出來（2026-08-20） */
 .filter-bar::before,.filter-bar::after{content:"";position:absolute;left:-16px;right:-16px;height:16px;background:var(--bg)}
 .filter-bar::before{top:-16px}
+/* 2026-10-14（她說「8 一起改」，照進—瑪 2026-10-02）：畫面 ≤1024px 時 .container 左右留白只剩 12px，遮片還是往外伸 16px →
+   整頁多出 4px 寬（手機直立、畫面又夠高時看得到左右晃）。遮片跟著縮成 12px。真 Chrome 量：改前 over=4、改後 0 */
+@media(max-width:1024px){.filter-bar::before,.filter-bar::after{left:-12px;right:-12px}}
 /* 進度記錄日期區間那一排（2026-09-20 她交辦）：跟上面的篩選列同一張卡片感，但不黏頂 */
 .date-bar{position:static;margin-top:-10px;padding-top:8px;border-top:1px dashed #e2e8f0;border-radius:0 0 10px 10px}
 /* ── 2026-09-21 她回報：筆電放大 125%〜200%，畫面中間出現一條色帶，底下的字被切掉 ──

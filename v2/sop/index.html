@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-09-30.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -1614,9 +1614,48 @@ function restoreCloudPhotos(data){
  * 規則跟 persistReport 一樣：先把雲端的大圖補回來才寫；補不回來（離線／讀取失敗）
  *   就**這一張先不寫**，回傳 false，讓呼叫端提示「稍後再同步」。
  * 補回來的是一份複本，S.reports 那份不動（本機快取照樣保持輕量）。 */
+/* ── 刪除紀錄（墓碑，2026-10-14 她確認示意圖：1甲 不追溯／2甲 不提示／3甲 永久保留）──────────
+ * 起因：A 電腦刪掉一張，B 電腦之前開過 → 開頁合併只會「加進來／換成雲端較新的」，
+ *   本機有、雲端沒有的那張一直留著；B 再存檔、或按「立即同步」（整批寫回本機每一張）→ 那張復活。
+ * 做法同日報表（cdr_pm/deleted）、進—圖（dtp/deleted）：刪除時在 sop/deleted/{id} 記下刪除時間；
+ *   開頁先把有紀錄的從本機拿掉（不提示）；任何寫回雲端之前再讀一次那一格，有紀錄就不寫、從本機拿掉。
+ *   · 不追溯：以前刪的沒有紀錄，不去猜（「本機有、雲端沒有」也可能是離線新增還沒傳上去）
+ *   · 永久保留：一筆只有一個時間戳；真的刪錯從每日備份找回
+ *   · 查檢表 id 是亂數（uid），不會有「同一個 id 重建」的問題 */
+var _tombstones = {};
+var DELETED_MSG = '這張查檢表已在別台刪除，沒有存檔';
+function isDeleted(id){ return !!(id && _tombstones[id]); }
+function loadTombstones(d){ if(d && typeof d==='object') Object.keys(d).forEach(function(k){ if(d[k]) _tombstones[k]=d[k]; }); }
+/* 從本機拿掉有刪除紀錄的；回傳拿掉幾張 */
+function dropDeletedLocal(){
+  var n=S.reports.length;
+  S.reports=S.reports.filter(function(r){ return !(r && isDeleted(r.id)); });
+  return n-S.reports.length;
+}
+/* 刪除：先記墓碑再刪那張（順序不能反 —— 先刪的話，中間有人同步就補回去了） */
+function markDeleted(id){
+  if(!id) return Promise.resolve();
+  _tombstones[id]=Date.now();
+  if(!window._sopSet) return Promise.resolve();
+  return window._sopSet('deleted/'+id, _tombstones[id]);
+}
+/* 寫雲端前重讀那一格（不靠開頁時抓的那份 —— 別台可能是剛剛才刪的）。讀不到（離線）＝當作沒刪 */
+function checkDeleted(id){
+  if(isDeleted(id)) return Promise.resolve(true);
+  if(!window._sopGet || !id) return Promise.resolve(false);
+  return window._sopGet('deleted/'+id).then(function(v){ if(v){ _tombstones[id]=v; return true; } return false; })
+    .catch(function(){ return false; });
+}
+/* 回傳：true＝寫上去了／false＝補不回大圖先不寫／'deleted'＝別台刪了，沒寫、本機也拿掉 */
 function writeReportSafely(r){
   if(!window._sopSet || !r) return Promise.resolve(false);
   var copy=JSON.parse(JSON.stringify(r));
+  return checkDeleted(copy.id).then(function(del){
+    if(del){ dropDeletedLocal(); saveLS(); return 'deleted'; }
+    return _writeReportSafely(copy);
+  });
+}
+function _writeReportSafely(copy){
   return restoreCloudPhotos(copy).then(function(ok){
     if(!ok) return false;
     return window._sopSet('reports/'+copy.id, copy).then(function(){ return true; });
@@ -1630,6 +1669,10 @@ function persistReport(){
   saveLS();
   if(window._sopSet){
     setSyncStatus('saving');
+    checkDeleted(data.id).then(function(del){
+      if(del){ dropDeletedLocal(); saveLS(); setSyncStatus('saved'); showToast(DELETED_MSG); renderHome(); return false; }
+      return true;
+    }).then(function(go){ if(!go) return;
     restoreCloudPhotos(data).then(function(okPhotos){
       if(!okPhotos){
         setSyncStatus('error');
@@ -1637,6 +1680,7 @@ function persistReport(){
         return;
       }
       window._sopSet('reports/'+data.id, data).then(function(){ setSyncStatus('saved'); }).catch(function(){ setSyncStatus('error'); });
+    });
     });
   }
   /* 照片搬家（2026-09-28）：先送縮圖（標 th=1），再送大圖；兩條都成功才清查檢表裡那份大圖。
@@ -1879,7 +1923,9 @@ function deleteReportFromHistory(id){
   S.reports=S.reports.filter(function(x){return x.id!==id;});
   saveLS();
   if(window._sopSet){
-    window._sopSet('reports/'+id, null).then(function(){ showToast('已刪除並同步'); }).catch(function(){ showToast('已刪除（本機）'); });
+    /* 2026-10-14：先記刪除紀錄、再刪那張（別台才不會把它補回來） */
+    markDeleted(id).catch(function(){}).then(function(){ return window._sopSet('reports/'+id, null); })
+      .then(function(){ showToast('已刪除並同步'); }).catch(function(){ showToast('已刪除（本機）'); });
   } else {
     showToast('已刪除');
   }
@@ -1937,7 +1983,7 @@ function deleteReport(id){
   if(!confirm('確定刪除此查核記錄？')) return;
   S.reports=S.reports.filter(function(r){return r.id!==id;});
   saveLS();
-  if(window._sopRemove){ window._sopRemove('reports/'+id).catch(function(){}); }
+  if(window._sopRemove){ markDeleted(id).catch(function(){}).then(function(){ return window._sopRemove('reports/'+id); }).catch(function(){}); }   /* 先記刪除紀錄（2026-10-14） */
   showToast('已刪除');
   goBack();
 }
@@ -3510,8 +3556,9 @@ function enforcePortalLogin(){
 
   // load Firebase
   if(window._sopGet){
-    Promise.all([window._sopGet('config'), window._sopGet('reports')]).then(function(res){
+    Promise.all([window._sopGet('config'), window._sopGet('reports'), window._sopGet('deleted').catch(function(){ return null; })]).then(function(res){
       var fbCfg=res[0], fbRpts=res[1];
+      loadTombstones(res[2]);   /* 刪除紀錄（2026-10-14） */
       if(fbCfg){
         ['cases','departments','personnel','contractors','templates','cats'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; });
         syncCatsFromConfig();
@@ -3525,6 +3572,7 @@ function enforcePortalLogin(){
           else S.reports.push(r);
         });
       }
+      dropDeletedLocal();   /* 別台刪掉的，本機那份也拿掉（不提示，她選 2甲） */
       saveLS();
       setSyncStatus('saved');
       renderHome();
