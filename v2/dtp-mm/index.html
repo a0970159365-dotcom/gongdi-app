@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-15.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -104,6 +104,15 @@ textarea.fi{resize:vertical;min-height:60px}
 .tbl-act{display:inline-flex;flex-direction:column;gap:3px}
 .tbl-act .btn{min-width:48px;justify-content:center}
 .d-none{display:none!important}
+/* 編輯框案場「選擇案場／＋ 新增案場」（2026-10-15）—— 名字都加 proj- 前綴、限定在 #edit-overlay，不跟別人撞 */
+#edit-overlay .proj-seg{display:inline-flex;align-self:flex-start;border:1.5px solid var(--primary);border-radius:7px;overflow:hidden;margin-bottom:6px;flex:none}
+#edit-overlay .proj-mb{font-family:inherit;font-size:13px;padding:5px 14px;border:none;background:#fff;color:var(--primary);cursor:pointer;white-space:nowrap}
+#edit-overlay .proj-mb[aria-pressed="true"]{background:var(--primary);color:#fff;font-weight:700}
+#edit-overlay .proj-mb:disabled{cursor:default;opacity:.75}
+#edit-overlay .proj-msg{margin-top:6px;font-size:13px;border-radius:6px;padding:6px 9px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+#edit-overlay .proj-msg-bad{background:#fdecec;color:#b91c1c}
+#edit-overlay .proj-msg-ok{background:#e8f6ec;color:#15803d}
+#edit-overlay .proj-msg .btn{flex:none;white-space:nowrap}
 
 .filter-bar{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;position:sticky;top:var(--navh,52px);z-index:40}
 /* 黏住時上下各補一塊同色底，免得捲過去的內容從圓角與間距的縫隙露出來（2026-08-20） */
@@ -298,6 +307,21 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .filter-bar .mm-amt-lb{font-size:12px;color:var(--muted)}
 .filter-bar .mm-tg{font-family:inherit;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:#fff;color:var(--muted);border-radius:999px;padding:4px 10px;cursor:pointer;white-space:nowrap;display:inline-flex;gap:3px;align-items:center}
 .filter-bar .mm-tg.on{background:var(--primary);border-color:var(--primary);color:#fff}
+/* 篩選列各組自己的顏色（2026-10-15 她選甲）：部門藍／狀態綠／順序紫／金額橘，每組淡底 */
+.filter-bar .mm-amt-tg.mm-g-dept,.filter-bar .mm-amt-tg.mm-g-st,.filter-bar .mm-amt-tg.mm-g-ord,.filter-bar .mm-amt-tg.mm-g-amt{border-radius:8px;padding:3px 6px 3px 8px}
+.filter-bar .mm-g-dept{background:#eaf1ff}.filter-bar .mm-g-dept .mm-amt-lb{color:#1d4ed8;font-weight:700}.filter-bar .mm-g-dept .mm-seg{border-color:#1d4ed8}.filter-bar .mm-g-dept .mm-seg button.on{background:#1d4ed8;color:#fff}
+.filter-bar .mm-g-st{background:#e8f6ec}.filter-bar .mm-g-st .mm-amt-lb{color:#15803d;font-weight:700}.filter-bar .mm-g-st .mm-seg{border-color:#15803d}.filter-bar .mm-g-st .mm-seg button.on{background:#15803d;color:#fff}
+.filter-bar .mm-g-ord{background:#f1ebff}.filter-bar .mm-g-ord .mm-amt-lb{color:#6d28d9;font-weight:700}.filter-bar .mm-g-ord .mm-seg{border-color:#6d28d9}.filter-bar .mm-g-ord .mm-seg button.on{background:#6d28d9;color:#fff}
+.filter-bar .mm-g-amt{background:#fff1e6}.filter-bar .mm-g-amt .mm-amt-lb{color:#c2410c;font-weight:700}.filter-bar .mm-g-amt .mm-tg.on{background:#c2410c;border-color:#c2410c;color:#fff}
+/* 全部展開／全部收合（2026-10-15 她選 Q1甲 Q2甲）：照案場實際的開關亮 ——
+   全部打開＝「全部展開」實心綠＋✓；全部收起＝「全部收合」實心綠＋✓；有開有關＝兩顆都是白底綠框綠字 */
+.filter-bar .btn.mm-xbtn{background:#fff;border:1.5px solid #15803d;color:#15803d;white-space:nowrap}
+.filter-bar .btn.mm-xbtn:hover{background:#e8f6ec;border-color:#15803d;color:#15803d}
+.filter-bar .btn.mm-xbtn[aria-pressed="true"]{background:#15803d;border-color:#15803d;color:#fff}
+.filter-bar .btn.mm-xbtn[aria-pressed="true"]::before{content:"✓ "}
+/* 目前看的是哪一處（第三行右邊，跟筆數一起） */
+.filter-bar .mm-scope{margin-left:auto;font-size:12px;font-weight:700;color:#1d4ed8;background:#eaf1ff;border-radius:999px;padding:2px 10px;white-space:nowrap;flex:none}
+.filter-bar .mm-scope:empty{display:none}
 /* 系統設定：狀態表、工廠兩層（2026-10-02 第三批） */
 #page-settings .st-tbl{min-width:560px}   /* 窄畫面由外層 .tbl-scroll 左右滑，不讓名稱欄被壓扁 */
 /* 設定頁三塊並排（2026-10-05 第五批）：群組二＝狀態｜案場｜區域、群組三＝款別｜施工項目｜業務。
@@ -433,6 +457,14 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #money-overlay .mn-sp[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
 #money-overlay .mn-sp:disabled,#money-overlay .mn-sg-name:disabled{cursor:default;opacity:.75}
 #money-overlay .mn-sg-none{font-size:12px;color:var(--muted)}
+/* 2026-10-15：業務組別下拉＋整組鈕、「已選」那一行 */
+#money-overlay .mn-sg-bar{display:flex;gap:8px;align-items:center}
+#money-overlay .mn-sg-bar #mn-sg-sel{flex:1 1 auto;min-width:0;max-width:260px}
+#money-overlay .mn-sg-bar #mn-sg-all{flex:none;white-space:nowrap}
+#money-overlay .mn-picked{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12.5px}
+#money-overlay .mn-pk-lb{color:var(--muted);flex:none;white-space:nowrap}
+#money-overlay .mn-pk{display:inline-flex;align-items:center;gap:2px;background:#e7f0ea;color:var(--primary);font-weight:700;border-radius:999px;padding:2px 4px 2px 10px;white-space:nowrap;flex:none}
+#money-overlay .mn-pk-x{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 5px}
 #money-overlay .mn-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:6px}
 /* 計算含稅價／倒推未稅價（2026-10-14 她指定，整個框一顆） */
 #money-overlay .mn-modebar{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap}
@@ -820,16 +852,26 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'sales')"><span id="mslb-sales">全部業務</span><span style="opacity:.5;font-size:11px">▾</span></button>
       <div class="ms-panel" id="msp-sales"></div>
     </div>
-    <button type="button" class="btn btn-g btn-sm" onclick="expandAll(true)">全部展開</button>
-    <button type="button" class="btn btn-g btn-sm" onclick="expandAll(false)">全部收合</button>
-    <!-- 第二列（2026-10-05 第五批，她指定）：「顯示（依狀態）」全部／報價／執行／完工 ＋「顯示（依金額）」實際值／大約值。
-         .mm-brk 佔滿一整行，把這兩組固定擠到第二列。 -->
+    <!-- 全部展開／全部收合：綠底白字（2026-10-15 她指定） -->
+    <button type="button" class="btn btn-sm mm-xbtn" id="mm-x-open" aria-pressed="false" onclick="expandAll(true)">全部展開</button>
+    <button type="button" class="btn btn-sm mm-xbtn" id="mm-x-close" aria-pressed="false" onclick="expandAll(false)">全部收合</button>
+    <!-- 2026-10-15 她確認的排法：第二行＝依部門、依狀態、報價金額、應收帳款；第三行＝顯示順序＋目前範圍＋筆數。
+         每一組自己的顏色（部門藍／狀態綠／順序紫／金額橘），.mm-g-* 只用在這一排。 -->
     <span class="mm-brk" aria-hidden="true"></span>
+    <!-- 依部門（2026-10-15 她確認全甲）：瑪一＝瑪摩石工程事業一處、瑪二＝二處、瑪全＝全部。
+         每次打開預設＝登入者自己的處（不是這兩處的人＝瑪全），每個人都可以切。onclick 只帶固定英文字。 -->
+    <span class="mm-amt-tg mm-g-dept" role="group" aria-label="依部門">
+      <span class="mm-amt-lb">依部門</span>
+      <span class="mm-seg" id="mm-dept-seg">
+        <button type="button" data-dept="1" onclick="setDept('1')">瑪一</button>
+        <button type="button" data-dept="2" onclick="setDept('2')">瑪二</button>
+        <button type="button" data-dept="all" onclick="setDept('all')">瑪全</button>
+      </span>
+    </span>
     <!-- 案場狀態的三個階段（2026-10-02 第二版）：報價（待報價／報價中／已報價）、執行（已成案／執行中）、完工（已完工）。
-         狀態是每個案場自己設的（金額 ✏️ 裡），不再從進度記錄推算。
-         onclick 只帶固定的英文字，不帶案場名稱，不會有引號截斷的問題。 -->
-    <span class="mm-amt-tg" role="group" aria-label="顯示（依狀態）">
-      <span class="mm-amt-lb">顯示（依狀態）</span>
+         2026-10-15：標題「顯示（依狀態）」→「依狀態」 -->
+    <span class="mm-amt-tg mm-g-st" role="group" aria-label="依狀態">
+      <span class="mm-amt-lb">依狀態</span>
       <span class="mm-seg" id="mm-phase-seg">
         <button type="button" data-phase="all" class="on" onclick="setPhase('all')">全部</button>
         <button type="button" data-phase="quote" onclick="setPhase('quote')">報價</button>
@@ -837,28 +879,30 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <button type="button" data-phase="done" onclick="setPhase('done')">完工</button>
       </span>
     </span>
+    <!-- 金額顯示的開關（2026-10-12 她選 V 甲：兩欄各一組）：打開頁面 報價金額＝只開大約值、應收帳款＝只開實際值（不記憶）。
+         某一欄兩個都關 → 那一欄整欄收起。匯出 Excel 的框不受這裡影響（兩個都勾）。 -->
+    <span class="mm-amt-tg mm-g-amt" role="group" aria-label="報價金額">
+      <span class="mm-amt-lb">報價金額</span>
+      <button type="button" id="tg-q-act" class="mm-tg" aria-pressed="false" onclick="toggleAmt('qact')"><span class="mm-tg-mk">☐</span>實際值</button>
+      <button type="button" id="tg-q-apx" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('qapx')"><span class="mm-tg-mk">☑</span>大約值</button>
+    </span>
+    <span class="mm-amt-tg mm-g-amt" role="group" aria-label="應收帳款">
+      <span class="mm-amt-lb">應收帳款</span>
+      <button type="button" id="tg-r-act" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('ract')"><span class="mm-tg-mk">☑</span>實際值</button>
+      <button type="button" id="tg-r-apx" class="mm-tg" aria-pressed="false" onclick="toggleAmt('rapx')"><span class="mm-tg-mk">☐</span>大約值</button>
+    </span>
+    <span class="mm-brk" aria-hidden="true"></span>
     <!-- 顯示順序（2026-10-13 她指定）：依新增日期（新的在上）／依案場狀態（照群組二狀態表的順序，同狀態新的在上）。
          預設依案場狀態；選了哪個這台電腦記住。onclick 只帶固定英文字。 -->
-    <span class="mm-amt-tg" role="group" aria-label="顯示順序">
+    <span class="mm-amt-tg mm-g-ord" role="group" aria-label="顯示順序">
       <span class="mm-amt-lb">顯示順序</span>
       <span class="mm-seg" id="mm-order-seg">
         <button type="button" data-ord="date" onclick="setOrder('date')">依新增日期</button>
         <button type="button" data-ord="status" onclick="setOrder('status')">依案場狀態</button>
       </span>
     </span>
-    <!-- 金額顯示的開關（2026-10-12 她選 V 甲：兩欄各一組）：打開頁面 報價金額＝只開大約值、應收帳款＝只開實際值（不記憶）。
-         某一欄兩個都關 → 那一欄整欄收起。匯出 Excel 的框不受這裡影響（兩個都勾）。 -->
-    <span class="mm-amt-tg" role="group" aria-label="報價金額">
-      <span class="mm-amt-lb">報價金額</span>
-      <button type="button" id="tg-q-act" class="mm-tg" aria-pressed="false" onclick="toggleAmt('qact')"><span class="mm-tg-mk">☐</span>實際值</button>
-      <button type="button" id="tg-q-apx" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('qapx')"><span class="mm-tg-mk">☑</span>大約值</button>
-    </span>
-    <span class="mm-amt-tg" role="group" aria-label="應收帳款">
-      <span class="mm-amt-lb">應收帳款</span>
-      <button type="button" id="tg-r-act" class="mm-tg on" aria-pressed="true" onclick="toggleAmt('ract')"><span class="mm-tg-mk">☑</span>實際值</button>
-      <button type="button" id="tg-r-apx" class="mm-tg" aria-pressed="false" onclick="toggleAmt('rapx')"><span class="mm-tg-mk">☐</span>大約值</button>
-    </span>
-    <span id="result-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+    <span id="mm-scope" class="mm-scope"></span>
+    <span id="result-count" style="font-size:12px;color:var(--muted);margin-left:6px"></span>
   </div>
   <!-- 進度記錄日期區間（2026-09-20 她交辦）：區間外的記錄不顯示，整筆沒記錄就不出現 -->
   <div class="filter-bar date-bar">
@@ -1173,8 +1217,15 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
            其他程式一律讀 #e-proj 的值，不用跟著改。 -->
       <div class="fg" style="grid-column:span 2">
         <label class="fl">案場 *</label>
+        <!-- 2026-10-15 她交辦（Q2 甲）：「＋ 新案場…」不再藏在下拉最後一項，改成上面兩顆鈕切換；
+             新增案場打的名字跟現有案場一樣 → 紅字＋「選擇案場」鈕，不能當新案場存 -->
+        <div class="proj-seg" role="group" aria-label="案場來源">
+          <button type="button" id="e-proj-m-pick" class="proj-mb" aria-pressed="true" onclick="projMode(false,true)">選擇案場</button>
+          <button type="button" id="e-proj-m-new" class="proj-mb" aria-pressed="false" onclick="projMode(true,true)">＋ 新增案場</button>
+        </div>
         <select id="e-proj-sel" class="fi" aria-label="案場" onchange="projSelChanged(this)"></select>
-        <input type="text" id="e-proj" class="fi d-none" placeholder="輸入新案場名稱" oninput="editProjChanged()" style="margin-top:6px">
+        <input type="text" id="e-proj" class="fi d-none" placeholder="輸入新案場名稱" autocomplete="off" oninput="projNameCheck();editProjChanged()">
+        <div id="e-proj-msg" class="proj-msg d-none" role="status"></div>
       </div>
       <div class="fg">
         <label class="fl">部門</label>
@@ -1242,7 +1293,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
       <!-- 2026-10-02 第四批：狀態搬到進度總表直接選（案場標題列的下拉），這個視窗不再有狀態 -->
       <!-- 2026-10-12 第七八批（她選 N 甲）：業務可以複選 —— 照業務群組列名字按鈕，點名字選、再點一下取消；點組別名稱＝整組選起來／整組取消 -->
       <div class="fg" style="grid-column:1/-1">
-        <label class="fl">業務<span class="fl-tip">點名字選，可以選好幾位；點組別名稱＝整組</span></label>
+        <label class="fl">業務<span class="fl-tip">先選組別再點名字；可以跨組選好幾位</span></label>
         <div id="mn-sales" class="mn-sales" role="group" aria-label="業務"></div>
       </div>
       <!-- 2026-10-14：切換鈕跟提示字同一列（原本提示在金額下面自成一列）—— 多一列的話手機 375 視窗會長出捲軸、「已收合計」被擠成兩行（真 Chrome 量過） -->
@@ -1927,6 +1978,40 @@ function sortForMain(list){
       return a.i-b.i;
     })
     .map(x=>x.r);
+}
+
+/* ══ 依部門（2026-10-15 她確認全甲）══
+ * 瑪一＝名稱有「瑪摩」＋「一處」的部門、瑪二＝「瑪摩」＋「二處」、瑪全＝全部（其他部門的紀錄只在瑪全看得到）。
+ * 每次打開＝登入者自己的處；不是這兩處的人（總經理室、系統維護）＝瑪全；每個人都可以切。
+ * 一筆紀錄算哪一處看它自己的「部門」；案場底下的紀錄都同一處（線上 10-15 查過沒有混用的案場）。
+ * 上面的案場／執行者／業務下拉、匯出 Excel 都只算選的那一處。不算進 hasActiveFilter（不然一打開就把案場全部展開）。 */
+var MM_DEPT_LABEL={'1':'瑪一','2':'瑪二',all:'瑪全'};
+/* Excel 檔名、第一列標題用的字（2026-10-15 她指定：一處／二處／全部；分頁名稱不加） */
+var MM_DEPT_FILE={'1':'一處','2':'二處',all:'全部'};
+var mmDept=null;   /* null＝還沒定（等登入者出來才照他的部門定） */
+function deptCodeOf(name){
+  const n=String(name||'');
+  if(/瑪摩/.test(n)&&/一處/.test(n))return '1';
+  if(/瑪摩/.test(n)&&/二處/.test(n))return '2';
+  return '';
+}
+function mmDeptNow(){
+  if(mmDept===null){
+    if(!currentUser)return 'all';             /* 登入者還沒出來：先看全部，不鎖定 */
+    mmDept=deptCodeOf(currentUser.dept)||'all';
+  }
+  return mmDept;
+}
+function deptPass(r,dOv){ const d=dOv||mmDeptNow(); return d==='all'||deptCodeOf(r&&r.部門)===d; }
+function setDept(d){
+  mmDept=(d==='1'||d==='2')?d:'all';
+  updateFilters();
+  renderMain();
+}
+function syncDeptButtons(){
+  const d=mmDeptNow();
+  [].forEach.call(document.querySelectorAll('#mm-dept-seg button'),function(b){ b.classList.toggle('on',b.getAttribute('data-dept')===d); });
+  const sc=document.getElementById('mm-scope'); if(sc)sc.textContent='目前：'+MM_DEPT_LABEL[d];
 }
 
 /* 篩選列的「全部／報價／執行／完工」（階段） */
@@ -4212,6 +4297,15 @@ function emptyReasonHtml(){
   if(msSel.sales.size)conds.push('業務「'+esc([...msSel.sales].join('、'))+'」');
   if(drActive())conds.push('進度記錄日期 '+(drVal('dr-from')||'不限')+' ～ '+(drVal('dr-to')||'不限'));
   if(mmPhase!=='all')conds.push('階段「'+MM_GROUP_LABEL[mmPhase]+'」');   /* 2026-10-02 */
+  /* 2026-10-15 依部門：這一處沒有紀錄 → 講出來＋「看瑪全」 */
+  const _dAll=mmDeptNow()==='all';
+  const deptBtn=_dAll?'':' <button type="button" class="btn btn-o btn-sm" id="empty-dept-all" style="margin-top:8px" onclick="setDept(\'all\')">看瑪全</button>';
+  if(!_dAll&&!conds.length&&!q){
+    return '<div class="empty" data-why="dept"><div class="empty-icon">🗂️</div>'
+      + '<div class="empty-t">「'+MM_DEPT_LABEL[mmDeptNow()]+'」目前沒有紀錄。</div>'
+      + '<div class="empty-s">你看得到的全部共 '+vis.length+' 筆。<br>'+deptBtn+'</div></div>';
+  }
+  if(!_dAll)conds.push('部門「'+MM_DEPT_LABEL[mmDeptNow()]+'」');
   const btn=function(t){
     return '<button type="button" class="btn btn-o btn-sm" id="empty-clear" '
          + 'style="margin-top:8px" onclick="clearAllFilters()">'+t+'</button>';
@@ -4225,7 +4319,7 @@ function emptyReasonHtml(){
   if(conds.length){
     return '<div class="empty" data-why="filter"><div class="empty-icon">🗂️</div>'
       + '<div class="empty-t">你看得到 <b>'+vis.length+' 筆</b>，但目前的篩選一筆都對不上。</div>'
-      + '<div class="empty-s">正在生效：'+conds.join('・')+'<br>'+btn('清除全部篩選')+'</div></div>';
+      + '<div class="empty-s">正在生效：'+conds.join('・')+'<br>'+btn('清除全部篩選')+deptBtn+'</div></div>';
   }
   /* 保底：理論上到不了（沒篩選、看得到、卻還是 0 筆） */
   return '<div class="empty" data-why="other"><div class="empty-icon">📭</div>'
@@ -4267,16 +4361,12 @@ document.addEventListener('click',function(e){
  * 預設全選＝跟改版前一模一樣的結果，不勾也不會少東西。*/
 var xpSel=new Set(), xpGroups=new Map();
 function openExportPicker(){
-  const data=getFiltered();
-  if(!data.length){toast('沒有資料可匯出','e');return}
-  xpGroups=new Map();
-  data.forEach(r=>{const k=r.案場||'（未填案場）'; xpGroups.set(k,(xpGroups.get(k)||0)+1)});
-  xpSel=new Set(xpGroups.keys());
-  const other=(msSel.exec.size||msSel.status.size||msSel.sales.size||mmPhase!=='all'||((document.getElementById('q')||{value:''}).value.trim()))
-    ? '（畫面上其他篩選也還在生效）' : '';
-  document.getElementById('xp-hint').textContent=
-    '目前畫面上共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
-  xpDept=new Set(); xpStatus=new Set();
+  if(!getFiltered('all').length){toast('沒有資料可匯出','e');return}
+  /* 2026-10-15 她確認（Q1甲 Q2甲）：部門固定三顆、單選，預設＝登入者的部門（不是一、二處＝全部）；
+     只影響這次匯出，不動畫面上的「依部門」 */
+  xpDeptCode=deptCodeOf(currentUser&&currentUser.dept)||'all';
+  xpStatus=new Set();
+  xpRebuild();
   /* 金額兩個勾選（2026-10-02 第三批）：預設＝畫面上目前的兩顆開關 */
   xpAct=true; xpApx=true;   /* 2026-10-12（V 甲）：不跟畫面上的開關，兩個都勾 */
   xpTax=true; xpUntax=false;   /* 2026-10-13 她指定：預設只勾含稅 */
@@ -4290,14 +4380,26 @@ function openExportPicker(){
 /* ══════ 匯出框多三個條件（2026-09-20 她交辦）══════
  * 原本只能勾案場；現在再加「部門」「日期區間」「工作狀態」。
  * 三個都是**沒選＝不限**，跟畫面上的篩選同一套邏輯。 */
-var xpDept = new Set(), xpStatus = new Set();
+var xpDeptCode = 'all', xpStatus = new Set();   /* 2026-10-15：部門改成固定三顆單選（'1'／'2'／'all'） */
+var MM_XP_DEPT={'1':'瑪工一處','2':'瑪工二處',all:'瑪工全部'};
+/* 照框裡選的部門重算案場清單（全部勾起來）＋說明字 */
+function xpRebuild(){
+  const data=getFiltered(xpDeptCode);
+  xpGroups=new Map();
+  data.forEach(r=>{const k=r.案場||'（未填案場）'; xpGroups.set(k,(xpGroups.get(k)||0)+1)});
+  xpSel=new Set(xpGroups.keys());
+  const other=(msSel.exec.size||msSel.status.size||msSel.sales.size||mmPhase!=='all'||((document.getElementById('q')||{value:''}).value.trim()))
+    ? '（畫面上其他篩選也還在生效）' : '';
+  document.getElementById('xp-hint').textContent=
+    MM_XP_DEPT[xpDeptCode]+'共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
+}
 var xpAct = true, xpApx = true;   /* 匯出的金額欄（2026-10-02 第三批） */
 var xpTax = true, xpUntax = false;   /* 含稅／未稅（2026-10-13）：兩個都勾＝兩行都印；都不勾＝沒有金額欄 */
 var xpPh = false;                 /* 含施工照片（2026-10-05 第五批，她選甲＝另開「施工照片」分頁） */
 var xpPaid = true, xpUnpaid = false;   /* 已收／未收（2026-10-14）：報價一律印；已收、未收照勾選 */
 var xpMan0 = true;                /* 出工數＝0 要不要印「（出工 0）」（2026-10-14，預設列印） */
 function xpOptions(){
-  var data = getFiltered();
+  var data = getFiltered(xpDeptCode);
   var depts = [], sts = [];
   data.forEach(function(r){
     var d = String(r.部門 || '').trim();
@@ -4319,18 +4421,28 @@ function xpChip(kind, v, on){
     + esc(v) + '</button>';
 }
 function xpPick(kind, v){
-  var set = (kind === 'dept') ? xpDept : xpStatus;
+  if(kind === 'dept'){   /* 2026-10-15：單選；換部門 → 案場清單換成那一處、狀態裡那一處沒有的拿掉 */
+    xpDeptCode = (v === '1' || v === '2') ? v : 'all';
+    xpRebuild();
+    var have = xpOptions().sts; xpStatus.forEach(function(x){ if(have.indexOf(x) < 0) xpStatus.delete(x); });
+    renderExportPicker(); renderExportExtra(true); return;
+  }
+  var set = xpStatus;
   if(v === ''){ set.clear(); }
   else if(set.has(v)) set.delete(v); else set.add(v);
-  renderExportExtra();
+  renderExportExtra(true);
 }
-function renderExportExtra(){
+/* keepDates＝true：點狀態／部門整塊重畫時，已經填的日期區間留著（2026-10-15 她選甲；原本會被清空）。
+   打開匯出框那次不帶 → 日期照舊從空的開始 */
+function renderExportExtra(keepDates){
   var host = document.getElementById('xp-extra'); if(!host) return;
+  var _f = document.getElementById('xp-from'), _t = document.getElementById('xp-to');
+  var keepF = keepDates && _f ? _f.value : '', keepT = keepDates && _t ? _t.value : '';
   var o = xpOptions();
   host.innerHTML =
-    '<div class="xp-grp"><b>部門</b><div class="xp-chips">'
-    + xpChip('dept', '', xpDept.size === 0).replace('>' + '<', '>全部<')
-    + o.depts.map(function(d){ return xpChip('dept', d, xpDept.has(d)); }).join('')
+    /* 部門：固定三顆（2026-10-15 她指定順序 瑪工一處／瑪工二處／瑪工全部），不管誰登入都三顆 */
+    '<div class="xp-grp"><b>部門</b><div class="xp-chips" id="xp-dept-chips">'
+    + ['1','2','all'].map(function(d){ return xpChip('dept', d, xpDeptCode === d).replace('>' + d + '<', '>' + MM_XP_DEPT[d] + '<'); }).join('')
     + '</div></div>'
     + '<div class="xp-grp"><b>日期區間</b><div class="xp-chips">'
     + '<input type="date" id="xp-from" class="fi" style="max-width:145px">'
@@ -4363,6 +4475,10 @@ function renderExportExtra(){
     + '<div class="xp-grp"><b>照片</b><div class="xp-chips">'
     + '<label class="xp-chk"><input type="checkbox" id="xp-ph"' + (xpPh ? ' checked' : '') + ' onchange="xpPh=this.checked">含施工照片（另開「施工照片」分頁）</label>'
     + '</div></div>';
+  if(keepDates){
+    var nf = document.getElementById('xp-from'), nt = document.getElementById('xp-to');
+    if(nf) nf.value = keepF; if(nt) nt.value = keepT;
+  }
 }
 function xpDateFromScreen(){
   var a = document.getElementById('xp-from'), b = document.getElementById('xp-to');
@@ -4376,7 +4492,7 @@ function xpDateClear(){
 /* 匯出時真正套用的條件（exportExcel 會讀這一包） */
 function xpFilters(){
   var g = function(id){ var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
-  return { depts:[...xpDept], statuses:[...xpStatus], from:g('xp-from'), to:g('xp-to'), act:!!xpAct, apx:!!xpApx, tax:!!xpTax, untax:!!xpUntax, paid:!!xpPaid, unpaid:!!xpUnpaid, man0:!!xpMan0, photos:!!xpPh };
+  return { dept:xpDeptCode, statuses:[...xpStatus], from:g('xp-from'), to:g('xp-to'), act:!!xpAct, apx:!!xpApx, tax:!!xpTax, untax:!!xpUntax, paid:!!xpPaid, unpaid:!!xpUnpaid, man0:!!xpMan0, photos:!!xpPh };
 }
 function renderExportPicker(){
   const names=[...xpGroups.keys()].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
@@ -4466,12 +4582,13 @@ function drQuick(kind){
   if(et) et.value = fmt(to);
   renderMain();
 }
-function getFiltered(){
+function getFiltered(dOv){   /* dOv＝指定部門（匯出框用，2026-10-15）；沒給＝照畫面上的「依部門」 */
   const q=(document.getElementById('q')||{value:''}).value.toLowerCase();
   /* 2026-10-02 第二版：狀態、業務都是**案場層級**的（cases），篩的時候看這一列所屬案場的值。
      狀態篩選不再一條一條篩進度記錄（進度記錄已經沒有狀態）。 */
   // 2026-08-20：篩選改複選 —— 沒勾＝不限，勾了就只留勾到的
   return sortForMain(records.map(normalizeRecord).filter(canViewRecord).filter(r=>{   /* 2026-10-13：照「顯示順序」按鈕排 */
+    if(!deptPass(r,dOv))return false;   /* 2026-10-15 依部門 */
     const cs=caseStatusOf(r.案場);
     if(mmPhase!=='all' && statusGroupOf(cs)!==mmPhase) return false;
     if(msSel.status.size&&!msSel.status.has(cs))return false;
@@ -4494,8 +4611,10 @@ function getFiltered(){
 }
 
 function updateFilters(){
-  const ps=[...new Set(visibleRecords().map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
-  const es=[...new Set(visibleRecords().flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
+  /* 2026-10-15（Q4 甲）：下拉只列選的那一處 */
+  const vrs=visibleRecords().filter(r=>deptPass(r));   /* 不能直接 filter(deptPass)：第二個參數會被當成索引傳進去 */
+  const ps=[...new Set(vrs.map(r=>r.案場))].sort((a,b)=>(projOrderIdx(a)-projOrderIdx(b))||a.localeCompare(b,'zh-Hant',{numeric:true}));
+  const es=[...new Set(vrs.flatMap(r=>(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean)))].sort();
   /* 狀態＝系統設定的狀態清單（2026-10-02 第三批）；業務＝看得到的案場目前選的業務 */
   /* 2026-10-12：刪掉、但還有案場在用的狀態也列（不然篩不到那幾個案場）；業務可以複選 → 拆成一個一個人 */
   const ss=statusNames().concat([...new Set(ps.map(caseStatusOf).filter(statusIsDeleted))]);
@@ -4550,6 +4669,8 @@ window.addEventListener('resize',mmHsUpdate);
 window.addEventListener('resize',mmStickyTop);
 
 function renderMain(){
+  /* 2026-10-15 依部門：登入者一出來就定成他的處，下拉也要照那一處重列 */
+  if(mmDept===null&&currentUser){mmDeptNow();updateFilters();}
   const filtered=getFiltered();
   // 篩選條件一改就展開符合的群組（否則篩完只看到一排標題，會以為壞掉）；之後可以自己收合（2026-10-01）
   syncOpenWithFilter(filtered);
@@ -4557,6 +4678,7 @@ function renderMain(){
      筆＝畫面上的資料列數；條＝那些列底下的進度記錄條數（＝匯出 Excel 的列數）。 */
   const _lineCnt = filtered.reduce(function(a,r){ return a + logsOf(r).length; }, 0);
   document.getElementById('result-count').textContent='共 '+filtered.length+' 筆 · '+_lineCnt+' 條';
+  syncDeptButtons();   /* 2026-10-15：依部門的按鈕＋「目前：瑪二」 */
   var _drh=document.getElementById('dr-hint');
   if(_drh) _drh.textContent = drActive() ? '（只看這個區間內的進度記錄）' : '';
   const groups={};
@@ -4564,7 +4686,7 @@ function renderMain(){
   /* 2026-09-20：同一個案場底下照「順序」欄位排（沒有順序的排在後面，維持原本的相對位置） */
   Object.keys(groups).forEach(function(k){ groups[k]=sortRowsByOrder(groups[k]); });
   const el=document.getElementById('main-table');
-  if(!filtered.length){el.innerHTML=emptyReasonHtml();return}   /* 0 筆要講出原因（2026-09-22） */
+  if(!filtered.length){el.innerHTML=emptyReasonHtml();syncXBtns();return}   /* 0 筆要講出原因（2026-09-22） */
   const _groupCount=Object.keys(groups).length;
   /* ══ 第二版（2026-10-02 示意圖 v2）══
    * 欄位：狀態／案場／執行者／區域／工作內容／報價金額（萬）／應收帳款（萬）／業務／按鈕
@@ -4650,6 +4772,7 @@ function renderMain(){
     </div>`;
   }).join('')+'</div></div></div>';
   mmHsSetup(_oldLeft);
+  syncXBtns();
 }
 
 /* ══════ 項目列手動拖曳（2026-09-20 她交辦）══════
@@ -4905,6 +5028,15 @@ function toggleSec(id,hdr){
   const nowHidden=el.classList.toggle('d-none');
   hdr.classList.toggle('sec-collapsed',nowHidden);
   if(nowHidden)_openSecs.delete(id);else _openSecs.add(id);
+  syncXBtns();   /* 一個一個開關，全部展開／收合也跟著變（2026-10-15） */
+}
+/* 全部展開／全部收合照畫面上案場的開關亮（2026-10-15 Q1 甲）；沒有案場＝兩顆都不亮 */
+function syncXBtns(){
+  const hs=document.querySelectorAll('#main-table .mm-case-head');
+  const shut=[].filter.call(hs,h=>h.classList.contains('sec-collapsed')).length;
+  const o=document.getElementById('mm-x-open'), c=document.getElementById('mm-x-close');
+  if(o)o.setAttribute('aria-pressed',String(hs.length>0&&shut===0));
+  if(c)c.setAttribute('aria-pressed',String(hs.length>0&&shut===hs.length));
 }
 
 // ============================================================
@@ -5218,24 +5350,67 @@ function renderSettingsFbStatus(){
 // ============================================================
 /* 案場下拉（2026-10-12 她選 A 甲）：系統設定的案場（照清單順序）＋紀錄裡有、清單還沒有的案場（線上 10-12 有 5 個是這樣）
    ＋這筆原本的案場＋最後「＋ 新案場…」 */
-var PROJ_NEW='__new__';
-function fillProjSelect(cur){
-  const sel=document.getElementById('e-proj-sel'); if(!sel)return;
+/* 2026-10-15：「＋ 新案場…」那一項拿掉，改成上面的「選擇案場／＋ 新增案場」兩顆鈕（projMode） */
+function projListAll(){
   const list=(cfg.案場||[]).slice();
   [...new Set((records||[]).map(r=>r&&r.案場).filter(Boolean))].filter(p=>list.indexOf(p)<0)
     .sort((a,b)=>a.localeCompare(b,'zh-Hant',{numeric:true})).forEach(p=>list.push(p));
+  return list;
+}
+function fillProjSelect(cur){
+  const sel=document.getElementById('e-proj-sel'); if(!sel)return;
+  const list=projListAll();
   if(cur&&list.indexOf(cur)<0)list.push(cur);
   sel.innerHTML='<option value="">— 選擇案場 —</option>'
-    +list.map(v=>'<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(v)+'</option>').join('')
-    +'<option value="'+PROJ_NEW+'">＋ 新案場…</option>';
+    +list.map(v=>'<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(v)+'</option>').join('');
   sel.value=cur||'';
 }
 function projSelChanged(sel){
-  const inp=document.getElementById('e-proj');
-  if(sel.value===PROJ_NEW){ inp.value=''; inp.classList.remove('d-none'); inp.focus(); }
-  else{ inp.value=sel.value; inp.classList.add('d-none'); }
+  document.getElementById('e-proj').value=sel.value;
   editProjChanged();
 }
+/* 新增案場打的名字已經有了 → 回傳現有那個名字（頭尾空白不算）；沒有回傳 '' */
+function projExisting(v){
+  v=String(v||'').trim(); if(!v)return '';
+  return projListAll().find(p=>String(p).trim()===v)||'';
+}
+var _projNew=false;
+/* 切換「選擇案場／＋ 新增案場」。切到新增：打字格清空；切回選擇：打的字丟掉，案場回到下拉選著的那個 */
+function projMode(isNew,focus){
+  _projNew=!!isNew;
+  const sel=document.getElementById('e-proj-sel'), inp=document.getElementById('e-proj');
+  document.getElementById('e-proj-m-pick').setAttribute('aria-pressed',String(!_projNew));
+  document.getElementById('e-proj-m-new').setAttribute('aria-pressed',String(_projNew));
+  sel.classList.toggle('d-none',_projNew);
+  inp.classList.toggle('d-none',!_projNew);
+  inp.value=_projNew?'':sel.value;
+  projNameCheck();
+  if(focus)(_projNew?inp:sel).focus();
+  editProjChanged();
+}
+function projNameCheck(){
+  const box=document.getElementById('e-proj-msg'); if(!box)return;
+  const v=document.getElementById('e-proj').value.trim();
+  if(!_projNew||!v){box.className='proj-msg d-none';box.innerHTML='';return}
+  const ex=projExisting(v);
+  if(ex){
+    box.className='proj-msg proj-msg-bad';
+    box.innerHTML='<span>「'+esc(ex)+'」案場已存在。改用「選擇案場」功能。</span>'
+      +'<button type="button" class="btn btn-p btn-sm" id="e-proj-use">選擇案場</button>';
+  }else{
+    box.className='proj-msg proj-msg-ok';
+    box.textContent='新案場「'+v+'」。儲存後會自動加進系統設定「群組二：案場」。';
+  }
+}
+/* 紅字旁的「選擇案場」：切回選擇，並選好那個現有案場（名字不經 onclick 帶，避開引號截斷） */
+document.addEventListener('click',function(e){
+  const b=(e.target&&e.target.closest)?e.target.closest('#e-proj-use'):null;
+  if(!b)return;
+  const ex=projExisting(document.getElementById('e-proj').value);
+  const sel=document.getElementById('e-proj-sel');
+  projMode(false,true);
+  if(ex){sel.value=ex;projSelChanged(sel)}
+});
 /* 部門下拉：入口網頁的部門（2026-08-19 起一律以入口為準）＋這筆原本的部門（不在名單裡也列，不讓它被靜靜換掉） */
 function fillDeptSelect(cur){
   const sel=document.getElementById('e-dept'); if(!sel)return;
@@ -5294,8 +5469,7 @@ function openEdit(id){
   if(id&&r){
     const rg=regionOf(r);
     fillProjSelect(r.案場||'');
-    document.getElementById('e-proj').value=r.案場||'';
-    document.getElementById('e-proj').classList.add('d-none');
+    projMode(false);   /* 2026-10-15：一律從「選擇案場」開始 */
     fillDeptSelect(r.部門||'');
     document.getElementById('e-exec').value=r.執行者||'';
     document.getElementById('e-loc').innerHTML=regionOptsHtml(rg.區域);
@@ -5309,7 +5483,7 @@ function openEdit(id){
   }else{
     ['e-proj','e-exec','e-scope','e-note'].forEach(fid=>document.getElementById(fid).value='');
     fillProjSelect('');
-    document.getElementById('e-proj').classList.add('d-none');
+    projMode(false);   /* 2026-10-15：新增時預設「選擇案場」 */
     document.getElementById('e-loc').innerHTML=regionOptsHtml('');
     fillDeptSelect('');
     // 新增時自動帶入當前執行者與所屬部門
@@ -5330,7 +5504,7 @@ function openEdit(id){
   const _etip=document.getElementById('exec-tip');      // 唯讀沒有名字排 → 這句提醒也收起來
   if(_etip)_etip.style.display=readonly?'none':'';
   // 唯讀模式：所有 input 設為 disabled
-  ['e-proj-sel','e-proj','e-dept','e-exec','e-loc','e-scope','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
+  ['e-proj-sel','e-proj','e-proj-m-pick','e-proj-m-new','e-dept','e-exec','e-loc','e-scope','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
   document.querySelectorAll('#log-editor .fi').forEach(el=>el.disabled=readonly);
   document.querySelectorAll('#log-editor .log-del').forEach(el=>el.style.display=readonly?'none':'');
   document.getElementById('e-add-log').style.display=readonly?'none':'';
@@ -5388,6 +5562,9 @@ function overlayClick(e){ /* 點外面不關，避免沒存到的內容消失 */
 function saveRecord(){
   const proj=document.getElementById('e-proj').value.trim();
   if(!proj){alert('請填入案場名稱');return}
+  /* 2026-10-15（Q2 甲）：「＋ 新增案場」打了現有的名字 → 擋下來，不偷偷併進舊案場 */
+  if(_projNew){ const _ex=projExisting(proj);
+    if(_ex){projNameCheck();toast('「'+_ex+'」案場已存在。改用「選擇案場」功能。','e');return} }
   { const _eid=document.getElementById('edit-id').value;   // 編輯到一半被別人刪掉 → 以刪除為準（2026-10-06 她選 1甲）
     if(_eid&&isDeleted(_eid)){records=dropDeleted(records);saveLocal();closeEdit(true);renderMain();renderHistory();updateFilters();toast(DELETED_MSG,'e');return} }
   /* 出工數只收 0 以上的整數（2026-10-02） */
@@ -5417,6 +5594,7 @@ function saveRecord(){
   else records.push(r);
   /* 「＋ 新案場…」打的新名字 → 也加進系統設定的案場清單（2026-10-12：案場改成下拉後，清單沒有的下次就選不到） */
   if(!Array.isArray(cfg.案場))cfg.案場=[];
+  const _newCase=_projNew&&cfg.案場.indexOf(proj)<0;   /* 2026-10-15：這次是「＋ 新增案場」新開的 → 存檔提示要講 */
   if(cfg.案場.indexOf(proj)<0){cfg.案場.push(proj);saveCfgLocal();renderCfgLists()}
   /* 「＋ 新增區域」多出來的每一塊 → 各自一筆工作項目（同一個案場、部門、執行者；什麼都沒填的塊不存） */
   let extra=0;
@@ -5428,7 +5606,9 @@ function saveRecord(){
     extra++;
   });
   fbSave();renderMain();renderHistory();updateFilters();updateDataLists();closeEdit(true);   // 已存檔 → 直接關（2026-09-20）
-  toast(extra?'已儲存 ✓（共 '+(extra+1)+' 個區域）':'已儲存 ✓','s');
+  /* 新案場的提示字（2026-10-15 她指定）：✅已儲存「X」，並存入系統設定案場清單 */
+  toast(_newCase?('✅已儲存「'+proj+'」，並存入系統設定案場清單'+(extra?'（共 '+(extra+1)+' 個區域）':''))
+    :extra?'已儲存 ✓（共 '+(extra+1)+' 個區域）':'已儲存 ✓','s');
 }
 function delRecord(){
   if(!requireDelete())return;
@@ -5458,6 +5638,7 @@ function openCaseMoney(proj){
   document.getElementById('mn-add').style.display=can?'':'none';
   _mnSales=caseSalesList(_moneyCase);
   _mnCan=can;
+  _mnGrp=mnFirstGrp();   /* 2026-10-15 Q5 甲：第一位業務所在的組；沒有業務 → 還沒選 */
   renderMnSales();
   document.getElementById('mn-note').value=String(c.報價回款說明||'');
   document.getElementById('mn-note').disabled=!can;
@@ -5474,46 +5655,77 @@ function openCaseMoney(proj){
   document.getElementById('money-overlay').classList.add('show');
   _moneySnap=moneyFormSnap();
 }
-/* 業務複選（2026-10-12 N 甲）：_mnSales＝選了誰（照點的順序，存的時候照業務群組的順序排） */
-var _mnSales=[], _mnCan=true;
+/* 業務複選（2026-10-12 N 甲）：_mnSales＝選了誰（照點的順序，存的時候照業務群組的順序排）
+ * 2026-10-15 她交辦（Q3～Q5 都甲）：改成跟編輯框「部門 → 名字」一樣 —— 先用下拉選業務組別，下面只列那一組的人。
+ *   · 換組別時，別組已經點的人留著，列在下面「已選：○○ ×」那一行（可以跨組複選，按 × 拿掉）
+ *   · 原本「點組別名稱＝整組」改成下拉旁邊一顆「整組選／整組取消」
+ *   · 打開時：已經有業務 → 選第一位業務所在的組；還沒有 → 停在「— 選擇業務組別 —」，名字先不列
+ * _mnGrp＝下拉選著第幾組（只算有人的組），-1＝還沒選 */
+var _mnSales=[], _mnCan=true, _mnGrp=-1;
+function mnGroups(){ return salesGroups().filter(g=>(g.人員||[]).length); }
+function mnFirstGrp(){
+  const gs=mnGroups();
+  for(const p of mnSalesOrdered()){ const i=gs.findIndex(g=>g.人員.indexOf(p)>=0); if(i>=0)return i; }   /* 「第一位」＝已選那一行的第一位（照業務群組順序） */
+  return -1;
+}
 function renderMnSales(){
   const host=document.getElementById('mn-sales'); if(!host)return;
-  const gs=salesGroups().filter(g=>(g.人員||[]).length);
-  const inGroups=new Set(gs.flatMap(g=>g.人員));
-  const extra=_mnSales.filter(p=>!inGroups.has(p));   /* 已經選了、但不在業務設定裡的（群組刪掉、改名）→ 照樣列、照樣選著 */
+  const gs=mnGroups();
+  if(_mnGrp>=gs.length)_mnGrp=-1;
   const dis=_mnCan?'':' disabled';
-  const chip=(p,gi,j)=>'<button type="button" class="mn-sp" data-g="'+gi+'" data-p="'+j+'" aria-pressed="'+(_mnSales.indexOf(p)>=0)+'"'+dis+'>'
-    +(_mnSales.indexOf(p)>=0?'✓ ':'')+esc(p)+'</button>';
-  host.innerHTML=(gs.length||extra.length)
-    ? gs.map((g,i)=>'<div class="mn-sg"><button type="button" class="mn-sg-name" data-g="'+i+'" title="整組選起來／取消"'+dis+'>'+esc(g.名稱)+'</button>'
-        +g.人員.map((p,j)=>chip(p,i,j)).join('')+'</div>').join('')
-      +(extra.length?'<div class="mn-sg"><span class="mn-sg-name" style="cursor:default">（不在業務設定裡）</span>'
-        +extra.map((p,j)=>chip(p,-1,j)).join('')+'</div>':'')
-    : '<span class="mn-sg-none">還沒有業務群組，到系統設定群組三新增</span>';
+  const g=_mnGrp>=0?gs[_mnGrp]:null;
+  const full=!!g&&g.人員.every(p=>_mnSales.indexOf(p)>=0);
+  const picked=mnSalesOrdered();
+  host.innerHTML=(gs.length
+    ? '<div class="mn-sg-bar"><select id="mn-sg-sel" class="fi" aria-label="業務組別">'
+        +'<option value="-1">— 選擇業務組別 —</option>'
+        +gs.map((x,i)=>'<option value="'+i+'"'+(i===_mnGrp?' selected':'')+'>'+esc(x.名稱)+'</option>').join('')
+      +'</select>'
+      +(g?'<button type="button" class="btn btn-o btn-sm" id="mn-sg-all"'+dis+'>'+(full?'整組取消':'整組選')+'</button>':'')
+      +'</div>'
+      +(g?'<div class="mn-sg">'+g.人員.map((p,j)=>{const on=_mnSales.indexOf(p)>=0;
+          return '<button type="button" class="mn-sp" data-p="'+j+'" aria-pressed="'+on+'"'+dis+'>'+(on?'✓ ':'')+esc(p)+'</button>'}).join('')+'</div>'
+        :'<span class="mn-sg-none">先選業務組別，名字才會出現</span>')
+    : '<span class="mn-sg-none">還沒有業務群組，到系統設定群組三新增</span>')
+    +'<div class="mn-picked"><span class="mn-pk-lb">已選：</span>'
+      +(picked.length?picked.map((p,i)=>'<span class="mn-pk">'+esc(p)
+          +(_mnCan?'<button type="button" class="mn-pk-x" data-i="'+i+'" aria-label="拿掉 '+esc(p)+'">×</button>':'')+'</span>').join('')
+        :'<span class="mn-sg-none">還沒選業務</span>')
+    +'</div>';
+  const sel=document.getElementById('mn-sg-sel'); if(sel)sel.value=String(_mnGrp);
 }
 /* 存的順序：照業務群組的順序，設定裡沒有的接在後面 */
-function mnSalesValue(){
+function mnSalesOrdered(){
   const order=salesGroups().flatMap(g=>g.人員||[]);
-  return _mnSales.slice().sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?9999:ia)-(ib<0?9999:ib)}).join('、');
+  return _mnSales.slice().sort((a,b)=>{const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?9999:ia)-(ib<0?9999:ib)});
 }
+function mnSalesValue(){ return mnSalesOrdered().join('、'); }
+document.addEventListener('change',function(e){
+  const t=e.target; if(!t||t.id!=='mn-sg-sel')return;
+  _mnGrp=Number(t.value); if(!(_mnGrp>=0))_mnGrp=-1;
+  renderMnSales();
+});
 document.addEventListener('click',function(e){
   const t=e.target; if(!t||!t.closest||!t.closest('#mn-sales')||!_mnCan)return;
-  const gs=salesGroups().filter(g=>(g.人員||[]).length);
+  const g=mnGroups()[_mnGrp];
   const sp=t.closest('.mn-sp');
   if(sp){
-    const gi=Number(sp.getAttribute('data-g')), j=Number(sp.getAttribute('data-p'));
-    const inGroups=new Set(gs.flatMap(g=>g.人員));
-    const name=gi>=0?(gs[gi]&&gs[gi].人員[j]):_mnSales.filter(p=>!inGroups.has(p))[j];
+    const name=g&&g.人員[Number(sp.getAttribute('data-p'))];
     if(name===undefined)return;
     const at=_mnSales.indexOf(name); if(at>=0)_mnSales.splice(at,1); else _mnSales.push(name);
     renderMnSales(); return;
   }
-  const gn=t.closest('.mn-sg-name[data-g]');
-  if(gn){
-    const g=gs[Number(gn.getAttribute('data-g'))]; if(!g)return;
+  if(t.closest('#mn-sg-all')){
+    if(!g)return;
     const all=g.人員.every(p=>_mnSales.indexOf(p)>=0);
     if(all)_mnSales=_mnSales.filter(p=>g.人員.indexOf(p)<0);
     else g.人員.forEach(p=>{ if(_mnSales.indexOf(p)<0)_mnSales.push(p); });
+    renderMnSales(); return;
+  }
+  const x=t.closest('.mn-pk-x');
+  if(x){
+    const name=mnSalesOrdered()[Number(x.getAttribute('data-i'))];
+    const at=_mnSales.indexOf(name); if(at>=0)_mnSales.splice(at,1);
     renderMnSales();
   }
 });
@@ -5718,11 +5930,11 @@ function logsToExcelText(logs){
 }
 /* projs：要匯出的案場名清單。不給＝全部（直接呼叫仍是舊行為，不會壞） */
 async function exportExcel(projs,opt){
-  let data=getFiltered();
+  const xd=(opt&&opt.dept)||mmDeptNow();   /* 2026-10-15：匯出框選的部門（檔名、標題也照它） */
+  let data=getFiltered(xd);
   if(projs&&projs.length) data=data.filter(r=>projs.indexOf(r.案場||'（未填案場）')>=0);
   /* 2026-09-20 她交辦：匯出框裡的部門／日期區間／工作狀態 —— 沒選＝不限 */
   if(opt){
-    if(opt.depts&&opt.depts.length) data=data.filter(r=>opt.depts.indexOf(String(r.部門||'').trim())>=0);
     /* 2026-10-02 第二版：狀態是案場層級的 → 看這一列所屬案場的狀態 */
     if(opt.statuses&&opt.statuses.length){
       data = data.filter(r => opt.statuses.indexOf(caseStatusOf(r.案場)) >= 0);
@@ -5820,7 +6032,7 @@ async function exportExcel(projs,opt){
   });
   ws.columns=colW.map(w=>({width:w}));
   /* 第 1 列：標題（跨全部欄） */
-  const tr=ws.addRow(['進度表—瑪摩工程　'+fnDate()+' 匯出']);
+  const tr=ws.addRow(['進度表—瑪摩工程（'+MM_DEPT_FILE[xd]+'）　'+fnDate()+' 匯出']);   /* 2026-10-15 Q1 甲：加處別 */
   ws.mergeCells(tr.number,1,tr.number,NC);
   tr.height=26;
   tr.getCell(1).font={bold:true,size:14,color:{argb:'FF1A3A5C'}};
@@ -5865,7 +6077,7 @@ async function exportExcel(projs,opt){
   }
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
-  const a=document.createElement('a');a.href=url;a.download='進度表-瑪摩工程_'+fnDate()+(projs&&projs.length===1?'_'+fnSafe(projs[0]):'')+'.xlsx';a.click();
+  const a=document.createElement('a');a.href=url;a.download='進度表-瑪摩工程_'+MM_DEPT_FILE[xd]+'_'+fnDate()+(projs&&projs.length===1?'_'+fnSafe(projs[0]):'')+'.xlsx';   /* 2026-10-15 Q1 甲 */a.click();
   URL.revokeObjectURL(url);toast(`Excel 已匯出 ✓（${groupsX.length} 個案場、${lines.length} 列，一個工作項目一列`+(opt&&opt.photos?`；照片 ${phN} 張`:'')+`）`,'s');
 }
 /* ══ Excel「施工照片」分頁（2026-10-05 第五批，她選甲）══
