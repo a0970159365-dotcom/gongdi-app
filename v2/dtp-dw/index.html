@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-18.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -1759,7 +1759,9 @@ function rescueLocalNewer(){
 async function initFb(){
   let t=0;
   while(!window._fbGet&&t<5000){await new Promise(r=>setTimeout(r,200));t+=200}
-  if(!window._fbGet){setSyncIcon('err');loadLocal();return}
+  /* 2026-10-18 她選甲：雲端 SDK 5 秒沒載好（訊號弱／斷線）→ 讀完本機也要把畫面畫出來，
+     原本直接 return，總表、歷史資料頁都是空白（進—瑪 09-30 已用同樣方法修過） */
+  if(!window._fbGet){setSyncIcon('err');loadLocal();renderMain();renderHistory();updateFilters();updateDataLists();return}
   try{
     const data=await window._fbGet();
     if(data&&data.records){
