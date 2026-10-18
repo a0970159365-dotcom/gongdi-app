@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-18.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -250,7 +250,10 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .wtbl .stf-btn{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0;width:100%}
 .wtbl .stf-btn.stf-empty{color:var(--muted)}
 .wtbl .stf-btn:disabled{cursor:not-allowed;opacity:.7}
-.readonly-form .wtbl .stf-btn{pointer-events:none;opacity:.7}
+/* 2026-10-16 她選甲：不能改的（整張唯讀、別人填的列）也點得開名字框 —— 只看、不能改 */
+.readonly-form .wtbl .stf-btn{pointer-events:auto;cursor:pointer}
+.wtbl .stf-btn[data-ro]{cursor:pointer}
+.stf-pop .stf-chip.stf-ro{cursor:default}
 .stf-pop{position:fixed;z-index:900;background:#fff;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px 12px;max-height:60vh;overflow-y:auto}
 .stf-pop .stf-hd{font-size:12px;color:var(--muted);margin-bottom:6px}
 .stf-pop .stf-chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -3659,6 +3662,8 @@ function unlockRow(btn){
   _unlockedRows[id] = true;
   tr.classList.remove('row-locked');
   tr.querySelectorAll('select,input,button.stf-btn').forEach(function(el){ el.disabled = false; });
+  tr.querySelectorAll('button.stf-btn[data-ro]').forEach(function(el){ el.removeAttribute('data-ro'); });   /* 2026-10-16：解鎖後點名字框又能改 */
+  if(_stfOpen&&_stfOpen.tr===tr) stfClose();
   var cell = tr.querySelector('.lock-btn, .owner-cell');   // 主管看到的是 button，一般欄位是 span
   if(cell){
     var span = document.createElement('span');
@@ -3724,7 +3729,8 @@ function stfLabel(names){
 function stfCellHtml(f,val,dis){
   const names=staffSplit(val);
   return '<input type="hidden" data-f="'+f+'" value="'+escHtml(names.join('、'))+'">'
-    +'<button type="button" class="cs stf-btn'+(names.length?'':' stf-empty')+'" data-sf="'+f+'" onclick="stfToggle(this)" title="'+escHtml(names.join('、'))+'"'+dis+'>'+escHtml(stfLabel(names))+'</button>'
+    /* 2026-10-16 她選甲：別人的列不再 disabled（disabled 點不開、也不跳 title）→ 改掛 data-ro，點了只看 */
+    +'<button type="button" class="cs stf-btn'+(names.length?'':' stf-empty')+'" data-sf="'+f+'" onclick="stfToggle(this)" title="'+escHtml(names.join('、'))+'"'+(dis?' data-ro="1"':'')+'>'+escHtml(stfLabel(names))+'</button>'
     +'<span class="stf-print" data-sp="'+f+'">'+escHtml(names.join('、'))+'</span>';
 }
 /* 寫回一列的值；count＝要不要順便把出工數改成人數 */
@@ -3745,7 +3751,7 @@ function stfPop(){
       /* 點名字會重畫整個框，被點的那顆已經不在畫面上 → 不擋的話，下面「點外面就關」會誤判成點到外面 */
       e.stopPropagation();
       const c=e.target.closest('.stf-chip');
-      if(c){ stfPick(c.getAttribute('data-n')); return; }
+      if(c){ if(!(_stfOpen&&_stfOpen.ro)) stfPick(c.getAttribute('data-n')); return; }
       if(e.target.closest('.stf-ok')) stfClose();
     });
     document.body.appendChild(p);
@@ -3756,13 +3762,25 @@ function stfToggle(btn){
   if(!btn||btn.disabled) return;
   const tr=btn.closest('tr'), f=btn.getAttribute('data-sf');
   if(_stfOpen&&_stfOpen.btn===btn){ stfClose(); return; }
-  _stfOpen={tr:tr,f:f,btn:btn};
+  /* 只看：這一列不是自己的（data-ro），或整張日報唯讀 */
+  const pg=document.getElementById('page-report');
+  const ro=btn.hasAttribute('data-ro')||!!(pg&&pg.classList.contains('readonly-form'));
+  _stfOpen={tr:tr,f:f,btn:btn,ro:ro};
   stfRender(); stfPlace();
 }
 function stfVendor(){ const o=_stfOpen; return o?((o.tr.querySelector('[data-f="'+(o.f==='staff'?'vendor':'vendor2')+'"]')||{}).value||''):''; }
 function stfRender(){
   const o=_stfOpen, p=stfPop(); if(!o){ p.hidden=true; return; }
   const vd=stfVendor(), list=staffOf(vd), cur=staffSplit((o.tr.querySelector('[data-f="'+o.f+'"]')||{}).value);
+  /* 2026-10-16 她選甲：只看 → 只列這一列選了的人，點了沒反應，按鈕寫「關閉」 */
+  if(o.ro){
+    let r='<div class="stf-hd">'+(vd?escHtml(vd)+'・':'')+'共 '+cur.length+' 人（唯讀，只能看）</div>';
+    r+= cur.length
+      ? '<div class="stf-chips">'+cur.map(n=>'<span class="stf-chip on stf-ro" data-n="'+escHtml(n)+'">'+escHtml(n)+'</span>').join('')+'</div>'
+      : '<div class="stf-hd">沒有選施工人員</div>';
+    r+='<div class="stf-ft"><button type="button" class="btn btn-p btn-sm stf-ok">關閉</button></div>';
+    p.innerHTML=r; p.hidden=false; return;
+  }
   const names=list.concat(cur.filter(n=>!list.includes(n)));
   let h='<div class="stf-hd">'+(vd?escHtml(vd)+'・點名字加入，再點一下拿掉':'先選廠商，才有施工人員可以點')+'</div>';
   if(vd) h+= names.length
@@ -3786,7 +3804,7 @@ function stfPlace(){
   p.style.top=(up ? Math.max(8, r.top-4-Math.min(h, above)) : r.bottom+4)+'px';
 }
 function stfPick(n){
-  const o=_stfOpen; if(!o) return;
+  const o=_stfOpen; if(!o||o.ro) return;
   const hid=o.tr.querySelector('[data-f="'+o.f+'"]'); let cur=staffSplit(hid&&hid.value);
   cur = cur.includes(n) ? cur.filter(x=>x!==n) : cur.concat([n]);
   const order=staffOf(stfVendor());   /* 照設定清單順序排；清單上沒有的（舊資料）排後面、維持原順序 */

@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-18.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -164,9 +164,9 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .wk-tag{display:inline-block;background:#f0fdf4;color:#166534;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700}
 .loc-tag{display:inline-block;background:#fdf4ff;color:#7e22ce;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700;margin-bottom:3px}
 
-/* 卡關紅字高亮 */
-.tr-stuck>td{background:#fef2f2!important}
-.tr-stuck .log-tx{color:#991b1b}
+/* 卡關紅字高亮 —— 2026-10-18 她選甲：只標「暫停/卡關」那幾行，整列不再紅底、其它行不再紅字 */
+/* 寫成 .log-li.log-li-stuck：下面 .log-li{padding:3px 0} 排在後面，單一 class 會被它蓋掉左右內距 */
+.log-li.log-li-stuck{background:#fef2f2;border-radius:4px;padding-left:4px;padding-right:4px;margin:0 -4px}   /* 左右負邊距：紅底多出 4px，文字仍跟上下行對齊 */
 .log-li-stuck .log-tx{color:#991b1b;font-weight:700}
 
 /* 進度紀錄內小徽章 */
@@ -2435,7 +2435,8 @@ function renderRow(r, ri, total){
   /* 2026-09-21 她選「方案乙」：狀態改成「一筆記錄一格」，由 renderLog 跟每一筆排在同一行。
      原本是「一個品項一列」的彙總 —— 左邊 5 筆、右邊 3 列，上下貼著就被看成一一對應。
      statusByItem 仍留著給篩選、卡關判斷與匯出用，那三個要的是「這個品項目前到哪」。 */
-  const trCls=isStuck(r)?' class="tr-stuck"':'';
+  /* 2026-10-18：整列紅底拿掉，卡關改由 renderLog 逐行標（log-li-stuck）；isStuck 仍給篩選、歷史卡片用 */
+  const trCls='';
   const editable=canEditRecord(r);
   const actionCell=editable
     ?`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="編輯">✏️</button>`

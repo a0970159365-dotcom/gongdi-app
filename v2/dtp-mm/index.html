@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-15.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-18.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1220,8 +1220,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <!-- 2026-10-15 她交辦（Q2 甲）：「＋ 新案場…」不再藏在下拉最後一項，改成上面兩顆鈕切換；
              新增案場打的名字跟現有案場一樣 → 紅字＋「選擇案場」鈕，不能當新案場存 -->
         <div class="proj-seg" role="group" aria-label="案場來源">
-          <button type="button" id="e-proj-m-pick" class="proj-mb" aria-pressed="true" onclick="projMode(false,true)">選擇案場</button>
+          <!-- 2026-10-16 她指定（Q1 甲）：「＋ 新增案場」移到前面；新增紀錄預設新增案場，編輯舊紀錄仍從「選擇案場」開始 -->
           <button type="button" id="e-proj-m-new" class="proj-mb" aria-pressed="false" onclick="projMode(true,true)">＋ 新增案場</button>
+          <button type="button" id="e-proj-m-pick" class="proj-mb" aria-pressed="true" onclick="projMode(false,true)">選擇案場</button>
         </div>
         <select id="e-proj-sel" class="fi" aria-label="案場" onchange="projSelChanged(this)"></select>
         <input type="text" id="e-proj" class="fi d-none" placeholder="輸入新案場名稱" autocomplete="off" oninput="projNameCheck();editProjChanged()">
@@ -3167,6 +3168,7 @@ function logRowsToArray(host){
     row.dataset.rid=rid;
     const o={rid,date,location,status,text,work,factory,crew};
     if(staff.length)o.施工人員=staff;
+    /* 2026-10-16：其它 6 種項目的舊出工數（藏起來的那格）照存，不刪（Q3 甲）；改成別的項目時 logWorkChanged 已清空（Q2 甲） */
     if(manRaw!=='')o.出工數=Number(manRaw);
     if(photos.length)o.photos=photos;
     return o;
@@ -3176,6 +3178,7 @@ function logRowsToArray(host){
 function badManRow(){
   const rows=[...document.querySelectorAll('#edit-overlay .log-edit-row')];   /* 每一塊區域都算，照畫面順序數 */
   for(let i=0;i<rows.length;i++){
+    if(((rows[i].querySelector('.log-work')||{}).value||'')!==MM_WORK_CREW)continue;   /* 2026-10-16：其它項目沒有出工數 */
     const v=String(rows[i].querySelector('.log-man').value||'').trim();
     if(v!==''&&!/^\d+$/.test(v))return i+1;
   }
@@ -3247,6 +3250,9 @@ function syncLogSub(row){
   const f=row.querySelector('.log-fac'), st=row.querySelector('.log-staff');
   if(f)f.classList.toggle('d-none',w!==MM_WORK_FACTORY&&w!==MM_WORK_CREW);
   if(st)st.classList.toggle('d-none',w!==MM_WORK_CREW);
+  /* 2026-10-16 她指定：7 種報價／施工項目只有「進場施工」要填出工數，其它 6 種不出現那一格 */
+  const mw=row.querySelector('.log-man-wrap');
+  if(mw)mw.classList.toggle('d-none',w!==MM_WORK_CREW);
 }
 /* 換施工項目：第三格在「工廠」「廠商」兩張清單之間換了 → 原本選的不屬於新清單，清掉重列（勾的施工人員一起清） */
 function logWorkChanged(sel){
@@ -3257,6 +3263,8 @@ function logWorkChanged(sel){
     if((row._staff||[]).length){row._staff=[];staffSetCount(row)}
   }
   if(k)row.dataset.fk=k;
+  /* 2026-10-16（Q2 甲）：改成進場施工以外的項目 → 出工數清掉，不存 */
+  if(work!==MM_WORK_CREW){ const m=row.querySelector('.log-man'); if(m)m.value=''; }
   syncLogSub(row); renderRowStaff(row);
 }
 /* 編輯框換案場：2026-10-13 起下拉不看案場狀態，不用重列（函式留著，onchange 還會叫它） */
@@ -4372,7 +4380,7 @@ function openExportPicker(){
   xpTax=true; xpUntax=false;   /* 2026-10-13 她指定：預設只勾含稅 */
   xpPh=false;               /* 含施工照片（2026-10-05 第五批）：每次打開預設不勾 */
   xpPaid=true; xpUnpaid=false;   /* 2026-10-14 她指定：已收／未收各一個勾選，預設只勾已收 */
-  xpMan0=true;              /* 2026-10-14 她指定：出工 0 列印／不列印，預設列印 */
+  xpMan0=false;             /* 2026-10-16 她指定：出工數未填寫或=0，預設改「不列印」（10-14 是列印） */
   renderExportPicker();
   renderExportExtra();      /* 部門／日期區間／工作狀態（2026-09-20） */
   document.getElementById('xp-overlay').classList.add('show');
@@ -4397,7 +4405,7 @@ var xpAct = true, xpApx = true;   /* 匯出的金額欄（2026-10-02 第三批�
 var xpTax = true, xpUntax = false;   /* 含稅／未稅（2026-10-13）：兩個都勾＝兩行都印；都不勾＝沒有金額欄 */
 var xpPh = false;                 /* 含施工照片（2026-10-05 第五批，她選甲＝另開「施工照片」分頁） */
 var xpPaid = true, xpUnpaid = false;   /* 已收／未收（2026-10-14）：報價一律印；已收、未收照勾選 */
-var xpMan0 = true;                /* 出工數＝0 要不要印「（出工 0）」（2026-10-14，預設列印） */
+var xpMan0 = false;               /* 進場施工出工數未填寫或=0 要不要印「（出工 0）」（2026-10-14；10-16 預設改不列印） */
 function xpOptions(){
   var data = getFiltered(xpDeptCode);
   var depts = [], sts = [];
@@ -4466,10 +4474,10 @@ function renderExportExtra(keepDates){
     + '<label class="xp-chk"><input type="checkbox" id="xp-paid"' + (xpPaid ? ' checked' : '') + ' onchange="xpPaid=this.checked">已收</label>'
     + '<label class="xp-chk"><input type="checkbox" id="xp-unpaid"' + (xpUnpaid ? ' checked' : '') + ' onchange="xpUnpaid=this.checked">未收</label>'
     + '</div></div>'
-    /* 出工數＝0（2026-10-14 她指定）：畫面上 0 不顯示；Excel 由這裡選，預設列印 */
-    + '<div class="xp-grp"><b>出工數＝0</b><div class="xp-chips">'
-    + '<label class="xp-chk"><input type="radio" name="xp-man0" id="xp-man0-on"' + (xpMan0 ? ' checked' : '') + ' onchange="if(this.checked)xpMan0=true">列印</label>'
+    /* 出工數（2026-10-14 她指定；10-16 改字「出工數未填寫或=0」、不列印移到前面、預設不列印）：畫面上 0 不顯示；Excel 由這裡選 */
+    + '<div class="xp-grp"><b>出工數未填寫或=0</b><div class="xp-chips">'
     + '<label class="xp-chk"><input type="radio" name="xp-man0" id="xp-man0-off"' + (xpMan0 ? '' : ' checked') + ' onchange="if(this.checked)xpMan0=false">不列印</label>'
+    + '<label class="xp-chk"><input type="radio" name="xp-man0" id="xp-man0-on"' + (xpMan0 ? ' checked' : '') + ' onchange="if(this.checked)xpMan0=true">列印</label>'
     + '</div></div>'
     /* 照片（2026-10-05 第五批）：勾了 → 多一個「施工照片」分頁，照 案場 › 區域 › 日期 分組，用縮圖 */
     + '<div class="xp-grp"><b>照片</b><div class="xp-chips">'
@@ -4934,7 +4942,8 @@ function renderLog(logs){
     const subV=logSubText(item);
     const subHtml=subV?`<span class="log-wsub">${esc(subV)}</span>`:'';
     /* 2026-10-14 她指定（增3）：出工數＝0 不顯示、>0 才顯示；存的資料不動，編輯框照樣看得到 0 */
-    const manHtml=(typeof item.出工數==='number'&&isFinite(item.出工數)&&item.出工數>0)?`<span class="mm-man">出工 ${item.出工數}</span>`:'';
+    /* 2026-10-16（Q3 甲）：只有進場施工才顯示；其它項目的舊出工數不顯示（資料不刪） */
+    const manHtml=(item.work===MM_WORK_CREW&&typeof item.出工數==='number'&&isFinite(item.出工數)&&item.出工數>0)?`<span class="mm-man">出工 ${item.出工數}</span>`:'';
     const phN=Array.isArray(item.photos)?item.photos.filter(p=>p&&p.id).length:0;
     const phHtml=phN?`<span class="mm-phn" title="這一筆有 ${phN} 張照片">📷 ${phN}</span>`:'';
     return`<li class="log-li">${dtHtml}<span class="log-tx">${wiHtml}${subHtml}${locHtml}${esc(item.text||'')}${manHtml}${phHtml}</span></li>`;
@@ -5483,7 +5492,7 @@ function openEdit(id){
   }else{
     ['e-proj','e-exec','e-scope','e-note'].forEach(fid=>document.getElementById(fid).value='');
     fillProjSelect('');
-    projMode(false);   /* 2026-10-15：新增時預設「選擇案場」 */
+    projMode(true);    /* 2026-10-16 她指定（Q1 甲）：新增紀錄預設「＋ 新增案場」（10-15 是選擇案場） */
     document.getElementById('e-loc').innerHTML=regionOptsHtml('');
     fillDeptSelect('');
     // 新增時自動帶入當前執行者與所屬部門
@@ -5974,10 +5983,10 @@ async function exportExcel(projs,opt){
   /* 含稅／未稅（2026-10-13 她指定）：匯出框勾哪個印哪個；沒帶這兩個參數（舊的呼叫）＝兩個都印 */
   const xTax=opt&&typeof opt.tax==='boolean'?opt.tax:true;
   const xUntax=opt&&typeof opt.untax==='boolean'?opt.untax:true;
-  /* 已收／未收（2026-10-14 她指定）：沒帶參數（舊的呼叫）＝兩段都印；出工 0 沒帶＝照印 */
+  /* 已收／未收（2026-10-14 她指定）：沒帶參數（舊的呼叫）＝兩段都印；出工 0 沒帶＝不印（2026-10-16 預設改不列印） */
   const xPaid=opt&&typeof opt.paid==='boolean'?opt.paid:true;
   const xUnpaid=opt&&typeof opt.unpaid==='boolean'?opt.unpaid:true;
-  const xMan0=opt&&typeof opt.man0==='boolean'?opt.man0:true;
+  const xMan0=opt&&typeof opt.man0==='boolean'?opt.man0:false;
   const showMoney=(act||apx)&&(xTax||xUntax);
   const amtX=n=>{ if(n===null||n===undefined)return '—'; const p=[]; if(act)p.push(fmtYuan(n)); if(apx)p.push(fmtWanApprox(n)); return p.join('　'); };
   const moneyText=mi=>{
@@ -5995,7 +6004,10 @@ async function exportExcel(projs,opt){
   };
   const logLine=l=>{
     const dt=fmtLogDate(l.date), sub=logSubText(l);
-    const man=(typeof l.出工數==='number'&&isFinite(l.出工數)&&(xMan0||l.出工數!==0))?'（出工 '+l.出工數+'）':'';
+    /* 2026-10-16 她指定：只有進場施工印出工數（Q3 甲：其它項目的舊值不印）；
+       未填寫或=0 → 匯出框選「列印」才印「（出工 0）」（Q4 甲：空白也印 0），預設不列印 */
+    const hasN=typeof l.出工數==='number'&&isFinite(l.出工數);
+    const man=l.work!==MM_WORK_CREW?'':(hasN&&l.出工數>0)?'（出工 '+l.出工數+'）':(xMan0?'（出工 0）':'');
     return [dt,l.work||'',sub,String(l.text||'').trim()].filter(Boolean).join(' ')+man;
   };
   const COLS=[{h:'狀態',min:10,max:12,k:'status',c:1},{h:'案場',min:22,max:36,c:1},{h:'執行者',min:14,max:22},{h:'區域',min:12,max:24},
