@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-18.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-19.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -109,6 +109,9 @@ textarea.fi{resize:vertical;min-height:60px}
 #edit-overlay .proj-mb{font-family:inherit;font-size:13px;padding:5px 14px;border:none;background:#fff;color:var(--primary);cursor:pointer;white-space:nowrap}
 #edit-overlay .proj-mb[aria-pressed="true"]{background:var(--primary);color:#fff;font-weight:700}
 #edit-overlay .proj-mb:disabled{cursor:default;opacity:.75}
+#edit-overlay .proj-fixed{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1.5px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:700;min-width:0}
+#edit-overlay .proj-fixed > span{min-width:0;overflow-wrap:anywhere}
+#edit-overlay .proj-change{flex:none;white-space:nowrap;font-family:inherit;font-size:12.5px;font-weight:400;border:none;background:none;color:var(--primary);text-decoration:underline;cursor:pointer;padding:2px 0}
 #edit-overlay .proj-msg{margin-top:6px;font-size:13px;border-radius:6px;padding:6px 9px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
 #edit-overlay .proj-msg-bad{background:#fdecec;color:#b91c1c}
 #edit-overlay .proj-msg-ok{background:#e8f6ec;color:#15803d}
@@ -249,13 +252,13 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #main-table .mm-inner{min-width:1000px}   /* 第五批：窄畫面 1230 → 1000（≥1280 照舊 1230，見下面） */
 #main-table .mm-col-quote{width:150px}
 #main-table .mm-col-recv{width:180px}
-@media(min-width:1280px){#main-table .mm-inner{min-width:1230px}#main-table .mm-col-quote{width:200px}#main-table .mm-col-recv{width:240px}}
+@media(min-width:1280px){#main-table .mm-inner{min-width:1230px}#main-table .mm-col-quote{width:200px}#main-table .mm-col-recv{width:270px}}   /* 2026-10-19：已收→已請款多兩個字，240→270 才不折行，表格總寬不變（工作內容那欄讓出 30px）（真 Chrome 量過） */
 #main-table .mm-inner.mm-noamt{min-width:950px}   /* 金額兩欄收起來時（2026-10-02 第三批） */
 #main-table .mm-inner.mm-oneamt:not(.mm-noamt){min-width:1000px}   /* 只收一欄（2026-10-12 兩欄各一組開關） */
 /* 應收帳款實際值、大約值都開：那一欄加寬（2026-10-12） */
 #main-table .mm-inner.mm-recv2 .mm-col-recv{width:250px}
 #main-table .mm-inner.mm-recv2{min-width:1070px}
-@media(min-width:1280px){#main-table .mm-inner.mm-recv2 .mm-col-recv{width:310px}#main-table .mm-inner.mm-recv2{min-width:1300px}}
+@media(min-width:1280px){#main-table .mm-inner.mm-recv2 .mm-col-recv{width:340px}#main-table .mm-inner.mm-recv2{min-width:1330px}}   /* 2026-10-19：已收→已請款多兩個字，310→340 才不折行（真 Chrome 量過） */
 #main-table .tbl-scroll{overflow:visible}
 #main-table .mm-tbl{min-width:0;width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px;background:#fff}
 #main-table .mm-colhead th{text-align:left;background:#f8fafc;color:var(--muted);font-weight:700;font-size:12px;padding:7px 8px;border-bottom:2px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1219,7 +1222,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <label class="fl">案場 *</label>
         <!-- 2026-10-15 她交辦（Q2 甲）：「＋ 新案場…」不再藏在下拉最後一項，改成上面兩顆鈕切換；
              新增案場打的名字跟現有案場一樣 → 紅字＋「選擇案場」鈕，不能當新案場存 -->
-        <div class="proj-seg" role="group" aria-label="案場來源">
+        <!-- 2026-10-19 她指定（3 甲）：編輯舊紀錄只顯示已選的案場，旁邊小字「更換」點了才出現下拉；兩顆鈕只給新增紀錄 -->
+        <div id="e-proj-fixed" class="proj-fixed d-none"><span id="e-proj-fixed-name"></span><button type="button" id="e-proj-change" class="proj-change" onclick="projFixed(false,true)">更換</button></div>
+        <div class="proj-seg" id="e-proj-seg" role="group" aria-label="案場來源">
           <!-- 2026-10-16 她指定（Q1 甲）：「＋ 新增案場」移到前面；新增紀錄預設新增案場，編輯舊紀錄仍從「選擇案場」開始 -->
           <button type="button" id="e-proj-m-new" class="proj-mb" aria-pressed="false" onclick="projMode(true,true)">＋ 新增案場</button>
           <button type="button" id="e-proj-m-pick" class="proj-mb" aria-pressed="true" onclick="projMode(false,true)">選擇案場</button>
@@ -1287,7 +1292,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 <div id="money-overlay" class="overlay">
   <div class="modal-box" style="max-width:680px">
     <div class="modal-title">
-      <span>💰 案場金額＋已收帳款<span id="mn-case" style="display:block;font-size:13px;color:var(--muted);font-weight:700;margin-top:2px"></span></span>
+      <span>💰 案場金額＋已請款<span id="mn-case" style="display:block;font-size:13px;color:var(--muted);font-weight:700;margin-top:2px"></span></span>
       <button class="modal-close" id="mn-x" onclick="closeCaseMoney()">✕</button>
     </div>
     <div class="g g2 mn-top">
@@ -1316,20 +1321,20 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     </div>
     <div class="mn-err" id="mn-err" role="alert"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px;gap:6px;flex-wrap:wrap">
-      <label class="fl" style="margin-bottom:0">已收帳款（已回款）</label>
-      <button type="button" class="btn btn-a btn-sm" id="mn-add" onclick="addPayRow()">＋ 新增一筆收款</button>
+      <label class="fl" style="margin-bottom:0">已請款</label>
+      <button type="button" class="btn btn-a btn-sm" id="mn-add" onclick="addPayRow()">＋ 新增一筆請款</button>
     </div>
     <!-- 2026-10-05 第六批：每一筆分未稅／含稅（填未稅自動帶含稅 ×1.05）；佔總額＝這筆含稅 ÷ 報價含稅 -->
     <div class="mn-head"><span>日期</span><span>款別</span><span style="text-align:right">未稅（元）</span><span style="text-align:right">含稅（元）</span><span style="text-align:right">佔總額</span><span></span></div>
     <div id="mn-list"></div>
     <div class="mn-tot" id="mn-tot">
       <!-- 2026-10-14 她選乙：「已收合計」改「已收」，跟「未收」、進度總表、Excel 同一套字 -->
-      <div class="mn-tot-row"><span>已收</span><span class="mn-tv" id="mn-paid-u">—</span><span class="mn-tv" id="mn-paid">—</span><span class="mn-tp" id="mn-paid-p">—</span><span></span></div>
-      <div class="mn-tot-row"><span>未收</span><span class="mn-tv" id="mn-unpaid-u">—</span><span class="mn-tv" id="mn-unpaid">—</span><span class="mn-tp" id="mn-unpaid-p">—</span><span></span></div>
+      <div class="mn-tot-row"><span>已請款</span><span class="mn-tv" id="mn-paid-u">—</span><span class="mn-tv" id="mn-paid">—</span><span class="mn-tp" id="mn-paid-p">—</span><span></span></div>
+      <div class="mn-tot-row"><span>未請款</span><span class="mn-tv" id="mn-unpaid-u">—</span><span class="mn-tv" id="mn-unpaid">—</span><span class="mn-tp" id="mn-unpaid-p">—</span><span></span></div>
     </div>
     <!-- 2026-10-12（她選 I 甲）：報價／回款說明 —— 自己打字，Excel「報價／回款說明」那欄印這段 -->
     <div class="fg" style="margin-top:10px">
-      <label class="fl" for="mn-note">報價／回款說明</label>
+      <label class="fl" for="mn-note">報價／請款說明</label>
       <textarea id="mn-note" class="fi" rows="2" placeholder="例：圖面報價；230 大廳地坪、573 標準層梯廳"></textarea>
     </div>
     <div class="modal-footer">
@@ -2296,7 +2301,7 @@ function cfgDelMsg(key,val){
     return head+'\n'+(n?('有 '+n+' 筆工作項目'+(money?'和金額、帳款':'')+'用到。'):money?'有金額、帳款用到。':'目前沒有紀錄用到。')
       +'\n只從清單和下拉拿掉，底下的紀錄、金額、照片都不會刪。';
   }
-  if(key==='款別')return head+'\n'+(n?'有 '+n+' 個案場的已收帳款用到，刪了以後照樣顯示「'+val+'」，只是下拉選單不再出現。':'目前沒有案場用到。');
+  if(key==='款別')return head+'\n'+(n?'有 '+n+' 個案場的已請款用到，刪了以後照樣顯示「'+val+'」，只是下拉選單不再出現。':'目前沒有案場用到。');
   if(!n)return head+'\n目前沒有紀錄用到。';
   return head+'\n有 '+n+' 筆紀錄用到，刪了以後照樣顯示「'+val+'」，只是下拉選單不再出現。';
 }
@@ -2499,9 +2504,9 @@ function cfgRenameAsk(key,oldV,newV,used,cb){
     +'<div class="cfg-ren-row"><span class="cfg-ren-old">'+esc(oldV)+'</span><span style="color:var(--muted)">→</span><span class="cfg-ren-new">'+esc(newV)+'</span></div>'
     +'<div style="font-size:14px;line-height:1.7;margin-bottom:16px">'
     +(key==='款別'
-      ? '<strong>'+used+' 個案場</strong>的已收帳款會一起改成新款別。'      /* 2026-10-02：款別掛在案場上 */
+      ? '<strong>'+used+' 個案場</strong>的已請款會一起改成新款別。'      /* 2026-10-02：款別掛在案場上 */
       : '<strong>'+used+' 筆</strong>紀錄的「'+esc(cfgLabel(key))+'」會一起改成新名字。'
-        +(key==='案場'?'金額和已收帳款也會跟著搬過去。':''))+'</div>'
+        +(key==='案場'?'金額和已請款也會跟著搬過去。':''))+'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
     +'<button class="btn btn-p btn-sm" id="cfgren-all">一起更新（'+used+(key==='款別'?' 個案場':' 筆')+'）</button>'
     +'<button class="btn btn-g btn-sm" id="cfgren-cancel">取消</button>'
@@ -4471,8 +4476,8 @@ function renderExportExtra(keepDates){
     + '<label class="xp-chk"><input type="checkbox" id="xp-tax"' + (xpTax ? ' checked' : '') + ' onchange="xpTax=this.checked">含稅</label>'
     + '<label class="xp-chk"><input type="checkbox" id="xp-untax"' + (xpUntax ? ' checked' : '') + ' onchange="xpUntax=this.checked">未稅</label>'
     + '</div><div class="xp-chips" style="margin-top:4px">'
-    + '<label class="xp-chk"><input type="checkbox" id="xp-paid"' + (xpPaid ? ' checked' : '') + ' onchange="xpPaid=this.checked">已收</label>'
-    + '<label class="xp-chk"><input type="checkbox" id="xp-unpaid"' + (xpUnpaid ? ' checked' : '') + ' onchange="xpUnpaid=this.checked">未收</label>'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-paid"' + (xpPaid ? ' checked' : '') + ' onchange="xpPaid=this.checked">已請款</label>'
+    + '<label class="xp-chk"><input type="checkbox" id="xp-unpaid"' + (xpUnpaid ? ' checked' : '') + ' onchange="xpUnpaid=this.checked">未請款</label>'
     + '</div></div>'
     /* 出工數（2026-10-14 她指定；10-16 改字「出工數未填寫或=0」、不列印移到前面、預設不列印）：畫面上 0 不顯示；Excel 由這裡選 */
     + '<div class="xp-grp"><b>出工數未填寫或=0</b><div class="xp-chips">'
@@ -4756,7 +4761,7 @@ function renderMain(){
        「已收・含稅 $83,101 8.3萬（78.8%）」寫全在 1280 寬會折行（真 Chrome 量過）→ 含稅那行沿用原本的「已收／未收」字樣 */
     /* 應收帳款（2026-10-12 O 甲）：只放實際值（$），含稅在上、寫「含稅」；未稅縮排小字在下 */
     const recv=!mi.n?'<span class="mm-dash">—</span>'
-      :'<div class="mm-money mm-recv"><span>已收 '+amtOf(mi.paid,'r')+'（含稅）（'+pctText(mi.paid,mi.tax)+'）</span><small class="mm-sub">'+amtOf(mi.paidU,'r')+'（未稅）</small></div>';
+      :'<div class="mm-money mm-recv"><span>已請款 '+amtOf(mi.paid,'r')+'（含稅）（'+pctText(mi.paid,mi.tax)+'）</span><small class="mm-sub">'+amtOf(mi.paidU,'r')+'（未稅）</small></div>';
     const btns=`<div class="mm-hbtns">`
       +`<button type="button" class="mm-hbtn mm-money-btn" data-case="${esc(proj)}" onclick="event.stopPropagation();openCaseMoney(this.getAttribute('data-case'))">金額 ✏️</button>`
       +`<button type="button" class="mm-hbtn mm-ph-btn" data-case="${esc(proj)}" onclick="event.stopPropagation();downloadCasePhotos(this.getAttribute('data-case'))">案場照片 📥</button></div>`;
@@ -5397,6 +5402,14 @@ function projMode(isNew,focus){
   if(focus)(_projNew?inp:sel).focus();
   editProjChanged();
 }
+/* 2026-10-19 她指定（3 甲）：編輯舊紀錄 on＝只顯示案場名字＋「更換」；按「更換」（on＝false）才出現下拉，兩顆鈕一律不出現 */
+function projFixed(on,focus){
+  const sel=document.getElementById('e-proj-sel');
+  document.getElementById('e-proj-fixed-name').textContent=sel.value;
+  document.getElementById('e-proj-fixed').classList.toggle('d-none',!on);
+  sel.classList.toggle('d-none',!!on);
+  if(!on&&focus)sel.focus();
+}
 function projNameCheck(){
   const box=document.getElementById('e-proj-msg'); if(!box)return;
   const v=document.getElementById('e-proj').value.trim();
@@ -5479,6 +5492,8 @@ function openEdit(id){
     const rg=regionOf(r);
     fillProjSelect(r.案場||'');
     projMode(false);   /* 2026-10-15：一律從「選擇案場」開始 */
+    document.getElementById('e-proj-seg').classList.add('d-none');
+    projFixed(true);   /* 2026-10-19（3 甲）：只顯示已選的案場＋「更換」 */
     fillDeptSelect(r.部門||'');
     document.getElementById('e-exec').value=r.執行者||'';
     document.getElementById('e-loc').innerHTML=regionOptsHtml(rg.區域);
@@ -5492,6 +5507,8 @@ function openEdit(id){
   }else{
     ['e-proj','e-exec','e-scope','e-note'].forEach(fid=>document.getElementById(fid).value='');
     fillProjSelect('');
+    document.getElementById('e-proj-seg').classList.remove('d-none');
+    document.getElementById('e-proj-fixed').classList.add('d-none');
     projMode(true);    /* 2026-10-16 她指定（Q1 甲）：新增紀錄預設「＋ 新增案場」（10-15 是選擇案場） */
     document.getElementById('e-loc').innerHTML=regionOptsHtml('');
     fillDeptSelect('');
@@ -5513,7 +5530,7 @@ function openEdit(id){
   const _etip=document.getElementById('exec-tip');      // 唯讀沒有名字排 → 這句提醒也收起來
   if(_etip)_etip.style.display=readonly?'none':'';
   // 唯讀模式：所有 input 設為 disabled
-  ['e-proj-sel','e-proj','e-proj-m-pick','e-proj-m-new','e-dept','e-exec','e-loc','e-scope','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
+  ['e-proj-sel','e-proj','e-proj-m-pick','e-proj-m-new','e-proj-change','e-dept','e-exec','e-loc','e-scope','e-note'].forEach(fid=>document.getElementById(fid).disabled=readonly);
   document.querySelectorAll('#log-editor .fi').forEach(el=>el.disabled=readonly);
   document.querySelectorAll('#log-editor .log-del').forEach(el=>el.style.display=readonly?'none':'');
   document.getElementById('e-add-log').style.display=readonly?'none':'';
@@ -5821,7 +5838,7 @@ function addPayRow(p){
     +`<input type="text" class="fi mn-amt mn-pu" inputmode="numeric" autocomplete="off" placeholder="未稅（元）" aria-label="未稅（元）" value="${a.u===null?'':commas(a.u)}" oninput="mnPayUntaxInput(this)">`
     +`<input type="text" class="fi mn-amt mn-pt" inputmode="numeric" autocomplete="off" placeholder="含稅（元）" aria-label="含稅（元）" value="${a.t===null?'':commas(a.t)}" oninput="mnPayTaxInput(this)">`
     +`<span class="mn-pct">—</span>`
-    +`<button type="button" class="btn btn-g btn-icon btn-sm mn-del" title="刪除這筆收款" onclick="this.closest('.mn-row').remove();renderMoneySum()">✕</button>`;
+    +`<button type="button" class="btn btn-g btn-icon btn-sm mn-del" title="刪除這筆請款" onclick="this.closest('.mn-row').remove();renderMoneySum()">✕</button>`;
   list.appendChild(row);
   syncMnMode();   /* 新的這列也標出哪一格是算出來的（2026-10-14） */
   renderMoneySum();
@@ -5838,13 +5855,13 @@ function moneyFormError(){
   chk(document.getElementById('mn-tax'),'含稅');
   [].forEach.call(document.querySelectorAll('#mn-list .mn-row'),(row,i)=>{
     const pu=row.querySelector('.mn-pu'), pt=row.querySelector('.mn-pt');
-    chk(pu,'第 '+(i+1)+' 筆收款的未稅');
-    chk(pt,'第 '+(i+1)+' 筆收款的含稅');
+    chk(pu,'第 '+(i+1)+' 筆請款的未稅');
+    chk(pt,'第 '+(i+1)+' 筆請款的含稅');
     const d=row.querySelector('.mn-date').value, k=row.querySelector('.mn-kind').value;
     /* 有填東西的那一筆，未稅、含稅都要有（佔總額用含稅算） */
     if(!msg&&(d||k||pu.value.trim()||pt.value.trim())){
-      if(pu.value.trim()===''){pu.classList.add('bad');msg='第 '+(i+1)+' 筆收款還沒填未稅'}
-      else if(pt.value.trim()===''){pt.classList.add('bad');msg='第 '+(i+1)+' 筆收款還沒填含稅'}
+      if(pu.value.trim()===''){pu.classList.add('bad');msg='第 '+(i+1)+' 筆請款還沒填未稅'}
+      else if(pt.value.trim()===''){pt.classList.add('bad');msg='第 '+(i+1)+' 筆請款還沒填含稅'}
     }
   });
   return msg;
@@ -5882,14 +5899,14 @@ function renderMoneySum(){
   set('mn-unpaid',tax===null?'—':fmtYuan(tax-paid)); set('mn-unpaid-p',tax===null?'—':pctText(tax-paid,tax));
   const list=document.getElementById('mn-list');
   if(list&&!list.querySelector('.mn-row')&&!list.querySelector('.mn-empty')){
-    list.insertAdjacentHTML('beforeend','<div class="mn-empty">還沒有收款，按右上「＋ 新增一筆收款」。</div>');
+    list.insertAdjacentHTML('beforeend','<div class="mn-empty">還沒有請款，按右上「＋ 新增一筆請款」。</div>');
   }else if(list&&list.querySelector('.mn-row')){
     const e=list.querySelector('.mn-empty'); if(e)e.remove();
   }
 }
 function closeCaseMoney(force){
   if(force!==true&&_moneySnap&&moneyFormSnap()!==_moneySnap){
-    if(!confirm('案場金額、已收帳款還沒儲存，確定不存就關掉？'))return;
+    if(!confirm('案場金額、已請款還沒儲存，確定不存就關掉？'))return;
   }
   _moneySnap='';_moneyCase=null;
   document.getElementById('money-overlay').classList.remove('show');
@@ -5921,7 +5938,7 @@ function saveCaseMoney(){
   fbSave();
   closeCaseMoney(true);
   renderMain();updateFilters();renderHistory();
-  toast('案場金額、已收帳款已儲存 ✓','s');
+  toast('案場金額、已請款已儲存 ✓','s');
 }
 
 
@@ -5992,13 +6009,13 @@ async function exportExcel(projs,opt){
   const moneyText=mi=>{
     const L=[];
     /* 一段（報價／已收／未收）：勾的那幾種各一行，第一行帶段名、第二行縮排 */
-    const block=(head,parts)=>{ parts.filter(Boolean).forEach((t,i)=>L.push((i?'　　':head)+' '+t)); };
+    const block=(head,parts)=>{ parts.filter(Boolean).forEach((t,i)=>L.push((i?'　'.repeat(head.length):head)+' '+t)); };
     if(mi.tax===null&&mi.untax===null)L.push('報價 —');
     /* 兩個都勾時，沒填的未稅那行不印（線上很多案場只填含稅，跟畫面一樣）；只勾未稅就照樣印「—」 */
     else block('報價',[xTax?'含稅 '+amtX(mi.tax):'',xUntax&&(mi.untax!==null||!xTax)?'未稅 '+amtX(mi.untax):'']);
     if(mi.n){
-      if(xPaid)block('已收',[xTax?'含稅 '+amtX(mi.paid)+'（'+pctText(mi.paid,mi.tax)+'）':'',xUntax?'未稅 '+amtX(mi.paidU):'']);
-      if(xUnpaid)block('未收',[xTax?'含稅 '+(mi.unpaid===null?'—':amtX(mi.unpaid)+'（'+pctText(mi.unpaid,mi.tax)+'）'):'',xUntax?'未稅 '+(mi.unpaidU===null?'—':amtX(mi.unpaidU)):'']);
+      if(xPaid)block('已請款',[xTax?'含稅 '+amtX(mi.paid)+'（'+pctText(mi.paid,mi.tax)+'）':'',xUntax?'未稅 '+amtX(mi.paidU):'']);
+      if(xUnpaid)block('未請款',[xTax?'含稅 '+(mi.unpaid===null?'—':amtX(mi.unpaid)+'（'+pctText(mi.unpaid,mi.tax)+'）'):'',xUntax?'未稅 '+(mi.unpaidU===null?'—':amtX(mi.unpaidU)):'']);
     }
     return L.join('\n');
   };
@@ -6012,8 +6029,8 @@ async function exportExcel(projs,opt){
   };
   const COLS=[{h:'狀態',min:10,max:12,k:'status',c:1},{h:'案場',min:22,max:36,c:1},{h:'執行者',min:14,max:22},{h:'區域',min:12,max:24},
     {h:'工作內容',min:40,max:70}];
-  if(showMoney)COLS.push({h:'報價／回款金額',min:act&&apx?30:20,max:40,c:1});
-  COLS.push({h:'報價／回款說明',min:16,max:30,c:1},{h:'業務',min:10,max:16,c:1});
+  if(showMoney)COLS.push({h:'報價／請款金額',min:act&&apx?30:20,max:40,c:1});
+  COLS.push({h:'報價／請款說明',min:16,max:30,c:1},{h:'業務',min:10,max:16,c:1});
   const headers=COLS.map(c=>c.h), NC=COLS.length;
   /* 案場分組（2026-10-13 她指定）：照群組二狀態表的順序（待報價 → 報價中 → 已報價 → 已成案 → 執行中 → 已完工），
      同一個狀態裡照系統設定的案場清單順序。以前只分報價／執行／完工三段，已成案和執行中會混在一起。

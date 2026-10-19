@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-18.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-19.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -166,9 +166,9 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .wk-tag{display:inline-block;background:#f0fdf4;color:#166534;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700}
 .loc-tag{display:inline-block;background:#fdf4ff;color:#7e22ce;border-radius:4px;padding:2px 7px;font-size:12px;font-weight:700;margin-bottom:3px}
 
-/* 卡關紅字高亮 */
-.tr-stuck>td{background:#fef2f2!important}
-.tr-stuck .log-tx{color:#991b1b}
+/* 卡關紅字高亮 —— 2026-10-19 她選甲：比照進—專，只標「暫停/卡關」那幾行，整列不再紅底、其它行不再紅字 */
+/* 寫成 .log-li.log-li-stuck：下面 .log-li{padding:3px 0} 排在後面，單一 class 會被它蓋掉左右內距 */
+.log-li.log-li-stuck{background:#fef2f2;border-radius:4px;padding-left:4px;padding-right:4px;margin:0 -4px}   /* 左右負邊距：紅底多出 4px，文字仍跟上下行對齊 */
 .log-li-stuck .log-tx{color:#991b1b;font-weight:700}
 
 /* 進度紀錄內小徽章 */
@@ -2435,7 +2435,8 @@ function renderRow(r, ri, total){
      原本是「一個品項一列」的彙總 —— 左邊 5 筆、右邊 3 列，上下貼著就被看成一一對應
      （真實資料裡 31 列有 22 列會這樣）。statusByItem 仍留著給篩選、卡關判斷與匯出用，
      那三個要的是「這個品項目前到哪」，不是逐筆。 */
-  const trCls=isStuck(r)?' class="tr-stuck"':'';
+  /* 2026-10-19：整列紅底拿掉（比照進—專），卡關改由 renderLog 逐行標（log-li-stuck）；isStuck 仍給篩選、歷史卡片用 */
+  const trCls='';
   const editable=canEditRecord(r);
   const actionCell=editable
     ?`<button class="btn btn-g btn-icon btn-sm" onclick="openEdit('${esc(r.id)}')" title="編輯">✏️</button>`
