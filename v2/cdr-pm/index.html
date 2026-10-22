@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-18.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1962,12 +1962,31 @@ function _clearReportData(id){
   (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(f); });
   ((S.report&&S.report.photos)||[]).forEach(f);
 }
+/* 待推清單分三種（2026-10-20 她確認甲，照進—瑪的寫法）：
+ *   · 已經存進報表（S.reports）的 → 推上雲
+ *   · 還在編輯框（S.report）或「清除表單」可復原那份裡的 → 留著，等存檔那一次再推
+ *   · 哪裡都沒有（刪掉的照片、沒存就換別張） → 從待推清單拿掉，不推
+ * 以前是全部照推 → 挑了又刪的照片也上了雲，9/3～10/20 累積 161 張沒人用。
+ * 回傳「可以推」的 id 集合。 */
+function _phPendingTriage(){
+  var saved={}, keep={};
+  var add=function(set){ return function(p){ if(p && p.id) set[p.id]=1; }; };
+  (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(add(saved)); });
+  ((S.report&&S.report.photos)||[]).forEach(add(keep));
+  ((_clearedSnapshot&&_clearedSnapshot.photos)||[]).forEach(add(keep));
+  Object.keys(_pendingFull).concat(Object.keys(_pendingThumb)).forEach(function(id){
+    if(!saved[id] && !keep[id]){ delete _pendingFull[id]; delete _pendingThumb[id]; }
+  });
+  return saved;
+}
 /* 存檔時把「這次新做好的縮圖」推到 cdr_pm_thumbs/{id}（2026-09-23 第 2 步）。
    推成功才在那張照片上標 th=1 —— 有了這個標記，_pushPendingFull() 才敢清掉報表裡的原圖。
    失敗就留在待推清單，下次存檔再試（期間原圖還在報表裡，照片不會不見）。 */
 function _pushPendingThumb(){
   if(!window._thSet) return;
+  var saved=_phPendingTriage();
   Object.keys(_pendingThumb).forEach(function(id){
+    if(!saved[id]) return;                     // 還沒存進報表 → 等存檔那一次
     var d=_pendingThumb[id];
     try{
       window._thSet(id, d).then(function(){
@@ -1984,7 +2003,9 @@ function _pushPendingThumb(){
    推成功才從待推清單移除；失敗就留著，下次存檔再試。 */
 function _pushPendingFull(){
   if(!window._phSet) return;
+  var saved=_phPendingTriage();
   Object.keys(_pendingFull).forEach(function(id){
+    if(!saved[id]) return;                     // 還沒存進報表 → 等存檔那一次
     var d=_pendingFull[id];
     try{
       window._phSet(id, d).then(function(){

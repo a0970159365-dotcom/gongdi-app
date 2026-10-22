@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-18.2';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -168,6 +168,14 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 /* 寫成 .log-li.log-li-stuck：下面 .log-li{padding:3px 0} 排在後面，單一 class 會被它蓋掉左右內距 */
 .log-li.log-li-stuck{background:#fef2f2;border-radius:4px;padding-left:4px;padding-right:4px;margin:0 -4px}   /* 左右負邊距：紅底多出 4px，文字仍跟上下行對齊 */
 .log-li-stuck .log-tx{color:#991b1b;font-weight:700}
+/* 2026-10-22：每個狀態都能設「整條底色」→ 顏色由 logRowStyle 直接寫在那一行上（卡關改了顏色也吃這裡） */
+.log-li.log-li-row{border-radius:4px;padding-left:4px;padding-right:4px;margin:0 -4px}
+.log-li.log-li-row .log-tx{font-weight:700}
+/* 案場抬頭的請款日（2026-10-22）：沒填 → 黃色虛線提醒 */
+.proj-header .pj-pay{font-weight:500;font-size:12px;margin-left:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:5px;padding:1px 8px;white-space:nowrap;display:inline-block}
+.proj-header .pj-pay b{color:#fde68a;font-variant-numeric:tabular-nums}
+.proj-header .pj-pay.pj-pay-empty{background:rgba(251,191,36,.18);border-style:dashed;border-color:#fbbf24}
+.proj-header .pj-pay.pj-pay-empty b{color:#fbbf24}
 
 /* 進度紀錄內小徽章 */
 .log-loc{display:inline-block;background:#ede9fe;color:#5b21b6;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700;margin-right:3px}
@@ -291,6 +299,51 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
   .log-edit-row .log-text{grid-column:1/3;grid-row:3}
   .log-edit-row .log-del{grid-column:3;grid-row:1/4}
 }
+/* 2026-10-22 案場請款日／狀態顏色。
+   10-22 晚她改：群組二三塊寬度 40／25／35（S1 甲），案場、狀態改成一列一筆的欄位表
+   「案場｜請款日｜放款日」「狀態｜底色｜整條底色」，表頭 .cfg-colhdr 跟每一列用同一組欄寬。
+   平板（≤1024）案場自己一整排、下面兩欄（S2 甲）；手機（≤640）退回名字下面第二行、欄名寫在格子前面 */
+.g.cfg-g2{grid-template-columns:4fr 2.5fr 3.5fr}
+.g.cfg-g2>div{min-width:0}
+#lw-案場,#lw-狀態{max-height:360px}
+#lw-案場 .cfg-row,#lw-狀態 .cfg-row,#lw-案場 .cfg-colhdr,#lw-狀態 .cfg-colhdr{display:grid;align-items:center;gap:8px}
+#lw-案場 .cfg-row,#lw-案場 .cfg-colhdr{grid-template-columns:22px minmax(0,1fr) 176px 96px}
+#lw-狀態 .cfg-row,#lw-狀態 .cfg-colhdr{grid-template-columns:22px minmax(0,1fr) 128px 96px}
+.cfg-list-wrap .cfg-colhdr{position:sticky;top:0;z-index:1;background:#f8fafc;border-bottom:1px solid #cbd5e1;padding:4px;font-size:12px;font-weight:700;color:#475569;white-space:nowrap}
+.cfg-colhdr .cfg-colhdr-2{display:flex;gap:8px}
+.cfg-colhdr .cfg-colhdr-2>span{flex:none}
+#lw-案場 .cfg-colhdr-2>span{width:84px}
+#lw-狀態 .cfg-colhdr-2>span:first-child{width:44px}
+#lw-狀態 .cfg-colhdr-2>span:last-child{width:76px}
+.cfg-row .cfg-ops{display:flex;align-items:center;gap:8px;flex-shrink:0}
+#lw-案場 .cfg-ops,#lw-狀態 .cfg-ops{justify-content:flex-end}
+.cfg-row .cfg-pay,.cfg-row .cfg-stc{display:flex;align-items:center;gap:8px;font-size:12px;color:#475569}
+.cfg-pay label{width:84px;flex:none}
+.cfg-stc .cfg-stc-bg{width:44px;flex:none;display:flex;align-items:center}
+.cfg-stc .cfg-stc-rw{width:76px;flex:none;display:flex;align-items:center;gap:6px}
+.cfg-pay .cfg-pay-k,.cfg-stc .cfg-stc-k{display:none}
+.cfg-pay label,.cfg-stc label{display:flex;align-items:center;gap:3px;white-space:nowrap}
+/* 新增列三欄（10-22 晚 A1 甲、A2 甲）：窄的時候換行，名字那格至少 140px */
+#ir-案場,#ir-狀態{flex-wrap:wrap;align-items:center}
+#ir-案場 .fi,#ir-狀態 .fi{flex:1 1 140px}
+.cfg-inp-row .cfg-inp-lbl{display:flex;align-items:center;gap:3px;flex:none;white-space:nowrap;font-size:12px;color:#475569}
+.cfg-inp-row .cfg-inp-day{flex:none;width:36px;padding:4px 3px;border:1.5px solid #cbd5e1;border-radius:5px;font:inherit;font-size:12px;text-align:center;background:#fff;color:#1e293b}
+.cfg-inp-row .cfg-inp-chip{flex:none;width:30px;height:20px;border:1px solid #94a3b8;border-radius:4px;cursor:pointer;padding:0;background:#fff}
+.cfg-inp-row .cfg-inp-cb{flex:none;margin:0}
+.cfg-pay .cfg-pay-inp{width:34px;flex:none;padding:2px 3px;border:1px solid #cbd5e1;border-radius:4px;font:inherit;font-size:12px;text-align:center;background:#fff;color:#1e293b}
+.cfg-pay .cfg-pay-inp.cfg-pay-blank{border-color:#fbbf24;background:#fffbeb}
+.cfg-stc .cfg-stc-chip{width:30px;height:20px;flex:none;border:1px solid #94a3b8;border-radius:4px;cursor:pointer;padding:0}
+.cfg-stc .cfg-stc-chip:disabled{cursor:default;opacity:.8}
+.cfg-stc .cfg-stc-off{font-size:11px;color:#94a3b8}
+.cfg-row-lbl .st-badge{white-space:normal}
+.st-pal{position:fixed;z-index:3000;background:#fff;color:#1e293b;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.18);padding:10px;width:236px;display:flex;flex-direction:column;gap:8px}
+.st-pal .st-pal-t{font-size:12px;font-weight:700;color:#475569}
+.st-pal .st-pal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.st-pal .st-pal-c{height:30px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;font:inherit;font-size:11px;font-weight:700;padding:0}
+.st-pal .st-pal-c.on{outline:2px solid #2563eb;outline-offset:1px}
+.st-pal .st-pal-cus{border-top:1px solid #e2e8f0;padding-top:8px;display:flex;align-items:center;gap:8px;font-size:12px}
+.st-pal .st-pal-cus input{width:36px;height:26px;padding:0;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff}
+.st-pal .st-pal-x{margin-left:auto;font-size:12px;color:#64748b;background:none;border:none;cursor:pointer}
 .cfg-empty-txt{font-size:12px;color:var(--muted);padding:6px 4px;text-align:center}
 details.adv-details{margin-top:8px}
 details.adv-details summary{font-size:12px;color:var(--muted);cursor:pointer;padding:6px 0;user-select:none}
@@ -392,11 +445,23 @@ details.adv-details>div{margin-top:12px;padding:14px;background:#f8fafc;border-r
   .ptbl{min-width:720px}
   .wt-tbl{min-width:900px}
   .g3{grid-template-columns:repeat(2,1fr)}
+  .g.cfg-g2{grid-template-columns:1fr 1fr}
+  .g.cfg-g2>div:first-child{grid-column:1/-1}
   .card-body{padding:12px 14px}
   .filter-bar{padding:8px 12px;gap:6px}
   .grp-title{font-size:13px}
   .log-li{font-size:12px}
   .log-dt{font-size:10px}
+}
+/* 群組二手機：一欄；案場、狀態退回「名字一行、日期／顏色第二行」，表頭收起來、欄名寫回格子前面 */
+@media(max-width:640px){
+  .g.cfg-g2{grid-template-columns:1fr}
+  #lw-案場 .cfg-colhdr,#lw-狀態 .cfg-colhdr{display:none}
+  #lw-案場 .cfg-row,#lw-狀態 .cfg-row{grid-template-columns:22px minmax(0,1fr) auto}
+  #lw-案場 .cfg-row .cfg-ops,#lw-狀態 .cfg-row .cfg-ops{grid-column:3;grid-row:1}
+  .cfg-row .cfg-pay,.cfg-row .cfg-stc{grid-column:2/-1;grid-row:2;flex-wrap:wrap;gap:4px 12px}
+  .cfg-pay label,.cfg-stc .cfg-stc-bg,.cfg-stc .cfg-stc-rw{width:auto;gap:3px}
+  .cfg-pay .cfg-pay-k,.cfg-stc .cfg-stc-k{display:inline}
 }
 @media(max-width:767px){nav{padding:6px 10px}.nav-logo{font-size:13px}.nav-btn{padding:5px 7px;font-size:11px}.nav-spacer{display:none}.nav-user{padding:3px 8px;font-size:11px}}
 /* ── 設定維護權（2026-08-17）──
@@ -545,7 +610,7 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
         <span class="grp-title">群組二：案場、施作位置／工作項目、狀態</span>
         <button class="btn btn-p btn-sm" data-mng onclick="manualSave()">💾 儲存</button>
       </div>
-      <div class="g g3" style="gap:16px;align-items:start">
+      <div class="g g3 cfg-g2" style="gap:16px;align-items:start">
         <div>
           <div class="set-grp-hdr">
             <span class="set-grp-title">📁 案場</span>
@@ -553,8 +618,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </div>
           <div class="cfg-list-wrap" id="lw-案場"></div>
           <div class="cfg-inp-row" id="ir-案場" style="display:none">
+            <!-- 10-22 晚她 Q3 甲：名稱 Enter → 請款日 →（打完自動）放款日 → Enter 才新增 -->
             <input type="text" id="cfg-inp-案場" class="fi" placeholder="輸入案場名稱後按 Enter"
-              onkeydown="if(event.key==='Enter')cfgAdd('案場');if(event.key==='Escape')cfgHideInp('案場')">
+              onkeydown="if(event.key==='Enter'){event.preventDefault();if(this.value.trim())cfgDayFocus('cfg-inp-案場-a')}if(event.key==='Escape')cfgHideInp('案場')">
+            <label class="cfg-inp-lbl">請款日 每月<input type="text" inputmode="numeric" maxlength="2" id="cfg-inp-案場-a" class="cfg-inp-day" aria-label="請款日"
+              oninput="if(cfgDayInput(this))cfgDayFocus('cfg-inp-案場-b')"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();cfgDayFocus('cfg-inp-案場-b')}if(event.key==='Escape')cfgHideInp('案場')">日</label>
+            <label class="cfg-inp-lbl">放款日 次月<input type="text" inputmode="numeric" maxlength="2" id="cfg-inp-案場-b" class="cfg-inp-day" aria-label="放款日"
+              onkeydown="if(event.key==='Enter')cfgAdd('案場');if(event.key==='Escape')cfgHideInp('案場')">日</label>
             <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('案場')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('案場')">取消</button>
           </div>
@@ -579,8 +650,10 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </div>
           <div class="cfg-list-wrap" id="lw-狀態"></div>
           <div class="cfg-inp-row" id="ir-狀態" style="display:none">
-            <input type="text" id="cfg-inp-狀態" class="fi" placeholder="狀態名稱"
+            <input type="text" id="cfg-inp-狀態" class="fi" placeholder="狀態名稱" oninput="cfgNewStSync()"
               onkeydown="if(event.key==='Enter')cfgAdd('狀態');if(event.key==='Escape')cfgHideInp('狀態')">
+            <span class="cfg-inp-lbl">底色<button type="button" id="cfg-inp-狀態-bg" class="cfg-inp-chip" title="系統推薦色，點了可以換" onclick="cfgNewStPal(event)"></button></span>
+            <label class="cfg-inp-lbl"><input type="checkbox" id="cfg-inp-狀態-row" class="cfg-inp-cb" onchange="cfgNewStRow()">整條底色</label>
             <button class="btn btn-p btn-sm" data-mng onclick="cfgAdd('狀態')">新增</button>
             <button class="btn btn-g btn-sm" onclick="cfgHideInp('狀態')">取消</button>
           </div>
@@ -873,6 +946,80 @@ const CFG_KEYS=[
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function uid(){return 'r_'+Date.now()+'_'+Math.random().toString(36).slice(2,6)}
 function stClassName(s){return 'st-'+String(s||'').replace(/[\s/]/g,'')}
+
+// ============================================================
+// 案場請款日＋狀態顏色（2026-10-22 她交辦）
+// ============================================================
+/* cfg.案場請款 = { key: {請款:'25', 放款:'10'} }、cfg.狀態色 = { key: {bg:'#fecaca', row:'#fef2f2'} }
+ * key 用 cfgMapKey(名稱)：Firebase 的 key 不能有 . # $ [ ] /（「暫停/卡關」就有 /）→ 轉成 %xx。
+ * 狀態沒存過顏色 → 用 ST_DEFAULT（原本寫死在 CSS 的那 9 個＋後來新增的 7 個）；
+ *   都沒有 → 依名字從推薦色盤固定挑一個（她 Q6：以後新增的狀態不要再是灰色）。
+ * row：''＝整條不上底色（她明確關掉）；沒存過就用預設（只有卡關、帳款有）。 */
+function cfgMapKey(name){return String(name||'').replace(/[%.#$\[\]\/]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())}
+/* fg＝標籤字色，tx＝整條上底色時那一行的字色（粗體） */
+const ST_DEFAULT={
+  '進行中':{bg:'#dbeafe',fg:'#1d4ed8'},'送審中':{bg:'#fef3c7',fg:'#b45309'},'已下單':{bg:'#fed7aa',fg:'#c2410c'},
+  '報價中':{bg:'#cffafe',fg:'#0e7490'},'已完成':{bg:'#dcfce7',fg:'#15803d'},'待確認':{bg:'#f1f5f9',fg:'#475569'},
+  '已定案':{bg:'#166534',fg:'#ffffff'},'暫停/卡關':{bg:'#fecaca',fg:'#991b1b',row:'#fef2f2',tx:'#991b1b'},
+  '恢復啟動':{bg:'#bbf7d0',fg:'#15803d'},
+  '施作中':{bg:'#e0e7ff',fg:'#4338ca'},'放樣丈量':{bg:'#fae8ff',fg:'#a21caf'},'預計施作時間':{bg:'#ede9fe',fg:'#6d28d9'},
+  '待二次':{bg:'#fef9c3',fg:'#a16207'},'工區進度':{bg:'#ccfbf1',fg:'#0f766e'},
+  '帳款':{bg:'#ea580c',fg:'#ffffff',row:'#fff7ed',tx:'#9a3412'},'追加':{bg:'#fce7f3',fg:'#be185d'}
+};
+/* 推薦色盤（她 Q2：先出推薦色、最下面再放「自訂」） */
+const ST_PAL=['#dbeafe','#cffafe','#ccfbf1','#dcfce7','#fef9c3','#fef3c7','#fed7aa','#fecaca',
+              '#fce7f3','#fae8ff','#ede9fe','#e0e7ff','#2563eb','#16a34a','#ea580c','#dc2626'];
+const ST_ROW_PAL=['#eff6ff','#ecfeff','#f0fdfa','#f0fdf4','#fefce8','#fffbeb','#fff7ed','#fef2f2',
+                  '#fdf2f8','#fdf4ff','#f5f3ff','#eef2ff','#f8fafc','#f1f5f9','#fafaf9','#ffffff'];
+function _hexRgb(h){h=String(h||'').replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');
+  const n=parseInt(h,16);return isNaN(n)?[226,232,240]:[(n>>16)&255,(n>>8)&255,n&255]}
+function _hueOf(rgb){const[r,g,b]=rgb.map(v=>v/255),mx=Math.max(r,g,b),d=mx-Math.min(r,g,b);
+  if(!d)return -1;let h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;return h<0?h+360:h}
+function _hsl(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),
+  f=n=>Math.round(255*(l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)))));
+  return'#'+[f(0),f(8),f(4)].map(v=>v.toString(16).padStart(2,'0')).join('')}
+/* 深色系的字：同色相、亮度 30%（灰色就給深灰） */
+function stDeep(bg){const h=_hueOf(_hexRgb(bg));return h<0?'#334155':_hsl(Math.round(h),75,30)}
+/* 字色依底色自動配（她 Q3 甲）：淺底配同色系深字、深底配白字 */
+function stAutoFg(bg){const[r,g,b]=_hexRgb(bg).map(v=>v/255);
+  return(0.2126*r+0.7152*g+0.0722*b)<0.62?'#ffffff':stDeep(bg)}
+function stPick(name){let h=0;for(const ch of String(name))h=(h*31+ch.codePointAt(0))>>>0;return ST_PAL[h%12]}
+/* 一個狀態實際用的顏色 → {bg, fg, row, tx} */
+function statusColor(name){
+  const d=ST_DEFAULT[name]||{bg:stPick(name)};
+  const m=(cfg&&cfg.狀態色&&cfg.狀態色[cfgMapKey(name)])||{};
+  const bg=m.bg||d.bg;
+  const fg=(bg===d.bg&&d.fg)?d.fg:stAutoFg(bg);
+  const row=(m.row!==undefined)?m.row:(d.row||'');
+  const tx=row?((bg===d.bg&&d.tx)?d.tx:(stAutoFg(bg)==='#ffffff'?stDeep(bg):stAutoFg(bg))):'';
+  return{bg,fg,row,tx};
+}
+function _cssId(s){return String(s).replace(/[^A-Za-z0-9_\-\u0080-￿]/g,c=>'\\'+c)}
+/* 把每個狀態的顏色寫成一張樣式表（排在原本寫死的 CSS 後面，同樣權重 → 後面的贏） */
+function applyStatusColors(){
+  if(typeof document==='undefined')return;
+  let el=document.getElementById('st-dyn-css');
+  if(!el){el=document.createElement('style');el.id='st-dyn-css';document.head.appendChild(el)}
+  const names=[...new Set([...(cfg.狀態||[]),...Object.keys(ST_DEFAULT)])];
+  el.textContent=names.map(n=>{const c=statusColor(n),cl='.'+_cssId(stClassName(n));
+    return cl+','+'.log-status'+cl+'{background:'+c.bg+';color:'+c.fg+'}'}).join('\n');
+}
+/* 進度記錄那一行要不要整條上底色 → {li:背景色, tx:字色}；沒有就 null */
+function logRowStyle(status){
+  if(!status)return null;
+  const c=statusColor(status);return c.row?{li:c.row,tx:c.tx}:null;
+}
+/* 案場的請款日／放款日 */
+function projPay(name){const m=(cfg&&cfg.案場請款&&cfg.案場請款[cfgMapKey(name)])||{};
+  return{a:String(m.請款||''),b:String(m.放款||'')}}
+function projPayHtml(name){
+  const p=projPay(name),empty=!p.a||!p.b;
+  return'<span class="pj-pay'+(empty?' pj-pay-empty':'')+'"'+(empty?' title="還沒填，到 ⚙️ 系統設定 → 案場 填日期"':'')+'>'
+    +'請款日：每月 <b>'+esc(p.a||'__')+'</b> 日｜放款日：次月 <b>'+esc(p.b||'__')+'</b> 日</span>';
+}
+/* Excel 案場格第二行（她 Q1 甲）；兩個都沒填就不加 */
+function projPayLine(name){const p=projPay(name);if(!p.a&&!p.b)return'';
+  return'請款 每月'+(p.a||'__')+'日／放款 次月'+(p.b||'__')+'日'}
 
 // ============================================================
 // 進度紀錄 結構化 (新格式：陣列 of {date, location, status, text})
@@ -1213,16 +1360,62 @@ function cfgAdd(key){
   const val=(inp&&inp.value||'').trim();
   if(!val)return;
   if(!cfg[key])cfg[key]=[];
-  if(cfg[key].includes(val)){toast('已存在','');return}
+  if(cfg[key].includes(val)){toast('已存在','');if(inp)inp.focus();return}
+  /* 10-22 晚她 A1 甲：新增案場時請款日／放款日一起填，可以空著 */
+  let pay=null;
+  if(key==='案場'){
+    pay={};
+    for(const[k,f]of[['a','請款'],['b','放款']]){
+      const el=document.getElementById('cfg-inp-案場-'+k);
+      let v=String(el&&el.value||'').replace(/\D/g,'');
+      if(v!==''){const n=+v;if(n<1||n>31){toast('日期請填 1～31','e');if(el)el.focus();return}v=String(n)}
+      pay[f]=v;
+    }
+  }
   cfg[key].push(val);
+  if(pay&&(pay.請款||pay.放款)){
+    if(!cfg.案場請款||typeof cfg.案場請款!=='object')cfg.案場請款={};
+    cfg.案場請款[cfgMapKey(val)]=pay;
+  }
+  /* 10-22 晚她 A2 甲：新增狀態時底色、整條底色一起設；沒動過的照系統推薦（不另外存） */
+  if(key==='狀態'&&(_newSt.bg||_newSt.rowTouched)){
+    if(!cfg.狀態色||typeof cfg.狀態色!=='object')cfg.狀態色={};
+    const bg=_newSt.bg||statusColor(val).bg,cur={};
+    if(_newSt.bg)cur.bg=_newSt.bg;
+    if(_newSt.rowTouched){const cb=document.getElementById('cfg-inp-狀態-row');cur.row=cb&&cb.checked?_stRowLight(val,bg):''}
+    cfg.狀態色[cfgMapKey(val)]=cur;
+  }
   saveCfg();renderCfgLists();updateDataLists();
   if(inp)inp.value='';
+  cfgNewReset(key);
+  if(key==='案場'&&inp)inp.focus();   /* 加完回名稱欄，接著打下一個（Q3 甲） */
+}
+/* 新增列（10-22 晚）：狀態的底色跟著名字走系統推薦色，使用者點過色盤或勾過整條底色就以使用者的為準 */
+let _newSt={bg:'',rowTouched:false};
+function cfgNewReset(key){
+  if(key==='案場')['a','b'].forEach(k=>{const el=document.getElementById('cfg-inp-案場-'+k);if(el)el.value=''});
+  if(key==='狀態'){_newSt={bg:'',rowTouched:false};cfgNewStSync()}
+}
+function cfgNewStSync(){
+  const name=String((document.getElementById('cfg-inp-狀態')||{}).value||'').trim();
+  const c=name?statusColor(name):null;
+  const chip=document.getElementById('cfg-inp-狀態-bg');
+  if(chip)chip.style.background=_newSt.bg||(c?c.bg:'#ffffff');
+  const cb=document.getElementById('cfg-inp-狀態-row');
+  if(cb&&!_newSt.rowTouched)cb.checked=!!(c&&c.row);
+}
+function cfgNewStRow(){_newSt.rowTouched=true}
+function cfgNewStPal(ev){
+  const name=String((document.getElementById('cfg-inp-狀態')||{}).value||'').trim();
+  _stPalShow(ev,'bg',_newSt.bg||(name?statusColor(name).bg:''),c=>{_newSt.bg=c;cfgNewStSync()});
 }
 function cfgDel(key,idx){
   if(mngGuard())return;
   if(appLockGuard())return;
   if(!requireDelete())return;
+  const _gone=cfg[key][idx];
   cfg[key].splice(idx,1);
+  cfgMapMove(key,_gone,null);   /* 刪掉的案場／狀態，請款日和顏色一起清掉（之後同名新增才不會冒出舊設定） */
   markCfgAuthoritative();   // 刪除是明確意圖 → 這次用本機版本覆蓋雲端，不做聯集（否則刪完會被補回來）
   saveCfg();renderCfgLists();updateDataLists();
 }
@@ -1251,6 +1444,7 @@ function cfgAddFromBtn(key){
   if(appLockGuard())return;
   const ir=document.getElementById('ir-'+key);
   if(ir){ir.style.display='flex';const inp=document.getElementById('cfg-inp-'+key);if(inp)inp.focus()}
+  if(key==='狀態')cfgNewStSync();
 }
 function cfgHideInp(key){
   const ir=document.getElementById('ir-'+key);
@@ -1284,7 +1478,8 @@ function cfgEditStart(key,idx){
   const no=document.createElement('button');
   no.className='cfg-del';no.title='取消';no.textContent='✕';
   no.onclick=()=>renderCfgLists();
-  row.appendChild(ok);row.appendChild(no);
+  const ops=row.querySelector('.cfg-ops')||row;   /* 10-22 晚起按鈕包在 .cfg-ops 裡（欄位表最後一格） */
+  ops.appendChild(ok);ops.appendChild(no);
   inp.focus();inp.select();
 }
 // 這個名稱目前有幾筆紀錄在用
@@ -1342,6 +1537,7 @@ function cfgEditSave(key,idx){
 }
 function cfgCommitRename(key,idx,oldV,newV,alsoRecords){
   cfg[key][idx]=newV;
+  cfgMapMove(key,oldV,newV);   /* 請款日／狀態顏色跟著新名字走（2026-10-22） */
   // 改名＝明確意圖，這次用本機版本覆蓋雲端，否則舊名字會被聯集補回來
   markCfgAuthoritative();
   let n=0;
@@ -1382,18 +1578,134 @@ function renderCfgLists(){
     const wrap=document.getElementById('lw-'+key);
     if(!wrap)return;
     const arr=cfg[key]||[];
+    /* 10-22 晚：案場、狀態加欄位表頭（跟每一列同一組欄寬） */
+    const hdr=key==='案場'?'<span>案場</span><span class="cfg-colhdr-2"><span>請款日</span><span>放款日</span></span>'
+      :key==='狀態'?'<span>狀態</span><span class="cfg-colhdr-2"><span>底色</span><span>整條底色</span></span>':'';
     wrap.innerHTML=arr.length===0
       ?`<div class="cfg-empty-txt">尚無選項，點右側「＋ 新增」加入</div>`
-      :arr.map((v,i)=>`<div class="cfg-row" id="cfgrow-${key}-${i}">
+      :(hdr?`<div class="cfg-colhdr" aria-hidden="true"><span></span>${hdr}<span></span></div>`:'')
+      +arr.map((v,i)=>`<div class="cfg-row" id="cfgrow-${key}-${i}">
           <span class="cfg-row-num">${i+1}</span>
-          <span class="cfg-row-lbl">${esc(v)}</span>
-          ${portalCanDragSort()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}
-          ${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}
-          ${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}
+          <span class="cfg-row-lbl">${key==='狀態'?`<span class="st-badge ${stClassName(v)}">${esc(v)}</span>`:esc(v)}</span>
+          ${key==='案場'?cfgPayCtl(v,i):key==='狀態'?cfgColorCtl(v,i):''}
+          <span class="cfg-ops">${portalCanDragSort()?`<button class="cfg-mv" onclick="cfgMove('${key}',${i},-1)" title="上移"${i===0?' disabled':''}>↑</button><button class="cfg-mv" onclick="cfgMove('${key}',${i},1)" title="下移"${i===arr.length-1?' disabled':''}>↓</button>`:''}${portalCanManageSettings()?`<button class="cfg-edit" onclick="cfgEditStart('${key}',${i})" title="編輯">✏️</button>`:''}${portalCanDelete()?`<button class="cfg-del" onclick="cfgDel('${key}',${i})" title="刪除">✕</button>`:''}</span>
         </div>`).join('');
   });
+  applyStatusColors();
+}
+/* 設定頁「案場」每一列：請款日／放款日（2026-10-22）。沒有設定權限 → 只看得到、不能改 */
+function cfgPayCtl(name,i){
+  const p=projPay(name),ro=portalCanManageSettings()?'':' disabled';
+  const inp=(k,v)=>`<input type="text" inputmode="numeric" maxlength="2" class="cfg-pay-inp${v?'':' cfg-pay-blank'}" id="cfgpay-${k}-${i}" value="${esc(v)}" aria-label="${k==='a'?'請款日':'放款日'}"${ro}`
+    +` onchange="cfgPaySet(${i},'${k}',this)" oninput="if(cfgDayInput(this))cfgPayNext(${i},'${k}',this)" onkeydown="if(event.key==='Enter'){event.preventDefault();cfgPayNext(${i},'${k}',this)}">`;
+  /* 欄名「請款日／放款日」在表頭；.cfg-pay-k 只有手機（沒表頭）才露出來 */
+  return`<div class="cfg-pay"><label><span class="cfg-pay-k">請款日：</span>每月 ${inp('a',p.a)} 日</label><label><span class="cfg-pay-k">放款日：</span>次月 ${inp('b',p.b)} 日</label></div>`;
+}
+function cfgPaySet(i,k,el){
+  if(mngGuard()){renderCfgLists();return}
+  if(appLockGuard()){renderCfgLists();return}
+  const name=(cfg.案場||[])[i];if(name==null)return;
+  let v=String(el.value||'').replace(/\D/g,'');
+  if(v!==''){const n=+v;if(n<1||n>31){toast('日期請填 1～31','e');el.value=projPay(name)[k];el.focus();return}v=String(n)}
+  if(!cfg.案場請款||typeof cfg.案場請款!=='object')cfg.案場請款={};
+  const key=cfgMapKey(name),cur=cfg.案場請款[key]||{};
+  cur[k==='a'?'請款':'放款']=v;   /* 清空存 ''（不是刪掉）→ 合併時才不會被別台的舊值補回來 */
+  cfg.案場請款[key]=cur;
+  /* 10-22 晚：只改這一格，不整張重畫 —— 整張重畫會把游標正要跳去的那格換掉，按 Tab／自動跳格後游標就不見了 */
+  el.value=v;el.classList.toggle('cfg-pay-blank',!v);
+  saveCfg();renderMain();
+}
+/* 請款日／放款日跳格（10-22 晚她 Q1 甲、Q2 甲、Q3 甲）：
+ * 打了兩位數，或 4～9 這種後面不會再接數字的 → 回 true（算打完）；1、2、3 等她按 Enter／Tab */
+function cfgDayInput(el){
+  const v=String(el.value||'').replace(/\D/g,'');
+  if(el.value!==v)el.value=v;
+  return v.length===2||(v.length===1&&+v>=4);
+}
+function cfgDayFocus(id){
+  const t=document.getElementById(id);
+  if(!t||t.disabled)return false;
+  t.focus();t.select();return true;
+}
+/* 清單：請款日 → 同一列放款日；放款日 → 下一列請款日；最後一列停住（照樣存） */
+function cfgPayNext(i,k,el){
+  if(cfgDayFocus(k==='a'?'cfgpay-b-'+i:'cfgpay-a-'+(i+1)))return;
+  cfgPaySet(i,k,el);
+}
+/* 設定頁「狀態」每一列：底色＋整條底色（2026-10-22） */
+function cfgColorCtl(name,i){
+  const c=statusColor(name),can=portalCanManageSettings(),ro=can?'':' disabled';
+  /* 10-22 晚：兩格分開對齊表頭「底色｜整條底色」；欄名 .cfg-stc-k 只有手機才露出來 */
+  return`<div class="cfg-stc"><span class="cfg-stc-bg"><span class="cfg-stc-k">底色&nbsp;</span><button type="button" class="cfg-stc-chip" id="cfgstc-bg-${i}" style="background:${c.bg}" title="換底色"${ro} onclick="stPalOpen(event,${i},'bg')"></button></span>`
+    +`<span class="cfg-stc-rw"><label title="整條底色"><input type="checkbox" id="cfgstc-on-${i}" aria-label="整條底色"${c.row?' checked':''}${ro} onchange="cfgRowToggle(${i},this.checked)"><span class="cfg-stc-k">整條底色</span></label>`
+    +(c.row?`<button type="button" class="cfg-stc-chip" id="cfgstc-row-${i}" style="background:${c.row}" title="換整條底色"${ro} onclick="stPalOpen(event,${i},'row')"></button>`:'')
+    +'</span></div>';
+}
+function _stColorSet(i,k,val){
+  if(mngGuard())return false;
+  if(appLockGuard())return false;
+  const name=(cfg.狀態||[])[i];if(name==null)return false;
+  if(!cfg.狀態色||typeof cfg.狀態色!=='object')cfg.狀態色={};
+  const key=cfgMapKey(name),cur=cfg.狀態色[key]||{};
+  if(k==='bg'&&cur.row===undefined)cur.row=statusColor(name).row;   /* 先把目前的整條底色定下來，換底色不影響它 */
+  cur[k]=val;cfg.狀態色[key]=cur;
+  saveCfg();renderCfgLists();renderMain();
+  return true;
+}
+/* 整條底色打開時用的顏色：有預設就用預設，沒有就用底色調淡 */
+function _stRowLight(name,bg){
+  const d=ST_DEFAULT[name];if(d&&d.row)return d.row;
+  const c=_hexRgb(bg).map(v=>Math.round(v*0.15+255*0.85));
+  return'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function cfgRowToggle(i,on){
+  const name=(cfg.狀態||[])[i];if(name==null)return;
+  if(!_stColorSet(i,'row',on?_stRowLight(name,statusColor(name).bg):''))renderCfgLists();
+}
+/* 色盤：上面 16 格推薦色、最下面「自訂」（她 Q2） */
+function stPalClose(){const p=document.getElementById('st-pal');if(p)p.remove()}
+function stPalOpen(ev,i,k){
+  const name=(cfg.狀態||[])[i];if(name==null)return;
+  _stPalShow(ev,k,statusColor(name)[k],c=>_stColorSet(i,k,c));
+}
+/* 色盤本體：清單上的色塊、新增列的色塊（10-22 晚）共用；onPick 拿到選的顏色 */
+function _stPalShow(ev,k,cur,onPick){
+  ev.stopPropagation();stPalClose();
+  const pal=k==='bg'?ST_PAL:ST_ROW_PAL;
+  const p=document.createElement('div');p.id='st-pal';p.className='st-pal';
+  p.innerHTML=`<div class="st-pal-t">${k==='bg'?'推薦底色':'推薦整條底色'}</div><div class="st-pal-grid">`
+    +pal.map(c=>`<button type="button" class="st-pal-c${c===cur?' on':''}" data-c="${c}" style="background:${c};color:${k==='bg'?stAutoFg(c):'#1e293b'}">${k==='bg'?'字':''}</button>`).join('')
+    +`</div><div class="st-pal-cus">自訂 <input type="color" id="st-pal-custom" value="${cur||'#ffffff'}"><button type="button" class="st-pal-x">關閉</button></div>`;
+  document.body.appendChild(p);
+  const b=ev.currentTarget.getBoundingClientRect();
+  const left=Math.max(8,Math.min(b.left,window.innerWidth-p.offsetWidth-8));
+  let top=b.bottom+4;if(top+p.offsetHeight>window.innerHeight-8)top=Math.max(8,b.top-p.offsetHeight-4);
+  p.style.left=left+'px';p.style.top=top+'px';
+  p.addEventListener('click',e=>e.stopPropagation());
+  p.querySelectorAll('.st-pal-c').forEach(btn=>btn.onclick=()=>{stPalClose();onPick(btn.dataset.c)});
+  p.querySelector('#st-pal-custom').onchange=e=>{stPalClose();onPick(e.target.value)};
+  p.querySelector('.st-pal-x').onclick=stPalClose;
+}
+if(typeof document!=='undefined'){
+  document.addEventListener('click',stPalClose);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')stPalClose()});
 }
 
+/* 改名／刪除時，把 cfg.案場請款／cfg.狀態色 裡那一項搬到新名字或刪掉 */
+function cfgMapMove(key,oldV,newV){
+  const mk=key==='案場'?'案場請款':key==='狀態'?'狀態色':'';
+  if(!mk)return;
+  /* 狀態沒存過顏色（用的是預設色）→ 改名前先把目前的顏色定下來，新名字才不會變成別的顏色 */
+  if(mk==='狀態色'&&newV!=null){
+    if(!cfg.狀態色||typeof cfg.狀態色!=='object')cfg.狀態色={};
+    const o0=cfgMapKey(oldV);
+    if(!(o0 in cfg.狀態色)){const c=statusColor(oldV);cfg.狀態色[o0]={bg:c.bg,row:c.row}}
+  }
+  if(!cfg[mk]||typeof cfg[mk]!=='object')return;
+  const o=cfgMapKey(oldV);if(!(o in cfg[mk]))return;
+  if(newV!=null)cfg[mk][cfgMapKey(newV)]=cfg[mk][o];
+  delete cfg[mk][o];
+}
 function renderCfgCards(){renderCfgLists()}
 
 // ============================================================
@@ -1422,10 +1734,20 @@ function addLogRow(date='',location='',status='',text='',rid=''){
   row.innerHTML=`
     <input type="date" class="fi log-date" value="${esc(date)}">
     <input type="text" class="fi log-loc" list="dl-位置" placeholder="位置 例:S31A1" value="${esc(location)}">
-    <select class="fi log-status" onchange="this.closest('.log-edit-row').classList.toggle('row-stuck',this.value==='暫停/卡關')">${opts}</select>
+    <select class="fi log-status" onchange="this.closest('.log-edit-row').classList.toggle('row-stuck',this.value==='暫停/卡關');tintLogEditRow(this.closest('.log-edit-row'))">${opts}</select>
     <input type="text" class="fi log-text" placeholder="工作進度說明..." value="${esc(text)}">
     <button class="btn btn-g btn-icon btn-sm log-del" onclick="this.closest('.log-edit-row').remove()" title="刪除">✕</button>`;
   editor.appendChild(row);
+  tintLogEditRow(row);
+}
+/* 編輯框裡那一行也照「整條底色」上色（2026-10-22）；沒設的維持原樣 */
+function tintLogEditRow(row){
+  if(!row)return;
+  const sel=row.querySelector('.log-status');
+  const c=sel&&sel.value?statusColor(sel.value):null;
+  const on=!!(c&&c.row);
+  row.style.background=on?c.row:'';
+  row.style.borderRadius=on?'4px':'';row.style.padding=on?'3px':'';row.style.margin=on?'-3px':'';
 }
 
 
@@ -1585,6 +1907,13 @@ function _mergeCfg(mine,cloud){
   const out={...mine};
   Object.keys(cloud||{}).forEach(k=>{
     const c=cloud[k];
+    /* 2026-10-22：案場請款、狀態色這種「名稱 → 設定」的物件 → 逐項補：本機有的用本機，本機沒有的用雲端
+       （不補的話，還沒收到新設定的那台一存檔，就會把別人剛填的請款日整包洗掉） */
+    if(c&&typeof c==='object'&&!Array.isArray(c)){
+      const m=(out[k]&&typeof out[k]==='object'&&!Array.isArray(out[k]))?out[k]:{};
+      out[k]={...c,...m};
+      return;
+    }
     if(!Array.isArray(c))return;
     // users 這類物件陣列無法用 includes 比對，會重複累加 → 不做聯集，保留本機
     if(c.some(v=>v&&typeof v==='object'))return;
@@ -2293,6 +2622,7 @@ function updateFilters(){
 // 渲染：進度總表
 // ============================================================
 function renderMain(){
+  applyStatusColors();   /* 2026-10-22：狀態顏色照設定頁（開機、雲端更新都會走這裡） */
   const filtered=getFiltered();
   // 篩選條件一改就展開符合的群組（否則篩完只看到一排標題，會以為壞掉）；之後可以自己收合（2026-10-01）
   syncOpenWithFilter(filtered);
@@ -2325,7 +2655,7 @@ function renderMain(){
     const dragAttr=canMv?` draggable="true" ondragstart="projDragStart(event,'${pj}')" ondragover="projDragOver(event,'${pj}')" ondragleave="projDragLeave(event)" ondrop="projDrop(event,'${pj}')" ondragend="projDragEnd(event)"`:'';
     return`<div class="proj-section">
       <div class="proj-header${open?'':' sec-collapsed'}"${dragAttr} onclick="toggleSec('${sid}',this)">
-        <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
+        <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span>${(cfg.案場||[]).includes(proj)?projPayHtml(proj):''}</span>
         ${mv}
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
@@ -2477,7 +2807,9 @@ function renderLog(logs){
       ?`<span class="log-status ${stClassName(item.status)}">${esc(item.status)}</span>`
       :'<span class="log-st-none" title="這一筆沒有選狀態">—</span>';
     const stuckCls=item.status==='暫停/卡關'?' log-li-stuck':'';
-    return`<li class="log-li${stuckCls}">${dtHtml}<span class="log-tx">${locHtml}${esc(item.text||'')}</span>`
+    /* 2026-10-22：整條底色改成照設定頁每個狀態的「整條底色」（預設只有卡關、帳款） */
+    const rs=logRowStyle(item.status);
+    return`<li class="log-li${stuckCls}${rs?' log-li-row':''}"${rs?' style="background:'+rs.li+'"':''}>${dtHtml}<span class="log-tx"${rs?' style="color:'+rs.tx+'"':''}>${locHtml}${esc(item.text||'')}</span>`
       +`<span class="log-st">${stHtml}</span></li>`;
   }).join('')+'</ul>';
 }
@@ -3012,6 +3344,30 @@ function logsToExcelText(logs){
     return[dt,loc,st,p.text].filter(Boolean).join(' ');
   }).join('\n');
 }
+/* 合併儲存格（2026-10-21 她交辦，示意圖定案）：前四欄上下相同就合併 ——
+ *   案場 → 同案場裡的部門 → 同部門裡的執行者 → 同執行者底下的施作位置（一層套一層，下一層不會跨過上一層的邊界）
+ *   · 只合併**相鄰**的（Q5 甲）：順序照畫面，同一個人中間被別人隔開就分成兩塊
+ *   · 備註不合併（Q6 乙）、部門欄保留（Q8 乙）、執行者欄不加篩選鈕（Q7 甲：合併後篩選會漏列）
+ *   · 合併的格子：白底、上下左右置中、一般字色（卡關那幾列的其他格照舊整列淡紅）
+ * 第 1 列是表頭，資料從第 2 列開始；expanded[i] 就是第 i+2 列。 */
+function mergeSameCells(ws,expanded){
+  const keyOf=(x,lv)=>{ const v=x.vals; return [v[0],v[1],v[2],v[3]].slice(0,lv+1).map(s=>String(s==null?'':s)).join('\u0001'); };
+  for(let lv=0;lv<4;lv++){
+    let i=0;
+    while(i<expanded.length){
+      let j=i; const k=keyOf(expanded[i],lv);
+      while(j+1<expanded.length&&keyOf(expanded[j+1],lv)===k)j++;
+      if(j>i){
+        ws.mergeCells(i+2,lv+1,j+2,lv+1);
+        const c=ws.getRow(i+2).getCell(lv+1);
+        c.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};
+        c.font={color:{argb:'FF1E293B'}};
+      }
+      i=j+1;
+    }
+  }
+}
 /* projs：要匯出的案場名清單。不給＝全部（直接呼叫仍是舊行為，不會壞） */
 async function exportExcel(projs,opt){
   let data=getFiltered();
@@ -3039,6 +3395,10 @@ async function exportExcel(projs,opt){
     if(!data.length){toast('這些條件之下沒有資料可匯出','e');return}
   }
   if(!data.length){toast('沒有資料可匯出','e');return}
+  /* 2026-10-21：列的順序跟畫面一樣（合併儲存格只合併相鄰的，順序要對）——
+     畫面是「案場照出現先後分組 → 同案場照拖曳的順序」；以前匯出沒套拖曳的順序，Excel 跟畫面不一樣 */
+  { const g=new Map(); data.forEach(r=>{const k=r.案場||''; if(!g.has(k))g.set(k,[]); g.get(k).push(r);});
+    data=[].concat(...[...g.values()].map(sortRowsByOrder)); }
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('進度表-專案管理');
   // 中文≈2.4、英數≈1 的視覺寬度（Excel CJK 實際渲染偏寬）
@@ -3052,6 +3412,8 @@ async function exportExcel(projs,opt){
       日期和狀態變成那一格裡的文字。）
      「工作天／暫停天」兩欄與「卡關明細」分頁維持拿掉 —— 她指定隱藏。 */
   const headers=['案場','部門','執行者','施作位置／工作項目','日期','品項','進度記錄','狀態','備註'];
+  /* 2026-10-22 她 Q1 甲：案場格第二行放請款日（同案場每列都一樣 → 合併儲存格照樣合得起來） */
+  const xlProj=n=>{const ln=(cfg.案場||[]).includes(n)?projPayLine(n):'';return ln?n+'\n'+ln:n};
   const minW=[22,14,18,20,12,16,54,12,26];
   const maxW=[40,20,24,40,14,28,80,16,50];
   const expanded=[];
@@ -3061,14 +3423,14 @@ async function exportExcel(projs,opt){
     if(!logs.length){
       /* 一筆進度記錄都沒有的，也要留一列 —— 不然這筆資料在 Excel 裡整個不見 */
       expanded.push({r:r,item:'',status:'',
-        vals:[r.案場,r.部門,r.執行者,r.施作位置,'','','','',r.備註]});
+        vals:[xlProj(r.案場),r.部門,r.執行者,r.施作位置,'','','','',r.備註]});
       return;
     }
     logs.forEach(l=>{
       if(!l)return;
       const it=String(l.location||'').trim();
       expanded.push({r:r,item:it,status:l.status||'',
-        vals:[r.案場,r.部門,r.執行者,r.施作位置,String(l.date||'').slice(0,10),
+        vals:[xlProj(r.案場),r.部門,r.執行者,r.施作位置,String(l.date||'').slice(0,10),
               it,String(l.text||''),l.status||'',r.備註]});
     });
   });
@@ -3088,8 +3450,11 @@ async function exportExcel(projs,opt){
     c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
     c.alignment={vertical:'middle',horizontal:'center'};
   });
-  const SBG={'進行中':'FFDBEAFE','送審中':'FFFEF3C7','已下單':'FFFED7AA','報價中':'FFCFFAFE','已完成':'FFDCFCE7','待確認':'FFF1F5F9','已定案':'FF166534','暫停/卡關':'FFFECACA','恢復啟動':'FFBBF7D0'};
-  const SFG={'已定案':'FFFFFFFF','暫停/卡關':'FF991B1B'};
+  /* 10-22 晚她 E1 甲：每一格都畫細黑線（表頭也畫）。空白格 eachCell 不會跑到 → 逐欄設 */
+  const XBD={style:'thin',color:{argb:'FF000000'}},XB={top:XBD,left:XBD,bottom:XBD,right:XBD};
+  for(let ci=1;ci<=headers.length;ci++)hr.getCell(ci).border=XB;
+  /* 2026-10-22：狀態格、整列底色改照設定頁的顏色（以前寫死 9 個，後來新增的都沒顏色） */
+  const argb=h=>'FF'+String(h).replace('#','').toUpperCase();
   expanded.forEach((x,i)=>{
     const st=x.status;
     const rd=x.vals;
@@ -3097,21 +3462,29 @@ async function exportExcel(projs,opt){
     // 取全列各儲存格估算行數的最大值來定列高（每行 20pt + 6pt buffer）
     const maxLines=Math.max(...rd.map((v,ci)=>estLines(v,colW[ci])));
     row.height=Math.max(24,maxLines*20+6);
-    const stuck=(st==='暫停/卡關');      /* 逐筆判斷（2026-09-21） */
+    /* 逐筆判斷（2026-09-21）；2026-10-22 起「整列上色」照設定頁每個狀態的整條底色（預設卡關、帳款） */
+    const sCol=st?statusColor(st):null;
+    const rowBg=sCol&&sCol.row?sCol.row:'';
     row.eachCell(c=>{
       c.alignment={vertical:'top',wrapText:true};
-      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:stuck?'FFFEF2F2':(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
-      if(stuck)c.font={color:{argb:'FF991B1B'}};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg?argb(rowBg):(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
+      if(rowBg)c.font={color:{argb:argb(sCol.tx)}};
     });
     /* 2026-09-21 逐筆之後欄位各往後移一格：日期第 5、品項第 6、狀態第 8 */
-    row.getCell(5).alignment={vertical:'middle',horizontal:'center',wrapText:false};
-    const ic=row.getCell(6);
-    ic.alignment={vertical:'middle',horizontal:'center',wrapText:false};
+    /* 10-22 晚她 E2 乙：前 6 欄（案場～品項）左右置中、上下靠上；合併過的格子 mergeSameCells 照舊上下置中 */
+    for(let ci=1;ci<=6;ci++)row.getCell(ci).alignment={vertical:'top',horizontal:'center',wrapText:ci<=4};
+    for(let ci=1;ci<=headers.length;ci++)row.getCell(ci).border=XB;
+    /* 10-22 晚她 B1 甲：前 4 欄（案場～施作位置）一律白底黑字，整條底色每一列都從「日期」開始
+       （以前只有合併格是白的，單獨一筆的會整列上色 → 起點有的在案場、有的在日期） */
+    for(let ci=1;ci<=4;ci++){const c=row.getCell(ci);c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};c.font={color:{argb:'FF1E293B'}}}
     const sc=row.getCell(8);
-    if(SBG[st])sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:SBG[st]}};
-    if(SFG[st])sc.font={bold:true,color:{argb:SFG[st]}};
+    if(sCol){
+      sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:argb(sCol.bg)}};
+      sc.font={bold:true,color:{argb:argb(sCol.fg)}};
+    }
     sc.alignment={vertical:'middle',horizontal:'center',wrapText:false};
   });
+  mergeSameCells(ws,expanded);
 
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));

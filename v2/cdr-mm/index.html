@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>日報表—瑪摩工程</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-10-05.1';window.APP_KEY='cdr';</script>
+<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='cdr';</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用（2026-09-17 從專案管理搬過來）：檔名＝施作位置_施工項目_YYMMDD_序號，不分資料夾。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -1771,9 +1771,27 @@ function _clearReportData(id){
   (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(f); });
   ((S.report&&S.report.photos)||[]).forEach(f);
 }
+/* 待推清單分三種（2026-10-20 她確認甲，跟日—專同一天一起改，照進—瑪的寫法）：
+ *   · 已經存進日報（S.reports）的 → 推上雲
+ *   · 還在編輯框（S.report）裡的 → 留著，等存檔那一次再推
+ *   · 哪裡都沒有（刪掉的照片、沒存就換別張／清除表單） → 從待推清單拿掉，不推
+ * 以前是全部照推 → 挑了又刪的照片也上了雲（日—專累積 161 張沒人用）。
+ * 回傳「可以推」的 id 集合。 */
+function _phPendingTriage(){
+  var saved={}, keep={};
+  var add=function(set){ return function(p){ if(p && p.id) set[p.id]=1; }; };
+  (S.reports||[]).forEach(function(r){ ((r&&r.photos)||[]).forEach(add(saved)); });
+  ((S.report&&S.report.photos)||[]).forEach(add(keep));
+  Object.keys(_pendingFull).concat(Object.keys(_pendingThumb)).forEach(function(id){
+    if(!saved[id] && !keep[id]){ delete _pendingFull[id]; delete _pendingThumb[id]; }
+  });
+  return saved;
+}
 function _pushPendingThumb(){
   if(!window._thSet) return;
+  var saved=_phPendingTriage();
   Object.keys(_pendingThumb).forEach(function(id){
+    if(!saved[id]) return;                     // 還沒存進日報 → 等存檔那一次
     var d=_pendingThumb[id];
     try{
       window._thSet(id, d).then(function(){
@@ -1788,7 +1806,9 @@ function _pushPendingThumb(){
 }
 function _pushPendingFull(){
   if(!window._phSet) return;
+  var saved=_phPendingTriage();
   Object.keys(_pendingFull).forEach(function(id){
+    if(!saved[id]) return;                     // 還沒存進日報 → 等存檔那一次
     var d=_pendingFull[id];
     try{
       window._phSet(id, d).then(function(){

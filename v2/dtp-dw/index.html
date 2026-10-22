@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-19.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -3008,6 +3008,30 @@ function logsToExcelText(logs){
     return[dt,loc,st,p.text].filter(Boolean).join(' ');
   }).join('\n');
 }
+/* 合併儲存格（2026-10-21 她交辦，示意圖定案）：前四欄上下相同就合併 ——
+ *   案場 → 同案場裡的部門 → 同部門裡的執行者 → 同執行者底下的施作位置（一層套一層，下一層不會跨過上一層的邊界）
+ *   · 只合併**相鄰**的（Q5 甲）：順序照畫面，同一個人中間被別人隔開就分成兩塊
+ *   · 備註不合併（Q6 乙）、部門欄保留（Q8 乙）、執行者欄不加篩選鈕（Q7 甲：合併後篩選會漏列）
+ *   · 合併的格子：白底、上下左右置中、一般字色（卡關那幾列的其他格照舊整列淡紅）
+ * 第 1 列是表頭，資料從第 2 列開始；expanded[i] 就是第 i+2 列。 */
+function mergeSameCells(ws,expanded){
+  const keyOf=(x,lv)=>{ const v=x.vals; return [v[0],v[1],v[2],v[3]].slice(0,lv+1).map(s=>String(s==null?'':s)).join('\u0001'); };
+  for(let lv=0;lv<4;lv++){
+    let i=0;
+    while(i<expanded.length){
+      let j=i; const k=keyOf(expanded[i],lv);
+      while(j+1<expanded.length&&keyOf(expanded[j+1],lv)===k)j++;
+      if(j>i){
+        ws.mergeCells(i+2,lv+1,j+2,lv+1);
+        const c=ws.getRow(i+2).getCell(lv+1);
+        c.alignment={vertical:'middle',horizontal:'center',wrapText:true};
+        c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};
+        c.font={color:{argb:'FF1E293B'}};
+      }
+      i=j+1;
+    }
+  }
+}
 /* projs：要匯出的案場名清單。不給＝全部（直接呼叫仍是舊行為，不會壞） */
 async function exportExcel(projs,opt){
   let data=getFiltered();
@@ -3035,6 +3059,10 @@ async function exportExcel(projs,opt){
     if(!data.length){toast('這些條件之下沒有資料可匯出','e');return}
   }
   if(!data.length){toast('沒有資料可匯出','e');return}
+  /* 2026-10-21：列的順序跟畫面一樣（合併儲存格只合併相鄰的，順序要對）——
+     畫面是「案場照出現先後分組 → 同案場照拖曳的順序」；以前匯出沒套拖曳的順序，Excel 跟畫面不一樣 */
+  { const g=new Map(); data.forEach(r=>{const k=r.案場||''; if(!g.has(k))g.set(k,[]); g.get(k).push(r);});
+    data=[].concat(...[...g.values()].map(sortRowsByOrder)); }
   const wb=new ExcelJS.Workbook();
   const ws=wb.addWorksheet('進度表-圖面管理');
   // 中文≈2.4、英數≈1 的視覺寬度（Excel CJK 實際渲染偏寬）
@@ -3084,6 +3112,9 @@ async function exportExcel(projs,opt){
     c.font={bold:true,color:{argb:'FFFFFFFF'},size:11};
     c.alignment={vertical:'middle',horizontal:'center'};
   });
+  /* 10-22 晚她 E1 甲：每一格都畫細黑線（表頭也畫）。空白格 eachCell 不會跑到 → 逐欄設 */
+  const XBD={style:'thin',color:{argb:'FF000000'}},XB={top:XBD,left:XBD,bottom:XBD,right:XBD};
+  for(let ci=1;ci<=headers.length;ci++)hr.getCell(ci).border=XB;
   const SBG={'進行中':'FFDBEAFE','送審中':'FFFEF3C7','已下單':'FFFED7AA','報價中':'FFCFFAFE','已完成':'FFDCFCE7','待確認':'FFF1F5F9','已定案':'FF166534','暫停/卡關':'FFFECACA','恢復啟動':'FFBBF7D0'};
   const SFG={'已定案':'FFFFFFFF','暫停/卡關':'FF991B1B'};
   expanded.forEach((x,i)=>{
@@ -3100,14 +3131,18 @@ async function exportExcel(projs,opt){
       if(stuck)c.font={color:{argb:'FF991B1B'}};
     });
     /* 2026-09-21 逐筆之後欄位各往後移一格：日期第 5、品項第 6、狀態第 8 */
-    row.getCell(5).alignment={vertical:'middle',horizontal:'center',wrapText:false};
-    const ic=row.getCell(6);
-    ic.alignment={vertical:'middle',horizontal:'center',wrapText:false};
+    /* 10-22 晚她 E2 乙：前 6 欄（案場～品項）左右置中、上下靠上；合併過的格子 mergeSameCells 照舊上下置中 */
+    for(let ci=1;ci<=6;ci++)row.getCell(ci).alignment={vertical:'top',horizontal:'center',wrapText:ci<=4};
+    for(let ci=1;ci<=headers.length;ci++)row.getCell(ci).border=XB;
+    /* 10-22 晚她 B1 甲：前 4 欄（案場～施作位置）一律白底黑字，整條底色每一列都從「日期」開始
+       （以前只有合併格是白的，單獨一筆的會整列上色 → 起點有的在案場、有的在日期） */
+    for(let ci=1;ci<=4;ci++){const c=row.getCell(ci);c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFFFFF'}};c.font={color:{argb:'FF1E293B'}}}
     const sc=row.getCell(8);
     if(SBG[st])sc.fill={type:'pattern',pattern:'solid',fgColor:{argb:SBG[st]}};
     if(SFG[st])sc.font={bold:true,color:{argb:SFG[st]}};
     sc.alignment={vertical:'middle',horizontal:'center',wrapText:false};
   });
+  mergeSameCells(ws,expanded);
 
   const buf=await wb.xlsx.writeBuffer();
   const url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));

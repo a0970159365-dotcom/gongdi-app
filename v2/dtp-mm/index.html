@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-19.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -305,6 +305,45 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 #main-table .mm-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px}
 #main-table .mm-man{display:inline-flex;border:1px solid var(--text);border-radius:4px;padding:0 5px;font-size:11px;font-weight:700;white-space:nowrap;margin-left:4px}
 #main-table .mm-phn{font-size:11.5px;white-space:nowrap;margin-left:4px;color:var(--muted)}
+/* 2026-10-21 她選 Q1 甲：📷 點一下就開預覽 → 記錄後面的 📷 N、案場列的 📷 N 都是按鈕 */
+#main-table button.mm-phn{font-family:inherit;background:none;border:1px solid transparent;border-radius:4px;padding:0 3px;cursor:pointer;line-height:1.4}
+#main-table button.mm-phn:hover,#main-table button.mm-phn:focus-visible{border-color:var(--primary-l);color:var(--primary);background:#f0fdf4}
+#main-table .mm-cname .mm-phc{flex:none;display:inline-flex;align-items:center;gap:2px;font-family:inherit;font-size:11px;font-weight:700;white-space:nowrap;margin-left:4px;
+  border:1.5px solid var(--primary-l);color:var(--primary);background:#fff;border-radius:999px;padding:0 7px;cursor:pointer;line-height:1.5;vertical-align:1px}
+#main-table .mm-cname .mm-phc:hover,#main-table .mm-cname .mm-phc:focus-visible{background:#f0fdf4}
+/* 請款狀況（2026-10-21 她選丁＋標題丙）：案場第一個工作項目列，橫跨「報價金額＋已請款」兩格，欄寬都不改；整塊外框、標題當框的頂端 */
+#main-table .mm-rec .mm-pay-td{overflow-wrap:normal}
+#main-table .mm-paybox{border:1px solid #86c29a;border-radius:6px;background:#f7fcf8;overflow:hidden;font-weight:400;max-width:360px}
+#main-table .mm-paybox .mm-pay-ttl{font-weight:700;font-size:12px;color:#14532d;background:#d6f2dc;padding:2px 8px;border-bottom:1px solid #86c29a}
+#main-table .mm-paybox .mm-paytbl{border-collapse:collapse;width:calc(100% - 8px);margin:2px 4px 4px;font-size:12px;font-variant-numeric:tabular-nums}
+#main-table .mm-paybox .mm-paytbl th{font-weight:400;color:var(--muted);font-size:11px;text-align:left;padding:1px 3px;border-bottom:1px solid #cbd5e1;white-space:nowrap}
+#main-table .mm-paybox .mm-paytbl td{padding:1px 3px;white-space:nowrap}
+#main-table .mm-paybox .mm-paytbl .r{text-align:right}
+#main-table .mm-paybox .mm-paytbl tr.mm-pay-sum td{border-top:1.5px solid var(--text);font-weight:700}
+#main-table .mm-paybox .mm-paytbl tr.mm-pay-un td{color:var(--muted)}
+#main-table .mm-paybox .mm-paytbl td.mm-pay-memo{white-space:normal;overflow-wrap:anywhere;color:var(--text);padding-top:4px}
+/* 報價金額欄被收起來時只剩已請款一格（180px 放不下）→ 往右延伸蓋到業務欄的空白（工作項目列的業務欄沒有字） */
+#main-table .mm-pay-solo{overflow:visible}
+#main-table .mm-pay-solo .mm-paybox{width:max-content;position:relative;z-index:1}
+/* 照片預覽（2026-10-21 她選 Q2 甲：案場的 📷 先看照日期分組的縮圖，點一張放大；記錄的 📷 直接大圖） */
+#mm-pv{z-index:320;align-items:center}
+#mm-pv .mm-pv-box{background:#111;color:#e5e7eb;border-radius:10px;padding:10px 12px;width:min(920px,96vw);max-height:94vh;margin:auto;display:flex;flex-direction:column;gap:8px;overflow:auto}
+#mm-pv .mm-pv-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;font-weight:700}
+#mm-pv .mm-pv-head .mm-pv-ttl{min-width:0;overflow-wrap:anywhere}
+#mm-pv .mm-pv-btns{display:flex;gap:6px;flex:none}
+#mm-pv .mm-pv-big{position:relative;display:flex;align-items:center;justify-content:center;min-height:200px;background:#000;border-radius:6px}
+#mm-pv .mm-pv-big img{max-width:100%;max-height:68vh;object-fit:contain;display:block}
+#mm-pv .mm-pv-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:60px;border:none;border-radius:6px;background:rgba(0,0,0,.45);color:#fff;font-size:26px;cursor:pointer}
+#mm-pv .mm-pv-nav.l{left:6px}
+#mm-pv .mm-pv-nav.r{right:6px}
+#mm-pv .mm-pv-cap{font-size:12.5px;text-align:center;overflow-wrap:anywhere}
+#mm-pv .mm-pv-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+#mm-pv .mm-pv-gh{font-size:12.5px;color:#cbd5e1;margin-top:6px;overflow-wrap:anywhere}
+#mm-pv .mm-pv-wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+#mm-pv .mm-pv-th{flex:none;padding:0;border:2px solid transparent;border-radius:5px;background:#1f2937;cursor:pointer;overflow:hidden;width:72px;height:54px}
+#mm-pv .mm-pv-wall .mm-pv-th{width:auto;height:76px}
+#mm-pv .mm-pv-th.on{border-color:#5eead4}
+#mm-pv .mm-pv-th img{width:100%;height:100%;object-fit:cover;display:block}
 /* 金額顯示的兩顆開關（2026-10-02 第三批） */
 .filter-bar .mm-amt-tg{display:inline-flex;align-items:center;gap:5px;flex:none;white-space:nowrap}
 .filter-bar .mm-amt-lb{font-size:12px;color:var(--muted)}
@@ -421,6 +460,8 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
   #main-table .mm-rec{margin-left:14px;border-left:3px solid var(--border)}
   #main-table .mm-rec .row-handle{width:auto;flex:none}
   #main-table .mm-rec .log-cell{order:3;flex:1 1 100%}
+  #main-table .mm-rec .mm-pay-td{order:4;flex:1 1 100%}   /* 請款狀況（10-21）：手機排在工作內容底下、整行 */
+  #main-table .mm-pay-solo .mm-paybox{width:auto}
   /* 2026-10-12（C 甲）：綠色導覽列下面黏一條「現在捲到的案場」—— 每個案場一條、放在案場最上面、position:sticky，
      捲過這個案場就被下一個案場的那條推走，所以會自己換。.mm-scroll 在手機不左右滑（卡片），要讓它 overflow 可見才黏得住整頁 */
   #main-table .mm-scroll,#main-table .mm-wrap{overflow:visible}
@@ -1345,6 +1386,14 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
 </div>
 
 <!-- 照片小檢視（2026-10-02）：點編輯框裡的縮圖，先放縮圖、原圖抓回來再換上 -->
+<!-- 進度總表的照片預覽（2026-10-21）：案場 📷 → 照日期分組的縮圖；記錄 📷 → 大圖左右翻。內容由 mmPvDraw 畫 -->
+<div id="mm-pv" class="overlay" onclick="if(event.target===event.currentTarget)mmPvClose()">
+  <div class="mm-pv-box" role="dialog" aria-label="照片預覽">
+    <div class="mm-pv-head"><span class="mm-pv-ttl" id="mm-pv-title"></span>
+      <span class="mm-pv-btns"><button type="button" class="btn btn-o btn-sm" id="mm-pv-back" data-act="wall">回縮圖</button><button type="button" class="btn btn-o btn-sm" data-act="close">關閉</button></span></div>
+    <div id="mm-pv-body"></div>
+  </div>
+</div>
 <div id="ph-view" class="overlay" onclick="if(event.target===event.currentTarget)phViewClose()">
   <div class="ph-view-box">
     <img id="ph-view-img" alt="">
@@ -3581,6 +3630,110 @@ function downloadCasePhotos(proj){
   const recs=visibleRecords().filter(r=>(r.案場||'')===(proj||''));
   return phZip(phItemsOf(recs),'施工照片_'+phSafe(proj||'（未填案場）')+'_'+fnDate()+'.zip');
 }
+/* ── 進度總表的照片預覽（2026-10-21 她交辦，Q1 甲 Q2 甲）──
+ * 案場列「📷 N」＝跟「案場照片 📥」同一批（這個案場畫面上看得到的每一列的照片），N＝張數；0 張不顯示。
+ * 點案場的 📷 → 照日期分組的縮圖，點一張放大（可「回縮圖」）；點記錄後面的 📷 → 直接大圖，只翻那一條的照片。
+ * 記錄的照片：renderLog 畫的時候登記在 _mmPvReg，按鈕帶 data-k（不在 onclick 裡塞字串，見案場名稱踩過的坑）。 */
+var _mmPvReg=[], _mmPv={items:[],i:0,wall:false,fromWall:false,title:''};
+function casePhotoItems(proj){
+  const items=phItemsOf(visibleRecords().filter(r=>(r.案場||'')===(proj||'')));
+  /* 照記錄日期排（沒日期的排最後），同一天維持原本順序 */
+  return items.map((x,i)=>({x,i})).sort((a,b)=>{
+    const da=String((a.x.log&&a.x.log.date)||'9999'), db=String((b.x.log&&b.x.log.date)||'9999');
+    return da<db?-1:da>db?1:a.i-b.i;
+  }).map(o=>o.x);
+}
+function casePhotoCounts(){
+  const m={};
+  visibleRecords().forEach(r=>{ const k=r.案場||''; logsOf(r).forEach(l=>((l&&l.photos)||[]).forEach(p=>{ if(p&&p.id)m[k]=(m[k]||0)+1; })); });
+  return m;
+}
+function mmPvLabel(log){ return [log&&log.work,logSubText(log),String((log&&log.text)||'').trim()].filter(Boolean).join(' '); }
+function mmPvCase(btn){
+  const proj=btn.getAttribute('data-case')||'';
+  const items=casePhotoItems(proj);
+  if(!items.length){toast('這個案場還沒有照片','e');return}
+  _mmPv={items,i:0,wall:true,fromWall:true,title:proj+'・共 '+items.length+' 張'};
+  mmPvDraw();
+}
+function mmPvLog(btn){
+  const reg=_mmPvReg[+btn.getAttribute('data-k')]; if(!reg)return;
+  const items=(reg.log.photos||[]).filter(p=>p&&p.id).map(p=>({p,log:reg.log}));
+  if(!items.length)return;
+  _mmPv={items,i:0,wall:false,fromWall:false,title:[fmtLogDate(reg.log.date),mmPvLabel(reg.log)].filter(Boolean).join(' ')+'・'+items.length+' 張'};
+  mmPvDraw();
+}
+function mmPvThumbBtn(it,i,on){
+  return '<button type="button" class="mm-pv-th'+(on?' on':'')+'" data-i="'+i+'" title="'+esc(fmtLogDate(it.log&&it.log.date))+'"><img data-pv="'+esc(it.p.id)+'" alt="照片 '+(i+1)+'"'
+    +(_thumbCache[it.p.id]?' src="'+_thumbCache[it.p.id]+'"':'')+'></button>';
+}
+function mmPvDraw(){
+  const ov=document.getElementById('mm-pv'), body=document.getElementById('mm-pv-body'); if(!ov||!body)return;
+  const S=_mmPv, n=S.items.length;
+  document.getElementById('mm-pv-title').textContent=S.title;
+  document.getElementById('mm-pv-back').hidden=!(S.fromWall&&!S.wall);
+  if(S.wall){
+    /* 同一天、同一條記錄放一組 */
+    const groups=[]; S.items.forEach((it,i)=>{ const g=groups[groups.length-1];
+      if(g&&g.log===it.log)g.idx.push(i); else groups.push({log:it.log,idx:[i]}); });
+    body.innerHTML=groups.map(g=>'<div class="mm-pv-gh">'+esc([fmtLogDate(g.log&&g.log.date),mmPvLabel(g.log)].filter(Boolean).join(' '))+'（'+g.idx.length+' 張）</div>'
+      +'<div class="mm-pv-wall">'+g.idx.map(i=>mmPvThumbBtn(S.items[i],i,false)).join('')+'</div>').join('');
+  }else{
+    const it=S.items[S.i], lg=it.log||{};
+    const k=S.items.filter((x,j)=>j<=S.i&&x.log===lg).length, of=(lg.photos||[]).filter(p=>p&&p.id).length;
+    body.innerHTML='<div class="mm-pv-big"><img id="mm-pv-img" alt="照片 '+(S.i+1)+' / '+n+'"'+(_thumbCache[it.p.id]?' src="'+_thumbCache[it.p.id]+'"':'')+'>'
+      +(n>1?'<button type="button" class="mm-pv-nav l" data-act="prev" aria-label="上一張">‹</button><button type="button" class="mm-pv-nav r" data-act="next" aria-label="下一張">›</button>':'')+'</div>'
+      +'<div class="mm-pv-cap">'+esc([fmtLogDate(lg.date),mmPvLabel(lg)].filter(Boolean).join('　'))+'　第 '+k+' / '+of+' 張'+(n>of?'（全部 '+(S.i+1)+' / '+n+'）':'')+'</div>'
+      +(n>1?'<div class="mm-pv-strip">'+S.items.map((x,i)=>mmPvThumbBtn(x,i,i===S.i)).join('')+'</div>':'');
+    const id=it.p.id;
+    photoFull(it.p).then(d=>{ const im=document.getElementById('mm-pv-img'); if(d&&im&&_mmPv.items[_mmPv.i]&&_mmPv.items[_mmPv.i].p.id===id)im.src=d; });
+    const on=body.querySelector('.mm-pv-th.on'); if(on&&on.scrollIntoView)on.scrollIntoView({block:'nearest',inline:'nearest'});
+  }
+  [].forEach.call(body.querySelectorAll('img[data-pv]'),im=>{
+    if(im.getAttribute('src'))return;
+    const it=S.items.find(x=>x.p.id===im.getAttribute('data-pv'));
+    if(it)photoThumb(it.p).then(d=>{if(d)im.setAttribute('src',d)});
+  });
+  ov.classList.add('show');
+}
+function mmPvGo(d){ const n=_mmPv.items.length; if(n<2)return; _mmPv.i=(_mmPv.i+d+n)%n; _mmPv.wall=false; mmPvDraw(); }
+function mmPvClose(){ const ov=document.getElementById('mm-pv'); if(ov)ov.classList.remove('show'); }
+document.addEventListener('click',function(e){
+  const t=e.target; if(!t||!t.closest)return;
+  if(!t.closest('#mm-pv'))return;
+  const a=t.closest('[data-act]'), th=t.closest('.mm-pv-th');
+  if(a){ const act=a.getAttribute('data-act');
+    if(act==='close')mmPvClose(); else if(act==='prev')mmPvGo(-1); else if(act==='next')mmPvGo(1);
+    else if(act==='wall'){_mmPv.wall=true;mmPvDraw()} return; }
+  if(th){ _mmPv.i=+th.getAttribute('data-i'); _mmPv.wall=false; mmPvDraw(); }
+});
+document.addEventListener('keydown',function(e){
+  const ov=document.getElementById('mm-pv'); if(!ov||!ov.classList.contains('show'))return;
+  if(e.key==='Escape')mmPvClose();
+  else if(!_mmPv.wall&&e.key==='ArrowLeft')mmPvGo(-1);
+  else if(!_mmPv.wall&&e.key==='ArrowRight')mmPvGo(1);
+});
+/* ── 請款狀況（2026-10-21 她交辦：丁＋標題丙、表頭「日期｜款別｜未稅｜含稅｜％」）──
+ * 跟「金額 ✏️」視窗同一套算法：每一筆的％＝這筆含稅 ÷ 報價含稅；已請款＝合計；未請款＝報價 − 已請款（未稅、含稅各自算）。
+ * 金額一律實際值（元），跟金額視窗一樣，不受上面金額開關的「大約金額」影響。沒有請款 → 不顯示。 */
+function casePayHtml(proj){
+  const c=caseOf(proj);
+  if(!caseIsYuan(c))return '';
+  const pays=Array.isArray(c.應收帳款)?c.應收帳款.filter(Boolean):[];
+  if(!pays.length)return '';
+  const mi=caseMoneyInfo(proj);
+  const row=(a,b,u,t,p,cls)=>'<tr'+(cls?' class="'+cls+'"':'')+'>'+(b===null?'<td colspan="2">'+a+'</td>':'<td>'+a+'</td><td>'+b+'</td>')
+    +'<td class="r">'+u+'</td><td class="r">'+t+'</td><td class="r">'+p+'</td></tr>';
+  let h='<div class="mm-paybox"><div class="mm-pay-ttl">請款狀況</div><table class="mm-paytbl">'
+    +'<tr><th>日期</th><th>款別</th><th class="r">未稅</th><th class="r">含稅</th><th class="r">％</th></tr>';
+  pays.forEach(p=>{ const a=payAmounts(p);
+    h+=row(esc(fmtLogDate(p.日期)||'—'),esc(p.款別||''),fmtYuan(a.u),fmtYuan(a.t),a.t===null?'—':pctText(a.t,mi.tax),''); });
+  h+=row('已請款',null,fmtYuan(mi.paidU),fmtYuan(mi.paid),pctText(mi.paid,mi.tax),'mm-pay-sum');
+  h+=row('未請款',null,mi.unpaidU===null?'—':fmtYuan(mi.unpaidU),mi.unpaid===null?'—':fmtYuan(mi.unpaid),mi.unpaid===null?'—':pctText(mi.unpaid,mi.tax),'mm-pay-un');
+  const memo=String(c.報價回款說明||'').trim();
+  if(memo)h+='<tr><td colspan="5" class="mm-pay-memo">說明：'+esc(memo).replace(/\n/g,'<br>')+'</td></tr>';
+  return h+'</table></div>';
+}
 /* 編輯框的「📥 下載這個區域的照片」：用編輯框**現在**的內容（剛加還沒存的也算）
    → 施工照片_{案場}_{區域}_{今天}.zip（區域空白寫「未分類」） */
 function downloadRecPhotos(){
@@ -4720,6 +4873,8 @@ function renderMain(){
   const head='<table class="mm-tbl mm-colhead">'+COLG+'<thead><tr><th class="mm-fz1">狀態</th><th class="mm-fz2">案場</th><th>執行者</th><th>區域</th><th>工作內容／施工照片</th>'
     +(showQ?'<th>報價金額</th>':'')+(showR?'<th>應收帳款</th>':'')+'<th>業務</th></tr></thead></table>';   /* 2026-10-12：標題「已收帳款」→「應收帳款」（格子裡的已收／未收不變） */
   const _oldSc=el.querySelector('.mm-scroll'), _oldLeft=_oldSc?_oldSc.scrollLeft:0;   /* 第五批：重畫後留在原本左右滑到的位置 */
+  _mmPvReg=[];   /* 照片預覽：記錄的 📷 按鈕在這一輪重新登記（2026-10-21） */
+  const _phCnt=casePhotoCounts();
   /* 2026-10-05 第六批（她指定）：欄位標題列固定在上方 ——
      標題列原本在 .mm-scroll（可以左右滑的那一塊）裡面，overflow 容器裡的 sticky 黏不到整頁，
      所以拉到外面一層 .mm-sticky（連第五批的「左右滑動」提示一起），左右位置由 mmHsSetup 跟著表格同步。 */
@@ -4773,14 +4928,14 @@ function renderMain(){
       <div class="proj-header mm-case-head${open?'':' sec-collapsed'}"${dragAttr} style="background:${sc.bg};--rowbg:${sc.bg}" onclick="toggleSec('${sid}',this)">
         <table class="mm-tbl">${COLG}<tbody><tr>
           <td class="mm-st-cell mm-fz1">${statusSelectHtml(proj,st,canCase)}</td>
-          <td class="mm-cname mm-fz2">${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:4px">▼</span><span style="opacity:.7;margin-right:4px;font-variant-numeric:tabular-nums">${gi+1}.</span><span class="mm-cn">${esc(proj)}</span><span class="proj-cnt">${rows.length} 筆</span>${mv}</td>
+          <td class="mm-cname mm-fz2">${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:4px">▼</span><span style="opacity:.7;margin-right:4px;font-variant-numeric:tabular-nums">${gi+1}.</span><span class="mm-cn">${esc(proj)}</span><span class="proj-cnt">${rows.length} 筆</span>${_phCnt[proj]?`<button type="button" class="mm-phc" data-case="${esc(proj)}" title="這個案場有 ${_phCnt[proj]} 張照片，點一下預覽" onclick="event.stopPropagation();mmPvCase(this)">📷 ${_phCnt[proj]}</button>`:''}${mv}</td>
           <td class="mm-case-exec" data-lb="人員">${cx.html}</td><td colspan="2"></td>
           ${showQ?'<td class="mm-amt-td" data-lb="報價金額">'+quote+'</td>':''}${showR?'<td class="mm-amt-td" data-lb="應收帳款">'+recv+'</td>':''}
           <td class="mm-sales-td" data-lb="業務"><div class="mm-sales">${sales?esc(sgSplit(sales).join('、')):'<span class="mm-dash">—</span>'}</div>${btns}</td>
         </tr></tbody></table>
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
-        <table class="mm-tbl">${COLG}<tbody>${rows.map((r,ri)=>renderRow(r,ri,rows.length,sc.light,cx.key)).join('')}</tbody></table>
+        <table class="mm-tbl">${COLG}<tbody>${rows.map((r,ri)=>renderRow(r,ri,rows.length,sc.light,cx.key,ri===0?casePayHtml(proj):'')).join('')}</tbody></table>
       </div>
     </div>`;
   }).join('')+'</div></div></div>';
@@ -4889,7 +5044,9 @@ function regionHtml(r){
   if(!rg.區域&&!rg.範圍)return '';
   return (rg.區域?'<span class="loc-tag">'+esc(rg.區域)+'</span>':'')+(rg.範圍?'<div class="mm-scope">'+esc(rg.範圍)+'</div>':'');
 }
-function renderRow(r, ri, total, tint, caseKeyExec){
+/* payHtml（2026-10-21）：案場第一個工作項目列才有 —— 請款狀況放在「報價金額＋已請款」兩格（合成一格）；
+   報價欄收起來就只放已請款那格（往右延伸）；已請款欄收起來就不放 */
+function renderRow(r, ri, total, tint, caseKeyExec, payHtml){
   normalizeRecord(r);
   /* 人員：跟案場列一樣（整個案場只有一種組合）就不再寫（2026-10-12 七 Q5 乙） */
   const sameAsCase=caseKeyExec!==undefined&&caseKeyExec!==null&&execKeyOf(r)===caseKeyExec;
@@ -4918,7 +5075,9 @@ function renderRow(r, ri, total, tint, caseKeyExec){
     <td>${exs}${(!sameAsCase&&r.部門)?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
     <td>${loc}</td>
     <td class="log-cell"><div class="mm-rec-edit">${actionCell}</div>${log}${note}</td>
-    ${amtShownQ()?'<td></td>':''}${amtShownR()?'<td></td>':''}<td></td>
+    ${(payHtml&&amtShownR())
+      ?(amtShownQ()?'<td class="mm-pay-td" colspan="2">'+payHtml+'</td>':'<td class="mm-pay-td mm-pay-solo">'+payHtml+'</td>')
+      :(amtShownQ()?'<td></td>':'')+(amtShownR()?'<td></td>':'')}<td></td>
   </tr>`;
 }
 
@@ -4950,7 +5109,8 @@ function renderLog(logs){
     /* 2026-10-16（Q3 甲）：只有進場施工才顯示；其它項目的舊出工數不顯示（資料不刪） */
     const manHtml=(item.work===MM_WORK_CREW&&typeof item.出工數==='number'&&isFinite(item.出工數)&&item.出工數>0)?`<span class="mm-man">出工 ${item.出工數}</span>`:'';
     const phN=Array.isArray(item.photos)?item.photos.filter(p=>p&&p.id).length:0;
-    const phHtml=phN?`<span class="mm-phn" title="這一筆有 ${phN} 張照片">📷 ${phN}</span>`:'';
+    /* 2026-10-21（Q1 甲）：點一下就開這一條的照片 */
+    const phHtml=phN?`<button type="button" class="mm-phn" data-k="${_mmPvReg.push({log:item})-1}" title="這一筆有 ${phN} 張照片，點一下預覽" onclick="mmPvLog(this)">📷 ${phN}</button>`:'';
     return`<li class="log-li">${dtHtml}<span class="log-tx">${wiHtml}${subHtml}${locHtml}${esc(item.text||'')}${manHtml}${phHtml}</span></li>`;
   }).join('')+'</ul>';
 }
