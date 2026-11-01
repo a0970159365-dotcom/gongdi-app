@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-27.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2215,6 +2215,16 @@ function sortLogs(logs){
     .sort((a,b)=>{const ta=_logTime(a.l),tb=_logTime(b.l);return ta===tb?a.i-b.i:ta-tb})
     .map(x=>x.l);
 }
+/* 2026-10-27 她交辦：同一施作位置／工作項目裡，狀態是「帳款」的排第一個（R2 乙＝只看狀態）。
+ * 帳款之間、其他記錄之間都維持原本的順序（舊到新，R3 乙）。
+ * 只改畫面與 Excel 的排列 → 回傳新陣列，存在雲端的順序不動。 */
+function payFirst(logs){
+  if(typeof logs==='string')logs=parseProgressString(logs);
+  if(!Array.isArray(logs))return [];
+  var pay=[],rest=[];
+  logs.forEach(function(l){ (l&&String(l.status||'').trim()==='帳款'?pay:rest).push(l); });
+  return pay.concat(rest);
+}
 
 // 4／5 展開狀態：預設全部收合；使用者展開過的記在 _openSecs，
 // 重繪（存檔、雲端同步）之後照著還原 —— 這就是第 5 項「存檔後展開狀態被重置」的修法。
@@ -2762,7 +2772,7 @@ function renderRow(r, ri, total){
   normalizeRecord(r);
   const exs=(r.執行者||'').split(/[、,，\n]/).map(e=>e.trim()).filter(Boolean).map(e=>`<span class="ex-tag">${esc(e)}</span>`).join('');
   const loc=r.施作位置?`<span class="loc-tag">${esc(r.施作位置)}</span>`:'';
-  const log=renderLog(r.進度記錄);
+  const log=renderLog(payFirst(r.進度記錄));   /* 2026-10-27：帳款那幾筆排在這一格最上面 */
   const note=r.備註?`<div style="font-size:12px;color:var(--muted);line-height:1.5">${esc(r.備註).replace(/\n/g,'<br>')}</div>`:'';
   /* 2026-09-21 她選「方案乙」：狀態改成「一筆記錄一格」，由 renderLog 跟每一筆排在同一行。
      原本是「一個品項一列」的彙總 —— 左邊 5 筆、右邊 3 列，上下貼著就被看成一一對應。
@@ -3426,7 +3436,7 @@ async function exportExcel(projs,opt){
         vals:[xlProj(r.案場),r.部門,r.執行者,r.施作位置,'','','','',r.備註]});
       return;
     }
-    logs.forEach(l=>{
+    payFirst(logs).forEach(l=>{   /* 2026-10-27：跟畫面一樣，帳款排在這一筆的最前面 */
       if(!l)return;
       const it=String(l.location||'').trim();
       expanded.push({r:r,item:it,status:l.status||'',
@@ -3465,11 +3475,12 @@ async function exportExcel(projs,opt){
     /* 逐筆判斷（2026-09-21）；2026-10-22 起「整列上色」照設定頁每個狀態的整條底色（預設卡關、帳款） */
     const sCol=st?statusColor(st):null;
     const rowBg=sCol&&sCol.row?sCol.row:'';
-    row.eachCell(c=>{
+    /* 10-22 晚她選甲：逐欄 1～9 塗，不用 eachCell —— 舊資料少了整個欄位（undefined）的格子 eachCell 會跳過，那格就沒底色 */
+    for(let ci=1;ci<=headers.length;ci++){const c=row.getCell(ci);
       c.alignment={vertical:'top',wrapText:true};
       c.fill={type:'pattern',pattern:'solid',fgColor:{argb:rowBg?argb(rowBg):(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
       if(rowBg)c.font={color:{argb:argb(sCol.tx)}};
-    });
+    }
     /* 2026-09-21 逐筆之後欄位各往後移一格：日期第 5、品項第 6、狀態第 8 */
     /* 10-22 晚她 E2 乙：前 6 欄（案場～品項）左右置中、上下靠上；合併過的格子 mergeSameCells 照舊上下置中 */
     for(let ci=1;ci<=6;ci++)row.getCell(ci).alignment={vertical:'top',horizontal:'center',wrapText:ci<=4};

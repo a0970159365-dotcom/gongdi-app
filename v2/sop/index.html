@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-10-14.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-10-27.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -20,8 +20,76 @@
     .btn-status.s-normal  {background:#16a34a!important;color:#fff!important;border-color:#15803d!important}
     .btn-status.s-abnormal{background:#dc2626!important;color:#fff!important;border-color:#b91c1c!important}
     .btn-status.s-improved{background:#ea580c!important;color:#fff!important;border-color:#c2410c!important}
+    .btn-status .st-nd{display:inline-block}
     .btn-status.s-na      {background:#6b7280!important;color:#fff!important;border-color:#4b5563!important}
     .hidden{display:none!important}
+    /* ── 主管意見／改善後回饋／每項 3 張照片（2026-10-27）── 前綴 rv-，整份檔案沒有別人用 */
+    .rv{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .rv:empty{display:none}
+    .rv-dt{margin-left:2rem}
+    /* 手機：內容包進輪次底色框之後，2rem 縮排會讓 3 張小圖排不下一行（2026-10-28 真 Chrome 400px 量到）→ 不縮排 */
+    @media (max-width:480px){ .rv-dt{margin-left:0} }
+    .rv-chip{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap;vertical-align:middle}
+    .rv-chip.wait{background:#dbeafe;color:#1d4ed8}.rv-chip.fix{background:#fee2e2;color:#991b1b}.rv-chip.done{background:#dcfce7;color:#15803d}
+    .rv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .rv-tog{display:flex;gap:6px;flex-wrap:wrap}
+    .rv-tog button{flex:1 1 auto;border:1px solid #d1d5db;background:#fff;color:#4b5563;border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer;white-space:nowrap}
+    .rv-tog button.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff;font-weight:700}
+    /* 輪次底色（2026-10-28 Y4）：同一輪同一個底色，藍、黃、綠輪流 */
+    .rv-band{border-radius:12px;padding:8px 10px 10px;display:flex;flex-direction:column;gap:6px;border-left:5px solid}
+    .rv-b1{background:#eff6ff;border-color:#3b82f6}.rv-b2{background:#fefce8;border-color:#eab308}.rv-b3{background:#f0fdf4;border-color:#22c55e}
+    .rv-bt{font-size:12px;font-weight:800;color:#334155}
+    .rv-band .rv-box,.rv-band .rv-step1,.rv-band .rv-none{background:#fff}
+    .rv-step1{border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+    .rv-n{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;border-radius:50%;background:#334155;color:#fff;font-size:10.5px;font-weight:700;margin-right:2px}
+    .rv-mbtn .rv-n{background:#1d4ed8;margin-right:6px;vertical-align:-3px}
+    /* 詳情頁分頁（2026-10-28 Y1～Y3） */
+    .dt-tabs{display:flex;border-bottom:1px solid #e5e7eb;background:#f8fafc}
+    .dt-tabs button{flex:1 1 0;min-width:0;padding:11px 6px;font-size:14px;font-weight:600;color:#64748b;border:0;border-bottom:3px solid transparent;background:none;cursor:pointer;white-space:nowrap}
+    .dt-tabs button.on{color:#1d4ed8;border-bottom-color:#1d4ed8;background:#fff}
+    .dt-tabs b{display:inline-block;min-width:18px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;padding:0 6px;margin-left:4px;line-height:18px}
+    .dt-sum{padding:12px 16px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #f3f4f6}
+    .dt-total{font-size:15px;font-weight:700;color:#1f2937}
+    .dt-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .dt-stats div{border-radius:10px;padding:8px 2px;text-align:center;font-size:11.5px}
+    .dt-stats b{display:block;font-size:20px;line-height:1.2}
+    .dt-stats .s-n{background:#f0fdf4;color:#15803d}.dt-stats .s-a{background:#fef2f2;color:#b91c1c}.dt-stats .s-i{background:#fff7ed;color:#c2410c}.dt-stats .s-x{background:#f3f4f6;color:#4b5563}
+    .dt-lbl{font-size:12px;font-weight:700;color:#6b7280}
+    .dt-row{cursor:pointer}
+    .dt-arw{color:#9ca3af;font-size:11px}
+    .dt-empty{padding:28px 16px;text-align:center;color:#9ca3af;font-size:14px}
+    .rv-lock{font-size:11.5px;color:#6b7280}
+    .rv-dt:empty{display:none}
+    .rv-ths{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .rv-th{position:relative;flex:none;width:84px;height:63px}
+    .rv-th img{width:84px;height:63px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;cursor:zoom-in;display:block;background:#f3f4f6}
+    .rv-x{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#ef4444;color:#fff;font-size:11px;line-height:22px;padding:0;cursor:pointer}
+    .rv-add{flex:none;display:flex;align-items:center;justify-content:center;min-width:84px;height:63px;padding:0 12px;border:2px dashed #d1d5db;border-radius:8px;color:#2563eb;font-size:13px;cursor:pointer;white-space:nowrap;background:#fff}
+    .rv-add:hover{border-color:#60a5fa}
+    .rv-meta{font-size:11px;color:#6b7280}
+    .rv-last{font-size:11.5px;color:#6b7280;display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+    .rv-his{background:none;border:0;padding:0;color:#2563eb;font-size:11.5px;cursor:pointer}
+    .rv-log{margin:0;padding:8px 10px;list-style:none;background:#f9fafb;border-radius:8px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:#374151}
+    .rv-log li{display:flex;flex-direction:column;gap:1px}
+    .rv-box{border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;background:#f9fafb;display:flex;flex-direction:column;gap:5px;min-width:0}
+    .rv-mgr{background:#eff6ff;border-color:#bfdbfe}
+    .rv-h{font-size:12.5px;font-weight:700;color:#374151;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+    .rv-t{font-size:13px;color:#1f2937;white-space:pre-wrap;word-break:break-word}
+    .rv-box textarea{width:100%;border:1px solid #d1d5db;border-radius:8px;padding:6px 8px;font-size:13px;resize:vertical;background:#fff;font-family:inherit}
+    .rv-v{font-size:11px;font-weight:700;border-radius:6px;padding:1px 8px;color:#fff}
+    .rv-v.ok{background:#16a34a}.rv-v.redo{background:#ea580c}
+    .rv-edit{background:none;border:0;padding:0;color:#2563eb;font-size:11.5px;font-weight:400;cursor:pointer}
+    .rv-acts{display:flex;gap:6px;flex-wrap:wrap}
+    .rv-acts button{flex:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid}
+    .rv-two{display:flex;gap:8px;flex-wrap:wrap}
+    .rv-vb{flex:1 1 110px;border-radius:10px;padding:8px;font-size:14px;font-weight:700;cursor:pointer;border:2px solid;background:#fff}
+    .rv-vb.redo{color:#c2410c;border-color:#f97316}.rv-vb.ok{color:#15803d;border-color:#16a34a}
+    .rv-vb.redo.on{background:#f97316;color:#fff}.rv-vb.ok.on{background:#16a34a;color:#fff}
+    .rv-save{background:#2563eb;color:#fff;border-color:#2563eb!important}
+    .rv-none{font-size:12px;color:#9ca3af;border:1px dashed #d1d5db;border-radius:10px;padding:7px;text-align:center}
+    .rv-cancel{background:#fff;color:#6b7280;border-color:#d1d5db!important;font-weight:400!important}
+    .rv-mbtn{width:100%;border:1.5px solid #1d4ed8;color:#1d4ed8;background:#eff6ff;border-radius:10px;padding:7px;font-size:13px;font-weight:700;cursor:pointer}
+    .rv-fb{width:100%;border:1.5px solid #2563eb;color:#2563eb;background:#fff;border-radius:10px;padding:7px;font-size:13px;font-weight:700;cursor:pointer}
     /* ── 日曆（2026-08-25 B批）── */
     .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
     .cal-dow{text-align:center;font-size:11px;color:#9ca3af;font-weight:700;padding:2px 0}
@@ -281,6 +349,8 @@
       <button id="h-tab-cal"  onclick="setHistMode('cal')"  class="flex-1 py-2 text-sm rounded-xl border">📅 月曆</button>
       <button id="h-tab-list" onclick="setHistMode('list')" class="flex-1 py-2 text-sm rounded-xl border">📋 清單</button>
     </div>
+    <!-- 2026-10-28（X2 甲）：只列要我處理的（主管：有等主管的；其他人：自己能改、有等改善的） -->
+    <div id="h-todo" class="rv-tog mb-3"></div>
 
     <!-- 月曆 -->
     <div id="hist-cal-wrap" class="hidden">
@@ -692,14 +762,25 @@ function _lightReports(){
     if(!r||!r.items) return r;
     var c=Object.assign({},r);
     c.items=r.items.map(function(it){
-      if(!it||!it.photo) return it;
-      if(it.photoId && !it.th) return it;   /* 新照片、縮圖還沒上雲 → 整張留著（2026-09-28） */
-      var ci=Object.assign({},it);
-      delete ci.photo; ci.photoOnCloud=true;
+      if(!it) return it;
+      var ci=_lightPic(it);
+      /* 2026-10-27：第 2、3 張與改善後回饋的照片，同一條規則 */
+      if((it.pics&&it.pics.length) || (it.rounds&&it.rounds.length)){
+        if(ci===it) ci=Object.assign({},it);
+        if(it.pics) ci.pics=it.pics.map(_lightPic);
+        if(it.rounds) ci.rounds=it.rounds.map(function(rd){ return rd ? Object.assign({},rd,{pics:roundPics(rd).map(_lightPic)}) : rd; });
+      }
       return ci;
     });
     return c;
   });
+}
+function _lightPic(it){
+  if(!it||!it.photo) return it;
+  if(it.photoId && !it.th) return it;   /* 新照片、縮圖還沒上雲 → 整張留著（2026-09-28） */
+  var ci=Object.assign({},it);
+  delete ci.photo; ci.photoOnCloud=true;
+  return ci;
 }
 function saveLS(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({config:S.config, reports:_lightReports()})); }catch(e){} }
 
@@ -853,6 +934,7 @@ function showView(v){
      要在改掉 S.view 之前判斷。 */
   if (S.view === 'settings' && v !== 'settings' && typeof autoSaveConfig === 'function') autoSaveConfig();
   S.view=v;
+  MGR_ED=null;     /* 換畫面就收掉寫到一半的主管意見框（2026-10-27） */
   document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('active'); });
   var el=$('view-'+v);
   if(el) el.classList.add('active');
@@ -1220,6 +1302,7 @@ function renderChecklist(){
       +'<div class="flex items-start gap-2 mb-1">'
       +'<span class="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center font-bold flex-shrink-0 mt-0.5">'+(idx+1)+'</span>'
       +'<h3 class="text-sm font-semibold text-gray-800 leading-tight flex-1">'+esc(item.name)+'</h3>'
+      +'<span id="cl-flow-'+idx+'" class="flex-shrink-0">'+flowChip(item)+'</span>'
       +'</div>'
       +(item.criterion
         ?'<button onclick="toggleById(\'cl-crit-'+idx+'\',\'cl-arw-'+idx+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mb-2 ml-8 transition-colors"><span id="cl-arw-'+idx+'">▶</span><span>查檢準則</span></button>'
@@ -1229,18 +1312,7 @@ function renderChecklist(){
       +statusBtn(idx,'正常',item.status)+statusBtn(idx,'不正常',item.status)
       +statusBtn(idx,'改善後合格',item.status)+statusBtn(idx,'未列入',item.status)
       +'</div>'
-      +'<div id="item-extra-'+idx+'" class="space-y-2">'
-      +'<textarea id="item-desc-'+idx+'" onchange="setDesc('+idx+',this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none" rows="2" placeholder="'+(item.status==='不正常'?'狀況說明（必填）':'狀況說明')+'">'+esc(item.description)+'</textarea>'
-      +'<div class="flex items-center gap-2">'
-      /* 2026-09-28：「有沒有照片」改看 itemHasPhoto —— 新格式照片查檢表裡可能一格影像都沒有，只有 photoId */
-      +'<label for="item-photo-'+idx+'" class="flex-1 flex items-center justify-center gap-2 border-2 border-dashed rounded-xl py-2 text-sm cursor-pointer '+(itemHasPhoto(item)?'border-green-400 text-green-600 bg-green-50':'border-gray-300 text-gray-500 hover:border-blue-400')+'">'
-      +'📷 '+(itemHasPhoto(item)?'已拍照（點擊更換）':'拍照 / 上傳')
-      +'<input id="item-photo-'+idx+'" type="file" accept="image/*" capture="environment" class="hidden" onchange="handlePhoto(event,'+idx+')">'
-      +'</label>'
-      +(itemHasPhoto(item)?'<button onclick="removePhoto('+idx+')" class="w-9 h-9 flex items-center justify-center bg-red-50 text-red-500 rounded-xl">🗑️</button>':'')
-      +'</div>'
-      +(itemHasPhoto(item)?'<img'+itemImgAttrs(item)+' onclick="openPhotoAt(\'checklist\','+idx+')" class="w-full object-cover rounded-xl border border-gray-200 cursor-zoom-in" style="max-height:9rem" title="點擊放大">':'')
-      +'</div>'
+      +'<div id="item-rv-'+idx+'" class="rv">'+clBody(item, idx)+'</div>'
       +'</div></div>';
   });
   $('checklist-items').innerHTML=html;
@@ -1248,9 +1320,29 @@ function renderChecklist(){
   updateCompleteBtn();
 }
 
+/* 2026-10-27 晚（她 W1 其它、W2 乙、W3 甲）：主管最近一次按的是「需改善」→ 不正常顯示成「不正常（需改善）」。
+   只換顯示：資料裡還是「不正常」，統計、篩選、顏色（紅）都照舊。主管之後按「已合格」→ 照舊變改善後合格。 */
+function lastVerdict(it){
+  var best=null;
+  [it&&it.mgr].concat(((it&&it.rounds)||[]).map(function(rd){ return rd&&rd.mgr; })).forEach(function(m){
+    if(m && (!best || (m.at||0)>=(best.at||0))) best=m;
+  });
+  return best ? best.verdict : null;
+}
+function statusText(it){
+  var s=(it&&it.status)||'';
+  if(s==='不正常' && lastVerdict(it)==='redo') return '不正常（需改善）';
+  return s;
+}
+/* 狀態鈕裡：手機上鈕只有 70 幾 px 寬，要換行時「（需改善）」整段一起換，不要從「需改」中間斷開 */
+function statusBtnHtml(it){
+  var t=statusText(it);
+  return t==='不正常（需改善）' ? '不正常<span class="st-nd">（需改善）</span>' : esc(t);
+}
 function statusBtn(idx,label,current){
   var map={'正常':'s-normal','不正常':'s-abnormal','改善後合格':'s-improved','未列入':'s-na'};
   var shortLabel={'正常':'正常','不正常':'不正常','改善後合格':'改善合格','未列入':'未列入'}[label]||label;
+  if(label==='不正常' && current==='不正常') shortLabel=statusBtnHtml(S.report.items[idx]);
   var cls='btn-status py-3 text-xs font-semibold rounded-xl bg-gray-100 text-gray-600 w-full '+(current===label?map[label]:'');
   return '<button class="'+cls+'" onclick="setStatus('+idx+',\''+label+'\')">'+shortLabel+'</button>';
 }
@@ -1277,7 +1369,13 @@ function setStatus(idx,s){
   grid.forEach(function(btn,i){
     ['s-normal','s-abnormal','s-improved','s-na'].forEach(function(c){ btn.classList.remove(c); });
     if(labels[i]===s) btn.classList.add(map2[s]);
+    if(labels[i]==='不正常') btn.innerHTML=(s==='不正常')?statusBtnHtml(S.report.items[idx]):'不正常';
   });
+
+  /* 2026-10-27：主管意見／改善後回饋跟狀態有關 → 只重畫這一項的那一塊（說明框不動，打到一半的字不會不見） */
+  var fl=$('cl-flow-'+idx); if(fl) fl.innerHTML=flowChip(S.report.items[idx]);
+  var rv=$('item-rv-'+idx);
+  if(rv){ rv.innerHTML=clBody(S.report.items[idx], idx); fillLazyItemThumbs(rv, S.report.items); }
 
   updateProgress();
   updateCompleteBtn();
@@ -1409,7 +1507,8 @@ function itemThumb(it){
 }
 /* 一次補齊一批項目的縮圖（列印前用）。已經有影像的一張都不會打雲端。 */
 function hydrateItems(items){
-  return Promise.all((items||[]).filter(function(it){ return it && !itemSrc(it) && it.photoId; })
+  var objs=[]; (items||[]).forEach(function(it){ if(it) objs=objs.concat(allPhotoObjs(it)); });   /* 2026-10-27：每項多張＋改善後回饋的照片 */
+  return Promise.all(objs.filter(function(it){ return it && !itemSrc(it) && it.photoId; })
     .map(function(it){ return itemThumb(it); }));
 }
 /* 畫面上還沒有圖的那幾格，抓回來再補上去 —— 不重畫整塊，避免閃一下 */
@@ -1418,7 +1517,8 @@ function fillLazyItemThumbs(host, items){
   [].forEach.call(host.querySelectorAll('img[data-ph]'), function(im){
     if(im.getAttribute('src')) return;
     var id=im.getAttribute('data-ph');
-    var it=(items||[]).find(function(x){ return x && x.photoId===id; });
+    var it=null;
+    (items||[]).some(function(x){ return x && allPhotoObjs(x).some(function(p){ if(p && p.photoId===id){ it=p; return true; } return false; }); });
     if(!it) return;
     itemThumb(it).then(function(d){ if(d) im.setAttribute('src', d); });
   });
@@ -1429,8 +1529,10 @@ function fillLazyItemThumbs(host, items){
  * 兩條推送各自非同步完成、誰先誰後不一定 → 兩條跑完都來敲一次，誰後到誰清。
  * S.report 是編輯中的深拷貝、S.reports 是清單，兩邊都要清，否則下次存檔又被 S.report 帶回來。 */
 function _eachItemWith(id, fn){
-  (S.reports||[]).forEach(function(r){ ((r&&r.items)||[]).forEach(function(it){ if(it && it.photoId===id) fn(it); }); });
-  ((S.report&&S.report.items)||[]).forEach(function(it){ if(it && it.photoId===id) fn(it); });
+  /* 2026-10-27：第 2、3 張與改善後回饋的照片，每一張的欄位跟項目上那張一樣 → 一起處理 */
+  var each=function(it){ if(!it) return; if(it.photoId===id) fn(it); extraPhotoObjs(it).forEach(function(p){ if(p.photoId===id) fn(p); }); };
+  (S.reports||[]).forEach(function(r){ ((r&&r.items)||[]).forEach(each); });
+  ((S.report&&S.report.items)||[]).forEach(each);
 }
 function _clearReportData(id){
   if(_pendingFull[id]) return;                    // 大圖還沒確定上雲 → 一個字都不准動
@@ -1476,6 +1578,12 @@ function handlePhoto(e,idx){
   var file=e.target.files[0]; if(!file) return;
   makePhoto(file,function(p){
     var it=S.report.items[idx];
+    /* 2026-10-27：每項最多 3 張 —— 已經有第 1 張就加在後面（pics），不再換掉 */
+    if(itemHasPhoto(it)){
+      if(itemPics(it).length>=PIC_MAX){ showToast('每一項最多 '+PIC_MAX+' 張照片'); return; }
+      it.pics=(it.pics||[]).filter(Boolean); it.pics.push(_newPic(p));
+      renderChecklist(); return;
+    }
     _dropPending(it);
     /* 2026-09-28 新格式：大圖**先留在查檢表裡**（跟改版前一樣會一起進雲端，關掉分頁也不會掉），
        同時放待推清單；縮圖只放記憶體＋待推清單，查檢表裡的 photoThumb 保持 null。
@@ -1489,13 +1597,530 @@ function handlePhoto(e,idx){
     renderChecklist();
   });
 }
-function removePhoto(idx){
+/* k：第幾張（itemPics 的順序）。第 1 張在項目本身，刪掉時把第 2 張搬上來（2026-10-27） */
+function removePhoto(idx,k){
   var it=S.report.items[idx];
+  var list=itemPics(it), p=list[k||0];
+  if(p && p!==it){
+    _dropPending(p);
+    it.pics=(it.pics||[]).filter(function(x){ return x!==p; });
+    renderChecklist(); return;
+  }
   _dropPending(it);
   it.photo=null; it.photoThumb=null;
   delete it.origName; delete it.origSize; delete it.origW; delete it.origH; delete it.photoOnCloud;
   delete it.photoId; delete it.th;   /* 2026-09-28 新格式標記一起拿掉；雲端節點裡的圖不動 */
+  if(it.pics && it.pics.length){
+    var nx=it.pics.shift();
+    PIC_KEYS.forEach(function(key){ if(nx[key]!=null) it[key]=nx[key]; });
+  }
   renderChecklist();
+}
+
+/* ══════ 主管意見／改善後回饋／修改紀錄／每項最多 3 張照片（2026-10-27 她確認示意圖第 3 頁）══════
+ * 資料（全部掛在查驗項目上，舊資料沒有這些欄位 → 畫面跟改版前一樣）：
+ *   照片    第 1 張照舊放在項目本身（photo／photoThumb／photoId…），舊版 App 也看得到；
+ *           第 2、3 張放 pics[]，每一張的欄位跟項目上那一張一模一樣 —— 所以縮圖／大圖／
+ *           搬上雲端那一整套（itemSrc、itemFull、_pendingFull…）直接拿一張照片來用就好。
+ *   mgr     第一次的主管意見 {text, verdict:'ok'|'redo', at, by}
+ *   rounds  改善後回饋 [{desc, pics[], at, by, mgr}]，第 n 筆＝第 n 次，mgr 是那一次的主管意見
+ *   mgrAt   主管最後一次按的時間 —— 存檔前跟雲端比，雲端比較新就用雲端的主管意見（見 mergeCloudMgr）
+ *   log     修改紀錄 {key:{at, by, t}}，用物件不用陣列：主管在詳情頁按的那一筆是單獨寫進雲端的，
+ *           陣列的話兩邊各寫一筆會互相蓋掉
+ * 規則：
+ *   主管意見  只有入口「主管／管理層／系統管理員」那幾組的角色能寫（看角色名稱，同入口的舊判斷）；
+ *             其他人只看到灰字「主管意見：未回覆」（10-27 晚她改）。未列入、還沒選狀態 → 沒有（S3 甲）。
+ *   已合格    不正常 → 改善後合格；需改善：正常／改善後合格 → 不正常（Q11、S4 甲；10-27 晚改名：合格→已合格、還要改→需改善）
+ *   改善後回饋按鈕  不正常一直都在；正常、改善後合格要主管寫過意見才出現（R5、S2 甲） */
+var PIC_MAX=3;
+var PIC_KEYS=['photoId','photo','photoThumb','th','origName','origSize','origW','origH','photoOnCloud'];
+var MGR_ROLE_RE=/主管|副總|總經理|系統管理員/;
+var LOG_MAX=40;                  // 每項最多留幾筆修改紀錄，免得一直改的項目越長越大
+function itemPics(it){ return it ? (itemHasPhoto(it)?[it]:[]).concat((it.pics||[]).filter(Boolean)) : []; }
+function roundPics(rd){ return ((rd&&rd.pics)||[]).filter(Boolean); }
+/* 不含項目本身那一張（項目上那張照舊走原本的程式） */
+function extraPhotoObjs(it){
+  var a=((it&&it.pics)||[]).filter(Boolean);
+  ((it&&it.rounds)||[]).forEach(function(rd){ a=a.concat(roundPics(rd)); });
+  return a;
+}
+/* 放大檢視的順序：第一次填寫的照片 → 第 1 次回饋 → 第 2 次…… */
+function allPhotoObjs(it){
+  var a=itemPics(it);
+  ((it&&it.rounds)||[]).forEach(function(rd){ a=a.concat(roundPics(rd)); });
+  return a;
+}
+function isMgr(){
+  try{
+    var p=JSON.parse(localStorage.getItem('portal_v1')||'{}');
+    var u=p.currentUser; if(!u || !u.roleId) return false;
+    var r=(p.roles||[]).find(function(x){ return x.id===u.roleId; });
+    return !!(r && MGR_ROLE_RE.test(r.name||''));
+  }catch(e){ return false; }
+}
+function whoAmI(){ return (S.currentUser&&S.currentUser.name) || (S.report&&S.report.personnel) || ''; }
+/* ── 每一項「現在等誰」（2026-10-28 她選 X1～X3 甲）——全部從現有資料算，不多存欄位 ──
+ *   wait＝等主管：不正常、主管還沒寫過；或填表人回饋（有存過的那一次）比主管最近一次意見還新；或已合格之後又被改回不正常
+ *   fix ＝等改善：主管最近一次是「需改善」，之後填表人還沒回饋
+ *   done＝已結案：主管最近一次是「已合格」
+ *   ''  ＝不標：正常／改善後合格且主管沒寫過、未列入、還沒選 */
+var FLOW_TXT={ wait:'等主管', fix:'等改善', done:'已結案' };
+function itemFlow(it){
+  if(!it) return '';
+  var s=it.status;
+  if(s!=='正常' && s!=='不正常' && s!=='改善後合格') return '';
+  var lm=null, lr=0;
+  [it.mgr].concat((it.rounds||[]).map(function(rd){ return rd&&rd.mgr; })).forEach(function(m){
+    if(m && (!lm || (m.at||0)>=(lm.at||0))) lm=m;
+  });
+  (it.rounds||[]).forEach(function(rd){ if(rd && rd.at && rd.at>lr) lr=rd.at; });
+  if(!lm) return s==='不正常' ? 'wait' : '';
+  if(lr>(lm.at||0)) return 'wait';
+  if(lm.verdict==='ok') return s==='不正常' ? 'wait' : 'done';
+  return 'fix';
+}
+function flowChip(it){ var f=itemFlow(it); return f ? '<span class="rv-chip '+f+'">'+FLOW_TXT[f]+'</span>' : ''; }
+function reportFlow(r){
+  var c={ wait:0, fix:0, done:0 };
+  ((r&&r.items)||[]).forEach(function(it){ var f=itemFlow(it); if(f) c[f]++; });
+  return c;
+}
+/* 「要我處理的」：主管 → 有等主管的；其他人 → 自己能改、有等改善的 */
+function needsMe(r){
+  var c=reportFlow(r);
+  return isMgr() ? c.wait>0 : (canEditReport(r) && c.fix>0);
+}
+function reportFlowChips(r){
+  var c=reportFlow(r), h='';
+  if(c.wait) h+='<span class="rv-chip wait">等主管 '+c.wait+' 項</span>';
+  if(c.fix)  h+='<span class="rv-chip fix">等改善 '+c.fix+' 項</span>';
+  return h ? '<div class="rv-chips">'+h+'</div>' : '';
+}
+var HIST_TODO=false;   // 歷史資料：只列「要我處理的」（X2 甲）
+function histTodo(on){
+  HIST_TODO=!!on;
+  if(HIST_TODO && CAL.mode!=='list') setHistMode('list'); else if(CAL.mode==='list') renderHistory(); else renderHistTodo();
+}
+function renderHistTodo(){
+  var box=$('h-todo'); if(!box) return;
+  var n=visibleReports().filter(needsMe).length;
+  box.innerHTML='<button type="button" class="'+(HIST_TODO?'':'on')+'" onclick="histTodo(false)">全部</button>'
+    +'<button type="button" class="'+(HIST_TODO?'on':'')+'" onclick="histTodo(true)">要我處理的（'+n+'）</button>';
+}
+/* 詳情頁三個分頁（2026-10-28 她 Y1～Y3 甲，取代 X3 的「全部／只看要處理的」切換）
+ *   sum＝摘要：總數、四種狀態各幾項、等誰幾項，下面列全部項目（點一項展開）
+ *   mgr＝主管檢視：只列等主管的，全部攤開，空著的主管意見直接出兩顆
+ *   fix＝需改善：只列等改善的，只攤開最新一輪，能改這張的人直接在這裡填改善後-回饋 */
+var DT_TAB='sum', DT_OPEN={};
+function dtTab(t){ DT_TAB=t; MGR_ED=null; FB=null; renderDetail(); }
+function dtToggle(idx){ DT_OPEN[idx]=!DT_OPEN[idx]; renderDetail(); }
+
+/* ── 需改善分頁直接填「第N次改善後-回饋」（Y3 甲）——存的時候只寫這一項的那幾格，跟主管意見一樣 ── */
+var FB=null;     // {idx, pics:[], tx}
+function fbOpen(idx){
+  var r=S.reports.find(function(x){ return x.id===S.selectedReportId; });
+  if(!r || !canEditReport(r)){ showToast('👁️ 唯讀 — 僅本人或權限範圍內可編輯'); return; }
+  FB={ idx:idx, pics:[], tx:'' };
+  renderDetail();
+  var ta=$('fb-desc'); if(ta){ try{ ta.focus(); }catch(e){} }
+}
+function fbCancel(){ (FB&&FB.pics||[]).forEach(_dropPending); FB=null; renderDetail(); }
+function _fbKeep(){ var ta=$('fb-desc'); if(ta && FB) FB.tx=ta.value; }
+function handleFbPhoto(e){
+  var file=e.target.files[0]; if(!file || !FB) return;
+  _fbKeep();
+  makePhoto(file,function(p){
+    if(!FB) return;
+    if(FB.pics.length>=PIC_MAX){ showToast('每一次最多 '+PIC_MAX+' 張照片'); return; }
+    FB.pics.push(_newPic(p)); renderDetail();
+  });
+}
+function removeFbPhoto(k){ if(!FB) return; _fbKeep(); var p=FB.pics[k]; if(p) _dropPending(p); FB.pics.splice(k,1); renderDetail(); }
+function fbSave(){
+  if(!FB) return;
+  _fbKeep();
+  var desc=String(FB.tx||'').trim();
+  if(!desc && !FB.pics.length){ showToast('請先寫改善後說明或加照片'); return; }
+  var rep=S.reports.find(function(x){ return x.id===S.selectedReportId; });
+  if(!rep || !canEditReport(rep)) return;
+  var idx=FB.idx, it=(rep.items||[])[idx]; if(!it) return;
+  if(!canAddRound(it)){ showToast('這一項現在不能再回饋'); return; }
+  it.rounds=(it.rounds||[]).filter(Boolean);
+  var j=it.rounds.length, now=Date.now(), by=whoAmI();
+  var rd={ desc:desc, pics:FB.pics.slice(), at:now, by:by };
+  it.rounds.push(rd);
+  var lkey=addLog(it, '新增'+fbTitle(j)+(desc?'「'+_clip(desc)+'」':'')+(rd.pics.length?'、照片 '+rd.pics.length+' 張':''), now, by);
+  rep.createdAt=now;
+  FB=null;
+  saveLS(); renderDetail();
+  if(!window._sopSet){ showToast(fbTitle(j)+'已儲存（本機）'); return; }
+  var base='reports/'+rep.id+'/items/'+idx;
+  setSyncStatus('saving');
+  checkDeleted(rep.id).then(function(del){
+    if(del){ dropDeletedLocal(); saveLS(); setSyncStatus('saved'); showToast(DELETED_MSG); goBack(); return; }
+    return Promise.all([
+      window._sopSet(base+'/rounds/'+j, JSON.parse(JSON.stringify(rd))),
+      window._sopSet(base+'/log/'+lkey, it.log[lkey]),
+      window._sopSet('reports/'+rep.id+'/createdAt', now)
+    ]).then(function(){ setSyncStatus('saved'); showToast(fbTitle(j)+'已儲存'); });
+  }).catch(function(){ setSyncStatus('error'); showToast('沒存到雲端，已存本機，請稍後再試'); });
+  /* 照片搬出查檢表那一套照舊：先推縮圖、再推大圖，兩條都成功才清掉資料裡那份大圖 */
+  _pushPendingThumb(); _pushPendingFull();
+}
+function fbFormHTML(it, idx){
+  var n=(it.rounds||[]).filter(Boolean).length;
+  if(!FB || FB.idx!==idx) return '<button type="button" class="rv-fb" onclick="fbOpen('+idx+')">＋ '+fbTitle(n)+'</button>';
+  return '<div class="rv-box rv-round rv-fbform"><div class="rv-h">'+fbTitle(n)+'</div>'
+    +'<textarea id="fb-desc" rows="2" placeholder="改善後說明">'+esc(FB.tx||'')+'</textarea>'
+    +'<div class="rv-ths">'+FB.pics.map(function(p,k){ return '<span class="rv-th"><img'+itemImgAttrs(p)+' alt=""><button type="button" class="rv-x" onclick="removeFbPhoto('+k+')" title="刪掉這張">✕</button></span>'; }).join('')
+    +rvAdd('fb-photo', 'handleFbPhoto(event)', FB.pics.length)+'</div>'
+    +'<div class="rv-meta">照片 '+FB.pics.length+' / '+PIC_MAX+'</div>'
+    +'<div class="rv-acts"><button type="button" class="rv-save" onclick="fbSave()">儲存</button><button type="button" class="rv-cancel" onclick="fbCancel()">取消</button></div></div>';
+}
+function hasAnyMgr(it){ return !!(it && (it.mgr || (it.rounds||[]).some(function(rd){ return rd && rd.mgr; }))); }
+function canMgrNote(it){ return !!(it && (it.status==='正常' || it.status==='不正常' || it.status==='改善後合格')); }
+function canAddRound(it){
+  if(!it) return false;
+  if(it.status==='不正常') return true;
+  return (it.status==='正常' || it.status==='改善後合格') && hasAnyMgr(it);
+}
+function verdictStatus(s, v){
+  if(v==='ok') return s==='不正常' ? '改善後合格' : s;
+  if(v==='redo') return (s==='正常' || s==='改善後合格') ? '不正常' : s;
+  return s;
+}
+/* 名稱（2026-10-28 她改）：「改善後─主管意見（第1次）」→「第1次改善後-主管意見」、「改善後回饋（第 1 次）」→「第1次改善後-回饋」 */
+function mgrTitle(r){ return r<0 ? '主管意見' : '第'+(r+1)+'次改善後-主管意見'; }
+function fbTitle(j){ return '第'+(j+1)+'次改善後-回饋'; }
+function fmtAt(ms){
+  if(!ms) return '';
+  var d=new Date(ms), p=function(n){ return String(n).padStart(2,'0'); };
+  return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function logList(it){
+  var lg=(it&&it.log)||{};
+  return Object.keys(lg).map(function(k){ return lg[k]; }).filter(Boolean)
+    .sort(function(a,b){ return (a.at||0)-(b.at||0); });
+}
+function addLog(it, t, at, by){
+  if(!it.log || typeof it.log!=='object' || Array.isArray(it.log)) it.log={};
+  /* Y5 甲（2026-10-28）：主管按兩次「修改」都存一樣的內容 → 只留一行 */
+  var L0=logList(it), last=L0[L0.length-1], who=by||whoAmI();
+  if(last && last.by===who && last.t===t){
+    for(var k0 in it.log){ if(it.log[k0]===last) return k0; }
+  }
+  var key='L'+(at||Date.now()).toString(36)+Math.random().toString(36).slice(2,5);
+  it.log[key]={ at:at||Date.now(), by:by||whoAmI(), t:t };
+  var ks=Object.keys(it.log).sort(function(a,b){ return (it.log[a].at||0)-(it.log[b].at||0); });
+  while(ks.length>LOG_MAX) delete it.log[ks.shift()];
+  return key;
+}
+function _clip(s){ s=String(s||'').replace(/\s+/g,' ').trim(); return s.length>40 ? s.slice(0,40)+'…' : s; }
+function _picKeys(list){ return list.map(function(p){ return p.photoId || p.photoThumb || p.photo || ''; }); }
+function _picDiff(a, b){
+  var ka=_picKeys(a), kb=_picKeys(b);
+  var add=kb.filter(function(k){ return ka.indexOf(k)<0; }).length;
+  var del=ka.filter(function(k){ return kb.indexOf(k)<0; }).length;
+  var s=[]; if(add) s.push('加 '+add+' 張'); if(del) s.push('刪 '+del+' 張');
+  return s.join('、');
+}
+/* 存檔時：跟上一次存的那份比，每一項改了什麼就記一筆（誰、什麼時候）。
+   主管的動作在按下去的當下就記了（mgrSave），這裡不重記。 */
+function stampChanges(rep, prev){
+  var now=Date.now(), by=whoAmI();
+  var pm={}; ((prev&&prev.items)||[]).forEach(function(it){ if(it&&it.id) pm[it.id]=it; });
+  (rep.items||[]).forEach(function(it){
+    if(!it) return;
+    /* 開了「＋ 改善後回饋」卻什麼都沒填、主管也還沒寫 → 不存這一次 */
+    if(it.rounds) it.rounds=it.rounds.filter(function(rd){ return rd && ((rd.desc||'').trim() || roundPics(rd).length || rd.mgr); });
+    var o=pm[it.id], parts=[];
+    if(!o){
+      if(it.status) parts.push('第一次填寫：'+it.status);
+      if((it.description||'').trim()) parts.push('狀況說明「'+_clip(it.description)+'」');
+      if(itemPics(it).length) parts.push('照片 '+itemPics(it).length+' 張');
+    } else {
+      if((o.status||'')!==(it.status||'') && it._stLogged!==it.status) parts.push('狀態：'+(o.status||'未填')+' → '+(it.status||'未填'));
+      if((o.description||'')!==(it.description||'')) parts.push('狀況說明「'+_clip(it.description)+'」');
+      var pd=_picDiff(itemPics(o), itemPics(it)); if(pd) parts.push('照片'+pd);
+    }
+    delete it._stLogged;
+    var ors=(o&&o.rounds)||[];
+    (it.rounds||[]).forEach(function(rd, j){
+      if(!rd) return;
+      var or=ors[j], rp=[];
+      var nm=fbTitle(j);
+      if(!or){
+        if(!(rd.desc||'').trim() && !roundPics(rd).length){ return; }
+        rp.push('新增'+nm+((rd.desc||'').trim()?'「'+_clip(rd.desc)+'」':'')+(roundPics(rd).length?'、照片 '+roundPics(rd).length+' 張':''));
+      } else {
+        if((or.desc||'')!==(rd.desc||'')) rp.push(nm+'說明「'+_clip(rd.desc)+'」');
+        var rpd=_picDiff(roundPics(or), roundPics(rd)); if(rpd) rp.push(nm+'照片'+rpd);
+      }
+      if(rp.length){ rd.at=now; rd.by=by; parts=parts.concat(rp); }
+      delete rd._new;
+    });
+    if(parts.length) addLog(it, parts.join('；'), now, by);
+  });
+}
+/* 存檔／同步寫雲端之前：雲端的主管意見比較新（別台主管剛在詳情頁按的）就用雲端的，
+   修改紀錄兩邊合起來。不這樣做的話，填表人手上那份是主管按之前開的，一存就把主管意見洗掉。
+   讀不到雲端（離線）就照手上的存，回傳 false。 */
+function mergeCloudMgr(data){
+  if(!window._sopGet || !data || !data.id) return Promise.resolve(false);
+  return window._sopGet('reports/'+data.id).then(function(cloud){
+    return mergeMgrFrom(data, cloud);
+  }).catch(function(){ return false; });
+}
+function mergeMgrFrom(data, cloud){
+  if(!cloud || !cloud.items) return false;
+  var cm={}, changed=false;
+  (cloud.items||[]).forEach(function(it){ if(it&&it.id) cm[it.id]=it; });
+  (data.items||[]).forEach(function(it){
+    var c=it && cm[it.id]; if(!c) return;
+    if((c.mgrAt||0) > (it.mgrAt||0)){
+      it.mgr=c.mgr||null; it.status=c.status; it.mgrAt=c.mgrAt;
+      (c.rounds||[]).forEach(function(cr, j){ if(it.rounds && it.rounds[j]) it.rounds[j].mgr=(cr&&cr.mgr)||null; });
+      changed=true;
+    }
+    if(c.log && typeof c.log==='object'){
+      var before=Object.keys(it.log||{}).length;
+      it.log=Object.assign({}, c.log, (it.log && !Array.isArray(it.log)) ? it.log : {});
+      if(Object.keys(it.log).length!==before) changed=true;
+    }
+  });
+  return changed;
+}
+
+/* ── 照片：第 1 張進項目本身（跟改版前一樣），第 2、3 張進 pics ── */
+function _newPic(p){
+  var pid=uid();
+  _fullCache[pid]=p.photo;     _pendingFull[pid]=p.photo;
+  _thumbCache[pid]=_pendingThumb[pid]=p.photoThumb||p.photo;
+  return { photoId:pid, photo:p.photo, photoThumb:null, origName:p.origName, origSize:p.origSize, origW:p.origW, origH:p.origH };
+}
+function handleRoundPhoto(e, idx, r){
+  var file=e.target.files[0]; if(!file) return;
+  makePhoto(file,function(p){
+    var rd=((S.report.items[idx]||{}).rounds||[])[r]; if(!rd || rd.mgr) return;
+    rd.pics=roundPics(rd);
+    if(rd.pics.length>=PIC_MAX){ showToast('每一次最多 '+PIC_MAX+' 張照片'); return; }
+    rd.pics.push(_newPic(p));
+    renderChecklist();
+  });
+}
+function removeRoundPhoto(idx, r, k){
+  var rd=((S.report.items[idx]||{}).rounds||[])[r]; if(!rd || rd.mgr) return;
+  var p=roundPics(rd)[k]; if(!p) return;
+  _dropPending(p);
+  rd.pics=roundPics(rd).filter(function(x){ return x!==p; });
+  renderChecklist();
+}
+function setRoundDesc(idx, r, v){ var rd=((S.report.items[idx]||{}).rounds||[])[r]; if(rd && !rd.mgr) rd.desc=v; }   /* 主管回覆過就鎖住（X4） */
+function addRound(idx){
+  var it=S.report.items[idx]; if(!canAddRound(it)) return;
+  it.rounds=(it.rounds||[]).filter(Boolean);
+  var last=it.rounds[it.rounds.length-1];
+  /* 上一次還是空的 → 不再多開一次，直接跳到那一格 */
+  if(!(last && !(last.desc||'').trim() && !roundPics(last).length)) it.rounds.push({ desc:'', pics:[], _new:1 });
+  renderChecklist();
+  var ta=$('rd-desc-'+idx+'-'+(it.rounds.length-1));
+  if(ta){ try{ ta.focus(); }catch(e){} }
+}
+function removeRound(idx, r){
+  var it=S.report.items[idx], rd=((it||{}).rounds||[])[r];
+  if(!rd || !rd._new || r!==it.rounds.length-1) return;   /* 只有這次新開、還沒存的最後一次可以拿掉 */
+  roundPics(rd).forEach(_dropPending);
+  it.rounds.pop();
+  renderChecklist();
+}
+
+/* ── 主管意見：平常一顆「＋ 主管意見」→ 點了先出「需改善」「已合格」→ 選了才出意見框＋儲存
+ *   （S5 甲；10-27 晚她改：V1 乙、V2 甲、V3 意見可寫可不寫）── */
+var MGR_ED=null;     // 正在寫的那一格 {where, idx, r, v, tx}；r=-1 是第一次的主管意見；v＝選了哪一顆；tx＝打到一半的字
+var VERDICT_TXT={ ok:'已合格', redo:'需改善' };
+function verdictTxt(v){ return VERDICT_TXT[v==='ok'?'ok':'redo']; }
+function _rerender(where){ if(where==='detail') renderDetail(); else renderChecklist(); }
+function mgrOpen(where, idx, r){
+  if(!isMgr()){ showToast('只有主管可以寫主管意見'); return; }
+  var it=_itemAt(where, idx), rec=it ? (r>=0 ? ((it.rounds||[])[r]||{}).mgr : it.mgr) : null;
+  MGR_ED={ where:where, idx:idx, r:r, v:rec?rec.verdict:null, tx:rec?(rec.text||''):'' };   // 修改舊的 → 帶出原本選的與寫的
+  _rerender(where);
+}
+/* 選「需改善」或「已合格」→ 下面才出現意見框；存之前可以換另一顆 */
+function mgrPick(v){
+  if(!MGR_ED || !isMgr()) return;
+  var ta=$('mgr-tx'); if(ta) MGR_ED.tx=ta.value;
+  MGR_ED.v=v;
+  _rerender(MGR_ED.where);
+  ta=$('mgr-tx'); if(ta){ try{ ta.focus(); }catch(e){} }
+}
+/* 主管檢視分頁的兩顆：等於「＋ 主管意見」再選一顆 */
+function mgrQuick(where, idx, r, v){
+  if(!isMgr()){ showToast('只有主管可以寫主管意見'); return; }
+  MGR_ED={ where:where, idx:idx, r:r, v:v, tx:'' };
+  _rerender(where);
+  var ta=$('mgr-tx'); if(ta){ try{ ta.focus(); }catch(e){} }
+}
+function mgrCancel(){ var w=MGR_ED&&MGR_ED.where; MGR_ED=null; _rerender(w); }
+function mgrSave(){
+  var ed=MGR_ED; if(!ed || !isMgr()) return;
+  var verdict=ed.v;
+  if(verdict!=='ok' && verdict!=='redo'){ showToast('請先選「需改善」或「已合格」'); return; }
+  var tx=(($('mgr-tx')||{}).value||'').trim();      /* 意見可寫可不寫（V3） */
+  var it=_itemAt(ed.where, ed.idx); if(!it) return;
+  var rd=ed.r>=0 ? (it.rounds||[])[ed.r] : null;
+  if(ed.r>=0 && !rd) return;
+  var now=Date.now(), by=whoAmI();
+  var rec={ text:tx, verdict:verdict, at:now, by:by };
+  var old=it.status, ns=verdictStatus(old, verdict);
+  if(rd) rd.mgr=rec; else it.mgr=rec;
+  it.status=ns; it.mgrAt=now;
+  if(ns!==old) it._stLogged=ns;
+  var lkey=addLog(it, mgrTitle(ed.r)+'：'+verdictTxt(verdict)+(tx?'「'+_clip(tx)+'」':'')+(ns!==old?'；狀態：'+(old||'未填')+' → '+ns:''), now, by);
+  MGR_ED=null;
+  if(ed.where!=='detail'){
+    showToast('已記下主管意見，記得按下方儲存');
+    renderChecklist(); return;
+  }
+  /* 詳情頁（唯讀畫面）：主管按下去就直接存，只寫這一項的那幾格，不整張蓋掉 —— 填表人可能正在別台改 */
+  delete it._stLogged;
+  var rep=S.reports.find(function(x){ return x.id===S.selectedReportId; });
+  if(rep) rep.createdAt=now;
+  saveLS();
+  renderDetail();
+  if(!window._sopSet || !rep){ showToast('主管意見已儲存（本機）'); return; }
+  var base='reports/'+rep.id+'/items/'+ed.idx;
+  setSyncStatus('saving');
+  checkDeleted(rep.id).then(function(del){
+    if(del){ dropDeletedLocal(); saveLS(); setSyncStatus('saved'); showToast(DELETED_MSG); goBack(); return; }
+    return Promise.all([
+      window._sopSet(ed.r>=0 ? base+'/rounds/'+ed.r+'/mgr' : base+'/mgr', rec),
+      window._sopSet(base+'/status', ns),
+      window._sopSet(base+'/mgrAt', now),
+      window._sopSet(base+'/log/'+lkey, it.log[lkey]),
+      window._sopSet('reports/'+rep.id+'/createdAt', now)
+    ]).then(function(){ setSyncStatus('saved'); showToast('主管意見已儲存'); });
+  }).catch(function(){ setSyncStatus('error'); showToast('主管意見沒存到雲端，已存本機，請稍後再按一次'); });
+}
+
+/* ── 畫面：照片一排小圖、主管意見、改善後回饋、修改紀錄（查驗畫面與詳情頁共用）── */
+function rvThumbs(list, where, idx, off, rmCall){
+  return list.map(function(p, k){
+    return '<span class="rv-th"><img'+itemImgAttrs(p)+' onclick="openPhotoAt(\''+where+'\','+idx+','+(off+k)+')" title="點擊放大" alt="">'
+      +(rmCall?'<button type="button" class="rv-x" onclick="'+rmCall(k)+'" title="刪掉這張">✕</button>':'')+'</span>';
+  }).join('');
+}
+function rvAdd(inputId, onchange, n){
+  if(n>=PIC_MAX) return '';
+  return '<label for="'+inputId+'" class="rv-add" title="拍照 / 上傳">'+(n?'＋':'📷 拍照 / 上傳')
+    +'<input id="'+inputId+'" type="file" accept="image/*" capture="environment" class="hidden" onchange="'+onchange+'"></label>';
+}
+function rvMgrBox(where, idx, r, rec, mgr, num, quick){
+  var editing=MGR_ED && MGR_ED.where===where && MGR_ED.idx===idx && MGR_ED.r===r;
+  var nb=num?rvN(num):'';
+  if(editing){
+    var v=MGR_ED.v;
+    return '<div class="rv-box rv-mgr"><div class="rv-h">'+nb+mgrTitle(r)+'</div>'
+      +'<div class="rv-two"><button type="button" class="rv-vb redo'+(v==='redo'?' on':'')+'" onclick="mgrPick(\'redo\')">需改善</button>'
+      +'<button type="button" class="rv-vb ok'+(v==='ok'?' on':'')+'" onclick="mgrPick(\'ok\')">已合格</button></div>'
+      +(v?'<textarea id="mgr-tx" rows="2" placeholder="寫給填表人的意見…">'+esc(MGR_ED.tx||'')+'</textarea>':'')
+      +'<div class="rv-acts">'+(v?'<button type="button" class="rv-save" onclick="mgrSave()">儲存</button>':'')
+      +'<button type="button" class="rv-cancel" onclick="mgrCancel()">取消</button></div></div>';
+  }
+  if(!rec){
+    /* 員工：一行灰字（她 10-27 晚：「還沒寫」改成「未回覆」） */
+    if(!mgr) return '<div class="rv-none">'+nb+mgrTitle(r)+'：未回覆</div>';
+    /* 主管檢視分頁（2026-10-28 她 Y1）：直接出兩顆，按了就展開意見框 */
+    if(quick) return '<div class="rv-box rv-mgr"><div class="rv-h">'+nb+mgrTitle(r)+'</div>'
+      +'<div class="rv-two"><button type="button" class="rv-vb redo" onclick="mgrQuick(\''+where+'\','+idx+','+r+',\'redo\')">需改善</button>'
+      +'<button type="button" class="rv-vb ok" onclick="mgrQuick(\''+where+'\','+idx+','+r+',\'ok\')">已合格</button></div></div>';
+    return '<button type="button" class="rv-mbtn" onclick="mgrOpen(\''+where+'\','+idx+','+r+')">'+(num?'<span class="rv-n">'+num+'</span>':'')+'＋ '+mgrTitle(r)+'</button>';
+  }
+  return '<div class="rv-box rv-mgr"><div class="rv-h">'+nb+mgrTitle(r)
+    +' <span class="rv-v '+(rec.verdict==='ok'?'ok':'redo')+'">'+verdictTxt(rec.verdict)+'</span>'
+    +(mgr?' <button type="button" class="rv-edit" onclick="mgrOpen(\''+where+'\','+idx+','+r+')">修改</button>':'')+'</div>'
+    +'<div class="rv-meta">'+esc(fmtAt(rec.at))+'　'+esc(rec.by||'')+'</div>'
+    +(rec.text?'<div class="rv-t">'+esc(rec.text)+'</div>':'')+'</div>';
+}
+/* 最後填寫＋修改紀錄（點開才看） */
+function rvLogHTML(it, where, idx){
+  var L=logList(it); if(!L.length) return '';
+  var last=L[L.length-1], id=where+'-log-'+idx, aid=where+'-logarw-'+idx;
+  return '<div class="rv-last">最後填寫　'+esc(fmtAt(last.at))+'　'+esc(last.by||'')
+    +'　<button type="button" class="rv-his" onclick="toggleById(\''+id+'\',\''+aid+'\')"><span id="'+aid+'">▶</span> 修改紀錄（'+L.length+'）</button></div>'
+    +'<ol id="'+id+'" class="rv-log hidden">'+L.slice().reverse().map(function(e){
+      return '<li><span class="rv-meta">'+esc(fmtAt(e.at))+'　'+esc(e.by||'')+'</span>'+esc(e.t)+'</li>'; }).join('')+'</ol>';
+}
+/* ── 一項的流程：照「輪」排，同一輪同一個底色（2026-10-28 她 Y4 甲）──
+ *   第 1 輪＝①填表 → ②主管意見 → ③第1次改善後-回饋
+ *   第 2 輪＝④第1次改善後-主管意見 → ⑤第2次改善後-回饋
+ *   第 k 輪＝第(k-1)次改善後-主管意見 → 第k次改善後-回饋 …… 每一輪的開頭是主管說要改什麼，結尾是填表人怎麼改
+ *   底色藍、黃、綠輪流；每一步前面編號照發生順序。
+ *   還沒進流程的項目（正常、主管沒寫過、沒有回饋）不包底色，照舊。
+ * mode：'edit'＝查驗畫面（說明照片可改，主管回覆過的那次鎖住）／'view'＝詳情頁／'latest'＝詳情頁「需改善」分頁（只攤開最新一輪）
+ * quick：主管檢視分頁 —— 空著的主管意見直接出「需改善」「已合格」兩顆，不用先按「＋ 主管意見」 */
+function inFlow(it){ return !!(it && (it.status==='不正常' || hasAnyMgr(it) || (it.rounds||[]).some(Boolean))); }
+function rvN(n){ return '<span class="rv-n">'+n+'</span>'; }
+function rvRoundBox(it, where, idx, j, num, edit, off){
+  var rd=it.rounds[j], ps=roundPics(rd);
+  /* X4 甲：主管回覆過的那一次就鎖住 —— 主管看過的照片和說明不能再換；要補就開下一次 */
+  var ed=edit && !rd.mgr;
+  return '<div class="rv-box rv-round"><div class="rv-h">'+rvN(num)+fbTitle(j)
+    +(ed && rd._new && j===it.rounds.length-1 ? ' <button type="button" class="rv-edit" onclick="removeRound('+idx+','+j+')">拿掉這次</button>':'')+'</div>'
+    +(rd.at?'<div class="rv-meta">'+esc(fmtAt(rd.at))+'　'+esc(rd.by||'')+'</div>':'')
+    +(edit && rd.mgr?'<div class="rv-lock">🔒 主管已回覆，不能再改；要補請開下一次改善後-回饋</div>':'')
+    +(ed
+      ? '<textarea id="rd-desc-'+idx+'-'+j+'" rows="2" placeholder="改善後說明" onchange="setRoundDesc('+idx+','+j+',this.value)">'+esc(rd.desc||'')+'</textarea>'
+      : (rd.desc?'<div class="rv-t">'+esc(rd.desc)+'</div>':''))
+    +'<div class="rv-ths">'+rvThumbs(ps, where, idx, off, ed?function(k){ return 'removeRoundPhoto('+idx+','+j+','+k+')'; }:null)
+    +(ed?rvAdd('rd-photo-'+idx+'-'+j, 'handleRoundPhoto(event,'+idx+','+j+')', ps.length):'')+'</div>'
+    +(ed?'<div class="rv-meta">照片 '+ps.length+' / '+PIC_MAX+'</div>':'')
+    +'</div>';
+}
+function rvFlowHTML(it, where, idx, mode, step1, quick, tail){
+  if(mode==='view-quick'){ mode='view'; quick=true; }
+  var mgr=isMgr(), edit=(mode==='edit'), rounds=it.rounds||[];
+  if(!inFlow(it)){
+    /* 還沒進流程：照舊，不包底色 */
+    return step1+(canMgrNote(it)?rvMgrBox(where, idx, -1, it.mgr, mgr, 0, quick):'')+(tail||'');
+  }
+  var n=0, bands=[], cur='', off=itemPics(it).length;
+  /* 第 1 輪 */
+  cur+='<div class="rv-step1"><div class="rv-h">'+rvN(++n)+'填表：'+esc(it.status||'未填')+'</div>'+step1+'</div>';
+  cur+=rvMgrBox(where, idx, -1, it.mgr, mgr, ++n, quick);
+  if(rounds[0]){ cur+=rvRoundBox(it, where, idx, 0, ++n, edit, off); off+=roundPics(rounds[0]).length; }
+  bands.push(cur);
+  /* 第 2 輪起：第 j 次改善後-主管意見 → 第 j+1 次改善後-回饋 */
+  for(var j=0; j<rounds.length; j++){
+    if(!rounds[j]) continue;
+    cur=rvMgrBox(where, idx, j, rounds[j].mgr, mgr, ++n, quick);
+    if(rounds[j+1]){ cur+=rvRoundBox(it, where, idx, j+1, ++n, edit, off); off+=roundPics(rounds[j+1]).length; }
+    bands.push(cur);
+  }
+  if(edit && canAddRound(it)) bands[bands.length-1]+='<button type="button" class="rv-fb" onclick="addRound('+idx+')">＋ '+fbTitle(rounds.filter(Boolean).length)+'</button>';
+  if(tail) bands[bands.length-1]+=tail;
+  var html=bands.map(function(b, k){
+    return '<div class="rv-band rv-b'+(k%3+1)+'"><div class="rv-bt">第 '+(k+1)+' 輪'+(mode==='latest' && k===bands.length-1 && k>0 ? '（最新）':'')+'</div>'+b+'</div>';
+  });
+  if(mode==='latest' && html.length>1){
+    var old=html.slice(0,-1).join(''), id='fx-old-'+idx, aid='fx-oldarw-'+idx;
+    return '<button type="button" class="rv-his" onclick="toggleById(\''+id+'\',\''+aid+'\')"><span id="'+aid+'">▶</span> 看前面 '+(html.length-1)+' 輪</button>'
+      +'<div id="'+id+'" class="hidden rv">'+old+'</div>'+html[html.length-1];
+  }
+  return html.join('');
+}
+/* 舊名字留著給別的地方叫（只畫主管意見與回饋，不含第一次填寫） */
+function rvRoundsHTML(it, where, idx, edit){ return rvFlowHTML(it, where, idx, edit?'edit':'view', ''); }
+/* 查驗畫面一項的內容：填表（說明＋照片）→ 主管意見 → 回饋…，最後是「最後填寫／修改紀錄」 */
+function clBody(item, idx){
+  var step1='<div class="space-y-2">'
+    +'<textarea id="item-desc-'+idx+'" onchange="setDesc('+idx+',this.value)" class="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none" rows="2" placeholder="'+(item.status==='不正常'?'狀況說明（必填）':'狀況說明')+'">'+esc(item.description)+'</textarea>'
+    /* 照片一排小圖、最多 3 張，滿了「＋」就不見（2026-10-27 S1 甲）；「有沒有照片」照舊看 itemHasPhoto */
+    +'<div class="rv-ths">'+rvThumbs(itemPics(item), 'checklist', idx, 0, function(k){ return 'removePhoto('+idx+','+k+')'; })
+    +rvAdd('item-photo-'+idx, 'handlePhoto(event,'+idx+')', itemPics(item).length)+'</div>'
+    +(itemPics(item).length?'<div class="rv-meta">照片 '+itemPics(item).length+' / '+PIC_MAX+'</div>':'')
+    +'</div>';
+  return rvFlowHTML(item, 'checklist', idx, 'edit', step1)+rvLogHTML(item,'cl',idx);
 }
 /* ── 放大檢視 ── */
 function _itemAt(where,idx){
@@ -1506,8 +2131,10 @@ function _itemAt(where,idx){
   return S.report && (S.report.items||[])[idx];
 }
 var _pvTok=0;   // 放大檢視的「第幾次打開」—— 非同步抓回來時比對，連點兩張才不會換錯圖（2026-09-28）
-function openPhotoAt(where,idx){
+function openPhotoAt(where,idx,k){
   var it=_itemAt(where,idx); if(!it) return;
+  /* 2026-10-27：k＝這一項的第幾張（第一次填寫的照片 → 第 1 次回饋 → …）；每一張照片的欄位跟項目上那張一樣 */
+  if(k){ it=allPhotoObjs(it)[k]; if(!it) return; }
   /* 內嵌大圖優先（舊資料、剛上傳還沒清的都走這條，跟改版前一樣）；
      沒有就先放手上有的縮圖，再去 sop_photos 抓大圖換上（2026-09-28） */
   var src=it.photo||itemSrc(it);
@@ -1559,6 +2186,8 @@ function toggleById(contentId,arrowId){
 function saveAsDraft(){
   S.report.status='draft';
   persistReport();
+  /* 2026-10-27：存完重畫 —— 「最後填寫」與修改紀錄要馬上看得到，沒填的那次改善後回饋也收掉 */
+  if(S.view==='checklist') renderChecklist();
   showToast('草稿已儲存');
 }
 function scrollToItem(idx){
@@ -1594,15 +2223,19 @@ function completeReport(){
  * 補不回來（離線／讀取失敗）就只存本機、不寫雲端 —— 寧可晚一點同步，也不要弄丟原圖。*/
 function restoreCloudPhotos(data){
   var need=(data.items||[]).filter(function(it){ return it && it.photoOnCloud && !it.photo; });
-  if(!need.length) return Promise.resolve(true);
+  /* 2026-10-27：第 2、3 張與改善後回饋的照片 —— 一定有 photoId，照 photoId 對 */
+  var needX=[]; (data.items||[]).forEach(function(it){ extraPhotoObjs(it).forEach(function(p){ if(p.photoOnCloud && !p.photo) needX.push(p); }); });
+  if(!need.length && !needX.length) return Promise.resolve(true);
   if(!window._sopGet) return Promise.resolve(false);
   return window._sopGet('reports/'+data.id).then(function(cloud){
     if(!cloud) return true;                       // 雲端本來就沒有 → 沒東西可弄丟
-    var m={}; (cloud.items||[]).forEach(function(it){ if(it&&it.id) m[it.id]=it; });
+    var m={}, bp={};
+    (cloud.items||[]).forEach(function(it){ if(it&&it.id) m[it.id]=it; extraPhotoObjs(it).forEach(function(p){ if(p.photoId && p.photo) bp[p.photoId]=p.photo; }); });
     need.forEach(function(it){
       var c=m[it.id];
       if(c&&c.photo){ it.photo=c.photo; delete it.photoOnCloud; }
     });
+    needX.forEach(function(p){ if(bp[p.photoId]){ p.photo=bp[p.photoId]; delete p.photoOnCloud; } });
     return true;
   }).catch(function(){ return false; });
 }
@@ -1656,12 +2289,18 @@ function writeReportSafely(r){
   });
 }
 function _writeReportSafely(copy){
-  return restoreCloudPhotos(copy).then(function(ok){
+  /* 2026-10-27：立即同步／改案場名稱也一樣，先把雲端比較新的主管意見合進來（S.reports 那份一起更新） */
+  return mergeCloudMgr(copy).then(function(changed){
+    if(changed){ var orig=S.reports.find(function(x){ return x.id===copy.id; }); if(orig){ mergeMgrFrom(orig, copy); saveLS(); } }
+    return restoreCloudPhotos(copy);
+  }).then(function(ok){
     if(!ok) return false;
     return window._sopSet('reports/'+copy.id, copy).then(function(){ return true; });
   });
 }
 function persistReport(){
+  /* 2026-10-27：跟上一次存的那份比，每一項改了什麼記進修改紀錄（誰、什麼時候） */
+  stampChanges(S.report, S.reports.find(function(r){ return r.id===S.report.id; }));
   var data=JSON.parse(JSON.stringify(S.report));
   data.createdAt=Date.now();
   var idx=S.reports.findIndex(function(r){return r.id===data.id;});
@@ -1672,6 +2311,14 @@ function persistReport(){
     checkDeleted(data.id).then(function(del){
       if(del){ dropDeletedLocal(); saveLS(); setSyncStatus('saved'); showToast(DELETED_MSG); renderHome(); return false; }
       return true;
+    }).then(function(go){ if(!go) return;
+    /* 2026-10-27：別台主管剛寫的意見比較新 → 先合進來再寫，不然一存就把它洗掉 */
+    return mergeCloudMgr(data).then(function(changed){
+      if(!changed) return true;
+      saveLS();
+      if(S.report && S.report.id===data.id && mergeMgrFrom(S.report, data) && S.view==='checklist') renderChecklist();
+      return true;
+    });
     }).then(function(go){ if(!go) return;
     restoreCloudPhotos(data).then(function(okPhotos){
       if(!okPhotos){
@@ -1724,7 +2371,7 @@ function itemsHTML(items, pfx){
       +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
       +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1 text-xs">&#128221; '+esc(item.description)+'</div>':'')
       +'</div>'
-      +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
+      +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(statusText(item)||'未填')+'</span>'
       +'</div></div>';
   }).join('');
 }
@@ -1765,6 +2412,7 @@ function calGoToday(){ CAL.ym = calToday().slice(0, 7); CAL.sel = calToday(); re
 function calPick(ds){ CAL.sel = ds; renderCal(); }
 
 function renderCal(){
+  renderHistTodo();
   if (!CAL.ym){
     var all = visibleReports().map(function(r){ return r.date; }).filter(Boolean).sort();
     CAL.ym = (all.length ? all[all.length - 1] : calToday()).slice(0, 7);
@@ -1826,6 +2474,7 @@ function renderCalDay(){
         +     '</div>'
         +     '<div class="text-xs text-gray-500 mt-1 truncate">' + esc(tplLabel(r)) + '</div>'
         +     '<div class="text-xs text-gray-400 mt-1">' + esc(r.date) + ' · ' + esc(r.personnel) + '</div>'
+        +     reportFlowChips(r)
         +   '</div>'
         +   '<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
         +     '<button onclick="openReportForEdit(\'' + r.id + '\')" class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">📂 開啟</button>'
@@ -1867,11 +2516,12 @@ function renderHistory(){
 
   var ft=sel.value, fs=$('h-filter-status').value, fc=csel.value;
   var list=mine
-    .filter(function(r){ return (!ft||r.templateId===ft)&&(!fs||r.status===fs)&&(!fc||r.caseName===fc); })
+    .filter(function(r){ return (!ft||r.templateId===ft)&&(!fs||r.status===fs)&&(!fc||r.caseName===fc)&&(!HIST_TODO||needsMe(r)); })
     .sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
 
+  renderHistTodo();
   if(list.length===0){
-    $('history-list').innerHTML='<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">📭</div><div class="text-sm">沒有符合的記錄</div></div>';
+    $('history-list').innerHTML='<div class="text-center py-12 text-gray-400"><div class="text-4xl mb-3">📭</div><div class="text-sm">'+(HIST_TODO?'沒有要你處理的查檢表 👍':'沒有符合的記錄')+'</div></div>';
     return;
   }
   $('history-list').innerHTML=list.map(function(r){
@@ -1884,6 +2534,7 @@ function renderHistory(){
       +'</div>'
       +'<div class="text-xs text-gray-500 mt-1 truncate">'+esc(tplLabel(r))+'</div>'
       +'<div class="text-xs text-gray-400 mt-1">'+esc(r.date)+' · '+esc(r.personnel)+'</div>'
+      +reportFlowChips(r)
       +'</div>'
       +'<div class="flex flex-col gap-1 flex-shrink-0 ml-2">'
       +'<button onclick="openReportForEdit(\''+r.id+'\')" class="px-3 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">📂 開啟</button>'
@@ -1935,6 +2586,7 @@ function deleteReportFromHistory(id){
 // ====== DETAIL ======
 function viewReport(id){
   S.selectedReportId=id;
+  DT_TAB='sum'; DT_OPEN={}; FB=null;   /* 換一張就回到「摘要」、全部收起來 */
   goTo('detail');
 }
 function renderDetail(){
@@ -1956,22 +2608,49 @@ function renderDetail(){
   var eb=$('btn-edit-detail');
   if(eb) eb.classList.toggle('hidden', !canEditReport(r));
 
-  $('detail-items').innerHTML='<div class="p-3 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">查驗明細</div>'
-    +'<div class="divide-y divide-gray-50">'
-    +(r.items||[]).map(function(item,idx){
-      var cid='dt-crit-'+idx, aid='dt-arw-'+idx;
-      return '<div class="px-4 py-2">'
-        +'<div class="flex items-start gap-3">'
-        +'<span class="text-xs text-gray-400 flex-shrink-0 mt-1" style="min-width:1.25rem;text-align:right">'+(idx+1)+'</span>'
-        +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+esc(item.name)+'</div>'
-        +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
-        +(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1">&#128221; '+esc(item.description)+'</div>':'')
-        /* 2026-09-28：新格式照片可能只有 photoId → 先出格子、fillLazyItemThumbs 再補圖 */
-        +(itemHasPhoto(item)?'<img'+itemImgAttrs(item)+' onclick="openPhotoAt(\'detail\','+idx+')" class="mt-2 w-full object-cover rounded-lg cursor-zoom-in" style="max-height:7rem" title="點擊放大">':'')
-        +'</div>'
-        +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(item.status||'未填')+'</span>'
-        +'</div></div>';
-    }).join('')+'</div>';
+  var items=r.items||[], cnt={ wait:0, fix:0, done:0 }, st={ '正常':0, '不正常':0, '改善後合格':0, '未列入':0 };
+  items.forEach(function(it){ var f=itemFlow(it); if(f) cnt[f]++; if(it && st.hasOwnProperty(it.status)) st[it.status]++; });
+  var canEd=canEditReport(r);
+  var tab=function(k, label, n){ return '<button type="button" id="dt-tab-'+k+'" class="'+(DT_TAB===k?'on':'')+'" onclick="dtTab(\''+k+'\')">'+label+(n?'<b>'+n+'</b>':'')+'</button>'; };
+  var head=function(item, idx, toggle){
+    return '<div class="flex items-start gap-3'+(toggle?' dt-row':'')+'"'+(toggle?' onclick="dtToggle('+idx+')"':'')+'>'
+      +'<span class="text-xs text-gray-400 flex-shrink-0 mt-1" style="min-width:1.25rem;text-align:right">'+(idx+1)+'</span>'
+      +'<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800">'+(toggle?'<span class="dt-arw">'+(DT_OPEN[idx]?'▼':'▶')+'</span> ':'')+esc(item.name)+(flowChip(item)?' '+flowChip(item):'')+'</div></div>'
+      +'<span class="text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 '+badgeClass(item.status)+'">'+esc(statusText(item)||'未填')+'</span>'
+      +'</div>';
+  };
+  var body=function(item, idx, mode){
+    var cid='dt-crit-'+idx, aid='dt-arw-'+idx;
+    var step1=(item.description?'<div class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1">&#128221; '+esc(item.description)+'</div>':'')
+      /* 新格式照片可能只有 photoId → 先出格子、fillLazyItemThumbs 再補圖（2026-09-28） */
+      +(itemPics(item).length?'<div class="rv-ths">'+rvThumbs(itemPics(item),'detail',idx,0,null)+'</div>':'');
+    var tail=(mode==='latest' && canEd && canAddRound(item)) ? fbFormHTML(item, idx) : '';
+    /* 手機 400px 時右邊的狀態標籤會把中間擠窄 → 內容一律放在標題那一列外面（2026-10-27） */
+    return '<div class="rv-dt">'
+      +(item.criterion?'<button onclick="toggleById(\''+cid+'\',\''+aid+'\')" class="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 mt-1"><span id="'+aid+'">▶</span><span>查檢準則</span></button><div id="'+cid+'" class="hidden mt-1 text-xs text-gray-600 bg-blue-50 rounded-lg p-2 leading-relaxed whitespace-pre-wrap">'+esc(item.criterion)+'</div>':'')
+      +'<div class="rv">'+rvFlowHTML(item, 'detail', idx, mode, step1, mode==='view-quick', tail)+rvLogHTML(item,'dt',idx)+'</div>'
+      +'</div>';
+  };
+  var list='';
+  if(DT_TAB==='mgr'){
+    items.forEach(function(item, idx){ if(itemFlow(item)==='wait') list+='<div class="px-4 py-3 dt-item">'+head(item, idx)+body(item, idx, 'view-quick')+'</div>'; });
+    if(!list) list='<div class="dt-empty">目前沒有等主管回覆的項目 👍</div>';
+  } else if(DT_TAB==='fix'){
+    items.forEach(function(item, idx){ if(itemFlow(item)==='fix') list+='<div class="px-4 py-3 dt-item">'+head(item, idx)+body(item, idx, 'latest')+'</div>'; });
+    if(!list) list='<div class="dt-empty">目前沒有需要改善的項目 👍</div>';
+  } else {
+    items.forEach(function(item, idx){ list+='<div class="px-4 py-2 dt-item">'+head(item, idx, true)+(DT_OPEN[idx]?body(item, idx, 'view'):'')+'</div>'; });
+  }
+  $('detail-items').innerHTML='<div class="dt-tabs">'+tab('sum','摘要',0)+tab('mgr','主管檢視',cnt.wait)+tab('fix','需改善',cnt.fix)+'</div>'
+    +(DT_TAB==='sum'
+      ? '<div class="dt-sum"><div class="dt-total">查驗項目共 '+items.length+' 項</div>'
+        +'<div class="dt-stats"><div class="s-n"><b>'+st['正常']+'</b>正常</div><div class="s-a"><b>'+st['不正常']+'</b>不正常</div>'
+        +'<div class="s-i"><b>'+st['改善後合格']+'</b>改善合格</div><div class="s-x"><b>'+st['未列入']+'</b>未列入</div></div>'
+        +((cnt.wait||cnt.fix||cnt.done)?'<div class="rv-chips">'+(cnt.wait?'<span class="rv-chip wait">等主管 '+cnt.wait+' 項</span>':'')
+          +(cnt.fix?'<span class="rv-chip fix">等改善 '+cnt.fix+' 項</span>':'')+(cnt.done?'<span class="rv-chip done">已結案 '+cnt.done+' 項</span>':'')+'</div>':'')
+        +'<div class="dt-lbl">全部項目（點一項看細節）</div></div>'
+      : '')
+    +'<div class="divide-y divide-gray-50">'+list+'</div>';
   fillLazyItemThumbs($('detail-items'), r.items);
 
   $('btn-print-detail').onclick=function(){ printReportData(r); };
@@ -3246,16 +3925,38 @@ function syncNow(){
 }
 
 // ====== PRINT ======
+/* 2026-10-27：每項最多 3 張照片並排；主管意見與每一次改善後回饋接在說明下面 */
+function printPics(list){
+  var a=list.filter(function(p){ return itemSrc(p); });
+  if(!a.length) return '';
+  return '<div style="margin-top:4px">'+a.map(function(p){ return '<img src="'+itemSrc(p)+'" style="max-height:72px;border-radius:4px;margin:0 4px 0 0">'; }).join('')+'</div>';
+}
+function printMgr(r, rec){
+  if(!rec) return '';
+  return '<div style="margin-top:4px;padding:3px 6px;background:#eff6ff;border-radius:4px"><b>'+esc(mgrTitle(r))+'</b>（'+verdictTxt(rec.verdict)+'）'
+    +'<span style="color:#888">　'+esc(fmtAt(rec.at))+' '+esc(rec.by||'')+'</span>'+(rec.text?'<br>'+esc(rec.text):'')+'</div>';
+}
+function printRounds(it){
+  var h=printMgr(-1, it.mgr);
+  (it.rounds||[]).forEach(function(rd, j){
+    if(!rd) return;
+    h+='<div style="margin-top:4px;padding:3px 6px;background:#f8fafc;border-radius:4px"><b>'+fbTitle(j)+'</b>'
+      +(rd.at?'<span style="color:#888">　'+esc(fmtAt(rd.at))+' '+esc(rd.by||'')+'</span>':'')
+      +(rd.desc?'<br>'+esc(rd.desc):'')+printPics(roundPics(rd))+'</div>'
+      +printMgr(j, rd.mgr);
+  });
+  return h;
+}
 function buildPrintHTML(r){
   var tpl=TEMPLATES.find(function(t){return t.id===r.templateId;})||{materialLabel:'材質/石材'};
   var rows=(r.items||[]).map(function(it,i){
     var sc={'正常':'s-n2','不正常':'s-a2','改善後合格':'s-i2','未列入':'s-x2'}[it.status]||'s-x2';
     return '<tr><td style="text-align:center;color:#888;width:24px">'+(i+1)+'</td>'
       +'<td><strong>'+esc(it.name)+'</strong></td>'
-      +'<td style="text-align:center;width:88px"><span class="status-badge '+sc+'">'+esc(it.status||'未填')+'</span></td>'
+      +'<td style="text-align:center;width:112px"><span class="status-badge '+sc+'">'+esc(statusText(it)||'未填')+'</span></td>'
       +'<td style="font-size:9.5pt;color:#555">'+esc(it.description||'')
       /* 2026-09-28：改用 itemSrc —— 新格式照片的縮圖在 sop_thumbs，列印前 _printWithThumbs 會先補進記憶體 */
-      +(itemSrc(it)?'<br><img src="'+itemSrc(it)+'" style="max-height:72px;border-radius:4px;margin-top:4px">':'')+'</td></tr>';
+      +printPics(itemPics(it))+printRounds(it)+'</td></tr>';
   }).join('');
 
   return '<div style="font-family:sans-serif;max-width:760px;margin:0 auto;padding:16px">'
@@ -3338,7 +4039,8 @@ function openPrint(html, title, preOpened){
  *             補完再把內容寫進去；最多等 PRINT_THUMB_WAIT，時間到就用手上有的先印，不讓視窗一直空白 */
 var PRINT_THUMB_WAIT=8000;
 function _printWithThumbs(r){
-  var need=(r.items||[]).filter(function(it){ return it && !itemSrc(it) && it.photoId; });
+  var need=[]; (r.items||[]).forEach(function(it){ if(it) need=need.concat(allPhotoObjs(it)); });   /* 2026-10-27 */
+  need=need.filter(function(it){ return it && !itemSrc(it) && it.photoId; });
   if(!need.length){ openPrint(buildPrintHTML(r), printFileName(r)); return; }
   var w=window.open('','_blank');
   try{ w.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">照片載入中…</p>'); }catch(e){}

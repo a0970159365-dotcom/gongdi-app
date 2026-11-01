@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-10-27.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -83,6 +83,11 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .prog-wrap{display:flex;flex-direction:column;gap:2px;align-items:center;min-width:56px}
 .prog-bar-bg{height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;width:52px}
 .prog-bar-fill{height:100%;background:var(--success);border-radius:2px;transition:width .3s}
+/* 帶出上次進度（2026-10-27）—— 範圍限在施工明細表 */
+#tbody .ci.prog-auto{border-color:#2563eb;background:#eff6ff;font-weight:700}
+#tbody .prog-hint{font-size:10.5px;line-height:1.2;color:#2563eb;white-space:nowrap}
+#tbody .prog-hint.first{color:#94a3b8}
+#tbody .prog-hint:empty{display:none}
 .mtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:680px;table-layout:fixed}
 .mtbl th{background:#475569;color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
 .mtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
@@ -280,6 +285,10 @@ body.print-preview .wtbl .stf-btn{display:none!important}body.print-preview .wtb
 .stat-exp.on{transform:rotate(90deg);color:var(--primary);border-color:var(--primary)}
 .stat-detail-row>td{background:var(--bg);padding:0 !important}
 .mat-unit{display:inline-block;font-size:12px;color:var(--muted)}
+/* 位置進度：09-13 以前的舊日報沒有施工說明（2026-10-27） */
+#mg-stat .loc-nodesc{color:var(--muted);font-size:12px}
+/* 手機上施工說明會被壓到一字一行（真 Chrome 400 量到 76px 寬、5 行）→ 留最少 11 字寬，表格在框裡左右捲 */
+#mg-stat .loc-desc{display:inline-block;min-width:11em}
 .mat-hits{padding:10px 12px}
 .mat-hits-t{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
 .mat-hits-tbl{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card,#fff);
@@ -415,6 +424,14 @@ body.cloud-syncing [onclick^="saveReport"],body.cloud-syncing [onclick^="saveSet
 .proj-check input{cursor:pointer;width:13px;height:13px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:200;align-items:center;justify-content:center}
 .overlay.show{display:flex}
+/* 照片放大的左右箭頭（2026-10-27）：疊在照片兩側、垂直置中；到頭／到尾變淡按不了 */
+#ph-overlay #ph-stage{position:relative;touch-action:pan-y}
+#ph-overlay .ph-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;flex:none;border:none;border-radius:50%;
+  background:rgba(15,23,42,.55);color:#fff;font-size:28px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 0 3px}
+#ph-overlay #ph-prev{left:8px}
+#ph-overlay #ph-next{right:8px}
+#ph-overlay .ph-nav:disabled{opacity:.25;cursor:default}
+#ph-overlay #ph-pos{font-size:12px;font-weight:700;color:var(--primary);white-space:nowrap;font-variant-numeric:tabular-nums}
 .modal{background:#fff;border-radius:12px;padding:22px;width:90%;max-width:520px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 .modal-title{font-size:16px;font-weight:700;color:var(--primary);margin-bottom:16px}
 .login-modal{max-width:400px;text-align:center}
@@ -905,6 +922,8 @@ window._cloudErrBar = (function(){
     </div>
     <!-- 2026-09-30 她指定文字：施工說明會進照片下載檔名，整張表只提示這一行（不是每一列都加） -->
     <div id="wdesc-hint" class="tl-hint no-print" style="margin:6px 16px 10px">※ 施工說明會帶進照片的下載檔名（只取前 30 字，如有符號 / \ : * ? " &lt; &gt; |，將以底線 _ 取代）</div>
+    <!-- 2026-10-27：施工說明的下拉清單（所有列共用一個，點到哪一格就換成那一格的位置＋項目） -->
+    <datalist id="wdesc-dl"></datalist>
   </div>
 
   <!-- 材料明細 -->
@@ -995,7 +1014,8 @@ window._cloudErrBar = (function(){
         <!-- 2026-09-03：誤按清除的救命鈕，平常隱藏，清除後才出現 -->
         <button class="btn btn-p btn-sm" id="undo-clear-btn" style="display:none" onclick="undoClearForm()">↩ 復原清除</button>
       </div>
-      <div class="flex gap2">
+      <!-- 2026-10-28（她 Y6 甲）：手機 400px 三顆擠一排會比螢幕寬 2px、整頁左右晃 → 太窄時自動換行、靠右 -->
+      <div class="flex gap2" style="flex-wrap:wrap;justify-content:flex-end">
         <button class="btn btn-xl btn-sm" onclick="exportExcel()">📊 匯出 Excel</button>
         <button class="btn btn-pdf btn-sm" onclick="printPDF()">🖨️ 列印 PDF</button>
         <button class="btn btn-p btn-sm" onclick="saveReport()">💾 儲存報表</button>
@@ -1532,9 +1552,15 @@ window._cloudErrBar = (function(){
 <!-- PHOTO MODAL -->
 <div id="ph-overlay" class="overlay" onclick="closePh(event)">
   <div class="modal" style="max-width:660px;padding:0;overflow:hidden">
-    <img id="ph-img" src="" style="width:100%;display:block;max-height:62vh;object-fit:contain;background:#000">
+    <!-- 2026-10-27 她交辦：左右箭頭前後看（Q5 甲＝這張日報全部照片、照畫面順序；Q6 甲＝到頭停住、箭頭變淡） -->
+    <div id="ph-stage">
+      <img id="ph-img" src="" style="width:100%;display:block;max-height:62vh;object-fit:contain;background:#000">
+      <button type="button" id="ph-prev" class="ph-nav" onclick="phStep(-1)" title="上一張（←）" aria-label="上一張">‹</button>
+      <button type="button" id="ph-next" class="ph-nav" onclick="phStep(1)" title="下一張（→）" aria-label="下一張">›</button>
+    </div>
     <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap">
+        <span id="ph-pos"></span>
         <span id="ph-phase-lbl" class="phase-tag"></span>
         <span id="ph-cap" style="font-size:12px;color:var(--muted)"></span>
       </div>
@@ -3594,6 +3620,38 @@ function atypeText(v){
   const hit = ATYPES.find(a => a[0] === v);
   return hit ? hit[2] : String(v);
 }
+/* ── 施工說明下拉（2026-10-27 她 Q7 甲）──
+ * 只列「同案場＋同施作位置＋同施工項目」以前打過的；最近用過的排上面，後面帶最後一次用的日期。
+ * 還是可以自己打字（打幾個字瀏覽器會自己篩），選了也能再改。 */
+function wdescHistory(pid, loc, work){
+  if(!pid || !loc) return [];
+  const last = new Map();                     // 說明 → 最後一次用的日期
+  (S.reports||[]).forEach(function(r){
+    if(!r) return;
+    const rpid = reportProjId(r);
+    (r.workItems||[]).forEach(function(wi){
+      if(!wi) return;
+      if((rpid || wi.projId || '') !== pid) return;
+      if((wi.loc||'') !== loc || (wi.work||'') !== (work||'')) return;
+      const t = String(wi.wdesc||'').trim(); if(!t) return;
+      const dt = String(r.date||'');
+      if(!last.has(t) || dt > last.get(t)) last.set(t, dt);
+    });
+  });
+  return [...last.entries()]
+    .sort(function(a,b){ return String(b[1]).localeCompare(String(a[1])) || a[0].localeCompare(b[0],'zh-Hant'); })
+    .map(function(x){ return { text:x[0], date:x[1] }; });
+}
+function wdescFill(inp){
+  const dl = $('wdesc-dl'); if(!dl || !inp) return;
+  const tr = inp.closest('tr');
+  const loc  = tr ? (tr.querySelector('[data-f="loc"]')?.value||'') : '';
+  const work = tr ? (tr.querySelector('[data-f="work"]')?.value||'') : '';
+  const pid  = ($('f-proj') && $('f-proj').value) || (S.report && S.report.projId) || '';
+  dl.innerHTML = wdescHistory(pid, loc, work).map(function(h){
+    return '<option value="' + escHtml(h.text) + '" label="' + escHtml(String(h.date).slice(5)) + '"></option>';
+  }).join('');
+}
 function addRow(it) {
   const tbody = $('tbody'); const n=++rowN;
   const aOpts = ATYPES.map(([v,l])=>`<option value="${v}"${it?.atype===v?' selected':''}>${l}</option>`).join('');
@@ -3615,7 +3673,7 @@ function addRow(it) {
     <td style="text-align:center;color:var(--muted);font-size:11px" class="rnum" title="按住拖曳換順序"><span class="ord-no"></span><span class="ord-mv no-print"><button type="button" class="ord-b" data-ordmv="-1" title="上移">↑</button><button type="button" class="ord-b" data-ordmv="1" title="下移">↓</button></span></td>
     <td data-label="施作位置"><select class="cs" data-f="loc" onchange="onRowChange(this)"${dis}>${selOpts(scopedLocs(),loc0,'施作位置...')}</select></td>
     <td data-label="施工項目"><select class="cs" data-f="work" onchange="onRowChange(this)"${dis}>${selOpts(worksOf(loc0),v('work'),'施工項目...')}</select></td>
-    <td data-label="施工說明"><input class="ci" data-f="wdesc" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." oninput="syncReport()"${dis}></td>
+    <td data-label="施工說明"><input class="ci" data-f="wdesc" list="wdesc-dl" autocomplete="off" value="${escHtml(v('wdesc'))}" placeholder="今天這一項做了什麼..." onfocus="wdescFill(this)" oninput="syncReport();wdescPicked(this)" onchange="progAutofill(this.closest('tr'))"${dis}></td>
     <td data-label="今日廠商"><select class="cs" data-f="vendor" onchange="onRowChange(this)"${dis}>${selOpts(scopedVendors(),vd0,'廠商...')}</select></td>
     <td data-label="今日施工人員">${stfCellHtml('staff',v('staff'),dis)}</td>
     <td data-label="今日出工"><input class="ci" type="number" data-f="w0" value="${v('w0')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
@@ -3624,8 +3682,9 @@ function addRow(it) {
     <td data-label="明日出工"><input class="ci" type="number" data-f="w1" value="${v('w1')||0}" min="0" max="99" step="0.5" oninput="recalc();syncReport()" style="max-width:60px"${dis}></td>
     <td data-label="完成進度%">
       <div class="prog-wrap">
-        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="updProg(this);syncReport()" style="max-width:52px;text-align:center"${dis}>
+        <input class="ci" type="number" data-f="progress" value="${prog}" min="0" max="100" step="1" oninput="progManual(this);updProg(this);syncReport()" style="max-width:52px;text-align:center"${dis}>
         <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${prog}%"></div></div>
+        <span class="prog-hint"></span>
       </div>
     </td>
     <td data-label="異常類型"><select class="cs" style="font-size:11px" data-f="atype" onchange="this.classList.remove('atype-warn');syncReport()"${dis}>${aOpts}</select></td>
@@ -3861,6 +3920,9 @@ function onRowChange(el) {
     if(f==='loc'){
       const list=worksOf(el.value), sel=tr.querySelector('[data-f="work"]');
       if(sel) sel.innerHTML=selOpts(list, list.includes(sel.value)?sel.value:'', '施工項目...');
+      progAutofill(tr, true);
+    } else if(f==='work'){
+      progAutofill(tr, true);
     } else if(f==='vendor'||f==='vendor2'){
       /* 2026-10-13 施工人員改成點名字（可多選）：換廠商 → 只留新廠商清單裡有的人，少了人出工數跟著變 */
       const sf=f==='vendor'?'staff':'staff2', hid=tr.querySelector('[data-f="'+sf+'"]');
@@ -3872,6 +3934,63 @@ function onRowChange(el) {
     }
   }
   buildSummary(); syncReport();
+}
+/* ══ 帶出上次完成進度（2026-10-27 她確認示意圖：P1 乙 三格一改就重新帶、P2 甲 日期最新那一筆、
+ *    P3 甲 藍框＋「上次 MM-DD：N%」、P4 甲 三格都一樣才帶）══
+ * 「上次」＝同案場＋同施作位置＋同施工項目＋同施工說明，**不算正在填的這一張**，也不看比這張日期還晚的；
+ * 同一天有兩筆取大的。對不到時：原本是帶出來的數字 → 退回 0（免得留著別筆的進度）；自己打的 → 不動。
+ * 只在使用者改那三格時跑（開舊日報不會動到已經存的數字）；🔒 別人的列不動。 */
+function lastProgress(pid, loc, work, desc){
+  desc=String(desc||'').trim();
+  if(!pid||!loc||!work||!desc) return null;
+  const myId=S.report&&S.report.id;
+  const myDate=($('f-date')&&$('f-date').value)||(S.report&&S.report.date)||'';
+  let best=null;
+  (S.reports||[]).forEach(function(r){
+    if(!r||r.id===myId) return;
+    const dt=String(r.date||''); if(myDate&&dt>myDate) return;
+    const rpid=reportProjId(r);
+    (r.workItems||[]).forEach(function(wi){
+      if(!wi) return;
+      if((rpid||wi.projId||'')!==pid) return;
+      if((wi.loc||'')!==loc||(wi.work||'')!==work||String(wi.wdesc||'').trim()!==desc) return;
+      if(wi.progress===''||wi.progress==null) return;
+      const p=Number(wi.progress); if(isNaN(p)) return;
+      if(!best||dt>best.date||(dt===best.date&&p>best.p)) best={date:dt,p:p};
+    });
+  });
+  return best;
+}
+function progAutofill(tr, quiet){
+  if(!tr||tr.classList.contains('row-locked')) return;
+  const g=function(f){ return tr.querySelector('[data-f="'+f+'"]'); };
+  const inp=g('progress'); if(!inp||inp.disabled) return;
+  const pid=($('f-proj')&&$('f-proj').value)||(S.report&&S.report.projId)||'';
+  const loc=(g('loc')||{}).value||'', work=(g('work')||{}).value||'', desc=String((g('wdesc')||{}).value||'').trim();
+  const hit=lastProgress(pid,loc,work,desc);
+  const hint=tr.querySelector('.prog-hint');
+  const before=inp.value;
+  if(hit){
+    inp.value=hit.p; inp.classList.add('prog-auto');
+    if(hint){ hint.textContent='上次 '+String(hit.date).slice(5)+'：'+hit.p+'%'; hint.classList.remove('first'); }
+  } else {
+    if(inp.classList.contains('prog-auto')){ inp.value=0; inp.classList.remove('prog-auto'); }
+    if(hint){ const first=!!(pid&&loc&&work&&desc); hint.textContent=first?'第一次填這項':''; hint.classList.toggle('first',first); }
+  }
+  updProg(inp);
+  if(!quiet && inp.value!==before){ buildSummary(); syncReport(); }
+}
+/* 從下拉選了一筆以前打過的說明（值剛好等於清單裡的一項）→ 馬上帶，不用等離開格子 */
+function wdescPicked(inp){
+  const dl=$('wdesc-dl'); if(!dl||!inp) return;
+  const v=inp.value;
+  if([].some.call(dl.options,function(o){ return o.value===v; })) progAutofill(inp.closest('tr'));
+}
+/* 自己改了數字 → 藍框和「上次…」拿掉 */
+function progManual(inp){
+  inp.classList.remove('prog-auto');
+  const hint=inp.closest('.prog-wrap')&&inp.closest('.prog-wrap').querySelector('.prog-hint');
+  if(hint){ hint.textContent=''; hint.classList.remove('first'); }
 }
 function updProg(inp) {
   const v = Math.min(100,Math.max(0,parseFloat(inp.value)||0));
@@ -4961,13 +5080,7 @@ function renderPhotos() {
   const list=S.report?.photos||[];
   const empty=$('ph-empty'); if(empty) empty.style.display=list.length?'none':'';
   if(!list.length){ host.innerHTML=''; return; }
-  // 用四層路徑當 key 分組，保持照片原有順序
-  const groups=new Map();
-  list.forEach((p,i)=>{
-    const key=phPath(p).join(' / ');
-    if(!groups.has(key)) groups.set(key,[]);
-    groups.get(key).push({p,i});
-  });
+  const groups=phGroups(list);
   host.innerHTML=[...groups.entries()].map(([key,items])=>`
     <div class="tl-group">
       <div class="tl-head">
@@ -4986,6 +5099,60 @@ function renderPhotos() {
     </div>`).join('');
   fillLazyThumbs();   /* 縮圖搬到 cdr_pm_thumbs 之後：沒圖的格子抓回來再補（2026-09-23） */
 }
+/* 用四層路徑當 key 分組，保持照片原有順序。
+ * 照片牆（renderPhotos）跟放大視窗的左右箭頭（phOrder）共用這一支 —— 箭頭的順序＝畫面上看到的順序（2026-10-27）。 */
+function phGroups(list){
+  const groups=new Map();
+  (list||[]).forEach((p,i)=>{
+    const key=phPath(p).join(' / ');
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push({p,i});
+  });
+  return groups;
+}
+/* 畫面順序的照片編號（S.report.photos 的 index） */
+function phOrder(){
+  const out=[];
+  phGroups(S.report?.photos||[]).forEach(items=>items.forEach(x=>out.push(x.i)));
+  return out;
+}
+/* 上一張／下一張：到頭或到尾就停住（她 Q6 甲） */
+function phStep(d){
+  if(!$('ph-overlay').classList.contains('show')) return;
+  const ord=phOrder(), at=ord.indexOf(viewPhIdx), to=ord[at+d];
+  if(at<0||to===undefined) return;
+  openPh(to);
+}
+function phNavSync(){
+  const ord=phOrder(), at=ord.indexOf(viewPhIdx);
+  const pv=$('ph-prev'), nx=$('ph-next'), pos=$('ph-pos');
+  if(pv) pv.disabled=at<=0;
+  if(nx) nx.disabled=at<0||at>=ord.length-1;
+  /* 只有 1 張就不用箭頭 */
+  if(pv) pv.hidden=ord.length<2;
+  if(nx) nx.hidden=ord.length<2;
+  if(pos) pos.textContent=at<0?'':(at+1)+' / '+ord.length;
+}
+/* 鍵盤 ← →（電腦）；正在打字的時候不搶 */
+document.addEventListener('keydown',function(e){
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight') return;
+  const ov=$('ph-overlay'); if(!ov||!ov.classList.contains('show')) return;
+  const tg=e.target&&e.target.tagName;
+  if(tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT') return;
+  e.preventDefault();
+  phStep(e.key==='ArrowLeft'?-1:1);
+});
+/* 手機左右滑：橫向移動超過 40px、而且比上下移動多，才算滑 */
+(function(){
+  let sx=null, sy=0;
+  const st=$('ph-stage'); if(!st) return;
+  st.addEventListener('touchstart',function(e){ const t=e.touches&&e.touches[0]; if(t){ sx=t.clientX; sy=t.clientY; } },{passive:true});
+  st.addEventListener('touchend',function(e){
+    const t=e.changedTouches&&e.changedTouches[0]; if(sx===null||!t) return;
+    const dx=t.clientX-sx, dy=t.clientY-sy; sx=null;
+    if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)) phStep(dx<0?1:-1);
+  });
+})();
 function openPh(i) {
   viewPhIdx=i;
   const p=S.report.photos[i];
@@ -5002,6 +5169,7 @@ function openPh(i) {
   const lbl=$('ph-phase-lbl');
   if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=phPath(p).join(' / '); }
   $('ph-overlay').classList.add('show');
+  phNavSync();
 }
 function closePh(e){if(e.target===$('ph-overlay'))$('ph-overlay').classList.remove('show');}
 function deletePhoto(){
@@ -5074,7 +5242,19 @@ async function downloadPhotosZip(){
 function updPV(el){const pv=$(el.id+'_pv');if(pv)pv.textContent=el.value;}
 
 /* ── AUTO GROW ── */
-function autoGrow(el){if(!el||el.offsetParent===null)return;el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+/* 文字框自動撐高。
+ * ⚠️ 2026-10-28 她回報「輸入時會跳掉」「選了施工人員就跳到下面」（影片）：
+ *    施工明細每改一個字／選一個人 → buildSummary → 這裡把上面的「今日工作摘要」框先縮成 4 行、再量高度撐回去。
+ *    摘要框在畫面上方很高（8 項時 600px），一縮一撐之間瀏覽器的捲動位置被推走（實測一次跳 492px）。
+ *    改成：撐完之後把捲動位置擺回去 —— 框整個在畫面上方時，往下補它實際長高（或變矮）的那一段，
+ *    畫面上看到的內容就一格都不動；框在畫面裡或下方時，捲動位置維持原樣。 */
+function autoGrow(el){
+  if(!el||el.offsetParent===null)return;
+  const sx=window.scrollX, sy=window.scrollY, r=el.getBoundingClientRect(), above=r.bottom<=0;
+  el.style.height='auto'; el.style.height=el.scrollHeight+'px';
+  const want = above ? sy + (el.getBoundingClientRect().height - r.height) : sy;
+  if(Math.abs(window.scrollY-want)>=1) window.scrollTo(sx, want);
+}
 function autoGrowAll(){document.querySelectorAll('textarea.fi').forEach(autoGrow);}
 document.addEventListener('input',e=>{if(e.target.matches('textarea.fi'))autoGrow(e.target);});
 
@@ -5643,26 +5823,33 @@ function mgWorkItems(){
 }
 const _n1=v=>v%1===0?v:Number(v.toFixed(1));
 
-/* ① 位置進度：每個「案場＋施作位置」取最新一張日報的進度% */
+/* ① 位置進度：一列＝「案場＋施作位置＋施工項目＋施工說明」，進度取回報過的**最大值**
+ * （2026-10-27 她 R4 甲。以前一列＝案場＋施作位置、取最新一張日報 → 外牆／室內／景觀全擠一列，
+ *  數字只是最後那筆。進度% 只會往上爬，最大值＝做到哪裡。）
+ * 沒填施工說明的（09-13 加這欄之前的舊日報）desc 是 ''，畫面顯示「（沒填說明）」。 */
 function getLocProgressRows(){
   const m=new Map();
   mgWorkItems().forEach(({r,wi,pname})=>{
     const loc=wi.loc||'（未填位置）';
-    const k=pname+'\u0000'+loc;
-    if(!m.has(k))m.set(k,{proj:pname,loc,progress:null,pdate:'',last:'',w0:0,n:0,hits:[]});
+    const work=wi.work||'';
+    const desc=String(wi.wdesc||'').trim();
+    const k=pname+'\u0000'+loc+'\u0000'+work+'\u0000'+desc;
+    if(!m.has(k))m.set(k,{proj:pname,loc,work,desc,progress:null,last:'',w0:0,n:0,hits:[]});
     const o=m.get(k);
     o.w0+=(wi.w0||0); o.n++;
-    /* 2026-10-14：細項＝這個位置的每一次回報（展開看得到進度是怎麼爬上來的） */
-    o.hits.push({date:r.date||'', work:wi.work||'', vendor:(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'',
+    /* 2026-10-14：細項＝這一列的每一次回報（展開看得到進度是怎麼爬上來的） */
+    o.hits.push({date:r.date||'', work, desc, vendor:(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'',
       w0:wi.w0||0, progress:wi.progress, who:(wi.owner||r.reporter||'')});
     if(String(r.date||'')>o.last)o.last=r.date||'';
     const p=Number(wi.progress);
-    if(!isNaN(p)&&wi.progress!==''&&wi.progress!==null&&String(r.date||'')>=o.pdate){o.progress=p;o.pdate=r.date||''}
+    if(!isNaN(p)&&wi.progress!==''&&wi.progress!==null&&(o.progress===null||p>o.progress))o.progress=p;
   });
+  const zh=(a,b)=>String(a).localeCompare(String(b),'zh-Hant',{numeric:true});
   return [...m.values()]
     .map(o=>{ o.hits.sort((x,y)=>String(y.date).localeCompare(String(x.date))); return o; })
-    .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||a.loc.localeCompare(b.loc,'zh-Hant',{numeric:true}));
+    .sort((a,b)=>zh(a.proj,b.proj)||zh(a.loc,b.loc)||zh(a.work,b.work)||zh(a.desc,b.desc));
 }
+const NO_WDESC='（沒填說明）';
 /* ② 出工統計：**一列＝一天**（2026-09-02 用戶指定；原本是一列＝案場×廠商）。
  * 案場移到抬頭上，所以列裡只留日期、當天有哪些廠商、當天出工與明日預估。 */
 function getManpowerRows(){
@@ -5787,11 +5974,12 @@ function renderMgStat(){
   const box=$('mg-stat'); if(!box)return;
   const dow=d=>{const x=new Date(d+'T00:00:00');return isNaN(x)?d:(d+'（'+DOW[x.getDay()]+'）')};
   if(mgView==='loc'){
-    /* 一列＝一個施作位置（重點是「現在做到哪」） */
+    /* 一列＝施作位置＋施工項目＋施工說明（重點是「每件事做到哪」，2026-10-27 R4 甲） */
     box.innerHTML=statGrouped(getLocProgressRows(),
-      [{t:'施作位置'},{t:'最新進度',num:1},{t:'最後回報'},{t:'累計出工',num:1},{t:'回報次數',num:1}],
-      o=>[escHtml(o.loc),o.progress===null?'—':(o.progress+'%'),o.last||'—',_n1(o.w0),o.n],
-      list=>list.length+' 個位置 · 出工 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
+      [{t:'施作位置'},{t:'施工項目'},{t:'施工說明'},{t:'進度',num:1},{t:'最後回報'},{t:'累計出工',num:1},{t:'回報次數',num:1}],
+      o=>[escHtml(o.loc),escHtml(o.work||'—'),'<span class="loc-desc'+(o.desc?'':' loc-nodesc')+'">'+(o.desc?escHtml(o.desc):NO_WDESC)+'</span>',
+        o.progress===null?'—':(o.progress+'%'),o.last||'—',_n1(o.w0),o.n],
+      list=>list.length+' 列 · 出工 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
       null,
       o=>({ open:statRowOpen(locRowKey(o)), html:locHitsHtml(o) }),
       o=>locRowKey(o));
@@ -5820,21 +6008,21 @@ function renderMgStat(){
    同一天多筆就各列一行 —— 合併起來反而看不出「那天到底進了幾次」。 */
 function matRowKey(o){ return (o.proj||'')+'\u0000'+(o.name||'')+'\u0000'+(o.unit||''); }
 /* 位置進度／出工統計的列鍵（2026-10-14）：前面加檢視名，跟材料的鍵分得開 */
-function locRowKey(o){ return 'loc\u0001'+(o.proj||'')+'\u0000'+(o.loc||''); }
+function locRowKey(o){ return 'loc\u0001'+(o.proj||'')+'\u0000'+(o.loc||'')+'\u0000'+(o.work||'')+'\u0000'+(o.desc||''); }
 function manRowKey(o){ return 'man\u0001'+(o.proj||'')+'\u0000'+(o.date||''); }
 function statKeyView(k){ k=String(k); return k.indexOf('loc\u0001')===0?'loc':k.indexOf('man\u0001')===0?'man':'mat'; }
 const _hitDow=d=>{const x=new Date(d+'T00:00:00');return isNaN(x)?(d||'—'):(d+'（'+DOW[x.getDay()]+'）')};
-/* 一個施作位置的每一次回報：日期｜施工項目｜廠商｜出工｜進度｜填表人（新的在上） */
+/* 一列的每一次回報：日期｜施工項目｜施工說明｜廠商｜出工｜進度｜填表人（新的在上；2026-10-27 多施工說明） */
 function locHitsHtml(o){
   const hits=(o&&o.hits)||[];
   if(!hits.length)return '';
   const pc=p=>(p===''||p===null||p===undefined||isNaN(Number(p)))?'—':(Number(p)+'%');
-  return '<div class="mat-hits"><div class="mat-hits-t">'+escHtml(o.loc)
+  return '<div class="mat-hits"><div class="mat-hits-t">'+escHtml([o.loc,o.work,o.desc||NO_WDESC].filter(Boolean).join('／'))
     +' 的回報紀錄（'+hits.length+' 筆）</div>'
-    +'<table class="mat-hits-tbl hits-nw"><thead><tr><th>日期</th><th>施工項目</th><th>廠商</th>'
+    +'<table class="mat-hits-tbl hits-nw"><thead><tr><th>日期</th><th>施工項目</th><th>施工說明</th><th>廠商</th>'
     +'<th style="text-align:right">出工</th><th style="text-align:right">進度</th><th>填表人</th></tr></thead><tbody>'
     +hits.map(h=>'<tr><td>'+escHtml(_hitDow(h.date))+'</td>'
-      +'<td>'+escHtml(h.work||'—')+'</td><td>'+escHtml(h.vendor||'—')+'</td>'
+      +'<td>'+escHtml(h.work||'—')+'</td><td>'+escHtml(h.desc||'—')+'</td><td>'+escHtml(h.vendor||'—')+'</td>'
       +'<td style="text-align:right">'+_n1(h.w0)+'</td><td style="text-align:right">'+pc(h.progress)+'</td>'
       +'<td>'+escHtml(h.who||'—')+'</td></tr>').join('')
     +'</tbody></table></div>';
@@ -6041,8 +6229,9 @@ function exportMgmtExcel(){
   let title='',headers=[],body=[];
   if(mgView==='loc'){
     title='位置進度';
-    headers=['案場','施作位置','最新進度%','最後回報','累計出工','回報次數'];
-    body=getLocProgressRows().map(o=>[o.proj,o.loc,o.progress===null?'':o.progress,o.last,_n1(o.w0),o.n]);
+    /* 2026-10-27 R4 甲：多施工項目、施工說明兩欄；進度取最大值 */
+    headers=['案場','施作位置','施工項目','施工說明','進度%','最後回報','累計出工','回報次數'];
+    body=getLocProgressRows().map(o=>[o.proj,o.loc,o.work,o.desc,o.progress===null?'':o.progress,o.last,_n1(o.w0),o.n]);
   } else if(mgView==='man'){
     title='出工統計';
     headers=['案場','日期','廠商','今日出工','明日預估','工項數'];
@@ -6283,13 +6472,18 @@ function addNoteRow(ws, label, text, lastCol, colw){
  * 依「施作位置 → 施工項目」分小標題。她選它的理由是工項表維持原樣，
  * 一頁印得完、也還能篩選排序。
  *
- * 照片一律用**報表裡現成的縮圖**、寬 160px（她定的）。不去雲端拉原圖 ——
+ * 照片一律用**報表裡現成的縮圖**、寬 320px（2026-10-28 她改：原本 160，橫拍直拍都放大 2 倍）。
+ * 縮圖本身長邊就是 320（THUMB_MAX_EDGE）→ 橫拍剛好原尺寸不會糊；直拍縮圖寬 240，放到 320 會稍軟。不去雲端拉原圖 ——
  * 幾十張要等快一分鐘，檔案也會從幾百 KB 變成幾十 MB。
  *
  * ⚠️ exceljs 的圖片是「浮在儲存格上面」的，tl 收的是欄／列索引（可以是小數）。
  *    要讓照片橫向並排，得自己把像素位置換算成小數欄索引；欄寬是算出來的，
  *    所以這一段**一定要在欄寬定案之後**才跑。 */
-const PH_XL_W = 160;                                   // 她指定的照片寬度（px）
+const PH_XL_W = 320;                                   // 她指定的照片寬度（px）—— 2026-10-28 由 160 放大 2 倍
+/* 照片框高的下限／上限（原本 90～220，跟著放大 2 倍）。
+ * ⚠️ 上限不是 440 而是 415：Excel 一列最高只能 409 點，下面列高還要乘 1.3 倍保險（imgRow.height），
+ *    415 × 0.75 × 1.3 + 4 = 409。再高的話列高被 Excel 夾住、照片就壓到下一排的檔名。 */
+const PH_XL_HMIN = 180, PH_XL_HMAX = 415;
 /* Excel 欄寬單位 → 像素（預設字型下的近似式，用來換算照片要擺在第幾欄） */
 /* 欄寬（Excel 的單位）→ 像素。
  * ⚠️ 2026-09-09 她回報「照片上下左右重疊」，病因就在這一行的那個係數。
@@ -6318,12 +6512,19 @@ function photoCols(colPx, step, imgW){
   }
   return cols.length ? cols : [0];          // 表太窄時至少放得下一張
 }
-/* 照片框高：有原始長寬就照比例，沒有就用 4:3；夾在 90～220 之間，
+/* 照片框高：有原始長寬就照比例，沒有就用 4:3；夾在 PH_XL_HMIN～PH_XL_HMAX 之間，
    免得一張直式照片把整列撐成一根長條。 */
 function phBoxH(p){
   var w = Number(p && p.w) || 0, h = Number(p && p.h) || 0;
   var px = (w > 0 && h > 0) ? Math.round(PH_XL_W * h / w) : Math.round(PH_XL_W * 3 / 4);
-  return Math.max(90, Math.min(220, px));
+  return Math.max(PH_XL_HMIN, Math.min(PH_XL_HMAX, px));
+}
+/* 照片框寬：平常就是 PH_XL_W；很長的直拍（例如手機截圖）高度被上限夾住時，寬度跟著等比例縮，
+   不要把照片壓扁（2026-10-28 放大 2 倍時改；以前是寬度固定、硬壓高度） */
+function phBoxW(p){
+  var w = Number(p && p.w) || 0, h = Number(p && p.h) || 0;
+  if (w > 0 && h > 0 && Math.round(PH_XL_W * h / w) > PH_XL_HMAX) return Math.round(PH_XL_HMAX * w / h);
+  return PH_XL_W;
 }
 /* 依 施作位置 → 施工項目 分組。順序照工項表，工項表裡沒有的（照片單獨指定過）排在後面。
    沒有影像資料的照片直接跳過 —— 舊照片可能只剩雲端那一份，本機沒有縮圖。 */
@@ -6392,7 +6593,7 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
         var col = slots[j];
         var id = wb.addImage({ base64: m[2], extension: ext });
         ws.addImage(id, { tl: { col: col, row: imgRow.number - 1 },
-                          ext: { width: PH_XL_W, height: phBoxH(p) } });
+                          ext: { width: phBoxW(p), height: phBoxH(p) } });
         /* 檔名寫在照片正上方、同一欄（2026-09-09 她指定）。
            要找原圖時拿這個檔名去「📷 照片 → 下載全部」那邊對。 */
         var cell = capRow.getCell(Math.min(lastCol, col + 1));

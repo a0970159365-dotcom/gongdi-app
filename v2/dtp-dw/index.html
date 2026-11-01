@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-10-22.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -3125,11 +3125,12 @@ async function exportExcel(projs,opt){
     const maxLines=Math.max(...rd.map((v,ci)=>estLines(v,colW[ci])));
     row.height=Math.max(24,maxLines*20+6);
     const stuck=(st==='暫停/卡關');      /* 逐筆判斷（2026-09-21） */
-    row.eachCell(c=>{
+    /* 10-22 晚她選甲：逐欄 1～9 塗，不用 eachCell —— 舊資料少了整個欄位（undefined）的格子 eachCell 會跳過，那格就沒底色 */
+    for(let ci=1;ci<=headers.length;ci++){const c=row.getCell(ci);
       c.alignment={vertical:'top',wrapText:true};
       c.fill={type:'pattern',pattern:'solid',fgColor:{argb:stuck?'FFFEF2F2':(i%2===0?'FFF8FAFC':'FFFFFFFF')}};
       if(stuck)c.font={color:{argb:'FF991B1B'}};
-    });
+    }
     /* 2026-09-21 逐筆之後欄位各往後移一格：日期第 5、品項第 6、狀態第 8 */
     /* 10-22 晚她 E2 乙：前 6 欄（案場～品項）左右置中、上下靠上；合併過的格子 mergeSameCells 照舊上下置中 */
     for(let ci=1;ci<=6;ci++)row.getCell(ci).alignment={vertical:'top',horizontal:'center',wrapText:ci<=4};
