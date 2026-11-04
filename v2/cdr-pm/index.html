@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-10-27.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-11-03.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -84,10 +84,21 @@ textarea.fi{resize:none;min-height:60px;overflow-y:hidden}
 .prog-bar-bg{height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;width:52px}
 .prog-bar-fill{height:100%;background:var(--success);border-radius:2px;transition:width .3s}
 /* 帶出上次進度（2026-10-27）—— 範圍限在施工明細表 */
-#tbody .ci.prog-auto{border-color:#2563eb;background:#eff6ff;font-weight:700}
-#tbody .prog-hint{font-size:10.5px;line-height:1.2;color:#2563eb;white-space:nowrap}
-#tbody .prog-hint.first{color:#94a3b8}
-#tbody .prog-hint:empty{display:none}
+#tbody .ci.prog-auto,#dg-tbody .ci.prog-auto{border-color:#2563eb;background:#eff6ff;font-weight:700}
+#tbody .prog-hint,#dg-tbody .prog-hint{font-size:10.5px;line-height:1.2;color:#2563eb;white-space:nowrap}
+#tbody .prog-hint.first,#dg-tbody .prog-hint.first{color:#94a3b8}
+#tbody .prog-hint:empty,#dg-tbody .prog-hint:empty{display:none}
+/* 點工明細（2026-11-02 她定）：橘色標題，跟施工明細一眼分得出來 */
+.dg-card .card-title{color:#c2410c}
+/* 清單上的「點工 N 人工」（2026-11-03）：橘字，只用在清單卡片與分組抬頭 */
+.ritem .rpt-dg,.ghead .rpt-dg{color:#c2410c;font-weight:700;white-space:nowrap}
+/* 照片牆的點工那組（2026-11-03）：橘色小標籤，只用在 .tl-head 裡 */
+.tl-head .ph-dg-tag{display:inline-block;font-size:11px;font-weight:700;color:#c2410c;background:#ffedd5;border-radius:4px;padding:0 6px;margin-left:4px;white-space:nowrap}
+/* 點工統計的日期、小計不准斷行：六欄塞進手機 400 寬，日期會被擠成三行、「永順泥作 小計」也是；
+   寧可表格在自己的框裡左右捲（tbl-wrap），整頁不會跟著捲 */
+.master-tbl .dg-nw{white-space:nowrap}
+.mat-hits .dg-tag{font-size:10.5px;font-weight:700;color:#c2410c;border:1px solid #fdba74;border-radius:4px;padding:0 4px;white-space:nowrap}
+.dg-card .tfoot-row.all-row td{border-top:2px solid #c2410c}
 .mtbl{width:100%;border-collapse:collapse;font-size:12px;min-width:680px;table-layout:fixed}
 .mtbl th{background:#475569;color:#fff;padding:8px 5px;font-weight:600;text-align:center;white-space:nowrap}
 .mtbl td{border:1px solid #e2e8f0;padding:3px;vertical-align:middle}
@@ -461,7 +472,7 @@ input[type="file"]{display:none}
 .ro-badge{background:#fef3c7;color:#b45309;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
 .rw-badge{background:#dcfce7;color:#166534;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
 .readonly-form .cs,.readonly-form .ci,.readonly-form input.fi:not([readonly]),.readonly-form select.fi,.readonly-form textarea.fi{pointer-events:none;opacity:.7;background:#f8fafc!important}
-.readonly-form button.btn-a,.readonly-form button.btn-d,.readonly-form #add-row-btn,.readonly-form #add-mat-btn{display:none!important}
+.readonly-form button.btn-a,.readonly-form button.btn-d,.readonly-form #add-row-btn,.readonly-form #add-dg-btn,.readonly-form #add-mat-btn{display:none!important}
 .sig-area{display:none}
 /* 明細換順序（2026-10-14）：電腦按住序號格拖曳；↑↓ 只在手機卡片出現。用 .wtbl／.mtbl 限定，不影響別的表 */
 .wtbl .rnum,.mtbl .mnum{cursor:grab;white-space:nowrap}
@@ -912,7 +923,7 @@ window._cloudErrBar = (function(){
         <tbody id="tbody"></tbody>
         <tfoot>
           <tr class="tfoot-row">
-            <td colspan="4" style="text-align:right;padding-right:10px">合計</td>
+            <td colspan="4" style="text-align:right;padding-right:10px">施工明細合計</td>
             <td></td><td></td><td id="tot-today">0</td>
             <td></td><td></td><td id="tot-tmrw">0</td>
             <td colspan="5"></td>
@@ -924,6 +935,53 @@ window._cloudErrBar = (function(){
     <div id="wdesc-hint" class="tl-hint no-print" style="margin:6px 16px 10px">※ 施工說明會帶進照片的下載檔名（只取前 30 字，如有符號 / \ : * ? " &lt; &gt; |，將以底線 _ 取代）</div>
     <!-- 2026-10-27：施工說明的下拉清單（所有列共用一個，點到哪一格就換成那一格的位置＋項目） -->
     <datalist id="wdesc-dl"></datalist>
+  </div>
+
+  <!-- 點工明細（2026-11-02 她定）：欄位跟施工明細一模一樣，廠商／施工人員共用同一份名單。
+       分開一張表＝統計時靠「填在哪一張」分正常出工或點工。最下面多一行「全部出工」（Q5 乙）。 -->
+  <div class="card dg-card">
+    <div class="card-header">
+      <span class="card-title">點工明細</span>
+      <button id="add-dg-btn" class="btn btn-a btn-sm no-print" onclick="addDgRowBtn()">＋ 新增點工</button>
+    </div>
+    <div class="tbl-wrap">
+      <table class="wtbl">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th style="min-width:90px">施作位置</th>
+            <th style="min-width:100px">施工項目</th>
+            <th style="min-width:130px">施工說明</th>
+            <th style="min-width:88px">今日廠商</th>
+            <th style="min-width:88px">今日<br>施工人員</th>
+            <th style="width:48px">今日<br>出工</th>
+            <th style="min-width:88px">明日廠商</th>
+            <th style="min-width:88px">明日<br>施工人員</th>
+            <th style="width:48px">明日<br>出工</th>
+            <th style="width:64px">完成<br>進度%</th>
+            <th style="min-width:84px">異常類型</th>
+            <th style="min-width:110px">備註</th>
+            <th style="min-width:70px">填表人</th>
+            <th class="no-print" style="width:30px">刪</th>
+          </tr>
+        </thead>
+        <tbody id="dg-tbody"></tbody>
+        <tfoot>
+          <tr class="tfoot-row">
+            <td colspan="4" style="text-align:right;padding-right:10px">點工明細合計</td>
+            <td></td><td></td><td id="dg-tot-today">0</td>
+            <td></td><td></td><td id="dg-tot-tmrw">0</td>
+            <td colspan="5"></td>
+          </tr>
+          <tr class="tfoot-row all-row">
+            <td colspan="4" style="text-align:right;padding-right:10px">全部出工</td>
+            <td></td><td></td><td id="all-tot-today">0</td>
+            <td></td><td></td><td id="all-tot-tmrw">0</td>
+            <td colspan="5"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 
   <!-- 材料明細 -->
@@ -1042,6 +1100,9 @@ window._cloudErrBar = (function(){
         <button id="mv-list" class="gbtn" onclick="setMgView('list')">📋 報表清單</button>
         <button id="mv-loc"  class="gbtn" onclick="setMgView('loc')">📍 位置進度</button>
         <button id="mv-man"  class="gbtn" onclick="setMgView('man')">👷 出工統計</button>
+        <!-- 2026-11-02 她定順序：點工統計接在出工統計旁邊、廠商統計其次、材料統計移到最後 -->
+        <button id="mv-dg"   class="gbtn" onclick="setMgView('dg')">🧾 點工統計</button>
+        <button id="mv-ven"  class="gbtn" onclick="setMgView('ven')">🏭 廠商統計</button>
         <button id="mv-mat"  class="gbtn" onclick="setMgView('mat')">📦 材料統計</button>
       </div>
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
@@ -1482,6 +1543,8 @@ window._cloudErrBar = (function(){
         <input type="checkbox" id="carry-notes" checked> 備註事項</label>
       <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
         <input type="checkbox" id="carry-work" checked> 施工明細</label>
+      <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+        <input type="checkbox" id="carry-dg"> 點工明細<span style="color:var(--muted)">（點工通常是臨時的，預設不帶）</span></label>
     </div>
 
     <div class="flex gap2" style="justify-content:flex-end;flex-wrap:wrap">
@@ -1645,7 +1708,7 @@ function newSubmissionId(){
 function stampSubmission(rep){
   const me = (S.user && S.user.name) || '', dept = (S.user && S.user.dept) || '';
   const sid = newSubmissionId(), at = new Date().toISOString();
-  ['workItems','materials'].forEach(k => {
+  ['workItems','dgItems','materials'].forEach(k => {
     (rep[k]||[]).forEach(row => {
       if(!row) return;
       if(!row.owner) row.owner = me;      // 沒主人的舊列＝我現在填的
@@ -1664,6 +1727,7 @@ function reportDepts(r){
   const push = d => { d = String(d||'').trim(); if(d && out.indexOf(d) < 0) out.push(d); };
   push(r && r.dept);
   ((r && r.workItems)||[]).forEach(wi => push(wi && wi.subDept));
+  ((r && r.dgItems)||[]).forEach(wi => push(wi && wi.subDept));
   ((r && r.materials)||[]).forEach(m => push(m && m.subDept));
   return out;
 }
@@ -1682,7 +1746,7 @@ function reportHasDept(r, dept){ return !dept || reportDepts(r).indexOf(dept) >=
  * 不覆蓋別人已經填好的天氣／注意事項。 */
 function mergeIntoKeyed(target, mine){
   const out = JSON.parse(JSON.stringify(target));
-  ['workItems','materials'].forEach(k => {
+  ['workItems','dgItems','materials'].forEach(k => {
     const have = new Set((out[k]||[]).map(x => x && x.id).filter(Boolean));
     out[k] = out[k] || [];
     (mine[k]||[]).forEach(row => {
@@ -1707,7 +1771,7 @@ function blankReport() {
   return {
     id: uid(), date: today(), dept:'', reporter:'', weather:'',
     projId:'', projName:'',                       // C 批：案場升到報表層
-    workItems: [], materials: [],
+    workItems: [], dgItems: [], materials: [],   // dgItems＝點工明細（2026-11-02）
     notes: { contact:'', other:'' },
     photos: [], createdAt: new Date().toISOString()
   };
@@ -2280,6 +2344,7 @@ function mergeReport(local, cloud, me, base){
   if (!cloud) return local;
   var out = Object.assign({}, local);
   out.workItems = mergeRows(local.workItems, cloud.workItems, me, base ? base.workItems : null);
+  out.dgItems   = mergeRows(local.dgItems,   cloud.dgItems,   me, base ? base.dgItems   : null);
   out.materials = mergeRows(local.materials, cloud.materials, me, base ? base.materials : null);
   out.photos    = mergeRows(local.photos,    cloud.photos,    me, base ? base.photos    : null);
   ['date','dept','reporter','weather','projId','projName'].forEach(function(k){
@@ -2292,7 +2357,7 @@ function mergeReport(local, cloud, me, base){
   };
   // 摘要要含別人的列，否則只剩我自己那幾條；材料／備註／天氣也用合併後的版本
   out.summary = summaryFromItems(out.workItems, out.date||'', out.projName||'',
-                                 out.materials, out.notes, out.weather);
+                                 out.materials, out.notes, out.weather, null, null, out.dgItems);
   return out;
 }
 function _snapshotReports(list){
@@ -2889,7 +2954,7 @@ function refreshScopedSelects(){
     sel.innerHTML = selOpts(list, cur, ph);
     sel.value = cur;                      // 不在清單裡的話 selOpts 已經補上，設得回去
   };
-  ($('tbody') ? [].slice.call($('tbody').querySelectorAll('tr')) : []).forEach(function(tr){
+  [].slice.call(document.querySelectorAll('#tbody > tr, #dg-tbody > tr')).forEach(function(tr){
     swap(tr.querySelector('[data-f="loc"]'),     locs,    '施作位置...');
     swap(tr.querySelector('[data-f="vendor"]'),  vendors, '廠商...');
     swap(tr.querySelector('[data-f="vendor2"]'), vendors, '廠商...');
@@ -2969,10 +3034,11 @@ function checkDeptDateDuplicate() {
      只看資料的話，「先填兩列、再選案場」會被當成空草稿 → 自動載入別張，剛填的就不見了。
      所以連畫面上的列與欄位一起看。 */
   const _domRows = ($('tbody') ? $('tbody').children.length : 0)
+                 + ($('dg-tbody') ? $('dg-tbody').children.length : 0)
                  + ($('mat-tbody') ? $('mat-tbody').children.length : 0);
   const _domNotes = (($('n-contact')||{}).value||'') + (($('n-other')||{}).value||'') + (($('f-weather')||{}).value||'');
   const emptyDraft = !_domRows && !_domNotes
-    && !(S.report.workItems||[]).length && !(S.report.materials||[]).length
+    && !(S.report.workItems||[]).length && !(S.report.dgItems||[]).length && !(S.report.materials||[]).length
     && !(S.report.notes && (S.report.notes.contact||S.report.notes.other)) && !S.report.weather;
   if (emptyDraft && _reportStarted && !_loadingDup && !_noAutoLoad) {
     _loadingDup = true;
@@ -3002,7 +3068,7 @@ function mergeDupHere(){
   if (!confirm('要把另外 ' + dups.length + ' 張的明細併進這一張嗎？\n（併完那幾張會刪掉，明細都會保留在這一張裡）')) return;
   let rows = 0;
   dups.forEach(function(d){
-    rows += ((d.workItems||[]).length) + ((d.materials||[]).length);
+    rows += ((d.workItems||[]).length) + ((d.dgItems||[]).length) + ((d.materials||[]).length);
     S.report = normReport(mergeIntoKeyed(S.report, d));
   });
   const idx = S.reports.findIndex(r=>r.id===S.report.id);
@@ -3295,6 +3361,7 @@ function carryApply(){
   const wantMat   = $('carry-mat').checked;
   const wantNotes = $('carry-notes').checked;
   const wantWork  = $('carry-work').checked;
+  const wantDg    = !!($('carry-dg') && $('carry-dg').checked);
   closeCarryModal();
 
   _noAutoLoad = true;            // 帶入期間先不要自動載入既有那張（見檔案上方說明）
@@ -3311,6 +3378,10 @@ function carryApply(){
   if (wantWork && (src.workItems||[]).length) {
     (src.workItems||[]).forEach(it => addRow({ ...it, id:uid(), owner:me }));
     brought.push(`施工明細 ${src.workItems.length} 筆`);
+  }
+  if (wantDg && (src.dgItems||[]).length) {
+    (src.dgItems||[]).forEach(it => addRow({ ...it, id:uid(), owner:me }, $('dg-tbody')));
+    brought.push(`點工明細 ${src.dgItems.length} 筆`);
   }
   if (wantNotes) {
     const n = src.notes || {};
@@ -3365,10 +3436,11 @@ function requireStarted(){
   return false;
 }
 function addRowBtn(){ if (appLockGuard()) return; if (!requireStarted()) return; addRow(); }
+function addDgRowBtn(){ if (appLockGuard()) return; if (!requireStarted()) return; addRow(null, $('dg-tbody')); }
 function addMatRowBtn(){ if (appLockGuard()) return; if (!requireStarted()) return; addMatRow(); }
 function newReport(seedDate) {
   if (appLockGuard()) return;
-  if ($('tbody').children.length > 0 || $('n-contact').value || $('n-other').value) {
+  if ($('tbody').children.length > 0 || ($('dg-tbody') && $('dg-tbody').children.length > 0) || $('n-contact').value || $('n-other').value) {
     if (!confirm('目前表單有內容，確定要離開它、開一張新的日報表？')) return;
   }
   openCarryModal(seedDate);
@@ -3425,6 +3497,8 @@ function renderReport() {
   $('n-other').value = S.report.notes?.other||'';
   $('tbody').innerHTML=''; rowN=0;
   (S.report.workItems||[]).forEach(it=>addRow(it));
+  $('dg-tbody').innerHTML='';
+  (S.report.dgItems||[]).forEach(it=>addRow(it, $('dg-tbody')));
   $('mat-tbody').innerHTML=''; matN=0;
   (S.report.materials||[]).forEach(m=>addMatRow(m));
   renderPhotos();
@@ -3454,6 +3528,7 @@ function syncReport() {
     other: $('n-other').value
   };
   S.report.workItems = collectRows();
+  S.report.dgItems = collectDgRows();
   refreshReporterField();
   S.report.materials = collectMatRows();
   buildSummary();
@@ -3597,7 +3672,7 @@ function applyUndoClearUI(){
  */
 function normReport(r){
   if(!r) return r;
-  ['workItems','materials','photos'].forEach(function(k){
+  ['workItems','dgItems','materials','photos'].forEach(function(k){
     if(!Array.isArray(r[k])) r[k] = [];
   });
   if(!r.notes || typeof r.notes !== 'object') r.notes = {};
@@ -3652,8 +3727,9 @@ function wdescFill(inp){
     return '<option value="' + escHtml(h.text) + '" label="' + escHtml(String(h.date).slice(5)) + '"></option>';
   }).join('');
 }
-function addRow(it) {
-  const tbody = $('tbody'); const n=++rowN;
+/* tb：要加在哪一張表。沒給＝施工明細；點工明細傳 $('dg-tbody')（2026-11-02，兩張表同一套列） */
+function addRow(it, tb) {
+  const tbody = tb || $('tbody'); const n=++rowN;
   const aOpts = ATYPES.map(([v,l])=>`<option value="${v}"${it?.atype===v?' selected':''}>${l}</option>`).join('');
   const v = f => it?(it[f]??''):'';
   const prog = it?Math.min(100,Math.max(0,parseFloat(it.progress)||0)):0;
@@ -4002,7 +4078,7 @@ function delRow(btn) {
   markRowDeleted(tr && tr.dataset && tr.dataset.id, S.report && S.report.id);   // 刻意刪 → 合併時不要復活
   tr.remove(); renum(); recalc(); buildSummary(); syncReport();
 }
-function renum() { ordRenum($('tbody'), '.rnum'); }
+function renum() { ordRenum($('tbody'), '.rnum'); if ($('dg-tbody')) ordRenum($('dg-tbody'), '.rnum'); }
 /* ══════ 施工明細／材料明細換順序（2026-10-14 她確認示意圖：1 所有人都能拖、2乙 最後存檔的人為準、3 手機 ↑↓）══════
  * 電腦：按住序號那格（⠿）拖到別列上；手機（卡片）：序號右邊的 ↑↓ 一格一格移。
  * 順序就是表格的順序：collectRows／collectMatRows 照畫面讀 → 存檔、摘要、Excel、列印都跟著。
@@ -4053,12 +4129,12 @@ document.addEventListener('click', function(e){
 /* 拖曳：按住序號格才讓那一列可以拖（整列一直 draggable 的話，格子裡的輸入框就選不了字） */
 let _ordDrag = null;
 document.addEventListener('mousedown', function(e){
-  const td = e.target && e.target.closest && e.target.closest('#tbody .rnum, #mat-tbody .mnum');
+  const td = e.target && e.target.closest && e.target.closest('#tbody .rnum, #dg-tbody .rnum, #mat-tbody .mnum');
   if (td && !e.target.closest('.ord-b')) td.parentNode.setAttribute('draggable','true');
 });
 function _ordClear(){ document.querySelectorAll('.ord-over-top,.ord-over-bot,.ord-dragging').forEach(x=>x.classList.remove('ord-over-top','ord-over-bot','ord-dragging')); }
 document.addEventListener('dragstart', function(e){
-  const tr = e.target && e.target.closest && e.target.closest('#tbody > tr, #mat-tbody > tr'); if (!tr) return;
+  const tr = e.target && e.target.closest && e.target.closest('#tbody > tr, #dg-tbody > tr, #mat-tbody > tr'); if (!tr) return;
   _ordDrag = tr; tr.classList.add('ord-dragging');
   try { e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain','ord'); } catch(err){}
 });
@@ -4082,14 +4158,15 @@ document.addEventListener('drop', function(e){
 document.addEventListener('dragend', function(){
   if (_ordDrag) { _ordDrag.removeAttribute('draggable'); _ordDrag = null; }
   _ordClear();
-  document.querySelectorAll('#tbody > tr[draggable], #mat-tbody > tr[draggable]').forEach(x=>x.removeAttribute('draggable'));
+  document.querySelectorAll('#tbody > tr[draggable], #dg-tbody > tr[draggable], #mat-tbody > tr[draggable]').forEach(x=>x.removeAttribute('draggable'));
 });
 function recalc() {
-  let t0=0, t1=0;
-  $('tbody').querySelectorAll('tr').forEach(tr=>{
+  const fmt = v => v%1===0?v:v.toFixed(1);
+  const tot = {tbody:[0,0], 'dg-tbody':[0,0]};
+  document.querySelectorAll('#tbody > tr, #dg-tbody > tr').forEach(tr=>{
     const w0 = parseFloat(tr.querySelector('[data-f="w0"]')?.value)||0;
     const w1 = parseFloat(tr.querySelector('[data-f="w1"]')?.value)||0;
-    t0+=w0; t1+=w1;
+    const t = tot[tr.parentNode.id]; t[0]+=w0; t[1]+=w1;
     if (w0===0 && tr.querySelector('[data-f="vendor"]')?.value) {
       tr.classList.add('row-zero');
       const at=tr.querySelector('[data-f="atype"]');
@@ -4099,8 +4176,14 @@ function recalc() {
       tr.querySelector('[data-f="atype"]')?.classList.remove('atype-warn');
     }
   });
-  $('tot-today').textContent = t0%1===0?t0:t0.toFixed(1);
-  $('tot-tmrw').textContent = t1%1===0?t1:t1.toFixed(1);
+  const [t0,t1] = tot.tbody, [d0,d1] = tot['dg-tbody'];
+  $('tot-today').textContent = fmt(t0);
+  $('tot-tmrw').textContent = fmt(t1);
+  /* 點工明細各自合計＋最下面「全部出工」（2026-11-02 Q5 乙） */
+  if ($('dg-tot-today')) {
+    $('dg-tot-today').textContent = fmt(d0); $('dg-tot-tmrw').textContent = fmt(d1);
+    $('all-tot-today').textContent = fmt(t0+d0); $('all-tot-tmrw').textContent = fmt(t1+d1);
+  }
 }
 /* 重建列時把 owner／提交資訊帶回來（用列 id 對回原本那一列）。
  * 沒有這一步：瑪摩那支會把別人的列認領成自己的，兩支的提交序號也會每次重生。 */
@@ -4117,9 +4200,9 @@ function _keepRowMeta(rows, key){
   });
   return rows;
 }
-function collectRows() {
+function collectRows(tb, key) {
   const rows=[];
-  $('tbody').querySelectorAll('tr').forEach(tr=>{
+  (tb || $('tbody')).querySelectorAll('tr').forEach(tr=>{
     rows.push({
       id: tr.dataset.id||uid(),
       owner: tr.dataset.owner||'',
@@ -4139,8 +4222,10 @@ function collectRows() {
       anote: tr.querySelector('[data-f="anote"]')?.value||''
     });
   });
-  return _keepRowMeta(rows, 'workItems');
+  return _keepRowMeta(rows, key || 'workItems');
 }
+/* 點工明細：同一套欄位，存在 dgItems（2026-11-02） */
+function collectDgRows(){ return $('dg-tbody') ? collectRows($('dg-tbody'), 'dgItems') : (((S.report||{}).dgItems)||[]); }
 
 /* ── SUMMARY ── */
 /* 摘要格式（2026-08-12 用戶指定）：
@@ -4358,7 +4443,7 @@ document.addEventListener('click', function(e){
   if(b && !b.hasAttribute('disabled')) sumPartToggle(b.getAttribute('data-k'));
 });
 
-function summaryFromItems(items, dateStr, projName, mats, notes, weather, parts, matOffSet){
+function summaryFromItems(items, dateStr, projName, mats, notes, weather, parts, matOffSet, dgItems){
   const P = parts || SUM_PARTS_DEF;       // 沒給＝整份都要（存檔／列印）
   const MO = matOffSet || {};             // 沒給＝材料一樣都不濾（存檔／列印）
   const rp = projName||'';
@@ -4366,7 +4451,7 @@ function summaryFromItems(items, dateStr, projName, mats, notes, weather, parts,
   if(P.title){ out.push(summaryTitle(dateStr, rp || ((items||[])[0]||{}).projName || '', weather)); out.push(''); }
 
   /* ── 施工明細 ── */
-  const lines = (items||[]).map(wi=>{
+  const lineOf = wi=>{
     /* C 批起案場由報表層提供；拆分前的舊資料若報表層還沒有，就沿用工項上的 */
     const pn = rp || wi.projName || '';
     /* 空白工項照樣產生（她指定「產生」）—— 只有「整列都沒有東西」才不算一列，
@@ -4381,9 +4466,14 @@ function summaryFromItems(items, dateStr, projName, mats, notes, weather, parts,
             `進度${parseFloat(wi.progress)||0}%`, wi.owner]
            .map(x => String(x == null ? '' : x).trim())
            .filter(Boolean).join('；');
-  }).filter(v => v !== null);
+  };
+  const lines = (items||[]).map(lineOf).filter(v => v !== null);
   /* 2026-09-22 她交辦：施工明細上方也要有段落標題，跟［材料明細］等其他三段一致 */
   if(P.items) out.push('［施工明細］', lines.length ? lines.map((l,i)=>(i+1)+'. '+l).join('\n') : '無');
+  /* 2026-11-02 Q6 甲：點工明細自成一段，格式跟施工明細一樣。
+     當天沒有點工就整段不出現 —— 大部分日報沒有點工，不要每封信都多一段「無」。 */
+  const dgLines = (dgItems||[]).map(lineOf).filter(v => v !== null);
+  if(P.items && dgLines.length) out.push('', '［點工明細］', dgLines.map((l,i)=>(i+1)+'. '+l).join('\n'));
 
   /* ── 材料 ── */
   if(P.mats){
@@ -4429,12 +4519,13 @@ function buildSummary() {
   const _date = $('f-date')?.value || S.report?.date || '';
   const _proj = curProjName();
   /* 完整版：列印（#f-summary-pv）與存檔（S.report.summary）都用這份 */
-  const txt = summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather);
+  const _dg = collectDgRows();
+  const txt = summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather, null, null, _dg);
   /* 畫面版：段落全開**而且**沒有取消任何材料時，就是同一份，不必重算
      （summaryMatArrival 要掃 S.reports，能省就省） */
   const _mo = matOffOf(_proj);
   const vis = (sumPartsAllOn() && !Object.keys(_mo).length) ? txt
-            : summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather, sumParts, _mo);
+            : summaryFromItems(_rows, _date, _proj, _mats, _notes, _weather, sumParts, _mo, _dg);
   $('f-summary').value = vis;            // 螢幕＋複製（copySummary 讀的就是這格）
   $('f-summary-pv').textContent = txt;   // 列印一律完整（她拍板：紙本是存檔憑證）
   autoGrow($('f-summary'));
@@ -4778,9 +4869,12 @@ const PH_UNSET='（未指定）';
  * 空白的由呼叫端顯示「（未指定）」（她指定：依日-瑪現在的表示方式）。
  * 說明一律以日報「現在」那一列為準 —— 事後改了說明，下載檔名跟著變。 */
 const PH_DESC_MAX=30;   // 檔名只取前 30 字（她 09-30 定；日報裡照樣可以打長）
+/* 點工照片（2026-11-03 她 A3／Q4 甲）：上傳時選的是點工明細那一列 → 照片記 dg:1，
+   說明去 dgItems 找；照片牆、燈箱、下載檔名、Excel 都標「點工」，跟施工照片分開 */
+function phIsDg(p){ return !!(p && p.dg); }
 function phRowDesc(p, r){
   if(!p) return '';
-  const rows=(((r||S.report||{}).workItems)||[]).filter(Boolean);
+  const rows=(((r||S.report||{})[phIsDg(p)?'dgItems':'workItems'])||[]).filter(Boolean);
   if(p.rowId){
     const hit=rows.find(w=>w.id===p.rowId);
     if(hit) return String(hit.wdesc||'').trim();
@@ -4822,36 +4916,44 @@ function phExt(p, src){
   const t=(m?m[1]:'jpeg').toLowerCase();
   return t==='jpeg'?'jpg':t;
 }
-/* 照片上方的下拉：列出這張日報目前有的工項，值是 tr 的序號 */
+/* 照片上方的下拉：列出這張日報目前有的工項，值是 tr 的序號
+   2026-11-03：點工明細也列（值是「dg＋序號」）；有點工時分成「施工明細／點工明細」兩組，沒點工就跟以前一樣 */
 function refreshPhWorkOptions(){
   const sel=$('ph-work'); if(!sel) return;
   const cur=sel.value;
-  const opts=[];
-  $('tbody').querySelectorAll('tr').forEach((tr,i)=>{
-    const loc=tr.querySelector('[data-f="loc"]')?.value||'';
-    const work=tr.querySelector('[data-f="work"]')?.value||'';
-    const desc=(tr.querySelector('[data-f="wdesc"]')?.value||'').trim();
-    // C 批：案場是整張報表的，下拉只要分得出「哪一項工項」就夠了
-    // 2026-09-30：多帶施工說明 —— 同位置同項目有好幾列時（e8柱、e9柱）才分得出來
-    if(loc||work){
-      opts.push({v:String(i),label:[loc,work].filter(Boolean).concat([desc||PH_UNSET]).join('｜')});
-    }
-  });
-  sel.innerHTML = opts.length
-    ? opts.map(o=>`<option value="${o.v}">${escHtml(o.label)}</option>`).join('')
-    : '<option value="">— 請先在上方新增工項 —</option>';
+  const rowsOf=(tb,pre)=>{
+    const opts=[];
+    if(tb) tb.querySelectorAll('tr').forEach((tr,i)=>{
+      const loc=tr.querySelector('[data-f="loc"]')?.value||'';
+      const work=tr.querySelector('[data-f="work"]')?.value||'';
+      const desc=(tr.querySelector('[data-f="wdesc"]')?.value||'').trim();
+      // C 批：案場是整張報表的，下拉只要分得出「哪一項工項」就夠了
+      // 2026-09-30：多帶施工說明 —— 同位置同項目有好幾列時（e8柱、e9柱）才分得出來
+      if(loc||work){
+        opts.push({v:pre+String(i),label:(pre?'（點工）':'')+[loc,work].filter(Boolean).concat([desc||PH_UNSET]).join('｜')});
+      }
+    });
+    return opts;
+  };
+  const wo=rowsOf($('tbody'),''), dg=rowsOf($('dg-tbody'),'dg');
+  const html=os=>os.map(o=>`<option value="${o.v}">${escHtml(o.label)}</option>`).join('');
+  sel.innerHTML = !wo.length && !dg.length ? '<option value="">— 請先在上方新增工項 —</option>'
+    : !dg.length ? html(wo)
+    : (wo.length ? '<optgroup label="施工明細">'+html(wo)+'</optgroup>' : '')+'<optgroup label="點工明細">'+html(dg)+'</optgroup>';
   if(cur && [...sel.options].some(o=>o.value===cur)) sel.value=cur;
 }
 function phTargetFromSelect(){
   const sel=$('ph-work'); const idx=sel?sel.value:'';
   if(idx==='') return null;
-  const tr=$('tbody').querySelectorAll('tr')[Number(idx)];
+  const dg=idx.startsWith('dg');
+  const tr=(dg?$('dg-tbody'):$('tbody'))?.querySelectorAll('tr')[Number(dg?idx.slice(2):idx)];
   if(!tr) return null;
   return {
     projName: curProjName(),          // C 批：案場取自報表層
     loc: tr.querySelector('[data-f="loc"]')?.value||'',
     work: tr.querySelector('[data-f="work"]')?.value||'',
-    rowId: tr.dataset.id||''          // 2026-09-30：記住是哪一列，下載檔名才帶得出正確的施工說明
+    rowId: tr.dataset.id||'',         // 2026-09-30：記住是哪一列，下載檔名才帶得出正確的施工說明
+    dg                                // 2026-11-03：掛在點工明細
   };
 }
 /* ── 照片壓縮（2026-08-18）────────────────────────────────────────
@@ -5046,7 +5148,8 @@ function _uploadPhotos(e) {
         id:_pid, data:r.data, thumb:'', name:f.name, ts:Date.now(),
         owner:(S.user&&S.user.name)||'',   // 多人共編：照片也記是誰上傳的，合併時別人的不會被蓋掉
         origName:f.name, origSize:f.size, origW:r.ow, origH:r.oh, w:r.w, h:r.h,
-        projName:tgt.projName, loc:tgt.loc, work:tgt.work, rowId:tgt.rowId||'', date:S.report?.date||today()
+        projName:tgt.projName, loc:tgt.loc, work:tgt.work, rowId:tgt.rowId||'', date:S.report?.date||today(),
+        ...(tgt.dg ? {dg:1} : {})          // 點工照片（2026-11-03）；施工照片不多存這一格
       });
       _thumbJobs.push(makeThumb(r.data).then(function(th){
         /* 2026-09-23 第 2 步：縮圖改放記憶體＋待推清單，報表裡的 thumb 保持空字串，
@@ -5081,10 +5184,11 @@ function renderPhotos() {
   const empty=$('ph-empty'); if(empty) empty.style.display=list.length?'none':'';
   if(!list.length){ host.innerHTML=''; return; }
   const groups=phGroups(list);
+  /* 標題用第一張的路徑（key 尾巴可能多了點工記號）；點工那組標橘色「點工」（2026-11-03 Q4 甲） */
   host.innerHTML=[...groups.entries()].map(([key,items])=>`
-    <div class="tl-group">
+    <div class="tl-group${phIsDg(items[0].p)?' ph-dg':''}">
       <div class="tl-head">
-        <span style="flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary);overflow-wrap:anywhere">📁 ${escHtml(key)}</span>
+        <span style="flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary);overflow-wrap:anywhere">📁 ${escHtml(phPath(items[0].p).join(' / '))}${phIsDg(items[0].p)?' <span class="ph-dg-tag">點工</span>':''}</span>
         <span class="tl-count">${items.length} 張</span>
       </div>
       <div class="tl-body">
@@ -5104,7 +5208,7 @@ function renderPhotos() {
 function phGroups(list){
   const groups=new Map();
   (list||[]).forEach((p,i)=>{
-    const key=phPath(p).join(' / ');
+    const key=phPath(p).join(' / ')+(phIsDg(p)?' \u0000dg':'');   /* 點工跟施工就算位置／項目／說明一樣也分開放 */
     if(!groups.has(key)) groups.set(key,[]);
     groups.get(key).push({p,i});
   });
@@ -5167,7 +5271,7 @@ function openPh(i) {
     if(full && viewPhIdx===i && $('ph-overlay').classList.contains('show')) $('ph-img').src=full;
   });
   const lbl=$('ph-phase-lbl');
-  if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=phPath(p).join(' / '); }
+  if(lbl){ lbl.className='phase-tag ph-d'; lbl.textContent=(phIsDg(p)?'【點工】':'')+phPath(p).join(' / '); }
   $('ph-overlay').classList.add('show');
   phNavSync();
 }
@@ -5207,7 +5311,8 @@ function phFileNames(list, fulls){
     const head=[lw.loc,lw.work].map(s=>String(s||'').trim()).filter(Boolean).map(safeName);
     const ymd=phYmd(p.date||S.report?.date);
     /* 位置、項目都沒有 → 只寫「未分類」，不再加（未指定）（她 09-30 選甲，兩個佔位字疊在一起看不懂） */
-    const prefix=(head.length?head.concat([phDescName(p)]):['未分類']).concat(ymd?[ymd]:[]).join('_');
+    /* 點工照片檔名前面加「點工_」（2026-11-03 Q4 甲）；序號也因此跟施工照片分開數 */
+    const prefix=(phIsDg(p)?['點工']:[]).concat(head.length?head.concat([phDescName(p)]):['未分類']).concat(ymd?[ymd]:[]).join('_');
     seq[prefix]=(seq[prefix]||0)+1;
     out[i]=prefix+'_'+String(seq[prefix]).padStart(3,'0')+'.'+phExt(p,(fulls&&fulls[i])||'');
   });
@@ -5313,6 +5418,22 @@ function calFill(r){
   if (!r.weather)  return 'part';
   if (!wi.reduce((s,w)=>s+(Number(w.w0)||0),0)) return 'part';
   return 'full';
+}
+/* 清單上那一行（2026-11-03 她 A2＋Q1 甲＋Q2 甲）：
+ *   出工 N 人工 ／ 點工 N 人工 ／ N 筆明細
+ *   · 出工＝施工明細的今日出工；點工＝點工明細的今日出工，那天沒點工就整段不寫
+ *   · 筆明細＝施工明細＋點工明細的列數
+ * 日曆檢視（renderCalDay）、歷史資料（renderHistory）共用；回傳 HTML（只有數字，沒有使用者打的字） */
+function rptW0(list){ return (list||[]).reduce((s,w)=>s+(Number(w&&w.w0)||0),0); }
+function rptCountHtml(r){
+  const t0=rptW0(r.workItems), d0=rptW0(r.dgItems);
+  const n=(r.workItems||[]).length+(r.dgItems||[]).length;
+  return '出工 '+t0+' 人工'+(d0?' ／ <span class="rpt-dg">點工 '+d0+' 人工</span>':'')+' ／ '+n+' 筆明細';
+}
+/* 分組抬頭（Q3 甲）：「· 點工 N」，整組沒點工就不寫；歷史資料、管理總表報表清單共用 */
+function rptGroupDgHtml(rows, fmt){
+  const d0=(rows||[]).reduce((s,r)=>s+rptW0(r.dgItems),0);
+  return d0 ? ' · <span class="rpt-dg">點工 '+(fmt?fmt(d0):d0)+'</span>' : '';
 }
 function calWhyPart(r){
   const wi = r.workItems || [], why = [];
@@ -5447,13 +5568,12 @@ function renderCalDay(){
        + '</div>';
   } else {
     rs.forEach(r=>{
-      const t0   = (r.workItems||[]).reduce((s,w)=>s+(Number(w.w0)||0),0);
       const part = calFill(r)==='part';
       h += '<div class="ritem"'+(part ? ' style="border-left-color:var(--warning)"' : '')+'>'
          +   '<div class="ritem-date"><div class="day">'+d.getDate()+'</div><div class="mon">'+(d.getMonth()+1)+'月</div></div>'
          +   '<div class="ritem-info"><h3>'+escHtml(reportProjName(r)||'（未指定案場）')+'</h3>'
          +     '<p style="margin-bottom:2px">'+escHtml(r.dept||'—')+' — '+escHtml(reportReporterText(r))+'</p>'
-         +     '<p>出工 '+t0+' 人工 ／ '+((r.workItems||[]).length)+' 筆明細'
+         +     '<p>'+rptCountHtml(r)
          +       (part ? ' ／ <b style="color:var(--warning)">未填完：'+escHtml(calWhyPart(r))+'</b>' : '')
          +     '</p></div>'
          +   '<div class="ritem-actions"><button class="btn btn-o btn-sm" onclick="openReportFromHistory(\''+r.id+'\',\'cal\')">開啟</button></div>'
@@ -5529,20 +5649,19 @@ function renderHistory() {
     sec.className='hgrp';
     sec.innerHTML=`<div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
       <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
-      <span class="gcnt">${rows.length} 張 · 出工 ${s0%1===0?s0:s0.toFixed(1)}</span></div>`;
+      <span class="gcnt">${rows.length} 張 · 出工 ${s0%1===0?s0:s0.toFixed(1)}${rptGroupDgHtml(rows,v=>v%1===0?v:v.toFixed(1))}</span></div>`;
     if(open){
       const body=document.createElement('div');
       body.className='hgrp-body';
       rows.forEach(r=>{
         const d=new Date(r.date+'T00:00:00');
-        const t0=(r.workItems||[]).reduce((s,wi)=>s+(wi.w0||0),0);
         const div=document.createElement('div');
         div.className='ritem';
         /* 抬頭已經寫了分組的那一項，卡片標題就換成另一項（案場↔日期），避免整頁都在重複同一個名字 */
         const title=byProj?(r.date+'（'+DOW[d.getDay()]+'）'):(reportProjName(r)||'（未指定案場）');
         const sub=byProj
-          ?`出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細`
-          :`📅 ${r.date}（${DOW[d.getDay()]}）／ 出工 ${t0} 人工 ／ ${(r.workItems||[]).length} 筆明細`;
+          ?rptCountHtml(r)
+          :`📅 ${r.date}（${DOW[d.getDay()]}）／ `+rptCountHtml(r);
         div.innerHTML=`
           <div class="ritem-info">
             <h3 class="ritem-proj">${escHtml(title)}</h3>
@@ -5707,9 +5826,10 @@ function renderMgmtHead(){
  *   list 報表清單（原本的）／loc 位置進度／man 出工統計／mat 材料統計
  * 日期改成起訖區間，預設不套用＝看全部 —— 一進來就被篩掉會讓人以為報表不見了。 */
 const MGVIEW_LSKEY=GROUP_LSKEY.replace('_group','_mgview');
-let mgView=(function(){try{const v=localStorage.getItem(MGVIEW_LSKEY);return ['list','loc','man','mat'].indexOf(v)>=0?v:'list'}catch(e){return 'list'}})();
+const MG_VIEWS=['list','loc','man','dg','ven','mat'];   // dg 點工統計／ven 廠商統計（2026-11-02）
+let mgView=(function(){try{const v=localStorage.getItem(MGVIEW_LSKEY);return MG_VIEWS.indexOf(v)>=0?v:'list'}catch(e){return 'list'}})();
 function setMgView(v){
-  mgView=['list','loc','man','mat'].indexOf(v)>=0?v:'list';
+  mgView=MG_VIEWS.indexOf(v)>=0?v:'list';
   try{localStorage.setItem(MGVIEW_LSKEY,mgView)}catch(e){}
   renderMgmt();
 }
@@ -5809,11 +5929,12 @@ function mgHit(r,f){
 }
 function mgReports(){ const f=mgFilter(); return visibleReports().filter(r=>mgHit(r,f)); }
 /* 舊報表一張可能混多個案場 → 篩了案場就只留那個案場的工項 */
-function mgWorkItems(){
+/* key：'workItems' 施工明細（預設）／'dgItems' 點工明細（2026-11-02） */
+function mgWorkItems(key){
   const f=mgFilter(); const out=[];
   mgReports().forEach(r=>{
     const rpid=reportProjId(r);
-    (r.workItems||[]).forEach(wi=>{
+    (r[key||'workItems']||[]).forEach(wi=>{
       const pid=rpid||wi.projId||'';
       if(f.proj && pid!==f.proj)return;
       out.push({r,wi,pid,pname:rpid?(r.projName||reportProjName(r)):(wi.projName||'（未指定案場）')});
@@ -5852,21 +5973,63 @@ function getLocProgressRows(){
 const NO_WDESC='（沒填說明）';
 /* ② 出工統計：**一列＝一天**（2026-09-02 用戶指定；原本是一列＝案場×廠商）。
  * 案場移到抬頭上，所以列裡只留日期、當天有哪些廠商、當天出工與明日預估。 */
+/* 2026-11-02 Q2 甲：多一欄「今日點工」（dg）。「今日出工」照舊只算施工明細，兩個數字分開看；
+ * 明日預估、工項數也只算施工明細。只有點工的那天一樣會出現一列（今日出工 0）。 */
 function getManpowerRows(){
   const m=new Map();
-  mgWorkItems().forEach(({r,wi,pname})=>{
+  const add=(dg)=>({r,wi,pname})=>{
     const date=r.date||'（未填日期）';
     const k=pname+'\u0000'+date;
-    if(!m.has(k))m.set(k,{proj:pname,date,vendors:[],w0:0,w1:0,items:0,hits:[]});
+    if(!m.has(k))m.set(k,{proj:pname,date,vendors:[],w0:0,w1:0,dg:0,items:0,hits:[]});
     const o=m.get(k);
     const ven=(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'（未指定廠商）';
     if(o.vendors.indexOf(ven)<0)o.vendors.push(ven);
-    o.w0+=(wi.w0||0); o.w1+=(wi.w1||0); o.items++;
-    /* 2026-10-14：細項＝那天每一個工項（照日報上的順序） */
-    o.hits.push({loc:wi.loc||'', work:wi.work||'', vendor:ven, staff:staffText(wi.staff)||'', w0:wi.w0||0, w1:wi.w1||0});
-  });
+    if(dg){ o.dg+=(wi.w0||0); }
+    else { o.w0+=(wi.w0||0); o.w1+=(wi.w1||0); o.items++; }
+    /* 2026-10-14：細項＝那天每一個工項（照日報上的順序；點工的排在後面、標「點工」） */
+    o.hits.push({loc:wi.loc||'', work:wi.work||'', vendor:ven, staff:staffText(wi.staff)||'', w0:wi.w0||0, w1:wi.w1||0, dg:!!dg});
+  };
+  mgWorkItems().forEach(add(false));
+  mgWorkItems('dgItems').forEach(add(true));
   return [...m.values()]
     .sort((a,b)=>a.proj.localeCompare(b.proj,'zh-Hant',{numeric:true})||String(b.date).localeCompare(String(a.date)));
+}
+/* ══ 點工統計／廠商統計（2026-11-02 她 Q8 甲）══
+ * 都只算「今日出工」（實際有來的）；明日是預排，不算。
+ * 點工統計＝點工明細逐筆（日期｜廠商｜施作位置｜施工項目｜施工人員｜點工），依廠商分組、每家一行小計 —— 對帳用。
+ * 廠商統計＝每家一列：正常出工（施工明細）｜點工｜合計｜出工天數（兩張表任一張有出工的日子，同一天只算一次）。 */
+function getDgRows(){
+  const zh=(a,b)=>String(a).localeCompare(String(b),'zh-Hant',{numeric:true});
+  return mgWorkItems('dgItems').map(({r,wi,pname})=>({
+    proj:pname, date:r.date||'', vendor:(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'（未指定廠商）',
+    loc:wi.loc||'', work:wi.work||'', staff:staffText(wi.staff)||'', w0:Number(wi.w0)||0
+  })).sort((a,b)=>zh(a.proj,b.proj)||zh(a.vendor,b.vendor)||String(a.date).localeCompare(String(b.date)));
+}
+function getVendorRows(){
+  const m=new Map();
+  const add=(dg)=>({r,wi,pname})=>{
+    const w=Number(wi.w0)||0;
+    const ven=(typeof wiVendor==='function'?wiVendor(wi):wi.vendor)||'';
+    if(!ven&&!w)return;                                  // 空白列不算
+    const v=ven||'（未指定廠商）', k=pname+'\u0000'+v;
+    if(!m.has(k))m.set(k,{proj:pname,vendor:v,w0:0,dg:0,days:new Set()});
+    const o=m.get(k);
+    if(dg)o.dg+=w; else o.w0+=w;
+    if(w>0&&r.date)o.days.add(r.date);
+  };
+  mgWorkItems().forEach(add(false));
+  mgWorkItems('dgItems').forEach(add(true));
+  const zh=(a,b)=>String(a).localeCompare(String(b),'zh-Hant',{numeric:true});
+  return [...m.values()].map(o=>({proj:o.proj,vendor:o.vendor,w0:o.w0,dg:o.dg,total:o.w0+o.dg,days:o.days.size}))
+    .sort((a,b)=>zh(a.proj,b.proj)||zh(a.vendor,b.vendor));
+}
+/* 點工逐筆＋每家小計，畫面和 Excel 共用（小計行 sub:true） */
+function dgWithSubtotals(list){
+  const out=[]; let cur=null, sum=0;
+  const flush=()=>{ if(cur!==null) out.push({sub:true,proj:list[0]&&list[0].proj,vendor:cur,w0:sum}); };
+  list.forEach(o=>{ if(o.vendor!==cur){ flush(); cur=o.vendor; sum=0; } out.push(o); sum+=o.w0; });
+  flush();
+  return out;
 }
 /* ③ 材料統計：依「材料名稱＋單位」加總（名稱是設定頁的下拉選項，不會有錯字拆散問題） */
 /* ③ 材料統計：**一列＝一種材料**，案場移到抬頭上（2026-09-02 用戶指定）。
@@ -5946,14 +6109,14 @@ let _openStatRows=new Set();
 /* 2026-10-14「細項展開／細項收合」也套到三張統計：改成「基準＋例外」（跟報表清單的 _detAll 一樣），
  * _openStatRows 變成例外清單 —— 全開之後單獨關掉的那列，重畫後仍然關著。
  * 基準每張統計各一個：在材料統計按全開，切到位置進度不會跟著全開。 */
-let _statDetAll={loc:false,man:false,mat:false};
+let _statDetAll={loc:false,man:false,dg:false,ven:false,mat:false};
 function statRowOpen(key){ return _statDetAll[mgView] ? !_openStatRows.has(key) : _openStatRows.has(key); }
 function toggleStatRow(key){
   if(_openStatRows.has(key))_openStatRows.delete(key); else _openStatRows.add(key);
   renderMgmt();
 }
 /* rows 要帶 proj，這裡照案場分組畫出「抬頭 ＋ 表格」 */
-function statGrouped(rows,headers,cellsOf,summaryOf,footOf,detailOf,keyOf){
+function statGrouped(rows,headers,cellsOf,summaryOf,footOf,detailOf,keyOf,rowsOf){
   if(!rows.length)return statEmptyHtml();
   const force=mgmtFilterActive();
   const m=new Map();
@@ -5965,7 +6128,7 @@ function statGrouped(rows,headers,cellsOf,summaryOf,footOf,detailOf,keyOf){
       +'<div class="ghead'+(open?'':' closed')+'" onclick="toggleStatGroup('+gi+')">'
       +'<span class="gchev">▼</span><span>📁 '+escHtml(key)+'</span>'
       +'<span class="gcnt">'+escHtml(summaryOf(list))+'</span></div>'
-      +(open?statTableHtml(headers,list.map(cellsOf),footOf?footOf(list):null,
+      +(open?statTableHtml(headers,rowsOf?rowsOf(list):list.map(cellsOf),footOf?footOf(list):null,
           detailOf?list.map(detailOf):null, keyOf?list.map(keyOf):null):'')
       +'</div>';
   }).join('');
@@ -5984,14 +6147,30 @@ function renderMgStat(){
       o=>({ open:statRowOpen(locRowKey(o)), html:locHitsHtml(o) }),
       o=>locRowKey(o));
   } else if(mgView==='man'){
-    /* 一列＝一天（重點是每天出多少工） */
+    /* 一列＝一天（重點是每天出多少工）；2026-11-02 多「今日點工」 */
     box.innerHTML=statGrouped(getManpowerRows(),
-      [{t:'日期'},{t:'廠商'},{t:'今日出工',num:1},{t:'明日預估',num:1},{t:'工項數',num:1}],
-      o=>[dow(o.date),escHtml(o.vendors.join('、')),_n1(o.w0),_n1(o.w1),o.items],
-      list=>list.length+' 天 · 出工合計 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
-      list=>['合計','',_n1(list.reduce((s,o)=>s+o.w0,0)),_n1(list.reduce((s,o)=>s+o.w1,0)),list.reduce((s,o)=>s+o.items,0)],
+      [{t:'日期'},{t:'廠商'},{t:'今日出工',num:1},{t:'今日點工',num:1},{t:'明日預估',num:1},{t:'工項數',num:1}],
+      o=>[dow(o.date),escHtml(o.vendors.join('、')),_n1(o.w0),_n1(o.dg),_n1(o.w1),o.items],
+      list=>list.length+' 天 · 出工合計 '+_n1(list.reduce((s,o)=>s+o.w0,0))+' · 點工 '+_n1(list.reduce((s,o)=>s+o.dg,0)),
+      list=>['合計','',_n1(list.reduce((s,o)=>s+o.w0,0)),_n1(list.reduce((s,o)=>s+o.dg,0)),_n1(list.reduce((s,o)=>s+o.w1,0)),list.reduce((s,o)=>s+o.items,0)],
       o=>({ open:statRowOpen(manRowKey(o)), html:manHitsHtml(o) }),
       o=>manRowKey(o));
+  } else if(mgView==='dg'){
+    /* 點工逐筆，依廠商分組、每家一行小計（對帳用） */
+    box.innerHTML=statGrouped(getDgRows(),
+      [{t:'日期'},{t:'廠商'},{t:'施作位置'},{t:'施工項目'},{t:'施工人員'},{t:'點工',num:1}],
+      null, list=>list.length+' 筆 · 點工 '+_n1(list.reduce((s,o)=>s+o.w0,0)),
+      list=>['合計','','','','',_n1(list.reduce((s,o)=>s+o.w0,0))],
+      null, null, list=>dgWithSubtotals(list).map(o=>o.sub
+        ? ['','<b class="dg-nw">'+escHtml(o.vendor)+' 小計</b>','','','','<b>'+_n1(o.w0)+'</b>']
+        : ['<span class="dg-nw">'+dow(o.date)+'</span>',escHtml(o.vendor),escHtml(o.loc||'—'),escHtml(o.work||'—'),escHtml(o.staff||'—'),_n1(o.w0)]));
+  } else if(mgView==='ven'){
+    /* 每家廠商一列：正常出工／點工／合計／出工天數 */
+    box.innerHTML=statGrouped(getVendorRows(),
+      [{t:'廠商'},{t:'正常出工',num:1},{t:'點工',num:1},{t:'合計',num:1},{t:'出工天數',num:1}],
+      o=>[escHtml(o.vendor),_n1(o.w0),_n1(o.dg),_n1(o.total),o.days],
+      list=>list.length+' 家 · 合計 '+_n1(list.reduce((s,o)=>s+o.total,0)),
+      list=>['合計',_n1(list.reduce((s,o)=>s+o.w0,0)),_n1(list.reduce((s,o)=>s+o.dg,0)),_n1(list.reduce((s,o)=>s+o.total,0)),'']);
   } else if(mgView==='mat'){
     /* 一列＝一種材料（重點是總共用了多少）。
        2026-09-03 用戶指定：單位縮小、移到「數量合計」後面；每一列可展開看各筆日期。 */
@@ -6035,9 +6214,9 @@ function manHitsHtml(o){
     +' 的工項（'+hits.length+' 項）</div>'
     +'<table class="mat-hits-tbl hits-nw"><thead><tr><th>施作位置</th><th>施工項目</th><th>廠商</th><th>施工人員</th>'
     +'<th style="text-align:right">今日</th><th style="text-align:right">明日</th></tr></thead><tbody>'
-    +hits.map(h=>'<tr><td>'+escHtml(h.loc||'—')+'</td><td>'+escHtml(h.work||'—')+'</td>'
+    +hits.map(h=>'<tr><td>'+escHtml(h.loc||'—')+'</td><td>'+escHtml(h.work||'—')+(h.dg?' <span class="dg-tag">點工</span>':'')+'</td>'
       +'<td>'+escHtml(h.vendor||'—')+'</td><td>'+escHtml(h.staff||'—')+'</td>'
-      +'<td style="text-align:right">'+_n1(h.w0)+'</td><td style="text-align:right">'+_n1(h.w1)+'</td></tr>').join('')
+      +'<td style="text-align:right">'+_n1(h.w0)+'</td><td style="text-align:right">'+(h.dg?'—':_n1(h.w1))+'</td></tr>').join('')
     +'</tbody></table></div>';
 }
 function matHitsHtml(o){
@@ -6055,7 +6234,7 @@ function matHitsHtml(o){
     +'</tbody></table></div>';
 }
 function syncMgViewButtons(){
-  [['mv-list','list'],['mv-loc','loc'],['mv-man','man'],['mv-mat','mat']].forEach(([id,v])=>{
+  [['mv-list','list'],['mv-loc','loc'],['mv-man','man'],['mv-dg','dg'],['mv-ven','ven'],['mv-mat','mat']].forEach(([id,v])=>{
     const b=$(id); if(b)b.classList.toggle('on',mgView===v);
   });
 }
@@ -6099,7 +6278,7 @@ function renderMgmt(){
     head.className='grp-row';
     head.innerHTML=`<td colspan="${COLS}"><div class="ghead${open?'':' closed'}" onclick="toggleGroup(${gi})">
       <span class="gchev">▼</span><span>${byProj?'📁':'📅'} ${escHtml(groupLabel(key))}</span>
-      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}</span></div></td>`;
+      <span class="gcnt">${rows.length} 張 · 出工 ${num(s0)}${rptGroupDgHtml(rows,num)}</span></div></td>`;
     tbody.appendChild(head);
     if(!open)return;
     rows.forEach(r=>{
@@ -6205,6 +6384,14 @@ function getMgmtMatRows(){
   });
   return sortExRows(rows);
 }
+/* 管理總表要匯出的點工列（2026-11-02）——跟 getMgmtRows 同一套條件，只是讀 dgItems */
+function getMgmtDgRows(){
+  const rows=mgWorkItems('dgItems').map(({r,wi,pid,pname})=>({
+    date:r.date,dept:r.dept,reporter:reportReporterText(r),...wi,
+    projId:pid, projName: reportProjId(r) ? pname : (wi.projName||'')
+  }));
+  return sortExRows(rows);
+}
 function getMgmtRows(){
   /* 2026-09-02：改吃日期區間（原本是單一天），判準與畫面共用 mgWorkItems() */
   const rows=mgWorkItems().map(({r,wi,pid,pname})=>({
@@ -6221,8 +6408,9 @@ function exportMgmtExcel(){
     /* 2026-09-18：這裡原本只送工項 → 匯出少了「材料明細」分頁（報表下載那條路一直都有）。
        判準與畫面共用 mgReports()，看到哪幾張就匯哪幾張的材料。 */
     const matRows=getMgmtMatRows();
-    if(!rows.length&&!matRows.length){toast('無符合條件的資料','e');return;}
-    doExportExcel(rows, matRows, '管理總表');
+    const dgRows=getMgmtDgRows();
+    if(!rows.length&&!matRows.length&&!dgRows.length){toast('無符合條件的資料','e');return;}
+    doExportExcel(rows, matRows, '管理總表', dgRows);
     return;
   }
   /* Excel 是平的表，沒有抬頭可用 → 案場放第一欄（2026-09-02 用戶指定「案場移至最前面」） */
@@ -6234,8 +6422,16 @@ function exportMgmtExcel(){
     body=getLocProgressRows().map(o=>[o.proj,o.loc,o.work,o.desc,o.progress===null?'':o.progress,o.last,_n1(o.w0),o.n]);
   } else if(mgView==='man'){
     title='出工統計';
-    headers=['案場','日期','廠商','今日出工','明日預估','工項數'];
-    body=getManpowerRows().map(o=>[o.proj,o.date,o.vendors.join('、'),_n1(o.w0),_n1(o.w1),o.items]);
+    headers=['案場','日期','廠商','今日出工','今日點工','明日預估','工項數'];
+    body=getManpowerRows().map(o=>[o.proj,o.date,o.vendors.join('、'),_n1(o.w0),_n1(o.dg),_n1(o.w1),o.items]);
+  } else if(mgView==='dg'){
+    title='點工統計';
+    headers=EX_DG_HEADERS;
+    body=dgSheetBody(getDgRows());
+  } else if(mgView==='ven'){
+    title='廠商統計';
+    headers=EX_VEN_HEADERS;
+    body=getVendorRows().map(venSheetRow);
   } else {
     title='材料統計';
     /* 欄序跟畫面一致（2026-09-03）：案場｜材料名稱｜數量合計｜單位｜筆數｜最後使用 */
@@ -6343,7 +6539,8 @@ function exReportPass(r,f){
   if(f.to&&r.date>f.to)return false;
   return true;
 }
-function getExRows(){
+/* key：'workItems'（預設）／'dgItems' 點工明細（2026-11-02，條件完全一樣） */
+function getExRows(key){
   const f=exFilters();
   const rows=[];
   visibleReports().forEach(r=>{
@@ -6351,7 +6548,7 @@ function getExRows(){
     /* C 批：案場改由報表層提供；拆分前的舊報表報表層推不出案場，就沿用工項上的，
        這樣「總表匯出」在拆分前後都不會漏資料 */
     const rpid = reportProjId(r);
-    (r.workItems||[]).forEach(wi=>{
+    (r[key||'workItems']||[]).forEach(wi=>{
       const pid = rpid || wi.projId || '';
       const pnm = rpid ? (r.projName || reportProjName(r)) : (wi.projName || '');
       if(f.projIds.size>0&&!f.projIds.has(pid))return;
@@ -6436,8 +6633,9 @@ function previewExport(){
 function doExport(){
   const rows=getExRows();
   const matRows=getExMatRows();
-  if(!rows.length&&!matRows.length){toast('無符合條件的資料','e');return;}
-  doExportExcel(rows,matRows);
+  const dgRows=getExRows('dgItems');
+  if(!rows.length&&!matRows.length&&!dgRows.length){toast('無符合條件的資料','e');return;}
+  doExportExcel(rows,matRows,undefined,dgRows);
 }
 
 /* ── Excel 備註列：橫向合併 + 自動撐高（2026-08-12）──
@@ -6530,15 +6728,16 @@ function phBoxW(p){
    沒有影像資料的照片直接跳過 —— 舊照片可能只剩雲端那一份，本機沒有縮圖。 */
 function photoGroups(r){
   var order = [], map = {};
-  var key = function(a, b){ return (a || "") + "\u0000" + (b || ""); };
+  /* 2026-11-03：點工照片自成一組（排在施工那幾組後面），標題標（點工） */
+  var key = function(a, b, dg){ return (dg ? "dg" : "") + "\u0000" + (a || "") + "\u0000" + (b || ""); };
   ((r && r.workItems) || []).forEach(function(wi){
-    var k = key(wi.loc, wi.work);
-    if (!map[k]) { map[k] = { loc: wi.loc || "", work: wi.work || "", photos: [] }; order.push(k); }
+    var k = key(wi.loc, wi.work, false);
+    if (!map[k]) { map[k] = { loc: wi.loc || "", work: wi.work || "", dg: false, photos: [] }; order.push(k); }
   });
   ((r && r.photos) || []).forEach(function(p){
     if (!p || !photoSrc(p)) return;
-    var k = key(p.loc, p.work);
-    if (!map[k]) { map[k] = { loc: p.loc || "", work: p.work || "", photos: [] }; order.push(k); }
+    var k = key(p.loc, p.work, phIsDg(p));
+    if (!map[k]) { map[k] = { loc: p.loc || "", work: p.work || "", dg: phIsDg(p), photos: [] }; order.push(k); }
     map[k].photos.push(p);
   });
   return order.map(function(k){ return map[k]; }).filter(function(g){ return g.photos.length; });
@@ -6560,7 +6759,7 @@ function addPhotoSection(wb, ws, r, colw, lastCol){
   tr.getCell(1).font = { bold: true, size: 12, color: { argb: "FF1A3A5C" } };
 
   groups.forEach(function(g){
-    var title = "📍 " + (g.loc || PH_UNSET) + "　›　" + (g.work || PH_UNSET)
+    var title = "📍 " + (g.dg ? "（點工）" : "") + (g.loc || PH_UNSET) + "　›　" + (g.work || PH_UNSET)
               + "　（" + g.photos.length + " 張）";
     var head = ws.addRow([title]);
     ws.mergeCells(head.number, 1, head.number, lastCol);
@@ -6685,10 +6884,67 @@ function addMatSheet(wb, matRows){
   return ws;
 }
 
+/* ── 點工統計／廠商統計工作表（2026-11-02 她 Q8 甲）──
+ * 工作表順序她指定：施工明細｜點工統計｜材料明細｜廠商統計。
+ * 點工統計＝逐筆＋每家廠商一行小計；沒有點工就不建（跟材料明細同一規則）。
+ * 廠商統計＝每家一列，正常出工（施工明細今日出工）＋點工；施工、點工都沒有就不建。 */
+const EX_DG_HEADERS=['案場','日期','廠商','施作位置','施工項目','施工人員','點工'];
+const EX_VEN_HEADERS=['案場','廠商','正常出工','點工','合計','出工天數'];
+function dgSheetBody(list){
+  return dgWithSubtotals(list).map(o=>o.sub
+    ? [o.proj||'','',o.vendor+' 小計','','','',_n1(o.w0)]
+    : [o.proj,o.date,o.vendor,o.loc,o.work,o.staff,_n1(o.w0)]);
+}
+function venSheetRow(o){ return [o.proj,o.vendor,_n1(o.w0),_n1(o.dg),_n1(o.total),o.days]; }
+/* 匯出列（getMgmtRows／getExRows 那種格式）→ 統計列：一組一組照案場分好再算，跟畫面同一套 */
+function exDgList(dgRows){
+  const zh=(a,b)=>String(a).localeCompare(String(b),'zh-Hant',{numeric:true});
+  return (dgRows||[]).map(r=>({proj:r.projName||'（未指定案場）',date:r.date||'',
+      vendor:(typeof wiVendor==='function'?wiVendor(r):r.vendor)||'（未指定廠商）',
+      loc:r.loc||'',work:r.work||'',staff:staffText(r.staff)||'',w0:Number(r.w0)||0}))
+    .sort((a,b)=>zh(a.proj,b.proj)||zh(a.vendor,b.vendor)||String(a.date).localeCompare(String(b.date)));
+}
+function exVenList(rows, dgRows){
+  const m=new Map();
+  const add=dg=>r=>{
+    const w=Number(r.w0)||0, ven=(typeof wiVendor==='function'?wiVendor(r):r.vendor)||'';
+    if(!ven&&!w)return;
+    const p=r.projName||'（未指定案場）', v=ven||'（未指定廠商）', k=p+'\u0000'+v;
+    if(!m.has(k))m.set(k,{proj:p,vendor:v,w0:0,dg:0,days:new Set()});
+    const o=m.get(k); if(dg)o.dg+=w; else o.w0+=w;
+    if(w>0&&r.date)o.days.add(r.date);
+  };
+  (rows||[]).forEach(add(false)); (dgRows||[]).forEach(add(true));
+  const zh=(a,b)=>String(a).localeCompare(String(b),'zh-Hant',{numeric:true});
+  return [...m.values()].map(o=>({proj:o.proj,vendor:o.vendor,w0:o.w0,dg:o.dg,total:o.w0+o.dg,days:o.days.size}))
+    .sort((a,b)=>zh(a.proj,b.proj)||zh(a.vendor,b.vendor));
+}
+function addStatSheet(wb, name, headers, body, subCol){
+  if(!body||!body.length) return null;
+  const ws=wb.addWorksheet(name);
+  ws.addRow(headers);
+  ws.getRow(1).eachCell(cell=>{
+    cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1A3A5C'}};
+    cell.font={color:{argb:'FFFFFFFF'},bold:true};
+    cell.alignment={horizontal:'center',vertical:'middle'};
+    cell.border={bottom:{style:'thin',color:{argb:'FF93C5FD'}}};
+  });
+  ws.getRow(1).height=22;
+  body.forEach((r,i)=>{
+    const row=ws.addRow(r);
+    const sub=subCol!=null&&/ 小計$/.test(String(r[subCol]||''));
+    if(sub){ row.eachCell(cell=>{ cell.font={bold:true}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF7ED'}}; }); }
+    else if(i%2===1) row.eachCell(cell=>cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}});
+    row.eachCell(cell=>cell.border={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}});
+  });
+  ws.columns=autoColW(ws,headers.length,8,34).map(w=>({width:w}));
+  return ws;
+}
+
 /* ── EXCEL EXPORT ── */
-async function doExportExcel(rows, matRows, source){
-  /* 2026-09-11：材料另開分頁後，「只有材料沒有工項」也是合法的一份 —— 兩邊都空才擋 */
-  if((!rows||!rows.length)&&(!matRows||!matRows.length)){toast('無資料可匯出','e');return;}
+async function doExportExcel(rows, matRows, source, dgRows){
+  /* 2026-09-11：材料另開分頁後，「只有材料沒有工項」也是合法的一份 —— 都空才擋 */
+  if((!rows||!rows.length)&&(!matRows||!matRows.length)&&(!dgRows||!dgRows.length)){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
@@ -6713,13 +6969,16 @@ async function doExportExcel(rows, matRows, source){
     ws.columns=autoColW(ws,headers.length,8,34).map(w=>({width:w}));
     /* 材料明細（2026-09-11 方案 C）—— 一定要排在第一頁定完欄寬之後，
        不然 autoColW 會把材料表的內容一起算進第一頁的欄寬。 */
+    /* 2026-11-02 她指定順序：施工明細｜點工統計｜材料明細｜廠商統計 */
+    addStatSheet(wb, '點工統計', EX_DG_HEADERS, dgSheetBody(exDgList(dgRows)), 2);
     addMatSheet(wb, matRows);
+    addStatSheet(wb, '廠商統計', EX_VEN_HEADERS, exVenList(rows, dgRows).map(venSheetRow));
     const buf=await wb.xlsx.writeBuffer();
     const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     /* 2026-09-11：檔名的日期與案場要把材料列一起算 ——
        否則「只有材料」的那種匯出，檔名會掉出案場與正確的日期區間。 */
-    const _all=(rows||[]).concat(matRows||[]);
+    const _all=(rows||[]).concat(matRows||[]).concat(dgRows||[]);
     const dates=_all.map(r=>r.date).filter(Boolean).sort();
     const fnDate=dates.length?spanText(dates[0],dates[dates.length-1]):today();
     /* 檔名要看得出案場（2026-09-07 她指定）；跨多個案場就標「多案場」 */
@@ -6732,13 +6991,14 @@ async function exportExcel(){
   syncReport();
   const r=S.report;
   const hasWork=(r.workItems||[]).length>0;
+  const hasDg=(r.dgItems||[]).length>0;     /* 點工明細（2026-11-03 A1 要、Q5 甲：接在施工明細下面） */
   const hasMat=(r.materials||[]).length>0;
   const hasNote=!!(r.notes?.contact||r.notes?.other);
   /* 2026-09-07：照片自己也算資料 —— 只拍了照、還沒填工項的那種報表也要匯得出來
      2026-09-23：縮圖搬到 cdr_pm_thumbs 之後，報表裡看不到影像但標了 th=1 的也算有照片。
      ⚠️ 這裡刻意**不 await** —— 一 await，底下建工作表那幾行就變成非同步的了。 */
   const hasPhoto=((r.photos||[]).filter(p=>p&&(photoSrc(p)||p.th))).length>0;
-  if(!hasWork&&!hasMat&&!hasNote&&!hasPhoto){toast('無資料可匯出','e');return;}
+  if(!hasWork&&!hasDg&&!hasMat&&!hasNote&&!hasPhoto){toast('無資料可匯出','e');return;}
   toast('產生 Excel 中…');
   try{
     const wb=new ExcelJS.Workbook();
@@ -6779,13 +7039,14 @@ async function exportExcel(){
     const info=ws.addRow(infoV);
     [1,3,5,7].forEach(c=>{const cell=info.getCell(c);cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE2E8F0'}};});
     ws.addRow([]);
-    // 工項
-    if(hasWork){
-      const tr=ws.addRow(['【施工明細】']);tr.font={bold:true,size:12,color:{argb:'FF1A3A5C'}};
+    // 工項（2026-11-03：點工明細同一套欄位，接在施工明細下面，標題橘色；沒點工整段不出現）
+    [[hasWork,'【施工明細】','FF1A3A5C',r.workItems],[hasDg,'【點工明細】','FFC2410C',r.dgItems]].forEach(([has,title,color,items])=>{
+      if(!has) return;
+      const tr=ws.addRow([title]);tr.font={bold:true,size:12,color:{argb:color}};
       const headers=['#','施作位置','施工項目','施工說明','今日廠商','今日施工人員','今日出工','明日廠商','明日施工人員','明日出工','完成%','異常類型','備註','填表人'];
       wtrack(headers,true);
       const hr=ws.addRow(headers);hr.eachCell(styleHead);hr.height=22;
-      (r.workItems||[]).forEach((wi,i)=>{
+      (items||[]).forEach((wi,i)=>{
         /* 異常類型存的是代號（weather／material…），直接印會變成一串英文 —— 改印中文 */
         const vals=[i+1,wi.loc||'',wi.work||'',wi.wdesc||'',wi.vendor||'',staffText(wi.staff),wi.w0||0,wi.vendor2||'',staffText(wi.staff2),wi.w1||0,wi.progress||0,atypeText(wi.atype),wi.anote||'',wi.owner||''];
         wtrack(vals);
@@ -6794,7 +7055,7 @@ async function exportExcel(){
         row.eachCell(c=>c.border={bottom:{style:'hair',color:BD}});
       });
       ws.addRow([]);
-    }
+    });
     /* ⚠️ 材料表**先量、後寫**（2026-09-07）：
        照片區要插在材料前面，而照片的橫向位置得換算欄寬才擺得準，
        欄寬又必須把材料的內容一起算進去 —— 所以順序只能是「量完全部 → 定欄寬 → 才開始寫」。 */

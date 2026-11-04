@@ -24,7 +24,7 @@
      · 只開放給瑪摩工程一處、二處（入口沒設定時的預設，見 portalAppAllowed）—— 2026-10-06 改成跟日—瑪一樣 -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（沿用圖面管理的做法；試做期間金額也是全部人都看得到，權限之後再接）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-22.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-11-03.1';window.APP_KEY='dtp_mm';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片打包下載（2026-10-02 第二版，跟日報表—專案管理同一個版本） -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -145,6 +145,9 @@ textarea.fi{resize:vertical;min-height:60px}
 
 /* ── 複選篩選器（2026-08-20 新增）── */
 .ms{position:relative}
+/* 篩選列的複選下拉寬度（2026-11-03）：沒選＝--msw；只勾一項（.ms-fit）＝照名字撐寬，最窄 --msw、最寬 260 */
+.filter-bar .ms{width:var(--msw,130px);max-width:100%;flex:none}
+.filter-bar .ms.ms-fit{width:auto;min-width:var(--msw,130px);max-width:min(260px,100%)}
 .ms-btn{width:100%;cursor:pointer;text-align:left;white-space:nowrap;display:flex;align-items:center;gap:6px;justify-content:space-between;overflow:hidden}
 .ms-btn>span:first-child{overflow:hidden;text-overflow:ellipsis}
 .ms-btn.on{border-color:var(--primary-l);background:#f0fdf4;font-weight:700;color:var(--primary)}
@@ -880,19 +883,27 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
          原本掛在整排篩選器的最右邊（margin-left:auto），視窗一窄就被擠到第二行找不到。 -->
     <button class="btn btn-p btn-sm" onclick="openEdit(null)">＋ 新增紀錄</button>
     <input type="text" id="q" class="fi" placeholder="搜尋案場、執行者、業務、工作內容..." style="max-width:220px" oninput="renderMain()">
-    <div class="ms" id="ms-status" style="max-width:140px;flex:0 1 140px">
+    <div class="ms" id="ms-status" style="--msw:120px">
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'status')"><span id="mslb-status">全部狀態</span><span style="opacity:.5;font-size:11px">▾</span></button>
       <div class="ms-panel" id="msp-status"></div>
     </div>
-    <div class="ms" id="ms-proj" style="max-width:190px;flex:0 1 190px">
+    <div class="ms" id="ms-proj" style="--msw:120px">
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'proj')"><span id="mslb-proj">全部案場</span><span style="opacity:.5;font-size:11px">▾</span></button>
       <div class="ms-panel" id="msp-proj"></div>
     </div>
-    <div class="ms" id="ms-exec" style="max-width:150px;flex:0 1 150px">
+    <div class="ms" id="ms-exec" style="--msw:130px">
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'exec')"><span id="mslb-exec">全部執行者</span><span style="opacity:.5;font-size:11px">▾</span></button>
       <div class="ms-panel" id="msp-exec"></div>
     </div>
-    <div class="ms" id="ms-sales" style="max-width:150px;flex:0 1 150px">
+    <!-- 部門名稱／業務群組（2026-11-03 她交辦，Q6～Q8 全甲）：名單＝系統設定的業務群組＋「（未分組）」，可複選；
+         選了之後右邊「全部業務」只剩這幾組的人。
+         寬度（2026-11-03 她選乙＋Q1 甲＋Q2 甲）：沒選照標籤字數（4 字 120／5 字 130／6 字 145，寫在 --msw）；
+         只勾一項 → 跟著名字撐寬（最寬 260，再長才「…」，滑鼠移上去看全名）；第一列排不下就讓後面的換到下一行。跟第二行「依部門」不同：那個看執行者的部門，這個看案場業務屬於哪一組 -->
+    <div class="ms" id="ms-grp" style="--msw:145px">
+      <button type="button" class="fi ms-btn" onclick="msToggle(event,'grp')"><span id="mslb-grp">全部業務群組</span><span style="opacity:.5;font-size:11px">▾</span></button>
+      <div class="ms-panel" id="msp-grp"></div>
+    </div>
+    <div class="ms" id="ms-sales" style="--msw:120px">
       <button type="button" class="fi ms-btn" onclick="msToggle(event,'sales')"><span id="mslb-sales">全部業務</span><span style="opacity:.5;font-size:11px">▾</span></button>
       <div class="ms-panel" id="msp-sales"></div>
     </div>
@@ -4355,9 +4366,25 @@ function expandAll(open){
 
 // 4b 複選篩選：原本三個下拉一次只能選一項，改成可勾多項。
 /* 2026-10-02 第二版：多一個「業務」；「狀態」改成案場狀態（6 種） */
-const MS_LABEL={proj:'案場',exec:'執行者',status:'狀態',sales:'業務'};
-const msSel={proj:new Set(),exec:new Set(),status:new Set(),sales:new Set()};
-let _msOpts={proj:[],exec:[],status:[],sales:[]};
+/* 2026-11-03：多一個「業務群組」（grp） */
+const MS_LABEL={proj:'案場',exec:'執行者',status:'狀態',grp:'業務群組',sales:'業務'};
+const msSel={proj:new Set(),exec:new Set(),status:new Set(),grp:new Set(),sales:new Set()};
+let _msOpts={proj:[],exec:[],status:[],grp:[],sales:[]};
+/* 業務群組篩選（2026-11-03）：案場屬於哪幾組＝它的業務各自在哪一組；
+   沒填業務、或有業務不在任何一組 → 也算「（未分組）」 */
+const MM_GRP_NONE='（未分組）';
+function salesGroupsOf(name){ return salesGroups().filter(g=>(g.人員||[]).indexOf(name)>=0).map(g=>g.名稱); }
+function caseGroups(proj){
+  const ss=caseSalesList(proj), out=new Set();
+  if(!ss.length)out.add(MM_GRP_NONE);
+  ss.forEach(s=>{ const gs=salesGroupsOf(s); if(gs.length)gs.forEach(g=>out.add(g)); else out.add(MM_GRP_NONE); });
+  return [...out];
+}
+/* 這個業務有沒有在勾選的群組裡（給「全部業務」下拉縮小名單用） */
+function salesInSelGroups(name){
+  const gs=salesGroupsOf(name);
+  return gs.length ? gs.some(g=>msSel.grp.has(g)) : msSel.grp.has(MM_GRP_NONE);
+}
 function msToggle(ev,key){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   const box=document.getElementById('ms-'+key);if(!box)return;
@@ -4367,10 +4394,14 @@ function msToggle(ev,key){
 }
 function msPick(key,val,checked){
   if(checked)msSel[key].add(val);else msSel[key].delete(val);
-  msLabel(key);renderMain();
+  msLabel(key);
+  if(key==='grp')updateFilters();   /* 群組一換，「全部業務」名單跟著縮（已勾的別組業務自動取消） */
+  renderMain();
 }
 function msClear(key){
-  msSel[key].clear();msLabel(key);msPanel(key,_msOpts[key]);renderMain();
+  msSel[key].clear();msLabel(key);msPanel(key,_msOpts[key]);
+  if(key==='grp')updateFilters();
+  renderMain();
 }
 function msLabel(key){
   const el=document.getElementById('mslb-'+key);if(!el)return;
@@ -4379,7 +4410,12 @@ function msLabel(key){
                  : n===1 ? [...msSel[key]][0]
                  : MS_LABEL[key]+' '+n+' 項';
   const btn=el.parentElement;
-  if(btn&&btn.classList.contains('ms-btn'))btn.classList.toggle('on',n>0);
+  if(btn&&btn.classList.contains('ms-btn')){
+    btn.classList.toggle('on',n>0);
+    btn.title = n===1 ? [...msSel[key]][0] : '';   /* 名字太長被切成「…」時，滑鼠移上去看全名 */
+  }
+  /* 只勾一項 → 這一格跟著名字變寬（2026-11-03 她選乙） */
+  const box=document.getElementById('ms-'+key); if(box)box.classList.toggle('ms-fit',n===1);
 }
 function msPanel(key,opts){
   _msOpts[key]=opts||[];
@@ -4424,7 +4460,7 @@ function _viewLevelWord(){
 /* 一次清掉搜尋＋三個複選＋日期區間 */
 function clearAllFilters(){
   const q=document.getElementById('q'); if(q)q.value='';
-  ['proj','exec','status','sales'].forEach(function(k){
+  ['proj','exec','status','grp','sales'].forEach(function(k){
     msSel[k].clear(); msLabel(k);
     if(typeof _msOpts!=='undefined'&&_msOpts[k])msPanel(k,_msOpts[k]);
   });
@@ -4460,6 +4496,7 @@ function emptyReasonHtml(){
   if(msSel.proj.size)conds.push('案場「'+esc([...msSel.proj].join('、'))+'」');
   if(msSel.exec.size)conds.push('執行者「'+esc([...msSel.exec].join('、'))+'」');
   if(msSel.status.size)conds.push('狀態「'+esc([...msSel.status].join('、'))+'」');
+  if(msSel.grp.size)conds.push('業務群組「'+esc([...msSel.grp].join('、'))+'」');
   if(msSel.sales.size)conds.push('業務「'+esc([...msSel.sales].join('、'))+'」');
   if(drActive())conds.push('進度記錄日期 '+(drVal('dr-from')||'不限')+' ～ '+(drVal('dr-to')||'不限'));
   if(mmPhase!=='all')conds.push('階段「'+MM_GROUP_LABEL[mmPhase]+'」');   /* 2026-10-02 */
@@ -4493,7 +4530,7 @@ function emptyReasonHtml(){
 }
 function hasActiveFilter(){
   const q=(document.getElementById('q')||{value:''}).value.trim();
-  return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0||msSel.sales.size>0||drActive()||mmPhase!=='all';
+  return !!q||msSel.proj.size>0||msSel.exec.size>0||msSel.status.size>0||msSel.grp.size>0||msSel.sales.size>0||drActive()||mmPhase!=='all';
 }
 /* 篩選後也能收合（2026-10-01 她指定，選甲；跟 dtp-dw 同一套）：
  * 篩選條件「改變的那一刻」才把找到的案場全部打開，之後照使用者自己開關；
@@ -4502,7 +4539,7 @@ let _fltSig='', _openBeforeFilter=null;
 function filterSig(){
   if(!hasActiveFilter())return '';
   const q=(document.getElementById('q')||{value:''}).value.trim();
-  return JSON.stringify([q,[...msSel.proj].sort(),[...msSel.exec].sort(),[...msSel.status].sort(),[...msSel.sales].sort(),drVal('dr-from'),drVal('dr-to'),mmPhase]);
+  return JSON.stringify([q,[...msSel.proj].sort(),[...msSel.exec].sort(),[...msSel.status].sort(),[...msSel.grp].sort(),[...msSel.sales].sort(),drVal('dr-from'),drVal('dr-to'),mmPhase]);
 }
 function syncOpenWithFilter(filtered){
   const sig=filterSig();
@@ -4554,7 +4591,7 @@ function xpRebuild(){
   xpGroups=new Map();
   data.forEach(r=>{const k=r.案場||'（未填案場）'; xpGroups.set(k,(xpGroups.get(k)||0)+1)});
   xpSel=new Set(xpGroups.keys());
-  const other=(msSel.exec.size||msSel.status.size||msSel.sales.size||mmPhase!=='all'||((document.getElementById('q')||{value:''}).value.trim()))
+  const other=(msSel.exec.size||msSel.status.size||msSel.grp.size||msSel.sales.size||mmPhase!=='all'||((document.getElementById('q')||{value:''}).value.trim()))
     ? '（畫面上其他篩選也還在生效）' : '';
   document.getElementById('xp-hint').textContent=
     MM_XP_DEPT[xpDeptCode]+'共 '+data.length+' 個項目、'+xpGroups.size+' 個案場。要匯出哪些案場？'+other;
@@ -4758,6 +4795,7 @@ function getFiltered(dOv){   /* dOv＝指定部門（匯出框用，2026-10-15�
     const cs=caseStatusOf(r.案場);
     if(mmPhase!=='all' && statusGroupOf(cs)!==mmPhase) return false;
     if(msSel.status.size&&!msSel.status.has(cs))return false;
+    if(msSel.grp.size&&!caseGroups(r.案場).some(g=>msSel.grp.has(g)))return false;      /* 2026-11-03 業務群組 */
     if(msSel.sales.size&&!caseSalesList(r.案場).some(s=>msSel.sales.has(s)))return false;   /* 2026-10-12 業務複選 */
     if(msSel.proj.size&&!msSel.proj.has(r.案場))return false;
     if(msSel.exec.size&&!_execList(r).some(e=>msSel.exec.has(e)))return false;
@@ -4784,10 +4822,15 @@ function updateFilters(){
   /* 狀態＝系統設定的狀態清單（2026-10-02 第三批）；業務＝看得到的案場目前選的業務 */
   /* 2026-10-12：刪掉、但還有案場在用的狀態也列（不然篩不到那幾個案場）；業務可以複選 → 拆成一個一個人 */
   const ss=statusNames().concat([...new Set(ps.map(caseStatusOf).filter(statusIsDeleted))]);
-  const sa=[...new Set(ps.flatMap(caseSalesList))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  /* 業務群組（2026-11-03）：照系統設定的順序，最後固定一項「（未分組）」；
+     先算群組（會移掉已刪的組），再用剩下勾的組縮小業務名單 */
+  const gl=salesGroups().map(g=>g.名稱).concat([MM_GRP_NONE]);
+  { const has=new Set(gl); [...msSel.grp].forEach(v=>{if(!has.has(v))msSel.grp.delete(v)}); }
+  let sa=[...new Set(ps.flatMap(caseSalesList))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+  if(msSel.grp.size)sa=sa.filter(salesInSelGroups);
   if(!document.getElementById('msp-proj'))return;
   // 已經不存在的選項要從勾選中移掉，否則會篩出 0 筆卻看不出原因
-  [['proj',ps],['exec',es],['status',ss],['sales',sa]].forEach(function(pair){
+  [['proj',ps],['exec',es],['status',ss],['grp',gl],['sales',sa]].forEach(function(pair){
     const k=pair[0],list=pair[1],has=new Set(list);
     [...msSel[k]].forEach(v=>{if(!has.has(v))msSel[k].delete(v)});
     msPanel(k,list);msLabel(k);
