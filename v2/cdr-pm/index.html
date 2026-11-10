@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-11-03.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-11-08.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -5412,11 +5412,14 @@ var CAL_ALL = '__all__';
 var CAL = { ym:'', sel:'', proj:'' };
 try { CAL.proj = localStorage.getItem('cdr_pm_cal_proj') || ''; } catch(e){}
 
+/* 2026-11-08 她 Q1～Q3 甲：施工明細、點工明細有填一個就算有明細；
+ * 出工 0 看「施工＋點工」合計；提醒字改「沒有施工或點工明細」。
+ * 日曆檢視、沿用上一筆的小月曆（carry）都吃這兩支。 */
 function calFill(r){
-  const wi = r.workItems || [];
-  if (!wi.length) return 'part';
+  const wi = r.workItems || [], dg = r.dgItems || [];
+  if (!wi.length && !dg.length) return 'part';
   if (!r.weather)  return 'part';
-  if (!wi.reduce((s,w)=>s+(Number(w.w0)||0),0)) return 'part';
+  if (!(rptW0(wi) + rptW0(dg))) return 'part';
   return 'full';
 }
 /* 清單上那一行（2026-11-03 她 A2＋Q1 甲＋Q2 甲）：
@@ -5436,10 +5439,11 @@ function rptGroupDgHtml(rows, fmt){
   return d0 ? ' · <span class="rpt-dg">點工 '+(fmt?fmt(d0):d0)+'</span>' : '';
 }
 function calWhyPart(r){
-  const wi = r.workItems || [], why = [];
-  if (!wi.length) why.push('沒有施工明細');
+  const wi = r.workItems || [], dg = r.dgItems || [], why = [];
+  const has = wi.length || dg.length;
+  if (!has) why.push('沒有施工或點工明細');
   if (!r.weather) why.push('天氣沒選');
-  if (wi.length && !wi.reduce((s,w)=>s+(Number(w.w0)||0),0)) why.push('今日出工 0');
+  if (has && !(rptW0(wi) + rptW0(dg))) why.push('今日出工 0');
   return why.join('、');
 }
 function calMap(){
