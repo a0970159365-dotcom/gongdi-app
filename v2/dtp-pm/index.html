@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-11-12.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-11-17.2';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2660,13 +2660,13 @@ function projDone(name){const m=cfg&&cfg.已完工&&cfg.已完工[cfgMapKey(name
 function setMainTab(t){_mainTab=t==='done'?'done':'open';renderMain()}
 function projDoneSet(name,on){
   if(!portalCanManageSettings()){toast('只有主管可以設定已完工','e');return}
-  if(on&&!confirm('確定「'+name+'」已完工？\n整個案場會移到「已完工」分頁，之後可以還原。'))return;
-  if(!on&&!confirm('確定把「'+name+'」還原到進行中？'))return;
+  if(on&&!confirm('確定「'+name+'」已完工？\n整個案場會移到「已完工」分頁，之後在已完工分頁再按一次就能取消。'))return;
+  if(!on&&!confirm('確定取消「'+name+'」的已完工？\n整個案場會移回「進行中」分頁。'))return;
   if(!cfg.已完工||typeof cfg.已完工!=='object')cfg.已完工={};
   const d=new Date(),p=n=>(n<10?'0':'')+n;
   cfg.已完工[cfgMapKey(name)]={on:!!on,date:d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()),by:(currentUser&&currentUser.name)||''};
   saveCfg();updateDataLists();renderMain();
-  toast(on?'已移到「已完工」':'已還原到「進行中」','s');
+  toast(on?'已移到「已完工」':'已取消已完工，移回「進行中」','s');
 }
 /* 系統設定「追蹤品項」（2026-11-12）：畫面在共用的 trkCfgRender，存檔走這支自己的 saveCfg */
 function trkCfgPaint(){
@@ -2721,7 +2721,7 @@ function renderMain(){
     return`<div class="proj-section">
       <div class="proj-header${open?'':' sec-collapsed'}"${dragAttr} onclick="toggleSec('${sid}',this)">
         <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span>${(cfg.案場||[]).includes(proj)?projPayHtml(proj):''}${projDone(proj)?'<span class="pj-done-info">'+esc(String(projDone(proj).date||'').slice(5).replace('-','/'))+' 完工'+(projDone(proj).by?'・'+esc(projDone(proj).by):'')+'</span>':''}</span>
-        <span class="pj-hd-r">${portalCanManageSettings()?(projDone(proj)?`<button type="button" class="pj-done-btn" onclick="event.stopPropagation();projDoneSet('${pj}',false)">↩ 還原</button>`:`<button type="button" class="pj-done-btn" onclick="event.stopPropagation();projDoneSet('${pj}',true)">✅ 已完工</button>`):''}${mv}</span>
+        <span class="pj-hd-r">${portalCanManageSettings()?(projDone(proj)?`<button type="button" class="pj-done-btn" onclick="event.stopPropagation();projDoneSet('${pj}',false)" title="再按一次取消已完工，移回進行中" aria-pressed="true">☑︎ 已完工</button>`:`<button type="button" class="pj-done-btn" onclick="event.stopPropagation();projDoneSet('${pj}',true)" title="勾選已完工，移到已完工分頁" aria-pressed="false">☐ 已完工</button>`):''}${mv}</span>
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
         <table class="ptbl">
