@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-10-22.2';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-11-12.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -587,6 +587,15 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
           </div>
         </div>
       </div>
+
+      <!-- 2026-11-12 追蹤品項：時間到出現在 🔔（這支＋入口） -->
+      <div class="grp-divider"></div>
+      <div class="grp-hdr-bar">
+        <span class="grp-title">群組三：追蹤品項</span>
+        <button class="btn btn-a btn-sm" data-mng onclick="trkCfgAddRow('trk-cfg-list')">＋ 新增</button>
+      </div>
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 8px">進度記錄選了這些狀態，從那筆的日期當日起算滿 N 天，就會出現在執行者、同部門主管、副總經理、總經理室的 🔔。例：07/17 送審、4 天 → 07/21 提醒。改了馬上存。</p>
+      <div id="trk-cfg-list"></div>
 
       <!-- 底部按鈕（仿 v3） -->
       <div style="margin-top:24px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
@@ -1827,7 +1836,7 @@ function applyRemote(data){
   const wt=document.getElementById('page-worktime');
   if(wt&&wt.classList.contains('active')&&typeof renderWorktime==='function')renderWorktime();
   const st=document.getElementById('page-settings');
-  if(st&&st.classList.contains('active')){renderCfgLists();if(typeof renderUsers==='function')renderUsers()}
+  if(st&&st.classList.contains('active')){renderCfgLists();trkCfgPaint();if(typeof renderUsers==='function')renderUsers()}
   setSyncIcon('ok');
 }
 function startWatch(){
@@ -1859,7 +1868,7 @@ function goPage(id){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>{if(b.getAttribute('onclick')===`goPage('${id}')`)b.classList.add('active')});
-  if(id==='settings'){renderCfgCards();updateDataLists();renderUsers();renderSettingsFbStatus();applyMngSettingsUI()}
+  if(id==='settings'){trkCfgPaint();renderCfgCards();updateDataLists();renderUsers();renderSettingsFbStatus();applyMngSettingsUI()}
   if(id==='worktime'){renderWorktime()}
 }
 
@@ -2289,7 +2298,19 @@ function updateFilters(){
 // ============================================================
 // 渲染：進度總表
 // ============================================================
+/* 系統設定「追蹤品項」（2026-11-12）：畫面在共用的 trkCfgRender，存檔走這支自己的 saveCfg */
+function trkCfgPaint(){
+  if(typeof trkCfgRender!=='function')return;
+  trkCfgRender('trk-cfg-list','dtp',cfg,cfg.狀態||[],portalCanManageSettings(),function(items,blank){
+    if(mngGuard()){trkCfgPaint();return}
+    cfg.追蹤={v:1,items:items};saveCfg();
+    if(typeof trkSetData==='function')trkSetData('dtp',{records:records,cfg:cfg});
+    if(!blank)trkCfgPaint();
+    toast('已儲存追蹤品項 ✓','s');
+  });
+}
 function renderMain(){
+  if(typeof trkSetData==='function')trkSetData('dtp',{records:records,cfg:cfg});   /* 2026-11-12 追蹤提醒跟著資料重算 */
   const filtered=getFiltered();
   // 篩選條件一改就展開符合的群組（否則篩完只看到一排標題，會以為壞掉）；之後可以自己收合（2026-10-01）
   syncOpenWithFilter(filtered);
@@ -3382,6 +3403,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   if (!portalAppAllowed()) { showNoAccessGate(); return; }   // 沒開通這支 App → 擋下
   updateNavUser();
   updateDataLists();
+  trkInit({ apps: ['dtp'], before: document.querySelector('nav .nav-spacer + *') });   /* 2026-11-12 追蹤提醒 🔔 */
+  trkSetData('dtp', { records: records, cfg: cfg });
   applyMngSettingsUI();   // 設定維護權：沒勾「維護設定」→ 設定頁只能看
   initFb().then(()=>{
     document.getElementById('login-overlay').style.display = 'none';
@@ -3484,9 +3507,390 @@ window._cloudErrBar = (function(){
   if (document.body) bar(); else document.addEventListener('DOMContentLoaded', bar);
 })();
 </script>
+<script>
+/* ══════ 追蹤提醒（2026-11-12 她交辦：進—專／進—圖／進—瑪＋入口鈴鐺）══════
+ * 🔁 這一段在 dtp-pm、dtp-dw、dtp-mm、portal 四支是「同一份」，改的話四支要一起改
+ *    （原稿：generated-pages/v2/_shared/track.js，tests/track-same.test.js 會比對四份是否一致）。
+ * 規則（她 11-12 定的）：
+ *  - 系統設定「追蹤品項」：每列＝品項＋「當日起算 N 天提醒」。進度記錄的日期＋N 天 ≤ 今天 → 進鈴鐺
+ *  - 收件人：那筆的執行者、同部門的副理／經理／協理、副總經理、總經理室
+ *  - 讀過就算（每人各自的已讀）；未讀／已讀兩個分頁；點一則在鈴鐺裡展開看，不跳頁
+ *  - 沒有推播：打開 App 時才算
+ * 資料：設定放各 App 的 cfg.追蹤 = {v:1, items:[{name, days}]}（用物件包起來 —— 空陣列存進
+ *       Firebase 會整個消失，刪光之後會變回預設值）；已讀放 track_read/<人>/<提醒編號> = 時間。 */
+var TRK_APPS = {
+  dtp_pm: { label: '進—專', key: 'status', def: [{ name: '帳款', days: 5 }] },
+  dtp:    { label: '進—圖', key: 'status', def: [{ name: '送審中', days: 4 }] },
+  dtp_mm: { label: '進—瑪', key: 'work',   def: [{ name: '報價送出', days: 5 }, { name: '請款送出', days: 5 }] }
+};
+var TRK_BOSS = ['副理', '經理', '協理'];
+function trkItems(app, c) {
+  var t = c && c.追蹤;
+  if (t && typeof t === 'object' && t.v) {
+    var a = Array.isArray(t.items) ? t.items : (t.items && typeof t.items === 'object' ? Object.values(t.items) : []);
+    return a.filter(function (x) { return x && String(x.name || '').trim(); })
+      .map(function (x) { return { name: String(x.name).trim(), days: Math.max(0, parseInt(x.days, 10) || 0) }; });
+  }
+  return TRK_APPS[app].def.map(function (x) { return { name: x.name, days: x.days }; });
+}
+function trkYmd(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function trkToday() { return trkYmd(new Date()); }
+function trkAddDays(ymd, n) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(ymd || ''));
+  if (!m) return '';
+  return trkYmd(new Date(+m[1], +m[2] - 1, +m[3] + n));
+}
+function trkSplit(s) { return String(s || '').split(/[、,，\n]/).map(function (x) { return x.trim(); }).filter(Boolean); }
+function trkList(v) { return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []); }
+/* 到期的提醒（不分人）。data = { records, cfg } */
+function trkDue(app, data, today) {
+  var A = TRK_APPS[app], days = {};
+  trkItems(app, data && data.cfg).forEach(function (i) { days[i.name] = i.days; });
+  today = today || trkToday();
+  var out = [];
+  trkList(data && data.records).forEach(function (r) {
+    if (!r || !r.id) return;
+    trkList(r.進度記錄).forEach(function (l, i) {
+      if (!l) return;
+      var k = String(l[A.key] || '');
+      if (!Object.prototype.hasOwnProperty.call(days, k)) return;
+      var due = trkAddDays(l.date, days[k]);
+      if (!due || due > today) return;
+      out.push({
+        id: app + '~' + r.id + '~' + (l.rid || ('i' + i)), app: app, item: k, days: days[k],
+        date: l.date, due: due, proj: r.案場 || '', loc: l.location || r.施作位置 || '', range: r.範圍 || '',
+        text: l.text || '', execs: trkSplit(r.執行者), dept: r.部門 || ''
+      });
+    });
+  });
+  return out.sort(function (a, b) { return b.due.localeCompare(a.due) || a.proj.localeCompare(b.proj); });
+}
+/* 現在登入的人（入口的登入身分＋員工資料的部門、職務） */
+function trkMe() {
+  try {
+    var p = JSON.parse(localStorage.getItem('portal_v1') || '{}');
+    var u = p.currentUser; if (!u || !u.name) return null;
+    var emps = trkList(p.employees);
+    var e = emps.filter(function (x) { return x && u.id && x.id === u.id; })[0]
+         || emps.filter(function (x) { return x && x.name === u.name; })[0] || {};
+    return { key: String(u.id || u.name), name: u.name, dept: e.dept || u.dept || '', job: e.jobTitle || '' };
+  } catch (err) { return null; }
+}
+function trkForMe(n, me) {
+  if (!me) return false;
+  if (n.execs.indexOf(me.name) >= 0) return true;
+  /* 2026-11-14：職務改名「副總經理」；舊的「副總」還沒被入口換掉的那台照樣認，過渡期不漏收 */
+  if (me.dept === '總經理室' || me.job === '總經理' || me.job === '副總經理' || me.job === '副總') return true;
+  return !!(n.dept && me.dept === n.dept && TRK_BOSS.indexOf(me.job) >= 0);
+}
+function trkSafe(s) { return String(s).replace(/[.#$\[\]\/%]/g, function (c) { return '%' + c.charCodeAt(0).toString(16).toUpperCase(); }); }
+/* ── 已讀（本機一份＋雲端一份，兩邊聯集） ── */
+var TRK = { app: '', apps: [], data: {}, read: {}, tab: 'unread', open: '', seen: {}, inited: false, fetchedAt: 0 };
+function trkReadLoad(me) {
+  try { TRK.read = JSON.parse(localStorage.getItem('trk_read_' + me.key) || '{}') || {}; } catch (e) { TRK.read = {}; }
+}
+function trkReadSaveLocal(me) { try { localStorage.setItem('trk_read_' + me.key, JSON.stringify(TRK.read)); } catch (e) {} }
+function trkIsRead(id) { return !!TRK.read[trkSafe(id)]; }
+function trkMark(ids) {
+  var me = trkMe(); if (!me || !ids.length) return;
+  var now = new Date().toISOString(), patch = {};
+  ids.forEach(function (id) { var k = trkSafe(id); if (!TRK.read[k]) { TRK.read[k] = now; patch[k] = now; } });
+  if (!Object.keys(patch).length) return;
+  trkReadSaveLocal(me);
+  if (window._trkFb) { try { window._trkFb.update('track_read/' + trkSafe(me.key), patch); } catch (e) { console.warn('已讀寫雲端失敗', e); } }
+}
+function trkCloudRead(val) {
+  var me = trkMe(); if (!me || !val || typeof val !== 'object') return;
+  var ch = false;
+  Object.keys(val).forEach(function (k) { if (!TRK.read[k]) { TRK.read[k] = val[k]; ch = true; } });
+  if (ch) { trkReadSaveLocal(me); trkRender(); }
+}
+/* ── 畫面 ── */
+function trkCss() {
+  if (document.getElementById('trk-css')) return;
+  var s = document.createElement('style'); s.id = 'trk-css';
+  s.textContent = ''
+    + '.trk-bell{position:relative;flex:none;width:36px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:17px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;margin:0 4px}'
+    + '.trk-bell:hover{background:rgba(255,255,255,.22)}'
+    + '.trk-bell .trk-dot{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px;box-sizing:border-box;border:2px solid #fff}'
+    + '.trk-panel{position:fixed;z-index:2500;top:56px;right:12px;width:min(400px,calc(100vw - 24px));max-height:calc(100vh - 80px);display:none;flex-direction:column;background:#fff;color:#1e293b;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.25);font-size:13px;text-align:left}'
+    + '.trk-panel.show{display:flex}'
+    + '.trk-panel .trk-hd{display:flex;align-items:center;gap:6px;padding:10px 12px 0;flex:none}'
+    + '.trk-panel .trk-hd b{font-size:14px;flex:1;white-space:nowrap}'
+    + '.trk-panel .trk-x{border:none;background:none;font-size:18px;cursor:pointer;color:#64748b;width:28px;height:28px;flex:none}'
+    + '.trk-panel .trk-tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid #e2e8f0;flex:none}'
+    + '.trk-panel .trk-tab{font:inherit;font-size:13px;font-weight:700;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px;padding:4px 12px;cursor:pointer;white-space:nowrap}'
+    + '.trk-panel .trk-tab.on{background:#1a3a5c;border-color:#1a3a5c;color:#fff}'
+    + '.trk-panel .trk-body{overflow-y:auto;padding:4px 0;flex:1 1 auto;min-height:60px}'
+    + '.trk-panel .trk-grp{font-size:12px;font-weight:800;color:#475569;background:#f1f5f9;padding:4px 12px;margin-top:4px}'
+    + '.trk-panel .trk-grp.trk-app{font-size:13.5px;font-weight:800;color:#0f172a;background:#e2e8f0}'
+    + '.trk-panel .trk-sec{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-weight:700;user-select:none}'
+    + '.trk-panel .trk-sec:hover{background:#f8fafc}'
+    + '.trk-panel .trk-sec:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}'
+    + '.trk-panel .trk-sec .trk-ar{width:12px;flex:none;color:#64748b;font-size:11px}'
+    + '.trk-panel .trk-sec .trk-sn{flex:1;min-width:0;word-break:break-word}'
+    + '.trk-panel .trk-sec .trk-sc{flex:none;min-width:20px;text-align:center;font-size:11.5px;font-weight:700;background:#fee2e2;color:#b91c1c;border-radius:10px;padding:0 7px}'
+    + '.trk-panel .trk-it{padding:8px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer}'
+    + '.trk-panel .trk-it.trk-in{padding-left:30px}'
+    + '.trk-panel .trk-it:hover{background:#f8fafc}'
+    + '.trk-panel .trk-it.unread{background:#eff6ff}'
+    + '.trk-panel .trk-t{font-weight:700;line-height:1.5;word-break:break-word}'
+    + '.trk-panel .trk-m{font-size:12px;color:#64748b;margin-top:2px}'
+    + '.trk-panel .trk-m .late{color:#b91c1c;font-weight:700}'
+    + '.trk-panel .trk-dt{margin-top:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:6px 8px;display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-size:12.5px}'
+    + '.trk-panel .trk-dt span:nth-child(odd){color:#64748b;white-space:nowrap}'
+    + '.trk-panel .trk-dt span:nth-child(even){word-break:break-word;white-space:pre-wrap}'
+    + '.trk-panel .trk-empty{color:#94a3b8;text-align:center;padding:24px 12px}'
+    + '.trk-panel .trk-empty.trk-err{color:#b45309;font-weight:600}'
+    + '.trk-panel .trk-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #e2e8f0;flex:none}'
+    + '.trk-panel .trk-all{font:inherit;font-size:12.5px;border:1px solid #2563eb;color:#2563eb;background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;white-space:nowrap}'
+    + '.trk-panel .trk-note{font-size:11.5px;color:#94a3b8}';
+  document.head.appendChild(s);
+}
+function trkEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function trkMd(ymd) { var m = /^\d{4}-(\d{2})-(\d{2})/.exec(ymd || ''); return m ? m[1] + '/' + m[2] : ''; }
+function trkDiff(a, b) { var x = new Date(a + 'T00:00:00'), y = new Date(b + 'T00:00:00'); return Math.round((y - x) / 86400000); }
+/* 我的提醒，依 App 分組 */
+function trkMine() {
+  var me = trkMe(), today = trkToday(), groups = [];
+  TRK.apps.forEach(function (app) {
+    var d = TRK.data[app];
+    /* 2026-11-14（她 Q35 甲）：入口一次看三支 → 還沒讀到的那組照樣列出來，寫「讀取中…」或「讀取失敗」，不要整片空白 */
+    if (!d) { if (TRK.apps.length > 1) groups.push({ app: app, label: TRK_APPS[app].label, items: [], state: (TRK.err && TRK.err[app]) ? 'err' : 'wait' }); return; }
+    var list = trkDue(app, d, today).filter(function (n) { return trkForMe(n, me); });
+    groups.push({ app: app, label: TRK_APPS[app].label, items: list });
+  });
+  return groups;
+}
+function trkRender() {
+  if (!TRK.inited) return;
+  var groups = trkMine(), today = trkToday();
+  var unread = 0, readN = 0;
+  groups.forEach(function (g) { g.items.forEach(function (n) { if (!trkIsRead(n.id)) unread++; else if (!TRK.seen[n.id]) readN++; }); });
+  var dot = document.getElementById('trk-dot');
+  if (dot) { dot.textContent = unread > 99 ? '99+' : String(unread); dot.style.display = unread ? 'flex' : 'none'; }
+  var bell = document.getElementById('trk-bell');
+  if (bell) bell.title = unread ? ('追蹤提醒：' + unread + ' 則未讀') : '追蹤提醒';
+  if (window.trkAfterRender) { try { window.trkAfterRender(unread); } catch (e) {} }
+  var panel = document.getElementById('trk-panel');
+  if (!panel || !panel.classList.contains('show')) return;
+  var tabU = TRK.tab === 'unread';
+  panel.querySelector('[data-trk-tab=unread]').textContent = '未讀（' + unread + '）';
+  panel.querySelector('[data-trk-tab=read]').textContent = '已讀（' + Math.max(0, readN) + '）';
+  panel.querySelector('[data-trk-tab=unread]').classList.toggle('on', tabU);
+  panel.querySelector('[data-trk-tab=read]').classList.toggle('on', !tabU);
+  /* 2026-11-15（她驗收第 3 條，示意圖甲）：先分 App（粗體，只有入口看得到）→ 再分追蹤項目（預設收合，點了才展開）→ 每一則
+   *   每則字首「⏰ 帳款追蹤：」→「⏰ 帳款：」（標題已經寫「追蹤提醒」）；0 筆的項目、0 筆的 App 都不列（Q3 甲）
+   *   2026-11-15 第 7 條：上面項目列已經寫了，每一則字首的「帳款：」「送審中：」整個拿掉（點開的小表「狀態／項目」那行照留，她選甲）
+   *   展開項目不算已讀，點到那一則才算；每次打開鈴鐺都是全部收合（trkToggle 清 TRK.sec） */
+  var multi = TRK.apps.length > 1, h = '';
+  TRK.sec = TRK.sec || {};
+  groups.forEach(function (g) {
+    if (g.state) {
+      h += '<div class="trk-grp trk-app">' + trkEsc(g.label) + '</div><div class="trk-empty trk-' + g.state + '" style="padding:8px 12px">'
+        + (g.state === 'err' ? '⚠️ 讀取失敗，請檢查網路後再按一次 🔔' : '讀取中…') + '</div>';
+      return;
+    }
+    var list = g.items.filter(function (n) { var r = trkIsRead(n.id); return tabU ? (!r || TRK.seen[n.id]) : (r && !TRK.seen[n.id]); });
+    if (!list.length) return;
+    if (multi) h += '<div class="trk-grp trk-app">' + trkEsc(g.label) + '</div>';
+    /* 項目順序＝系統設定「追蹤品項」的順序；設定裡已經拿掉、但還有舊提醒的排最後 */
+    var order = trkItems(g.app, TRK.data[g.app] && TRK.data[g.app].cfg).map(function (x) { return x.name; });
+    var by = {}; list.forEach(function (n) { (by[n.item] = by[n.item] || []).push(n); });
+    var names = order.filter(function (k) { return by[k]; }).concat(Object.keys(by).filter(function (k) { return order.indexOf(k) < 0; }));
+    names.forEach(function (k) {
+      var key = g.app + '~' + k, open = !!TRK.sec[key];
+      h += '<div class="trk-sec' + (open ? ' open' : '') + '" data-trk-sec="' + trkEsc(key) + '" role="button" tabindex="0" aria-expanded="' + open + '">'
+        + '<span class="trk-ar">' + (open ? '▼' : '▶') + '</span><span class="trk-sn">' + trkEsc(k) + '</span><span class="trk-sc">' + by[k].length + '</span></div>';
+      if (!open) return;
+      by[k].forEach(function (n) {
+        var late = trkDiff(n.date, today), isU = !trkIsRead(n.id);
+        var where = [n.proj, n.loc, n.range].filter(Boolean).join(' ');
+        h += '<div class="trk-it trk-in' + (isU ? ' unread' : '') + '" data-trk-id="' + trkEsc(n.id) + '">'
+          + '<div class="trk-t">⏰ ' + trkEsc(where || '（未填案場）') + (n.text ? '／' + trkEsc(n.text.split('\n')[0]) : '') + '（' + trkMd(n.date) + '）</div>'
+          + '<div class="trk-m"><span class="late">已過 ' + late + ' 天</span>・執行者 ' + trkEsc(n.execs.join('、') || '—') + '</div>';
+        if (TRK.open === n.id) {
+          h += '<div class="trk-dt">'
+            + '<span>案場</span><span>' + trkEsc(n.proj || '—') + '</span>'
+            + (n.loc ? '<span>' + (n.app === 'dtp_mm' ? '區域' : '施作位置') + '</span><span>' + trkEsc(n.loc) + '</span>' : '')
+            + (n.range ? '<span>範圍</span><span>' + trkEsc(n.range) + '</span>' : '')
+            + '<span>' + (n.app === 'dtp_mm' ? '項目' : '狀態') + '</span><span>' + trkEsc(n.item) + '</span>'
+            + '<span>日期</span><span>' + trkEsc(String(n.date || '').replace(/-/g, '/')) + '</span>'
+            + '<span>提醒日</span><span>' + trkEsc(n.due.replace(/-/g, '/')) + '（當日起算 ' + n.days + ' 天）</span>'
+            + '<span>內容</span><span>' + trkEsc(n.text || '—') + '</span>'
+            + '<span>執行者</span><span>' + trkEsc(n.execs.join('、') || '—') + '</span>'
+            + (n.dept ? '<span>部門</span><span>' + trkEsc(n.dept) + '</span>' : '')
+            + '</div>';
+        }
+        h += '</div>';
+      });
+    });
+  });
+  var total = groups.reduce(function (a, g) { return a + g.items.length; }, 0);
+  if (!h) h = '<div class="trk-empty">' + (tabU ? '沒有未讀的提醒' : '沒有已讀的提醒') + '</div>';
+  if (!trkMe()) h = '<div class="trk-empty">請先從入口登入</div>';
+  panel.querySelector('.trk-body').innerHTML = h;
+  panel.querySelector('.trk-all').style.display = (tabU && unread) ? '' : 'none';
+  panel.querySelector('.trk-note').textContent = total ? '' : '時間到的提醒會出現在這裡';
+}
+function trkToggle(e) {
+  if (e) e.stopPropagation();
+  var p = document.getElementById('trk-panel'); if (!p) return;
+  var show = !p.classList.contains('show');
+  p.classList.toggle('show', show);
+  if (show) {
+    TRK.seen = {}; TRK.open = ''; TRK.tab = 'unread'; TRK.sec = {};
+    var nav = document.querySelector('nav');
+    if (nav) p.style.top = Math.round(nav.getBoundingClientRect().bottom + 4) + 'px';
+    if (window.trkBeforeOpen) { try { window.trkBeforeOpen(); } catch (er) {} }
+  }
+  trkRender();
+}
+function trkClick(e) {
+  var t = e.target;
+  var tab = t.closest('[data-trk-tab]');
+  if (tab) { TRK.tab = tab.getAttribute('data-trk-tab'); TRK.seen = {}; TRK.open = ''; trkRender(); return; }
+  if (t.closest('.trk-x')) { trkToggle(); return; }
+  if (t.closest('.trk-all')) {
+    var ids = []; trkMine().forEach(function (g) { g.items.forEach(function (n) { if (!trkIsRead(n.id)) ids.push(n.id); }); });
+    trkMark(ids); TRK.seen = {}; TRK.open = ''; trkRender(); return;
+  }
+  var sec = t.closest('[data-trk-sec]');
+  if (sec) { var sk = sec.getAttribute('data-trk-sec'); TRK.sec = TRK.sec || {}; TRK.sec[sk] = !TRK.sec[sk]; trkRender(); return; }   /* 11-15：只展開，不算已讀 */
+  var it = t.closest('[data-trk-id]');
+  if (it) {
+    var id = it.getAttribute('data-trk-id');
+    TRK.open = TRK.open === id ? '' : id;
+    if (!trkIsRead(id)) { TRK.seen[id] = 1; trkMark([id]); }   /* 讀過就算；這次打開期間先留在原分頁，關掉再開才移到已讀 */
+    trkRender();
+  }
+}
+/* 掛上鈴鐺。opts = { apps:['dtp_pm'], before: 要插在哪個元素前面 } */
+function trkInit(opts) {
+  if (TRK.inited) return;
+  TRK.apps = opts.apps; TRK.inited = true;
+  trkCss();
+  var me = trkMe(); if (me) trkReadLoad(me);
+  var b = document.createElement('button');
+  b.type = 'button'; b.className = 'trk-bell'; b.id = 'trk-bell'; b.title = '追蹤提醒';
+  b.innerHTML = '🔔<span class="trk-dot" id="trk-dot"></span>';
+  b.addEventListener('click', trkToggle);
+  var anchor = opts.before;
+  if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(b, anchor);
+  else { var nav = document.querySelector('nav'); if (nav) nav.appendChild(b); }
+  var p = document.createElement('div');
+  p.className = 'trk-panel'; p.id = 'trk-panel';
+  p.innerHTML = '<div class="trk-hd"><b>🔔 追蹤提醒</b><button type="button" class="trk-x" title="關閉">✕</button></div>'
+    + '<div class="trk-tabs"><button type="button" class="trk-tab on" data-trk-tab="unread">未讀</button><button type="button" class="trk-tab" data-trk-tab="read">已讀</button></div>'
+    + '<div class="trk-body"></div>'
+    + '<div class="trk-ft"><span class="trk-note"></span><button type="button" class="trk-all">全部標為已讀</button></div>';
+  p.addEventListener('click', function (e) { e.stopPropagation(); trkClick(e); });
+  p.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-trk-sec]')) { e.preventDefault(); trkClick(e); } });   /* 11-15：項目列用鍵盤也能展開 */
+  document.body.appendChild(p);
+  document.addEventListener('click', function (e) {
+    if (!p.classList.contains('show')) return;
+    if (e.target.closest && (e.target.closest('#trk-panel') || e.target.closest('#trk-bell'))) return;
+    p.classList.remove('show'); TRK.seen = {}; TRK.open = ''; trkRender();
+  });
+  trkWatchMe(me);
+  /* 跨過午夜也要更新（開著不關的電腦） */
+  setInterval(trkRender, 10 * 60 * 1000);
+  trkRender();
+}
+/* ── 系統設定「追蹤品項」區（三支共用）──
+ * host：放清單的元素；choices：可以選的品項（狀態清單／報價＋施工項目）；canEdit：有沒有設定權限
+ * onSave(items)：存檔交給各 App 自己（各支存設定的方式不同） */
+function trkCfgCss() {
+  if (document.getElementById('trk-cfg-css')) return;
+  var s = document.createElement('style'); s.id = 'trk-cfg-css';
+  s.textContent = ''
+    + '.trk-cfg{display:flex;flex-direction:column;gap:6px;max-width:560px}'
+    + '.trk-cfg .trk-cfg-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}'
+    + '.trk-cfg .trk-cfg-num{flex:none;width:20px;color:#94a3b8;text-align:right;font-size:12px}'
+    + '.trk-cfg select{flex:1 1 160px;min-width:140px;max-width:240px;height:34px;font:inherit;font-size:13px;border:1px solid #cbd5e1;border-radius:6px;padding:0 6px;background:#fff}'
+    + '.trk-cfg .trk-cfg-days{display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap;flex:none}'
+    + '.trk-cfg .trk-cfg-days input{width:56px;height:32px;font:inherit;font-size:13px;text-align:center;border:1px solid #cbd5e1;border-radius:6px}'
+    + '.trk-cfg .trk-cfg-del{flex:none;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:6px;width:32px;height:32px;cursor:pointer}'
+    + '.trk-cfg .trk-cfg-empty{color:#94a3b8;font-size:13px;padding:6px 2px}'
+    + '.trk-cfg .trk-cfg-hint{color:#64748b;font-size:12px;line-height:1.6}';
+  document.head.appendChild(s);
+}
+function trkCfgRender(host, app, c, choices, canEdit, onSave) {
+  host = typeof host === 'string' ? document.getElementById(host) : host;
+  if (!host) return;
+  trkCfgCss();
+  host.classList.add('trk-cfg');
+  host._trk = { app: app, choices: choices || [], canEdit: !!canEdit, onSave: onSave };
+  var noun = app === 'dtp_mm' ? '項目' : '狀態';
+  var items = trkItems(app, c), dis = canEdit ? '' : ' disabled';
+  var opt = function (sel) {
+    var list = (choices || []).slice();
+    if (sel && list.indexOf(sel) < 0) list.unshift(sel);
+    return '<option value="">（選一個' + noun + '）</option>' + list.map(function (v) { return '<option' + (v === sel ? ' selected' : '') + '>' + trkEsc(v) + '</option>'; }).join('');
+  };
+  host.innerHTML = (items.length ? items.map(function (it, i) {
+    return '<div class="trk-cfg-row"><span class="trk-cfg-num">' + (i + 1) + '</span>'
+      + '<select class="trk-cfg-name" aria-label="追蹤品項"' + dis + '>' + opt(it.name) + '</select>'
+      + '<label class="trk-cfg-days">當日起算<input type="number" class="trk-cfg-d" min="0" max="365" step="1" inputmode="numeric" value="' + it.days + '" aria-label="天數"' + dis + '>天提醒</label>'
+      + (canEdit ? '<button type="button" class="trk-cfg-del" title="刪除這一項">🗑</button>' : '') + '</div>';
+  }).join('') : '<div class="trk-cfg-empty">目前沒有追蹤品項' + (canEdit ? '，點「＋ 新增」加入' : '') + '</div>');
+  if (!host._trkBound) {
+    host._trkBound = true;
+    host.addEventListener('change', function (e) { if (e.target.closest('.trk-cfg-row')) trkCfgCollect(host); });
+    host.addEventListener('click', function (e) {
+      var d = e.target.closest('.trk-cfg-del'); if (!d) return;
+      d.closest('.trk-cfg-row').remove(); trkCfgCollect(host);
+    });
+  }
+}
+/* 「＋ 新增」：先加一列空白，選了品項才存 */
+function trkCfgAddRow(host) {
+  host = typeof host === 'string' ? document.getElementById(host) : host;
+  if (!host || !host._trk || !host._trk.canEdit) return;
+  var em = host.querySelector('.trk-cfg-empty'); if (em) em.remove();
+  var n = host.querySelectorAll('.trk-cfg-row').length + 1, noun = host._trk.app === 'dtp_mm' ? '項目' : '狀態';
+  var row = document.createElement('div'); row.className = 'trk-cfg-row';
+  row.innerHTML = '<span class="trk-cfg-num">' + n + '</span><select class="trk-cfg-name" aria-label="追蹤品項"><option value="">（選一個' + noun + '）</option>'
+    + host._trk.choices.map(function (v) { return '<option>' + trkEsc(v) + '</option>'; }).join('') + '</select>'
+    + '<label class="trk-cfg-days">當日起算<input type="number" class="trk-cfg-d" min="0" max="365" step="1" inputmode="numeric" value="5" aria-label="天數">天提醒</label>'
+    + '<button type="button" class="trk-cfg-del" title="刪除這一項">🗑</button>';
+  host.appendChild(row);
+  row.querySelector('select').focus();
+}
+function trkCfgCollect(host) {
+  var seen = {}, items = [];
+  [].forEach.call(host.querySelectorAll('.trk-cfg-row'), function (r) {
+    var name = r.querySelector('.trk-cfg-name').value.trim();
+    var days = Math.max(0, Math.min(365, parseInt(r.querySelector('.trk-cfg-d').value, 10) || 0));
+    if (!name || seen[name]) return;
+    seen[name] = 1; items.push({ name: name, days: days });
+  });
+  var blank = [].some.call(host.querySelectorAll('.trk-cfg-name'), function (s) { return !s.value; });
+  if (host._trk && host._trk.onSave) host._trk.onSave(items, blank);
+}
+/* 雲端已讀：每個人只掛一次監聽 */
+function trkWatchMe(me) {
+  if (!me || !window._trkFb) return;
+  TRK.watched = TRK.watched || {};
+  if (TRK.watched[me.key]) return;
+  TRK.watched[me.key] = 1;
+  try { window._trkFb.watch('track_read/' + trkSafe(me.key), function (v) { var m = trkMe(); if (m && m.key === me.key) trkCloudRead(v); }); } catch (e) {}
+}
+/* 換人登入（入口）：重讀這個人的已讀、掛他的監聽 */
+function trkUserChanged() {
+  var me = trkMe();
+  TRK.read = {}; TRK.seen = {}; TRK.open = '';
+  if (me) { trkReadLoad(me); trkWatchMe(me); }
+  trkRender();
+}
+/* 子 App 的資料一變就呼叫：trkSetData('dtp_pm', {records, cfg}) */
+/* 讀不到資料（入口用，2026-11-14 Q35）：之前讀到過的就照舊顯示舊的，從來沒讀到才寫「讀取失敗」 */
+function trkSetErr(app) { TRK.err = TRK.err || {}; if (!TRK.data[app]) TRK.err[app] = 1; trkRender(); }
+function trkSetData(app, d) { TRK.data[app] = d; if (TRK.err) delete TRK.err[app]; trkRender(); }
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyAZ4knkPs9CTPJCECx01QHQLqfc5nE0S_Q",
@@ -3524,6 +3928,11 @@ const _noUndef = (v) => {
 };
 window._fbSet = async (data) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, 'dtp'), _noUndef(data)); };
 window._fbSetPath = async (path, val) => { if (window._LOCAL_PREVIEW) return;   /* 2026-09-18 本機預覽 */ await authReady; await set(ref(db, 'dtp/' + path), val === null ? null : _noUndef(val)); };  // per-record 寫入（val=null 即刪除）
+/* 追蹤提醒的已讀（2026-11-12）：只寫 track_read/<人>，不碰 dtp 整包 */
+window._trkFb = {
+  update: (p, o) => { if (window._LOCAL_PREVIEW) return Promise.resolve(); return authReady.then(() => update(ref(db, p), o)); },
+  watch: (p, cb) => { authReady.then(() => onValue(ref(db, p), s => { try { cb(s.val()); } catch (e) { console.warn(e); } }, err => console.warn('已讀讀取失敗', err))); }
+};
 window._fbGet = async () => { await authReady; const s = await get(ref(db, 'dtp')); return s.exists() ? s.val() : null; };
 window._fbGetPath = async (path) => { await authReady; const s = await get(ref(db, 'dtp/' + path)); return s.exists() ? s.val() : null; };
 // 即時同步：雲端一有變動就回呼，另一台裝置的修改幾秒內自動出現，不必重新整理（2026-08-13 新增）
