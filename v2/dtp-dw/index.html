@@ -9,7 +9,7 @@
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_VIEW_ALL＝這支 App 的紀錄全公司都看得到（2026-08-19 用戶決定：圖面進度所有人都要能看）。
      只影響「看得到什麼」，改不改得動仍照入口角色的編輯範圍判斷。 -->
-<script>window.APP_VERSION='2026-11-12.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
+<script>window.APP_VERSION='2026-11-18.1';window.APP_KEY='dtp';window.APP_VIEW_ALL=true;</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#4c1d95;--primary-l:#6d28d9;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f5f3fb;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -198,6 +198,14 @@ tr.row-drop td{border-top:2px solid var(--primary,#1a3a5c)}
 .proj-header.drag-over-bottom{box-shadow:inset 0 -4px 0 #fbbf24}
 .proj-header:hover{background:#1e4a6e}
 .proj-cnt{background:rgba(255,255,255,.18);border-radius:10px;padding:1px 8px;font-size:11px;margin-left:8px}
+/* 2026-11-18 案場分頁（她 Q1 甲：抬頭一個「狀態 ▾」小選單；順序 進行中→待進場→已完工→未成案） */
+.main-tabs{display:flex;gap:6px;margin:0 0 8px;flex-wrap:wrap}
+.main-tabs .mt-btn{font:inherit;font-size:13.5px;font-weight:700;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:8px 8px 0 0;padding:6px 16px;cursor:pointer;white-space:nowrap}
+.main-tabs .mt-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.proj-header .pj-hd-r{display:inline-flex;align-items:center;gap:6px;flex:none}
+.proj-header .pj-tab-sel{flex:none;width:auto;font:inherit;font-size:12px;font-weight:700;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);color:#fff;border-radius:6px;padding:2px 6px;height:26px;cursor:pointer}
+.proj-header .pj-tab-sel option{color:#1e293b;background:#fff}
+.proj-header .pj-tab-info{font-weight:500;font-size:12px;margin-left:10px;white-space:nowrap;display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.4);border-radius:5px;padding:1px 8px}
 .chevron{transition:transform .2s}
 .sec-collapsed .chevron{transform:rotate(-90deg)}
 
@@ -480,6 +488,9 @@ body.no-mng #page-settings select{pointer-events:none;background:#f3f4f6;color:#
     <button type="button" class="btn btn-g btn-sm" onclick="drQuick('clear')">清除</button>
     <span id="dr-hint" style="font-size:11.5px;color:var(--muted)"></span>
   </div>
+  <!-- 2026-11-18 她指定：案場分頁 進行中→待進場→已完工→未成案（主管在案場抬頭的選單移） -->
+  <button type="button" id="pj-tab-go" hidden onclick="projTabApply()" aria-hidden="true" tabindex="-1"></button>
+  <div class="main-tabs" id="main-tabs"><button type="button" class="mt-btn on" data-mt="open" onclick="setMainTab('open')">進行中</button><button type="button" class="mt-btn" data-mt="wait" onclick="setMainTab('wait')">待進場</button><button type="button" class="mt-btn" data-mt="done" onclick="setMainTab('done')">已完工</button><button type="button" class="mt-btn" data-mt="lost" onclick="setMainTab('lost')">未成案</button></div>
   <div id="main-table"></div>
 </div>
 
@@ -1541,6 +1552,7 @@ function updateDataLists(){
     const el=document.getElementById('dl-'+k);
     const src=(k==='部門')?portalDepts()
              :(k==='執行者')?portalExecs(execDeptNow())   // 執行者也走入口，依部門過濾
+             :(k==='案場')?(cfg[k]||[]).filter(v=>{const t=projTab(v);return t!=='done'&&t!=='lost'})   // 2026-11-18：已完工、未成案的案場不出現在新增的下拉
              :(cfg[k]||[]);                               // 其餘照 App 自己的設定
     if(el)el.innerHTML=src.map(v=>`<option value="${esc(v)}">`).join('');
   });
@@ -1591,6 +1603,13 @@ function _mergeCfg(mine,cloud){
   const out={...mine};
   Object.keys(cloud||{}).forEach(k=>{
     const c=cloud[k];
+    /* 2026-11-18（照進—專 10-22）：案場分頁這種「名稱 → 設定」的物件 → 逐項補：本機有的用本機，本機沒有的用雲端
+       （不補的話，還沒收到新設定的那台一存檔，就會把別人剛移的分頁整包洗掉） */
+    if(c&&typeof c==='object'&&!Array.isArray(c)){
+      const m=(out[k]&&typeof out[k]==='object'&&!Array.isArray(out[k]))?out[k]:{};
+      out[k]={...c,...m};
+      return;
+    }
     if(!Array.isArray(c))return;
     // users 這類物件陣列無法用 includes 比對，會重複累加 → 不做聯集，保留本機
     if(c.some(v=>v&&typeof v==='object'))return;
@@ -1770,7 +1789,7 @@ async function initFb(){
   while(!window._fbGet&&t<5000){await new Promise(r=>setTimeout(r,200));t+=200}
   /* 2026-10-18 她選甲：雲端 SDK 5 秒沒載好（訊號弱／斷線）→ 讀完本機也要把畫面畫出來，
      原本直接 return，總表、歷史資料頁都是空白（進—瑪 09-30 已用同樣方法修過） */
-  if(!window._fbGet){setSyncIcon('err');loadLocal();renderMain();renderHistory();updateFilters();updateDataLists();return}
+  if(!window._fbGet){setSyncIcon('err');loadLocal();renderMain();renderHistory();updateFilters();updateDataLists();if(typeof trkJumpPending==='function')trkJumpPending();return}
   try{
     const data=await window._fbGet();
     if(data&&data.records){
@@ -1793,6 +1812,7 @@ async function initFb(){
   }catch(e){console.warn('Firebase 連線失敗，使用本機資料:',e);setSyncIcon('err');loadLocal()}
   renderMain();renderHistory();updateFilters();updateDataLists();
   startWatch();
+  if(typeof trkJumpPending==='function')trkJumpPending();   /* 2026-11-18 從入口 🔔 點過來的 */
 }
 
 // ── 即時同步（2026-08-13 比照 dtp-pm 2026-08-06 新增）──────────────────────
@@ -2298,6 +2318,53 @@ function updateFilters(){
 // ============================================================
 // 渲染：進度總表
 // ============================================================
+/* ══════ 案場分頁（2026-11-18 她指定：進行中→待進場→已完工→未成案；Q1 甲 抬頭小選單、Q2 甲 追蹤提醒照算）══════
+ * cfg.案場分頁 = { 案場鍵: {tab:'open'|'wait'|'done'|'lost', date, by} } —— 移回進行中也是寫 tab:'open'、不刪鍵：
+ * cfg 存檔是「本機有的用本機、本機沒有的補雲端」，刪掉的鍵會被別台補回來。
+ * 只有主管（設定維護權）能移；歷史資料、匯出 Excel 都不受影響。 */
+var PJ_TABS=[['open','進行中'],['wait','待進場'],['done','已完工'],['lost','未成案']];
+var PJ_TAB_LABEL={open:'進行中',wait:'待進場',done:'已完工',lost:'未成案'};
+var _mainTab='open';
+function cfgMapKey(name){return String(name||'').replace(/[%.#$\[\]\/]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase())}
+function projTabInfo(name){const m=cfg&&cfg.案場分頁&&cfg.案場分頁[cfgMapKey(name)];return (m&&PJ_TAB_LABEL[m.tab])?m:null}
+function projTab(name){const m=projTabInfo(name);return m?m.tab:'open'}
+/* 抬頭左邊：「11/18 待進場・王經理」（進行中不顯示） */
+function projTabHtml(proj){
+  const m=projTabInfo(proj); if(!m||m.tab==='open')return '';
+  return '<span class="pj-tab-info">'+esc(String(m.date||'').slice(5).replace('-','/'))+' '+PJ_TAB_LABEL[m.tab]+(m.by?'・'+esc(m.by):'')+'</span>';
+}
+/* 抬頭右邊：主管才有的分頁選單（點它不要收合案場） */
+function projTabSelHtml(proj){
+  if(!portalCanManageSettings())return '';
+  const cur=projTab(proj);
+  return '<select class="pj-tab-sel" aria-label="案場分頁" title="把整個案場移到別的分頁" data-proj="'+esc(proj)+'" onclick="event.stopPropagation()" onchange="projTabSet(this.getAttribute(\'data-proj\'),this.value,this)">'
+    +PJ_TABS.map(x=>'<option value="'+x[0]+'"'+(x[0]===cur?' selected':'')+'>'+x[1]+'</option>').join('')+'</select>';
+}
+function setMainTab(t){_mainTab=PJ_TAB_LABEL[t]?t:'open';renderMain()}
+/* ⚠️ 確認框是自製的（09-23）：按「確認」時是把「觸發的那個元素」再點一次。下拉選單被點一次不會再觸發 change，
+ * 所以選單只記下要移去哪，再去點一顆藏起來的按鈕（#pj-tab-go）—— 確認框重放的是那顆按鈕，才會真的執行。 */
+var _pjPending=null;
+function projTabSet(name,t,sel){
+  const cur=projTab(name);
+  if(sel)sel.value=cur;   /* 先退回原樣：按了「確認」才真的移 */
+  if(!portalCanManageSettings()){toast('只有主管可以移動案場分頁','e');return}
+  if(!PJ_TAB_LABEL[t]||t===cur)return;
+  _pjPending={name:name,t:t};
+  const b=document.getElementById('pj-tab-go');
+  if(b)b.click();else projTabApply();
+}
+function projTabApply(){
+  const p=_pjPending; if(!p)return;
+  const lb=PJ_TAB_LABEL[p.t];
+  if(!confirm('確定把「'+p.name+'」移到「'+lb+'」？\n整個案場會移到「'+lb+'」分頁，之後在同一個選單改回「進行中」就能還原。'))return;
+  _pjPending=null;
+  if(!portalCanManageSettings())return;
+  if(!cfg.案場分頁||typeof cfg.案場分頁!=='object')cfg.案場分頁={};
+  const d=new Date(),pd=n=>(n<10?'0':'')+n;
+  cfg.案場分頁[cfgMapKey(p.name)]={tab:p.t,date:d.getFullYear()+'-'+pd(d.getMonth()+1)+'-'+pd(d.getDate()),by:(currentUser&&currentUser.name)||''};
+  saveCfg();updateDataLists();renderMain();
+  toast('已移到「'+lb+'」','s');
+}
 /* 系統設定「追蹤品項」（2026-11-12）：畫面在共用的 trkCfgRender，存檔走這支自己的 saveCfg */
 function trkCfgPaint(){
   if(typeof trkCfgRender!=='function')return;
@@ -2308,6 +2375,23 @@ function trkCfgPaint(){
     if(!blank)trkCfgPaint();
     toast('已儲存追蹤品項 ✓','s');
   });
+}
+/* ══════ 🔔 點 ➜ 跳到這一筆（2026-11-18 她 Q5、Q6）══════
+ * 回到總表 → 切到案場所在的分頁 → 被篩選擋住就把篩選清掉 → 展開案場 → 捲過去、閃黃。 */
+function trkJumpTo(recId){
+  const r=(records||[]).find(x=>x&&x.id===recId);
+  if(!r){toast('這筆記錄已經不在了','e');return}
+  if(typeof goPage==='function')goPage('main');
+  _mainTab=projTab(r.案場);
+  if(!getFiltered().some(x=>x&&x.id===recId)){
+    clearAllFilters();
+    if(!getFiltered().some(x=>x&&x.id===recId)){toast('你沒有權限看這一筆','e');return}
+    toast('已為你清除篩選，方便找到這一筆','s');
+  }
+  _openSecs.add(secId(r.案場));
+  renderMain();
+  const tr=[].find.call(document.querySelectorAll('#main-table tr[data-rec]'),e=>e.getAttribute('data-rec')===recId);
+  if(tr&&typeof trkFlash==='function')trkFlash(tr);
 }
 function renderMain(){
   if(typeof trkSetData==='function')trkSetData('dtp',{records:records,cfg:cfg});   /* 2026-11-12 追蹤提醒跟著資料重算 */
@@ -2324,8 +2408,16 @@ function renderMain(){
   filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
   /* 2026-09-20：同一個案場底下照「順序」欄位排（沒有順序的排在後面，維持原本的相對位置） */
   Object.keys(groups).forEach(function(k){ groups[k]=sortRowsByOrder(groups[k]); });
+  /* 2026-11-18 案場分頁：分頁上的數字＝目前篩選條件下各有幾個案場 */
+  const _cnt={open:0,wait:0,done:0,lost:0};
+  Object.keys(groups).forEach(k=>{ const t=projTab(k); _cnt[t]++; if(t!==_mainTab) delete groups[k]; });
+  const _mtb=document.getElementById('main-tabs');
+  if(_mtb)_mtb.querySelectorAll('.mt-btn').forEach(b=>{const k=b.dataset.mt;b.classList.toggle('on',k===_mainTab);b.textContent=PJ_TAB_LABEL[k]+'（'+_cnt[k]+'）'});
   const el=document.getElementById('main-table');
   if(!filtered.length){el.innerHTML=emptyReasonHtml();return}   /* 0 筆要講出原因（2026-09-22） */
+  if(!Object.keys(groups).length){
+    const _oth=PJ_TABS.map(x=>x[0]).filter(k=>k!==_mainTab&&_cnt[k]).map(k=>'「'+PJ_TAB_LABEL[k]+'（'+_cnt[k]+'）」');
+    el.innerHTML='<div class="empty"><div class="empty-icon">📭</div>這個分頁沒有符合條件的案場'+(_oth.length?'<br><span style="font-size:13px">符合的案場在 '+_oth.join('、')+' 分頁</span>':'')+'</div>';return}
   const _groupCount=Object.keys(groups).length;
   el.innerHTML=Object.entries(groups).map(([proj,rows],gi)=>{
     const sid=secId(proj);
@@ -2343,8 +2435,8 @@ function renderMain(){
     const dragAttr=canMv?` draggable="true" ondragstart="projDragStart(event,'${pj}')" ondragover="projDragOver(event,'${pj}')" ondragleave="projDragLeave(event)" ondrop="projDrop(event,'${pj}')" ondragend="projDragEnd(event)"`:'';
     return`<div class="proj-section">
       <div class="proj-header${open?'':' sec-collapsed'}"${dragAttr} onclick="toggleSec('${sid}',this)">
-        <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span></span>
-        ${mv}
+        <span>${canMv?'<span class="drag-handle" title="按住這裡拖曳可以換位置">⠿</span>':''}<span class="chevron" style="margin-right:6px">▼</span><span style="opacity:.85;margin-right:6px;font-variant-numeric:tabular-nums">${gi+1}.</span>📁 ${esc(proj)}<span class="proj-cnt">${rows.length} 筆</span>${projTabHtml(proj)}</span>
+        <span class="pj-hd-r">${projTabSelHtml(proj)}${mv}</span>
       </div>
       <div id="${sid}" class="tbl-scroll${open?'':' d-none'}">
         <table class="ptbl">
@@ -2472,7 +2564,7 @@ function renderRow(r, ri, total){
       +`<button type="button" onclick="rowMove('${rid}',1)" title="往下移"${ri===total-1?' disabled':''}>↓</button>`
       +`</span></td>`
     :'<td class="row-handle"></td>';
-  return`<tr${trCls}${dragRow}>
+  return`<tr${trCls}${dragRow} data-rec="${rid}">
     ${handleCell}
     <td>${exs}${r.部門?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${esc(r.部門)}</div>`:''}</td>
     <td>${loc}</td>
@@ -2508,7 +2600,7 @@ function renderLog(logs){
  * 而不是清單裡的前一項，否則按了畫面沒動、看起來像壞掉。
  * 畫面上出現、但清單裡還沒有的案場（匯入的舊資料）會先補進清單，順序才有得排。 */
 function projMove(proj,dir){
-  const shown=[...new Set(getFiltered().map(r=>r.案場))];      // 畫面上這幾組，順序＝畫面順序
+  const shown=[...new Set(getFiltered().map(r=>r.案場))].filter(p=>projTab(p)===_mainTab);   // 畫面上這幾組（2026-11-18：只算目前分頁）
   const at=shown.indexOf(proj);
   if(at<0)return;
   const nb=shown[at+dir];
@@ -3514,24 +3606,60 @@ window._cloudErrBar = (function(){
  * 規則（她 11-12 定的）：
  *  - 系統設定「追蹤品項」：每列＝品項＋「當日起算 N 天提醒」。進度記錄的日期＋N 天 ≤ 今天 → 進鈴鐺
  *  - 收件人：那筆的執行者、同部門的副理／經理／協理、副總經理、總經理室
- *  - 讀過就算（每人各自的已讀）；未讀／已讀兩個分頁；點一則在鈴鐺裡展開看，不跳頁
+ *  - 讀過就算（每人各自的已讀）；未讀／已讀兩個分頁；點一則在鈴鐺裡展開看；展開後按 ➜ 才跳到那一筆（2026-11-18）
  *  - 沒有推播：打開 App 時才算
  * 資料：設定放各 App 的 cfg.追蹤 = {v:1, items:[{name, days}]}（用物件包起來 —— 空陣列存進
  *       Firebase 會整個消失，刪光之後會變回預設值）；已讀放 track_read/<人>/<提醒編號> = 時間。 */
 var TRK_APPS = {
-  dtp_pm: { label: '進—專', key: 'status', def: [{ name: '帳款', days: 5 }] },
-  dtp:    { label: '進—圖', key: 'status', def: [{ name: '送審中', days: 4 }] },
-  dtp_mm: { label: '進—瑪', key: 'work',   def: [{ name: '報價送出', days: 5 }, { name: '請款送出', days: 5 }] }
+  dtp_pm: { label: '進—專', key: 'status', folder: 'dtp-pm', def: [{ name: '帳款', days: 5 }] },
+  dtp:    { label: '進—圖', key: 'status', folder: 'dtp-dw', def: [{ name: '送審中', days: 4 }] },
+  /* 2026-11-18（她 Q4 乙）：進—瑪每一條要選「案場狀態＋項目」，兩個都符合才提醒 */
+  dtp_mm: { label: '進—瑪', key: 'work',   folder: 'dtp-mm', st: true,
+            def: [{ name: '報價送出', days: 5, status: '已報價' }, { name: '請款送出', days: 5, status: '執行中' }] }
 };
+/* 11-18 之前存的進—瑪設定沒有狀態 → 這兩條照她說的補上（其他的留空，設定頁會標紅要人選） */
+var TRK_MM_DEF_ST = { '報價送出': '已報價', '請款送出': '執行中' };
 var TRK_BOSS = ['副理', '經理', '協理'];
 function trkItems(app, c) {
-  var t = c && c.追蹤;
+  var t = c && c.追蹤, A = TRK_APPS[app];
+  var fix = function (x) {
+    var st = A.st ? String(x.status || '').trim() : '';
+    if (A.st && !st) st = TRK_MM_DEF_ST[String(x.name).trim()] || '';
+    return { name: String(x.name).trim(), days: Math.max(0, parseInt(x.days, 10) || 0), status: st };
+  };
   if (t && typeof t === 'object' && t.v) {
     var a = Array.isArray(t.items) ? t.items : (t.items && typeof t.items === 'object' ? Object.values(t.items) : []);
-    return a.filter(function (x) { return x && String(x.name || '').trim(); })
-      .map(function (x) { return { name: String(x.name).trim(), days: Math.max(0, parseInt(x.days, 10) || 0) }; });
+    return a.filter(function (x) { return x && String(x.name || '').trim(); }).map(fix);
   }
-  return TRK_APPS[app].def.map(function (x) { return { name: x.name, days: x.days }; });
+  return A.def.map(fix);
+}
+/* ── 進—瑪的案場狀態（2026-11-18 她 Q3 乙＋甲）──
+ * 案場狀態存在 dtp_mm/cases/{案場鍵}.狀態；沒選過的＝狀態表「報價」階段的第一個（跟進—瑪畫面一樣）。
+ * 狀態改了以後：已經進 🔔 的留著 —— 靠案場上的「狀態歷程」[{d:改的日期, from:舊狀態, to:新狀態}] 判斷
+ *   「提醒到期那天之後，這個案場還是這個狀態過」。11-18 之前改的沒有歷程 → 只看目前狀態（她選甲）。 */
+function trkCaseKey(name) {
+  var s = String(name || '').trim() || '（未填案場）';
+  return s.replace(/[.#$\[\]\/%\x00-\x1f\x7f]/g, function (c) { return '%' + ('0' + c.charCodeAt(0).toString(16).toUpperCase()).slice(-2); });
+}
+function trkStatusDefs(c) {
+  var d = trkList(c && c.狀態設定).filter(function (x) { return x && x.名稱; });
+  return d;
+}
+function trkDefStatus(c) {
+  var d = trkStatusDefs(c), q = d.filter(function (x) { return x.階段 === '報價'; })[0];
+  return (q || d[0] || { 名稱: '待報價' }).名稱;
+}
+/* 狀態顯示成「報價：已報價」 */
+function trkStLabel(c, name) {
+  var d = trkStatusDefs(c).filter(function (x) { return x.名稱 === name; })[0];
+  return d && d.階段 ? d.階段 + '：' + name : name;
+}
+function trkStatusOk(data, r, status, due) {
+  if (!status) return true;
+  var cs = data && data.cases, k = trkCaseKey(r.案場), cc = cs && cs[k];
+  var cur = (cc && String(cc.狀態 || '').trim()) || trkDefStatus(data && data.cfg);
+  if (cur === status) return true;
+  return trkList(cc && cc.狀態歷程).some(function (h) { return h && h.from === status && String(h.d || '') >= due; });
 }
 function trkYmd(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function trkToday() { return trkYmd(new Date()); }
@@ -3544,8 +3672,9 @@ function trkSplit(s) { return String(s || '').split(/[、,，\n]/).map(function 
 function trkList(v) { return Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []); }
 /* 到期的提醒（不分人）。data = { records, cfg } */
 function trkDue(app, data, today) {
-  var A = TRK_APPS[app], days = {};
-  trkItems(app, data && data.cfg).forEach(function (i) { days[i.name] = i.days; });
+  var A = TRK_APPS[app], rules = {};
+  /* 同一個項目可以設好幾條（不同狀態）→ 一筆記錄只要符合其中一條就提醒一次（編號不變，已讀照舊算） */
+  trkItems(app, data && data.cfg).forEach(function (i) { (rules[i.name] = rules[i.name] || []).push(i); });
   today = today || trkToday();
   var out = [];
   trkList(data && data.records).forEach(function (r) {
@@ -3553,11 +3682,19 @@ function trkDue(app, data, today) {
     trkList(r.進度記錄).forEach(function (l, i) {
       if (!l) return;
       var k = String(l[A.key] || '');
-      if (!Object.prototype.hasOwnProperty.call(days, k)) return;
-      var due = trkAddDays(l.date, days[k]);
-      if (!due || due > today) return;
+      if (!Object.prototype.hasOwnProperty.call(rules, k)) return;
+      var hit = null, due = '';
+      rules[k].some(function (ru) {
+        var d = trkAddDays(l.date, ru.days);
+        if (!d || d > today) return false;
+        if (A.st && !trkStatusOk(data, r, ru.status, d)) return false;
+        hit = ru; due = d; return true;
+      });
+      if (!hit) return;
+      var lk = l.rid || ('i' + i);
       out.push({
-        id: app + '~' + r.id + '~' + (l.rid || ('i' + i)), app: app, item: k, days: days[k],
+        id: app + '~' + r.id + '~' + lk, app: app, item: k, days: hit.days, st: hit.status || '',
+        rec: r.id, lk: lk,
         date: l.date, due: due, proj: r.案場 || '', loc: l.location || r.施作位置 || '', range: r.範圍 || '',
         text: l.text || '', execs: trkSplit(r.執行者), dept: r.部門 || ''
       });
@@ -3644,7 +3781,19 @@ function trkCss() {
     + '.trk-panel .trk-empty.trk-err{color:#b45309;font-weight:600}'
     + '.trk-panel .trk-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid #e2e8f0;flex:none}'
     + '.trk-panel .trk-all{font:inherit;font-size:12.5px;border:1px solid #2563eb;color:#2563eb;background:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;white-space:nowrap}'
-    + '.trk-panel .trk-note{font-size:11.5px;color:#94a3b8}';
+    + '.trk-panel .trk-note{font-size:11.5px;color:#94a3b8}'
+    /* 2026-11-18 ➜ 前往這筆、跳過去之後那一列閃黃 */
+    + '.trk-panel .trk-row1{display:flex;align-items:flex-start;gap:6px}'
+    + '.trk-panel .trk-row1 .trk-t{flex:1 1 auto;min-width:0}'
+    + '.trk-panel .trk-sum,.trk-panel .trk-go{flex:none;height:26px;border-radius:13px;font:inherit;font-size:12px;font-weight:700;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:0 10px;white-space:nowrap}'
+    + '.trk-panel .trk-sum{border:1px solid #cbd5e1;background:#fff;color:#475569}'
+    + '.trk-panel .trk-sum:hover{background:#f1f5f9}'
+    + '.trk-panel .trk-go{border:1px solid #2563eb;background:#2563eb;color:#fff;padding:0 8px 0 11px}'
+    + '.trk-panel .trk-go:hover{background:#1d4ed8;border-color:#1d4ed8}'
+    + '.trk-panel .trk-sum:focus-visible,.trk-panel .trk-go:focus-visible{outline:2px solid #1e3a8a;outline-offset:2px}'
+    + '@keyframes trkFlash{0%,60%{background-color:#fef08a}100%{background-color:transparent}}'
+    + '.trk-flash,.trk-flash>td{animation:trkFlash 2.4s ease-out 1}'
+    + '.trk-flash{outline:3px solid #f59e0b;outline-offset:-3px}';
   document.head.appendChild(s);
 }
 function trkEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -3706,8 +3855,13 @@ function trkRender() {
       by[k].forEach(function (n) {
         var late = trkDiff(n.date, today), isU = !trkIsRead(n.id);
         var where = [n.proj, n.loc, n.range].filter(Boolean).join(' ');
+        /* 2026-11-18（她 Q1～Q4）：案場名稱右邊兩顆「▼ 摘要」「前往 ›」；收合 ▼、展開 ▲；點整行照舊也會展開 */
+        var opened = TRK.open === n.id;
         h += '<div class="trk-it trk-in' + (isU ? ' unread' : '') + '" data-trk-id="' + trkEsc(n.id) + '">'
-          + '<div class="trk-t">⏰ ' + trkEsc(where || '（未填案場）') + (n.text ? '／' + trkEsc(n.text.split('\n')[0]) : '') + '（' + trkMd(n.date) + '）</div>'
+          + '<div class="trk-row1"><div class="trk-t">⏰ ' + trkEsc(where || '（未填案場）') + (n.text ? '／' + trkEsc(n.text.split('\n')[0]) : '') + '（' + trkMd(n.date) + '）</div>'
+          + '<button type="button" class="trk-sum" aria-expanded="' + opened + '" title="' + (opened ? '收合摘要' : '展開摘要') + '">' + (opened ? '▲' : '▼') + ' 摘要</button>'
+          + '<button type="button" class="trk-go" data-trk-go="' + trkEsc(n.id) + '" title="前往這筆" aria-label="前往這筆">前往'
+          + '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>'
           + '<div class="trk-m"><span class="late">已過 ' + late + ' 天</span>・執行者 ' + trkEsc(n.execs.join('、') || '—') + '</div>';
         if (TRK.open === n.id) {
           h += '<div class="trk-dt">'
@@ -3720,6 +3874,7 @@ function trkRender() {
             + '<span>內容</span><span>' + trkEsc(n.text || '—') + '</span>'
             + '<span>執行者</span><span>' + trkEsc(n.execs.join('、') || '—') + '</span>'
             + (n.dept ? '<span>部門</span><span>' + trkEsc(n.dept) + '</span>' : '')
+            + (n.st ? '<span>案場狀態</span><span>' + trkEsc(trkStLabel(TRK.data[n.app] && TRK.data[n.app].cfg, n.st)) + '</span>' : '')
             + '</div>';
         }
         h += '</div>';
@@ -3755,6 +3910,8 @@ function trkClick(e) {
     var ids = []; trkMine().forEach(function (g) { g.items.forEach(function (n) { if (!trkIsRead(n.id)) ids.push(n.id); }); });
     trkMark(ids); TRK.seen = {}; TRK.open = ''; trkRender(); return;
   }
+  var go = t.closest('[data-trk-go]');
+  if (go) { trkGo(go.getAttribute('data-trk-go')); return; }
   var sec = t.closest('[data-trk-sec]');
   if (sec) { var sk = sec.getAttribute('data-trk-sec'); TRK.sec = TRK.sec || {}; TRK.sec[sk] = !TRK.sec[sk]; trkRender(); return; }   /* 11-15：只展開，不算已讀 */
   var it = t.closest('[data-trk-id]');
@@ -3764,6 +3921,38 @@ function trkClick(e) {
     if (!trkIsRead(id)) { TRK.seen[id] = 1; trkMark([id]); }   /* 讀過就算；這次打開期間先留在原分頁，關掉再開才移到已讀 */
     trkRender();
   }
+}
+/* ── 點 ➜ 跳到那一筆（2026-11-18 她 Q5 甲＋只要箭頭、Q6 甲）──
+ * 在進—專／進—圖／進—瑪自己的 🔔：同一頁跳（各支的 trkJumpTo 負責切分頁、清篩選、展開、捲過去）。
+ * 在入口的 🔔：入口的 trkOpenApp 開新分頁，網址帶 ?trk=記錄編號&lk=進度那一條，那支打開讀完資料就跳。 */
+function trkGo(id) {
+  var n = null;
+  trkMine().forEach(function (g) { g.items.forEach(function (x) { if (x.id === id) n = x; }); });
+  if (!n) return;
+  if (!trkIsRead(id)) trkMark([id]);
+  var p = document.getElementById('trk-panel');
+  if (p) p.classList.remove('show');
+  TRK.seen = {}; TRK.open = ''; trkRender();
+  if (TRK.apps.length === 1 && TRK.apps[0] === n.app && typeof trkJumpTo === 'function') trkJumpTo(n.rec, n.lk);
+  else if (typeof window.trkOpenApp === 'function') window.trkOpenApp(n);
+}
+/* 從入口開過來的：網址上的 ?trk= 先記著，等那支 App 讀完雲端資料（fbLoad 結尾）才跳 */
+var TRK_PENDING = (function () {
+  try { var q = new URLSearchParams(location.search), r = q.get('trk'); return r ? { rec: r, lk: q.get('lk') || '' } : null; } catch (e) { return null; }
+})();
+function trkJumpPending() {
+  if (!TRK_PENDING || typeof trkJumpTo !== 'function') return;
+  var p = TRK_PENDING; TRK_PENDING = null;
+  /* 網址上的 trk 拿掉（重新整理不要又跳一次），其他參數（登入身分）照留 */
+  try { var q = new URLSearchParams(location.search); q.delete('trk'); q.delete('lk'); var s = q.toString(); history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); } catch (e) {}
+  trkJumpTo(p.rec, p.lk);
+}
+/* 找到那一列：捲到畫面中間、閃黃 2 秒多 */
+function trkFlash(el) {
+  if (!el) return;
+  try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
+  el.classList.remove('trk-flash'); void el.offsetWidth; el.classList.add('trk-flash');
+  setTimeout(function () { el.classList.remove('trk-flash'); }, 2600);
 }
 /* 掛上鈴鐺。opts = { apps:['dtp_pm'], before: 要插在哪個元素前面 } */
 function trkInit(opts) {
@@ -3812,27 +4001,24 @@ function trkCfgCss() {
     + '.trk-cfg .trk-cfg-days input{width:56px;height:32px;font:inherit;font-size:13px;text-align:center;border:1px solid #cbd5e1;border-radius:6px}'
     + '.trk-cfg .trk-cfg-del{flex:none;border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:6px;width:32px;height:32px;cursor:pointer}'
     + '.trk-cfg .trk-cfg-empty{color:#94a3b8;font-size:13px;padding:6px 2px}'
-    + '.trk-cfg .trk-cfg-hint{color:#64748b;font-size:12px;line-height:1.6}';
+    + '.trk-cfg .trk-cfg-hint{color:#64748b;font-size:12px;line-height:1.6}'
+    + '.trk-cfg select.trk-cfg-need{border-color:#dc2626;background:#fef2f2}'
+    + '.trk-cfg .trk-cfg-plus{flex:none;color:#64748b;font-weight:700}'
+    + '.trk-cfg .trk-cfg-warn{flex:1 1 100%;color:#b91c1c;font-size:12px;padding-left:28px}'
+    + '.trk-cfg{max-width:720px}';
   document.head.appendChild(s);
 }
-function trkCfgRender(host, app, c, choices, canEdit, onSave) {
+/* stChoices（只有進—瑪）：可以選的案場狀態名稱；c 用來把狀態顯示成「報價：已報價」 */
+function trkCfgRender(host, app, c, choices, canEdit, onSave, stChoices) {
   host = typeof host === 'string' ? document.getElementById(host) : host;
   if (!host) return;
   trkCfgCss();
   host.classList.add('trk-cfg');
-  host._trk = { app: app, choices: choices || [], canEdit: !!canEdit, onSave: onSave };
-  var noun = app === 'dtp_mm' ? '項目' : '狀態';
+  var useSt = !!TRK_APPS[app].st;
+  host._trk = { app: app, choices: choices || [], canEdit: !!canEdit, onSave: onSave, st: useSt, stChoices: stChoices || [], cfg: c };
   var items = trkItems(app, c), dis = canEdit ? '' : ' disabled';
-  var opt = function (sel) {
-    var list = (choices || []).slice();
-    if (sel && list.indexOf(sel) < 0) list.unshift(sel);
-    return '<option value="">（選一個' + noun + '）</option>' + list.map(function (v) { return '<option' + (v === sel ? ' selected' : '') + '>' + trkEsc(v) + '</option>'; }).join('');
-  };
   host.innerHTML = (items.length ? items.map(function (it, i) {
-    return '<div class="trk-cfg-row"><span class="trk-cfg-num">' + (i + 1) + '</span>'
-      + '<select class="trk-cfg-name" aria-label="追蹤品項"' + dis + '>' + opt(it.name) + '</select>'
-      + '<label class="trk-cfg-days">當日起算<input type="number" class="trk-cfg-d" min="0" max="365" step="1" inputmode="numeric" value="' + it.days + '" aria-label="天數"' + dis + '>天提醒</label>'
-      + (canEdit ? '<button type="button" class="trk-cfg-del" title="刪除這一項">🗑</button>' : '') + '</div>';
+    return trkCfgRowHtml(host, i + 1, it.name, it.days, it.status, dis);
   }).join('') : '<div class="trk-cfg-empty">目前沒有追蹤品項' + (canEdit ? '，點「＋ 新增」加入' : '') + '</div>');
   if (!host._trkBound) {
     host._trkBound = true;
@@ -3843,29 +4029,51 @@ function trkCfgRender(host, app, c, choices, canEdit, onSave) {
     });
   }
 }
-/* 「＋ 新增」：先加一列空白，選了品項才存 */
+/* 一列：〔案場狀態〕＋〔項目／狀態〕＋當日起算 N 天 ＋ 🗑 */
+function trkCfgRowHtml(host, n, name, days, status, dis) {
+  var T = host._trk, noun = T.app === 'dtp_mm' ? '項目' : '狀態';
+  var opt = function (list, sel, ph, lab) {
+    list = (list || []).slice();
+    if (sel && list.indexOf(sel) < 0) list.unshift(sel);
+    return '<option value="">' + ph + '</option>' + list.map(function (v) { return '<option value="' + trkEsc(v) + '"' + (v === sel ? ' selected' : '') + '>' + trkEsc(lab ? lab(v) : v) + '</option>'; }).join('');
+  };
+  var st = T.st ? '<select class="trk-cfg-st' + (status ? '' : ' trk-cfg-need') + '" aria-label="案場狀態"' + dis + '>'
+      + opt(T.stChoices, status, '（選案場狀態）', function (v) { return trkStLabel(T.cfg, v); }) + '</select><span class="trk-cfg-plus">＋</span>' : '';
+  return '<div class="trk-cfg-row"><span class="trk-cfg-num">' + n + '</span>' + st
+    + '<select class="trk-cfg-name" aria-label="追蹤品項"' + dis + '>' + opt(T.choices, name, '（選一個' + noun + '）') + '</select>'
+    + '<label class="trk-cfg-days">當日起算<input type="number" class="trk-cfg-d" min="0" max="365" step="1" inputmode="numeric" value="' + days + '" aria-label="天數"' + dis + '>天提醒</label>'
+    + (T.canEdit ? '<button type="button" class="trk-cfg-del" title="刪除這一項">🗑</button>' : '')
+    + (T.st && !status ? '<span class="trk-cfg-warn">案場狀態一定要選，選好才會存</span>' : '') + '</div>';
+}
+/* 「＋ 新增」：先加一列空白，選了品項（進—瑪：狀態＋項目都選了）才存 */
 function trkCfgAddRow(host) {
   host = typeof host === 'string' ? document.getElementById(host) : host;
   if (!host || !host._trk || !host._trk.canEdit) return;
   var em = host.querySelector('.trk-cfg-empty'); if (em) em.remove();
-  var n = host.querySelectorAll('.trk-cfg-row').length + 1, noun = host._trk.app === 'dtp_mm' ? '項目' : '狀態';
-  var row = document.createElement('div'); row.className = 'trk-cfg-row';
-  row.innerHTML = '<span class="trk-cfg-num">' + n + '</span><select class="trk-cfg-name" aria-label="追蹤品項"><option value="">（選一個' + noun + '）</option>'
-    + host._trk.choices.map(function (v) { return '<option>' + trkEsc(v) + '</option>'; }).join('') + '</select>'
-    + '<label class="trk-cfg-days">當日起算<input type="number" class="trk-cfg-d" min="0" max="365" step="1" inputmode="numeric" value="5" aria-label="天數">天提醒</label>'
-    + '<button type="button" class="trk-cfg-del" title="刪除這一項">🗑</button>';
+  var n = host.querySelectorAll('.trk-cfg-row').length + 1;
+  var box = document.createElement('div');
+  box.innerHTML = trkCfgRowHtml(host, n, '', 5, '', '');
+  var row = box.firstChild;
+  var w = row.querySelector('.trk-cfg-warn'); if (w) w.remove();   /* 新的一列還沒選，不用先罵人 */
   host.appendChild(row);
   row.querySelector('select').focus();
 }
 function trkCfgCollect(host) {
-  var seen = {}, items = [];
+  var seen = {}, items = [], useSt = host._trk && host._trk.st, blank = false;
   [].forEach.call(host.querySelectorAll('.trk-cfg-row'), function (r) {
     var name = r.querySelector('.trk-cfg-name').value.trim();
+    var stEl = r.querySelector('.trk-cfg-st'), status = stEl ? stEl.value.trim() : '';
     var days = Math.max(0, Math.min(365, parseInt(r.querySelector('.trk-cfg-d').value, 10) || 0));
-    if (!name || seen[name]) return;
-    seen[name] = 1; items.push({ name: name, days: days });
+    if (stEl) stEl.classList.toggle('trk-cfg-need', !status);
+    var w = r.querySelector('.trk-cfg-warn');
+    if (useSt && !status && name) { if (!w) { w = document.createElement('span'); w.className = 'trk-cfg-warn'; w.textContent = '案場狀態一定要選，選好才會存'; r.appendChild(w); } }
+    else if (w) w.remove();
+    /* 2026-11-18（她 Q4 乙）：進—瑪狀態一定要選 —— 沒選的這一列先不存（留在畫面上等人選） */
+    if (!name || (useSt && !status)) { blank = true; return; }
+    var key = name + '|' + status;
+    if (seen[key]) return;
+    seen[key] = 1; items.push(useSt ? { name: name, days: days, status: status } : { name: name, days: days });
   });
-  var blank = [].some.call(host.querySelectorAll('.trk-cfg-name'), function (s) { return !s.value; });
   if (host._trk && host._trk.onSave) host._trk.onSave(items, blank);
 }
 /* 雲端已讀：每個人只掛一次監聽 */
