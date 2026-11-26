@@ -10,7 +10,7 @@
   <meta name="robots" content="noindex, nofollow">
   <title>查檢表—標準作業</title>
   <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.sop（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-  <script>window.APP_VERSION='2026-10-27.1';window.APP_KEY='sop';</script>
+  <script>window.APP_VERSION='2026-11-26.1';window.APP_KEY='sop';</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
   <style>
     *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
@@ -1081,10 +1081,10 @@ function renderHeaderForm(){
     if(addCustom) html+='<option value="__custom__">+ 自訂</option>';
     el.innerHTML=html;
   }
-  fillSelect('f-case', S.config.cases, true);
+  fillSelect('f-case', liveCfg('cases'), true);   /* 2026-11-26：已作廢的選不到 */
   fillSelect('f-dept', S.config.departments, false);
   fillSelect('f-person', S.config.personnel, false);
-  fillSelect('f-contractor', S.config.contractors, true);
+  fillSelect('f-contractor', liveCfg('contractors'), true);
 
   var tpl=TEMPLATES.find(function(t){return t.id===S.report.templateId;})||TEMPLATES[0];
   $('f-material-label').textContent=tpl.materialLabel;
@@ -2012,8 +2012,9 @@ function rvThumbs(list, where, idx, off, rmCall){
 }
 function rvAdd(inputId, onchange, n){
   if(n>=PIC_MAX) return '';
-  return '<label for="'+inputId+'" class="rv-add" title="拍照 / 上傳">'+(n?'＋':'📷 拍照 / 上傳')
-    +'<input id="'+inputId+'" type="file" accept="image/*" capture="environment" class="hidden" onchange="'+onchange+'"></label>';
+  /* 2026-11-26 她 Q4 甲：只上傳、不直接開相機 → 拿掉 capture，文字改「上傳照片」 */
+  return '<label for="'+inputId+'" class="rv-add" title="上傳照片">'+(n?'＋':'📤 上傳照片')
+    +'<input id="'+inputId+'" type="file" accept="image/*" class="hidden" onchange="'+onchange+'"></label>';
 }
 function rvMgrBox(where, idx, r, rec, mgr, num, quick){
   var editing=MGR_ED && MGR_ED.where===where && MGR_ED.idx===idx && MGR_ED.r===r;
@@ -2722,6 +2723,8 @@ function applyCfgPart(){
   }
   renderCfgWiz();
   /* 第 ③ 步的範圍／項目、第 ④ 步的查檢表，切過去時重畫一次才會是最新的 */
+  /* 2026-11-26 她回報「上面寫 2 個、下面只出現 1 個」：以前切到 ①② 只重算上面的數字、清單不重畫 → 清單也重畫 */
+  if((_cfgStep === 1 || _cfgStep === 2) && typeof renderCfgLists === 'function') renderCfgLists();
   if(_cfgStep === 3) renderCatsSection();
   if(_cfgStep === 4){ renderTplPickSection(); renderTemplatesSection(); }
   var prev = $('wiz-prev'), next = $('wiz-next');
@@ -2793,7 +2796,7 @@ function renderTplAllSection(){
     +'<input data-tpl-q type="search" value="'+esc(TPLQ)+'" oninput="tplAllQ(this.value)" '
     +'placeholder="🔍 打名稱、範圍或項目都能找 — 例如「乾掛」" '
     +'class="flex-1 min-w-[180px] border border-gray-300 rounded-xl px-3 py-1.5 text-sm">'
-    +chip('all','全部')+chip('live','使用中')+chip('void','已作廢')
+    +chip('all','全部')+chip('live','啟用中')+chip('void','已作廢')   /* 2026-11-26 她 Q2 甲：「使用中」留給「有人用過」 */
     +'<button data-tpl-add onclick="openNewFlow()" data-mng '
     +'class="px-4 py-1.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 whitespace-nowrap">＋ 新增</button>'
     +'</div>'
@@ -2843,7 +2846,10 @@ function renderTplAllList(){
      於是第二組以後既沒有欄名、欄位也跟第一組對不起來（名字越長偏得越多）。
      改法（她選甲案）：每一組都印一次表頭，而且欄寬**寫死並共用同一組**，上下連成一條直線。
      欄寬寫在這裡而不是 CSS，是因為表頭與內容要成對維護，拆開放很容易改了一邊忘了另一邊。 */
-  var TPL_COLW = ['72px', '', '56px', '76px', '104px'];   // 項目／SOP 名稱（吃剩下的）／品項／狀態／按鈕
+  /* 2026-11-26：狀態欄要放「🔒 使用中（23 張）」、按鈕欄多了作廢／刪除。
+     她截圖（11-26）：名稱欄吃掉剩下的寬度，按鈕欄 176px 在她的電腦放不下，出現左右捲軸、最後的按鈕被切掉
+     → 改成「SOP 名稱」固定 300px（窄一點），按鈕欄改吃剩下的寬度，字體比較寬的電腦也放得下 */
+  var TPL_COLW = ['72px', '300px', '56px', '140px', ''];   // 項目／SOP 名稱／品項／狀態／按鈕（吃剩下的）
   var tplColGroup = '<colgroup>' + TPL_COLW.map(function(w){
     return '<col' + (w ? ' style="width:' + w + '"' : '') + '>';
   }).join('') + '</colgroup>';
@@ -2872,7 +2878,7 @@ function renderTplAllList(){
       +'</div>'
       +(open
         ? '<div class="overflow-x-auto"><table data-tpl-all class="w-full text-left border-collapse" '
-          +'style="table-layout:fixed;min-width:520px">'
+          +'style="table-layout:fixed;min-width:880px">'
           +tplColGroup+thead+'<tbody class="divide-y divide-gray-100">'+list.map(tplAllRowHtml).join('')+'</tbody></table></div>'
         : '')
       +'</div>';
@@ -2880,8 +2886,11 @@ function renderTplAllList(){
   +'<p class="text-xs text-gray-400 mt-2">點任一列 → 下面就切成在編輯那一張。'
   +'按列尾的「⧉ 以此為範本」→ 直接用它開一張新的（查驗品項一起帶過來）。</p>';
 }
+/* 一覽按鈕三格的寬度（em → 跟著字級放大）。她的電腦字比 headless Chrome 寬約 25%，這裡已經留了餘裕 */
+var TPL_ACTS_GRID = 'display:grid;grid-template-columns:10.2em 6.5em 6.5em;column-gap:4px;justify-content:end;align-items:center;font-size:12px';
 function tplAllRowHtml(t){
   var on=(S.tplOpened && t.id===S.editingTplId);
+  var used=tplUsage(t.id);
   return '<tr data-tpl-all-row="'+esc(t.id)+'" onclick="jumpToTpl(\''+t.id+'\')" '
     +'class="cursor-pointer '+(on?'bg-blue-50':'hover:bg-gray-50')+'">'
     +'<td class="px-2 py-1.5 text-xs text-gray-500 whitespace-nowrap">'+esc(catNameIcon(2,tplCat(t,2)))+'</td>'
@@ -2889,15 +2898,32 @@ function tplAllRowHtml(t){
     +'<td class="px-2 py-1.5 text-sm truncate '+(on?'font-bold text-blue-700':'font-medium text-gray-800')
       +'" title="'+esc(t.name||'')+'">'+esc(t.name||'')+'</td>'
     +'<td class="px-2 py-1.5 text-xs text-gray-500 text-center whitespace-nowrap">'+((t.items||[]).length)+'</td>'
-    +'<td class="px-2 py-1.5 text-xs whitespace-nowrap">'
-    +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>':'<span class="text-green-700">使用中</span>')
+    +'<td class="px-2 py-1.5 text-xs whitespace-nowrap" data-tpl-st>'
+    /* 2026-11-26 她指定：照日—專案場 ——「使用中」＝有查檢表用到；沒作廢也沒人用＝未使用 */
+    +(t.void?'<span class="text-amber-700 font-semibold">🚫 已作廢</span>'
+      :used?'<span class="text-amber-700 font-semibold" title="已經有 '+used+' 張查檢表用到，不能刪除">🔒 使用中（'+used+' 張）</span>'
+      :'<span class="text-green-700 font-semibold" title="還沒有查檢表用到，可以刪除">✅ 未使用</span>')   /* 11-26e 她 Q2 甲：三種都有圖示、一樣粗 */
     +'</td>'
     /* 帶入現有 SOP：在看到的那一列直接按，範本就選好了 —— 不用進彈窗再找一次 */
-    +'<td class="px-2 py-1.5 text-right whitespace-nowrap">'
+    /* 2026-11-26e 她截圖「後方狀態顯示順序請整齊一點」→ Q1 甲：固定三格
+       ⧉ 以此為範本｜作廢或恢復｜刪除。沒有的按鈕留空格、後面的不往前補 → 每列（含不同分類的表）上下對齊 */
+    +'<td class="px-2 py-1.5 whitespace-nowrap"><div data-tpl-acts style="'+TPL_ACTS_GRID+'">'
     +'<button data-tpl-use="'+esc(t.id)+'" data-mng onclick="newFromTpl(\''+t.id+'\',event)" '
     +'title="用這一張當範本開一張新的" '
     +'class="px-2 py-0.5 text-xs rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100">'
-    +'⧉ 以此為範本</button></td>'
+    +'⧉ 以此為範本</button>'
+    +'<span data-tpl-slot="2">'
+    /* 2026-11-26 她第三輪 Q2 甲：每一列直接放作廢／刪除（用過的只能作廢，沒用過的才能刪） */
+    +(t.void
+      ? '<button data-tpl-restore="'+esc(t.id)+'" data-mng onclick="event.stopPropagation();restoreTemplate(\''+t.id+'\')" class="px-2 py-0.5 text-xs text-green-700 hover:underline font-semibold">♻️ 恢復</button>'
+      : used
+        ? '<button data-tpl-void="'+esc(t.id)+'" data-mng onclick="event.stopPropagation();voidTemplate(\''+t.id+'\')" class="px-2 py-0.5 text-xs text-amber-700 hover:underline font-semibold">🚫 作廢</button>'
+        : '')
+    +'</span><span data-tpl-slot="3">'
+    +(!used && portalCanDelete()
+      ? '<button data-tpl-del="'+esc(t.id)+'" onclick="event.stopPropagation();removeTemplate(\''+t.id+'\')" class="px-2 py-0.5 text-xs text-red-600 hover:underline font-semibold">🗑️ 刪除</button>'
+      : '')
+    +'</span></div></td>'
     +'</tr>';
 }
 /* 從一覽的某一列直接開新增流程：範本已經選好，跳過「先挑範本」那一頁 */
@@ -2928,6 +2954,10 @@ function renderSettings(){
   applyCfgPart();
   renderCatsSection();
   renderTemplatesSection();   // 內含 renderTplAllSection()
+  renderCfgLists();
+}
+/* ① 案場、② 施工廠商兩個清單（2026-11-26 從 renderSettings 拆出來：切步驟、雲端資料晚到都要能單獨重畫） */
+function renderCfgLists(){
   var secs=[
     {key:'cases',label:'案場管理',icon:'📍'},
     {key:'contractors',label:'施工廠商',icon:'🔨'}
@@ -2945,10 +2975,25 @@ function renderSettings(){
           +'<button onclick="cancelCfgEdit()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg" title="取消">&#10005;</button>'
           +'</div>';
       }
-      return '<div class="flex items-center gap-2 mb-2">'
-        +'<span class="flex-1 text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">'+esc(item)+'</span>'
-        +(portalCanManageSettings()?'<button onclick="startCfgEdit(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 rounded-lg" title="編輯">&#9998;</button>':'')
-        +(portalCanDelete()?'<button onclick="removeCfgItem(\''+sec.key+'\','+i+')" class="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-600 rounded-lg">&#10005;</button>':'')
+      /* 2026-11-26 她指定：照日—專的案場 —— 顯示使用狀態；未使用可刪除，使用中不能刪、只能作廢 */
+      var used=cfgUsage(sec.key,item), isVoid=cfgIsVoid(sec.key,item);
+      var st = isVoid ? '<span data-cfg-st="void" class="text-xs text-amber-700 font-semibold whitespace-nowrap">🚫 已作廢</span>'
+             : used ? '<span data-cfg-st="used" class="text-xs text-amber-700 font-semibold whitespace-nowrap" title="已經有 '+used+' 張查檢表用到，不能刪除">🔒 使用中（'+used+' 張）</span>'
+             : '<span data-cfg-st="free" class="text-xs text-green-700 whitespace-nowrap" title="還沒有查檢表用到，可以刪除">未使用</span>';
+      var a='\''+sec.key+'\','+i;
+      var ops='';
+      if(portalCanManageSettings()) ops+='<button onclick="startCfgEdit('+a+')" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 rounded-lg" title="編輯">&#9998;</button>';
+      if(isVoid){
+        if(portalCanManageSettings()) ops+='<button data-cfg-restore onclick="restoreCfgItem('+a+')" class="px-2 py-1 text-xs text-green-700 hover:underline font-medium whitespace-nowrap">♻️ 恢復使用</button>';
+      } else if(used){
+        ops+='<span data-cfg-nodel class="text-xs text-gray-400 whitespace-nowrap">不可刪</span>';
+        if(portalCanManageSettings()) ops+='<button data-cfg-void onclick="voidCfgItem('+a+')" class="px-2 py-1 text-xs text-amber-700 hover:underline font-medium whitespace-nowrap">🚫 作廢</button>';
+      }
+      if(!used && portalCanDelete()) ops+='<button data-cfg-del onclick="removeCfgItem('+a+')" class="px-2 py-1 text-xs text-red-600 hover:underline font-medium whitespace-nowrap">🗑️ 刪除</button>';
+      return '<div class="flex items-center gap-2 mb-2 flex-wrap'+(isVoid?' opacity-60':'')+'" data-cfg-row="'+esc(sec.key)+'">'
+        /* 名稱至少 160px（寫死，不靠 Tailwind 的任意值 class）；手機放不下時，狀態和按鈕整組換到下一行 */
+        +'<span class="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg" style="flex:1 1 160px;min-width:160px">'+esc(item)+'</span>'
+        +st+ops
         +'</div>';
     }).join('');
     if(!items.length) listHtml='<div class="text-xs text-gray-400 py-1 mb-2">尚無資料</div>';
@@ -2962,6 +3007,23 @@ function renderSettings(){
   });
 }
 
+/* ── 雲端資料晚到（2026-11-26 她回報，選甲）──
+ * 一打開 App 就馬上進設定頁 → 清單先用這台電腦存的舊資料畫；雲端資料一兩秒後才到。
+ * 以前只重畫首頁，設定頁的清單停在舊的（上面數字 2、下面清單 1），
+ * 而且清單上的 ✎／刪除／作廢 是照「第幾列」找項目 → 畫面跟資料對不上時可能動到別的項目。
+ * 現在：人在設定頁就重畫一次。正在改名（輸入框開著）就先不動，免得打到一半的字不見；
+ * 「新增」輸入框裡已經打的字保留。 */
+function refreshSettingsAfterCloud(){
+  var cur = S.viewStack && S.viewStack[S.viewStack.length-1];
+  if(cur !== 'settings') return;
+  if(S.cfgEditing) return;
+  var keep = {}, foc = document.activeElement && document.activeElement.id;
+  ['cases','contractors'].forEach(function(k){ var i=$('cfg-input-'+k); if(i) keep[k]=i.value; });
+  applyCfgPart();
+  renderCfgLists();
+  ['cases','contractors'].forEach(function(k){ var i=$('cfg-input-'+k); if(i && keep[k]) i.value=keep[k]; });
+  if(foc && $(foc)) try{ $(foc).focus(); }catch(e){}
+}
 function addCfgItem(key){
   if(mngGuard())return;
   var inp=$('cfg-input-'+key);
@@ -3660,13 +3722,15 @@ function renderTemplatesSection(){
     +(tpl.void
       ? '<button onclick="restoreTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-green-700 hover:underline font-medium">♻️ 恢復使用</button>'
       : '<button onclick="voidTemplate(\''+tpl.id+'\')" data-mng class="text-xs text-amber-700 hover:underline font-medium">🚫 作廢此 SOP</button>')
-    +(portalCanDelete()?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline font-medium">🗑️ 刪除此 SOP</button>':'')
+    +(portalCanDelete()&&!tplUsage(tpl.id)?'<button onclick="removeTemplate(\''+tpl.id+'\')" class="text-xs text-red-600 hover:text-red-700 hover:underline font-medium">🗑️ 刪除此 SOP</button>':'')
+    +(tplUsage(tpl.id)?'<span data-tpl-nodel class="text-xs text-gray-400">🔒 已有 '+tplUsage(tpl.id)+' 張查檢表用到，不可刪</span>':'')
     +'</div>'
     +'<p class="text-xs text-gray-500">'
     +(tpl.void ? '目前為<span class="font-semibold text-amber-700">【已作廢】</span>：首頁不會出現、無法新建報表；既有歷史報表照常顯示與列印。'
                : '作廢＝停用但不刪除，歷史報表不受影響，隨時可恢復。')
     +'</p>'+movePickerHtml+'</div>';
-  var dSum = tpl.void ? '🚫 已作廢' : '使用中';
+  /* 2026-11-26：「使用中」改成＝有查檢表用到（跟一覽、案場同一套） */
+  var dSum = tpl.void ? '🚫 已作廢' : (tplUsage(tpl.id) ? '🔒 使用中（'+tplUsage(tpl.id)+' 張）' : '未使用');
 
   setTplBox(el, true);   // 正在編某一張 → 鋪淡藍（2026-09-23 她選甲）
   /* 標題列：名稱 ＋ 路徑 ＋ 就地的儲存鈕（原本要捲到整頁最下面才按得到） */
@@ -3792,9 +3856,13 @@ function updateTemplate(tplId, field, value){
      刻意不重畫編輯卡本身：這是 onblur 觸發的，重畫會把游標與其他還沒存的輸入洗掉。 */
   if(field === 'name'){ renderTplAllSection(); renderCatsSection(); renderHome(); }
 }
+/* 2026-11-26 她指定：SOP 用過（有查檢表的 templateId 指到它）→ 不能刪，只能作廢 */
+function tplUsage(id){ return (S.reports||[]).filter(function(r){ return r && r.templateId===id; }).length; }
 function removeTemplate(tplId){
   if(mngGuard())return;
   if(!requireDelete()) return;
+  var _u=tplUsage(tplId);
+  if(_u){ showToast('已經有 '+_u+' 張查檢表用到這個 SOP，不能刪除，可以改按「作廢」'); return; }
   if(TEMPLATES.length <= 1){ alert('至少需保留一個工法'); return; }
   var tpl = TEMPLATES.find(function(t){ return t.id === tplId; });
   if(!tpl) return;
@@ -3840,6 +3908,7 @@ function saveCfgEdit(key){
 }
 function commitCfgRename(key,idx,oldV,newV,alsoReports){
   S.config[key][idx]=newV;
+  if(cfgIsVoid(key,oldV)){ cfgSetVoid(key,oldV,false); cfgSetVoid(key,newV,true); }   /* 2026-11-26：作廢跟著新名字走 */
   var n=0, jobs=[];
   if(alsoReports){
     var f=CFG_FIELD[key];
@@ -3894,8 +3963,41 @@ function askCfgRename(key,oldV,newV,used,cb){
 function removeCfgItem(key,idx){
   if(mngGuard())return;
   if(!requireDelete()) return;
+  var val=(S.config[key]||[])[idx]; if(val===undefined) return;
+  /* 2026-11-26：用過的不能刪，只能作廢（照日—專的案場） */
+  var used=cfgUsage(key,val);
+  if(used){ showToast('已經有 '+used+' 張查檢表用到，不能刪除，可以改按「作廢」'); renderSettings(); return; }
   S.config[key].splice(idx,1);
+  cfgSetVoid(key,val,false);
   renderSettings();
+}
+/* ── 案場／施工廠商的作廢（2026-11-26 她指定）──
+ * 作廢＝停用不刪除：新增查檢表的下拉選不到；舊查檢表照常顯示、列印，歷史篩選也找得到。
+ * 存在 S.config.voids = { cases:[名稱…], contractors:[名稱…] }，跟清單一起存上雲。 */
+function cfgVoids(key){ var v=S.config.voids&&S.config.voids[key]; return Array.isArray(v)?v:[]; }
+function cfgIsVoid(key,val){ return cfgVoids(key).indexOf(val)>=0; }
+function cfgSetVoid(key,val,on){
+  if(!S.config.voids||typeof S.config.voids!=='object') S.config.voids={};
+  var a=cfgVoids(key).filter(function(x){ return x!==val; });
+  if(on) a.push(val);
+  S.config.voids[key]=a;
+}
+function liveCfg(key){ return (S.config[key]||[]).filter(function(v){ return !cfgIsVoid(key,v); }); }
+function voidCfgItem(key,idx){
+  if(mngGuard())return;
+  var val=(S.config[key]||[])[idx]; if(val===undefined) return;
+  var label=(key==='cases'?'案場':'施工廠商');
+  if(!confirm('確定把'+label+'「'+val+'」設為作廢？\n\n・新增查檢表時選不到\n・已經用到它的 '+cfgUsage(key,val)+' 張查檢表照常顯示、可列印\n・之後隨時可以按「恢復使用」')) return;
+  cfgSetVoid(key,val,true);
+  renderSettings();
+  showToast('已作廢 — 記得按「儲存設定」');
+}
+function restoreCfgItem(key,idx){
+  if(mngGuard())return;
+  var val=(S.config[key]||[])[idx]; if(val===undefined) return;
+  cfgSetVoid(key,val,false);
+  renderSettings();
+  showToast('已恢復使用 — 記得按「儲存設定」');
 }
 /* manual===false 是自動存（切步驟／離開設定頁）→ 靜默；其餘照舊跳 toast。
    參數預設 undefined，所以舊的呼叫端 saveConfig() 行為完全不變。 */
@@ -4246,7 +4348,7 @@ function enforcePortalLogin(){
   // load local
   var local=loadLS();
   if(local){
-    if(local.config) { ['cases','departments','personnel','contractors','templates','cats'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }
+    if(local.config) { ['cases','departments','personnel','contractors','templates','cats','voids'].forEach(function(k){ if(local.config[k]) S.config[k]=local.config[k]; }); }   /* 2026-11-26 加 voids（作廢清單） */
     if(local.reports) S.reports=local.reports;
   }
   syncFromPortal();  // 從入口拉最新部門/人員 + 帶入登入身分
@@ -4263,6 +4365,8 @@ function enforcePortalLogin(){
       loadTombstones(res[2]);   /* 刪除紀錄（2026-10-14） */
       if(fbCfg){
         ['cases','departments','personnel','contractors','templates','cats'].forEach(function(k){ if(fbCfg[k]) S.config[k]=fbCfg[k]; });
+        /* 2026-11-26 作廢清單：雲端為準。全部恢復後雲端會是空的（Firebase 不存空陣列）→ 本機也要跟著清空，不能留舊的 */
+        S.config.voids = (fbCfg.voids && typeof fbCfg.voids === 'object') ? fbCfg.voids : {};
         syncCatsFromConfig();
         syncTemplatesFromConfig();
       }
@@ -4278,6 +4382,7 @@ function enforcePortalLogin(){
       saveLS();
       setSyncStatus('saved');
       renderHome();
+      refreshSettingsAfterCloud();   /* 2026-11-26：人已經在設定頁 → 清單換成雲端的 */
     }).catch(function(e){
       console.warn('Firebase load err:',e);
       /* 2026-09-11：權限被拒要讓使用者看得見（規則收緊後、停在舊版的人就是這一條） */

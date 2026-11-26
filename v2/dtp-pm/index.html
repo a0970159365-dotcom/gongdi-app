@@ -8,7 +8,7 @@
 <title>進度表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.dtp_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-11-18.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-11-26.1';window.APP_KEY='dtp_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 :root{--primary:#1a3a5c;--primary-l:#2563aa;--accent:#c2560a;--success:#16a34a;--danger:#dc2626;--warning:#ca8a04;--bg:#f1f5f9;--border:#cbd5e1;--text:#1e293b;--muted:#64748b}
@@ -2567,8 +2567,7 @@ function drActive(){ return !!(drVal('dr-from') || drVal('dr-to')); }
 function logsInRange(logs){
   var f = drVal('dr-from'), t = drVal('dr-to');
   if(!f && !t) return logs || [];
-  return (logs || []).filter(function(l){
-    if(!l) return false;
+  return keepRangeOrPay(logs, function(l){
     var d = String(l.date || '').slice(0, 10);
     if(!d) return false;                       // 沒有日期的記錄，有設區間時就不算
     if(f && d < f) return false;
@@ -2576,6 +2575,35 @@ function logsInRange(logs){
     return true;
   });
 }
+/* ══════ 帳款常駐（2026-11-26 她交辦，示意圖 6qPszsWj／3Se6YMTW）══════
+ * 同一個施作位置，**最新一筆**進度記錄的狀態是「帳款」或「請款」→ 還沒收款，不管日期區間設哪裡都顯示。
+ * 最新一筆改成「帳款已回」（或任何其他狀態）→ 回到照區間顯示。
+ * 例：10 月送請款、區間設 11 月 → 以前看不到，現在照樣出現。
+ * 顯示哪幾條：區間內的照舊，再加上「最後面連續幾條帳款／請款」（例如 10/15 帳款 → 10/20 請款 兩條都留）。
+ * 「最新」照日期排（同一天照原本的先後），不是照陣列順序 —— 補登舊日期的記錄不能被當成最新。
+ * Excel 匯出跟畫面同一套（她 Q7 甲）。 */
+var PAY_OPEN = ['帳款', '請款'];
+function isPayOpen(s){ return PAY_OPEN.indexOf(String(s || '').trim()) >= 0; }
+function payOpenLogs(logs){
+  var arr = (logs || []).map(function(l, i){ return { l: l, i: i }; }).filter(function(x){ return !!x.l; });
+  arr.sort(function(a, b){
+    return String(a.l.date || '').slice(0, 10).localeCompare(String(b.l.date || '').slice(0, 10)) || (a.i - b.i);
+  });
+  var out = [];
+  for(var k = arr.length - 1; k >= 0; k--){
+    if(isPayOpen(logStatusOf(arr[k].l))) out.unshift(arr[k].l); else break;
+  }
+  return out;
+}
+function payKey(l){ return [String(l.date || '').slice(0, 10), logStatusOf(l), l.location || '', l.text || ''].join('\u0001'); }
+/* logs 裡留下：區間內的（inR）＋ 還沒收款的帳款／請款（照 fullLogs 判斷最新一筆；沒給就用 logs 自己） */
+function keepRangeOrPay(logs, inR, fullLogs){
+  var open = {};
+  payOpenLogs(fullLogs || logs).forEach(function(l){ open[payKey(l)] = 1; });
+  return (logs || []).filter(function(l){ return !!l && (inR(l) || !!open[payKey(l)]); });
+}
+/* 一條進度記錄都沒有、自己的狀態是帳款／請款 → 也算還沒收款 */
+function recPayOpen(r){ return !logsOf(r).length && isPayOpen(recStatusOf(r)); }
 function drQuick(kind){
   var now = new Date(), from = new Date(now), to = new Date(now);
   if(kind === 'clear'){
@@ -2620,7 +2648,7 @@ function getFiltered(){
       const logText=(r.進度記錄||[]).map(p=>[p.date,p.location,p.status,p.text].join(' ')).join(' ');
       if(![r.案場,r.部門,r.執行者,r.施作位置,logText,r.備註].join(' ').toLowerCase().includes(q))return false;
     }
-    if(drActive() && !logsInRange(r.進度記錄).length) return false;   /* 區間內沒有記錄 → 這一列不出現（2026-09-20） */
+    if(drActive() && !logsInRange(logsOf(r)).length && !recPayOpen(r)) return false;   /* 區間內沒有記錄 → 這一列不出現（2026-09-20）；還沒收款的帳款／請款例外（2026-11-26） */
     return true;
   }).map(function(r){
     /* 有設區間或有勾狀態 → 回傳**複本**，只保留符合的那幾條進度記錄。
@@ -2708,7 +2736,7 @@ function renderMain(){
   const _lineCnt = filtered.reduce(function(a,r){ return a + logsOf(r).length; }, 0);
   document.getElementById('result-count').textContent='共 '+filtered.length+' 筆 · '+_lineCnt+' 條';
   var _drh=document.getElementById('dr-hint');
-  if(_drh) _drh.textContent = drActive() ? '（只看這個區間內的進度記錄）' : '';
+  if(_drh) _drh.textContent = drActive() ? '（只看這個區間內的進度記錄；還沒收款的帳款、請款一律顯示）' : '';
   const groups={};
   filtered.forEach(r=>{if(!groups[r.案場])groups[r.案場]=[];groups[r.案場].push(r)});
   /* 2026-09-20：同一個案場底下照「順序」欄位排（沒有順序的排在後面，維持原本的相對位置） */
@@ -3471,9 +3499,11 @@ async function exportExcel(projs,opt){
     if(opt.from||opt.to){
       const inR=l=>{const d=String((l&&l.date)||'').slice(0,10); if(!d)return false;
         if(opt.from&&d<opt.from)return false; if(opt.to&&d>opt.to)return false; return true;};
+      /* 2026-11-26 她 Q7 甲：跟畫面一樣 —— 還沒收款的帳款／請款不受區間限制（最新一筆照原始那筆判斷） */
+      const fullOf=r=>{const o=records.find(x=>x&&x.id===r.id); return logsOf(o?normalizeRecord(o):r);};
       data=data.map(r=>{let logs=r.進度記錄||[]; if(typeof logs==='string')logs=parseProgressString(logs);
-          return Object.assign({},r,{進度記錄:logs.filter(inR)});})
-        .filter(r=>(r.進度記錄||[]).length);
+          return Object.assign({},r,{進度記錄:keepRangeOrPay(logs,inR,fullOf(r))});})
+        .filter(r=>(r.進度記錄||[]).length||(!fullOf(r).length&&isPayOpen(recStatusOf(r))));
     }
     if(!data.length){toast('這些條件之下沒有資料可匯出','e');return}
   }

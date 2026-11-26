@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>石御石材工程管理系統（測試版）</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.portal（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
-<script>window.APP_VERSION='2026-11-18.1';window.APP_KEY='portal';</script>
+<script>window.APP_VERSION='2026-11-26.1';window.APP_KEY='portal';</script>
 <style>
 :root{
   --primary:#1a3a5c;--primary-l:#2563aa;--primary-d:#0f2440;
@@ -1006,10 +1006,10 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       <div class="rb-row rb-split">
         <div class="rb-l"><span class="rb-n">6</span><span class="rb-t">登入密碼</span></div>
         <div class="rb-m rb-pad">
-          <div class="rb-lead">留空＝登入時密碼欄可以不填
+          <div class="rb-lead">留空＝他下次登入時，要先自己建立密碼
             <span class="tipwrap"><button type="button" class="info" aria-expanded="false"
               aria-label="「登入密碼」的完整說明" onclick="rbTip(this)">i</button>
-              <span class="tip" role="tooltip"><b>登入密碼</b>留空的人，在登入畫面選了名字就能進來；一旦填了，之後每次登入都會驗。忘記密碼沒有自助復原，要由有「人員權限」的人回到這裡改。</span></span>
+              <span class="tip" role="tooltip"><b>登入密碼</b>留空的人，下次登入時會跳出「請先建立密碼」（至少 4 碼），建好才能進系統；一旦填了，之後每次登入都會驗。忘記密碼沒有自助復原，要由有「人員權限」的人回到這裡改。</span></span>
           </div>
           <input class="fi" id="emp-pw" placeholder="留空表示尚未設定" maxlength="30" autocomplete="new-password">
         </div>
@@ -1246,10 +1246,12 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
 <div class="modal-overlay" id="mypw-modal">
   <div class="modal">
     <div class="modal-header">
-      <h3>🔑 修改我的密碼</h3>
-      <button class="modal-close" onclick="closeModal('mypw-modal')">×</button>
+      <h3 id="mypw-title">🔑 修改我的密碼</h3>
+      <button class="modal-close" id="mypw-x" onclick="closeModal('mypw-modal')">×</button>
     </div>
     <div class="modal-body">
+      <!-- 2026-11-26 她 Q8 甲：密碼空白的人第一次登入要先建立密碼，不能跳過 -->
+      <div class="hint" id="mypw-force-msg" style="display:none;margin-bottom:10px;color:var(--danger);font-weight:700">第一次登入，請先建立自己的密碼才能進入系統</div>
       <div class="form-row">
         <label>目前登入身分</label>
         <div class="fi" id="mypw-who" style="background:var(--bg);font-weight:700"></div>
@@ -1260,17 +1262,17 @@ footer .ver{color:var(--text-light);margin-top:4px;font-size:11px}
       </div>
       <div class="form-row">
         <label>新密碼 <span style="color:var(--danger)">*</span></label>
-        <input class="fi" id="mypw-new" type="password" maxlength="30" autocomplete="new-password">
-        <div class="hint">設定後，下次登入就要輸入新密碼</div>
+        <input class="fi" id="mypw-new" type="password" maxlength="30" autocomplete="new-password" placeholder="至少 4 碼">
+        <div class="hint" id="mypw-new-hint">至少 4 碼（英文、數字都可以）；設定後，下次登入就要輸入新密碼</div>
       </div>
       <div class="form-row">
         <label>再輸入一次新密碼 <span style="color:var(--danger)">*</span></label>
-        <input class="fi" id="mypw-new2" type="password" maxlength="30" autocomplete="new-password">
+        <input class="fi" id="mypw-new2" type="password" maxlength="30" autocomplete="new-password" placeholder="至少 4 碼">
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('mypw-modal')">取消</button>
-      <button class="btn btn-primary" onclick="doChangeMyPw()">確定修改</button>
+      <button class="btn btn-secondary" id="mypw-cancel" onclick="closeModal('mypw-modal')">取消</button>
+      <button class="btn btn-primary" id="mypw-ok" onclick="doChangeMyPw()">確定修改</button>
     </div>
   </div>
 </div>
@@ -2436,6 +2438,11 @@ function updateAppCardLinks() {
     const base = card.getAttribute('data-base-url');
     const app = card.getAttribute('data-app');
     card.href = qs ? (base + '?' + qs) : base;
+    /* 2026-11-26 她 Q1 甲：日—瑪（停用）只給系統管理員看得到，其他人首頁不顯示（要查舊資料由系統管理員進去） */
+    if (app === 'cdr') {
+      const rr = u ? getRole(u.roleId) : null;
+      card.style.display = (rr && rr.name === '系統管理員') ? '' : 'none';
+    }
     // 2026-10-06：進—瑪上線，「只在 G 槽出現」「停用只在 G 槽」兩段拿掉（改寫在 HTML 上，一直生效）
     // 離職停用 → 全鎖；否則若沒勾此 App 的使用權才灰掉
     const allowed = !u || (!resigned && (app === 'dtp_mm' ? mmAppAllowed(u, emp) : appAccess[app] !== false));
@@ -2600,6 +2607,8 @@ function doGateLogin() {
   const res = authEmployee($('gate-dept').value, $('gate-name').value, $('gate-pw').value);
   if (!res.ok) { gateError(res.msg); $('gate-pw').focus(); return; }
   const emp = res.emp;
+  /* 2026-11-26 她 Q8 甲：還沒設密碼 → 先建立密碼（不能跳過），建好自動接著登入 */
+  if (!emp.password) { openForcePw('gate'); return; }
   // 記住我：勾了就存起來供下次帶入；沒勾就把之前記的清掉
   if ($('gate-remember')?.checked) saveRemembered(emp.dept, emp.name, $('gate-pw').value);
   else clearRemembered();
@@ -2627,6 +2636,8 @@ function logout() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && $('login-gate')?.classList.contains('show')) {
     e.preventDefault();
+    /* 密碼視窗開著（從閘門開的）→ Enter 是送出密碼，不是再按一次登入 */
+    if ($('mypw-modal')?.classList.contains('show')) { doChangeMyPw(); return; }
     doGateLogin();
   }
 });
@@ -2686,6 +2697,7 @@ function doLogin() {
     return;
   }
   const emp = res.emp;
+  if (!emp.password) { openForcePw('switch'); return; }   /* 2026-11-26：切換身分也一樣要先建立密碼 */
   // 登入成功
   S.currentUser = { id: emp.id, name: emp.name, dept: emp.dept, roleId: emp.roleId };
   saveLS();
@@ -2725,7 +2737,7 @@ function toast(msg, type='') {
 function openModal(id){ $(id).classList.add('show'); }
 function closeModal(id){ $(id).classList.remove('show'); }
 document.querySelectorAll('.modal-overlay').forEach(o => {
-  o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
+  o.addEventListener('click', e => { if (e.target === o && !(o.id === 'mypw-modal' && S.pwCtx && S.pwCtx.force)) closeModal(o.id); });
 });
 
 /* ============================================================
@@ -4022,12 +4034,29 @@ function resolvePwTarget(source) {
   if (!emp) { toast('查無此帳號，請重新登入', 'error'); return null; }
   return { emp, typed: '' };
 }
+/* ── 第一次登入：密碼空白 → 先建立密碼（2026-11-26 她 Q8 甲不能跳過、Q9 至少 4 碼）──
+ * 沿用「修改我的密碼」視窗，只是換標題、拿掉 × 和取消、點旁邊也關不掉。 */
+const PW_MIN = 4;
+function setPwForceUI(on) {
+  $('mypw-title').textContent = on ? '🔑 請先建立密碼' : '🔑 修改我的密碼';
+  $('mypw-force-msg').style.display = on ? '' : 'none';
+  $('mypw-x').style.display = on ? 'none' : '';
+  $('mypw-cancel').style.display = on ? 'none' : '';
+  $('mypw-ok').textContent = on ? '建立密碼並登入' : '確定修改';
+}
+function openForcePw(source) {
+  openMyPwModal(source);
+  if (!S.pwCtx) return;
+  S.pwCtx.force = true;
+  setPwForceUI(true);
+}
 function openMyPwModal(source) {
   const t = resolvePwTarget(source);
   if (!t) return;
   const emp = t.emp;
   if (isResigned(emp)) { toast('此帳號已離職停用，無法修改密碼', 'error'); return; }
   S.pwCtx = { id: emp.id, source: source || 'nav' };
+  setPwForceUI(false);
   $('mypw-who').textContent = (emp.dept || '—') + '　' + emp.name;
   // 還沒設定過密碼的人不需要輸入舊密碼
   $('mypw-old-row').style.display = emp.password ? '' : 'none';
@@ -4048,6 +4077,7 @@ function doChangeMyPw() {
   const nw2 = $('mypw-new2').value.trim();
   if (emp.password && oldPw !== emp.password) { toast('目前密碼不正確', 'error'); $('mypw-old').focus(); return; }
   if (!nw) { toast('請輸入新密碼', 'error'); $('mypw-new').focus(); return; }
+  if (nw.length < PW_MIN) { toast('密碼至少要 ' + PW_MIN + ' 碼', 'error'); $('mypw-new').focus(); return; }   /* 2026-11-26 她 Q9 */
   if (nw !== nw2) { toast('兩次輸入的新密碼不一致', 'error'); $('mypw-new2').focus(); return; }
   S.employees[i] = { ...emp, password: nw };
   saveAll();
@@ -4060,7 +4090,14 @@ function doChangeMyPw() {
   if (ctx.source === 'switch') $('login-pw').value = nw;
   const fromLogin = ctx.source === 'gate' || ctx.source === 'switch';
   S.pwCtx = null;
+  setPwForceUI(false);
   closeModal('mypw-modal');
+  /* 第一次登入建立密碼 → 不用再按一次登入，直接接著進去 */
+  if (ctx.force) {
+    toast('密碼已建立', 'success');
+    if (ctx.source === 'gate') doGateLogin(); else doLogin();
+    return;
+  }
   toast(fromLogin ? '密碼已更新，請按「登入」繼續' : '密碼已更新', 'success');
 }
 

@@ -8,7 +8,7 @@
 <title>日報表—專案管理</title>
 <!-- ══ 版本標記 ══ 每次部署都要同步更新根目錄 version.json 的 apps.cdr_pm（部署前跑 scripts/check-version.js 會自動核對，不一致會擋下） -->
 <!-- APP_DEPTS＝這支 App 服務哪些部門。看不到這些部門資料的人 → 整支唯讀（見下方「部門範圍鎖」） -->
-<script>window.APP_VERSION='2026-11-13.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
+<script>window.APP_VERSION='2026-11-26.1';window.APP_KEY='cdr_pm';window.APP_DEPTS=['專案管理部'];</script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <!-- 照片「下載全部」用：把這張日報的照片打包成 zip（檔名：施作位置_施工項目_YYMMDD_序號，2026-09-17 起不分資料夾）。載不到時只是該按鈕停用，不影響其他功能。 -->
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -6607,7 +6607,9 @@ async function exportStatExcel(title,headers,body){
 function addDgApplySheet(wb, list){
   const headers=DG_STAT_HEADERS, N=headers.length;
   const fill=argb=>({type:'pattern',pattern:'solid',fgColor:{argb}});
-  const hair={bottom:{style:'hair',color:{argb:'FFCBD5E1'}}};
+  /* 2026-11-26 她 Q2 甲：表頭到合計每一格都加細框線（最上面「點工申請單」標題不加） */
+  const thin={style:'thin',color:{argb:'FF94A3B8'}};
+  const hair={top:thin,left:thin,bottom:thin,right:thin};
   const allCells=(r,fn)=>{ for(let c=1;c<=N;c++) fn(r.getCell(c)); };   // 空白格也要上底色／框線（整列一條）
   const ws=wb.addWorksheet('點工統計');
   const t=ws.addRow(['點工申請單']);
@@ -6620,6 +6622,7 @@ function addDgApplySheet(wb, list){
     cell.fill=fill('FF1A3A5C');
     cell.font={color:{argb:'FFFFFFFF'},bold:true};
     cell.alignment={horizontal:'center',vertical:'middle'};
+    cell.border=hair;
   });
   hr.height=22;
   /* 依案場分段（getDgRows 已照案場排好，這裡照出現順序分） */
@@ -6631,6 +6634,7 @@ function addDgApplySheet(wb, list){
     ws.mergeCells(g.number,1,g.number,N);
     g.getCell(1).font={bold:true,color:{argb:'FF1A3A5C'}};
     g.getCell(1).fill=fill('FFE2E8F0');
+    allCells(g,c=>{ c.border=hair; });
     g.height=20;
     let i=0;
     dgWithSubtotals(rows).forEach(o=>{
@@ -6639,12 +6643,15 @@ function addDgApplySheet(wb, list){
         : [o.date,o.proj,o.vendor,_n1(o.w0),o.reason,o.who,'',o.resp,'','']);
       const bg=o.sub?'FFFFF7ED':((i++)%2===1?'FFF8FAFC':'');
       allCells(r,c=>{ if(o.sub) c.font={bold:true}; if(bg) c.fill=fill(bg); c.border=hair; });
+      r.getCell(5).alignment={wrapText:true,vertical:'top'};   /* 申請原因太長 → 自動換行 */
     });
     const s=ws.addRow(['合計','','',_n1(total),'','','','','','']);
     allCells(s,c=>{ c.font={bold:true}; c.fill=fill('FFDBEAFE'); c.border=hair; });
     s.getCell(1).alignment={horizontal:'center'};
   });
-  ws.columns=headers.map((h,i)=>({width:i===0?26:16}));   // 欄寬照舊（她 11-15：先不動）
+  /* 2026-11-26 她 Q2 甲：上工日 12、人數 8、申請原因 45，其他照舊 16 */
+  const DG_W={'上工日':12,'人數':8,'申請原因':45};
+  ws.columns=headers.map(h=>({width:DG_W[h]||16}));
   return ws;
 }
 async function exportDgStatExcel(list){
